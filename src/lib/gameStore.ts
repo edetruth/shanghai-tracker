@@ -43,8 +43,7 @@ export function generateRoomCode(): string {
 // Games
 export async function createGame(
   playerIds: string[],
-  date: string,
-  createdBy?: string
+  date: string
 ): Promise<Game> {
   const roomCode = generateRoomCode()
   const { data: game, error: gameError } = await supabase
@@ -52,7 +51,7 @@ export async function createGame(
     .insert({
       date,
       room_code: roomCode,
-      created_by: createdBy ?? null,
+      is_complete: false,
     })
     .select()
     .single()

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { X, Plus, LogIn } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { X, LogIn } from 'lucide-react'
 import { getPlayers, upsertPlayer, createGame } from '../lib/gameStore'
 import type { Player, Game } from '../lib/types'
 
@@ -11,36 +11,58 @@ interface Props {
 export default function PlayerSetup({ onGameCreated, onJoinGame }: Props) {
   const [knownPlayers, setKnownPlayers] = useState<Player[]>([])
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([])
-  const [newName, setNewName] = useState('')
+  const [query, setQuery] = useState('')
+  const [showSuggestions, setShowSuggestions] = useState(false)
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     getPlayers().then(setKnownPlayers).catch(console.error)
   }, [])
 
-  const addPlayer = async () => {
-    const name = newName.trim()
-    if (!name) return
-    try {
-      const player = await upsertPlayer(name)
+  const suggestions = query.trim()
+    ? knownPlayers.filter(
+        (p) =>
+          p.name.toLowerCase().includes(query.toLowerCase()) &&
+          !selectedPlayers.includes(p.id)
+      )
+    : []
+
+  const selectPlayer = (player: Player) => {
+    if (!selectedPlayers.includes(player.id)) {
+      setSelectedPlayers((prev) => [...prev, player.id])
       setKnownPlayers((prev) =>
         prev.find((p) => p.id === player.id) ? prev : [...prev, player]
       )
-      if (!selectedPlayers.includes(player.id)) {
-        setSelectedPlayers((prev) => [...prev, player.id])
-      }
-      setNewName('')
+    }
+    setQuery('')
+    setShowSuggestions(false)
+  }
+
+  const addPlayer = async () => {
+    const name = query.trim()
+    if (!name) return
+    // Exact match — just select it
+    const existing = knownPlayers.find(
+      (p) => p.name.toLowerCase() === name.toLowerCase()
+    )
+    if (existing) {
+      selectPlayer(existing)
+      return
+    }
+    try {
+      const player = await upsertPlayer(name)
+      selectPlayer(player)
     } catch (err) {
+      console.error(err)
       setError('Failed to add player')
     }
   }
 
-  const togglePlayer = (id: string) => {
-    setSelectedPlayers((prev) =>
-      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
-    )
+  const removePlayer = (id: string) => {
+    setSelectedPlayers((prev) => prev.filter((p) => p !== id))
   }
 
   const startGame = async () => {
@@ -57,6 +79,7 @@ export default function PlayerSetup({ onGameCreated, onJoinGame }: Props) {
       )
       onGameCreated(game, players)
     } catch (err) {
+      console.error('createGame error:', err)
       setError('Failed to create game')
     } finally {
       setLoading(false)
@@ -64,16 +87,27 @@ export default function PlayerSetup({ onGameCreated, onJoinGame }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-6 p-4">
+    <div className="flex flex-col gap-4 p-4">
       {/* Header */}
-      <div className="text-center pt-8 pb-2">
+      <div className="text-center pt-6 pb-1">
         <h1 className="font-display text-3xl font-bold text-[#e2b858]">Shanghai</h1>
         <p className="text-[#5e7190] text-sm mt-1">Score Tracker</p>
       </div>
 
+      {/* Join Existing Game — always visible near top */}
+      <button
+        onClick={onJoinGame}
+        className="btn-secondary flex items-center justify-center gap-2"
+      >
+        <LogIn size={18} />
+        Join Existing Game
+      </button>
+
       {/* Date picker */}
       <div className="card p-4">
-        <label className="text-xs text-[#5e7190] uppercase tracking-wider font-medium">Game Date</label>
+        <label className="text-xs text-[#5e7190] uppercase tracking-wider font-medium">
+          Game Date
+        </label>
         <input
           type="date"
           value={date}
@@ -86,82 +120,80 @@ export default function PlayerSetup({ onGameCreated, onJoinGame }: Props) {
       {/* Player selection */}
       <div className="card p-4">
         <label className="text-xs text-[#5e7190] uppercase tracking-wider font-medium">
-          Players ({selectedPlayers.length} selected)
+          Players {selectedPlayers.length > 0 && `(${selectedPlayers.length})`}
         </label>
 
-        {knownPlayers.length > 0 && (
+        {/* Selected player chips */}
+        {selectedPlayers.length > 0 && (
           <div className="flex flex-wrap gap-2 mt-3">
-            {knownPlayers.map((player) => {
-              const selected = selectedPlayers.includes(player.id)
+            {selectedPlayers.map((id, i) => {
+              const player = knownPlayers.find((p) => p.id === id)
               return (
-                <button
-                  key={player.id}
-                  onClick={() => togglePlayer(player.id)}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all
-                    ${selected
-                      ? 'bg-[#e2b858] text-[#0c1220]'
-                      : 'bg-[#1a2640] text-[#5e7190] border border-[#243351]'
-                    }`}
+                <span
+                  key={id}
+                  className="flex items-center gap-1.5 bg-[#e2b858] text-[#0c1220] text-sm font-medium px-2.5 py-1 rounded-full"
                 >
-                  {player.name}
-                </button>
+                  <span className="text-[#0c1220]/50 text-xs">{i + 1}.</span>
+                  {player?.name}
+                  <button
+                    onClick={() => removePlayer(id)}
+                    className="ml-0.5 hover:opacity-60"
+                  >
+                    <X size={13} />
+                  </button>
+                </span>
               )
             })}
           </div>
         )}
 
-        {/* Add new player */}
-        <div className="flex gap-2 mt-4">
+        {/* Typeahead input */}
+        <div className="relative mt-3">
           <input
+            ref={inputRef}
             type="text"
-            placeholder="New player name"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && addPlayer()}
-            className="flex-1 bg-[#0c1220] border border-[#1a2640] rounded-lg px-3 py-2 text-white
+            placeholder="Type a player name…"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value)
+              setShowSuggestions(true)
+            }}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') addPlayer()
+              if (e.key === 'Escape') setShowSuggestions(false)
+            }}
+            className="w-full bg-[#0c1220] border border-[#1a2640] rounded-lg px-3 py-2 text-white
                        placeholder-[#5e7190] focus:outline-none focus:border-[#e2b858] focus:ring-1 focus:ring-[#e2b858]"
           />
-          <button
-            onClick={addPlayer}
-            className="bg-[#1a2640] border border-[#243351] rounded-lg px-3 py-2 text-[#e2b858]"
-          >
-            <Plus size={20} />
-          </button>
+          {showSuggestions && suggestions.length > 0 && (
+            <div className="absolute z-10 w-full mt-1 bg-[#131d30] border border-[#1a2640] rounded-lg overflow-hidden shadow-lg">
+              {suggestions.map((player) => (
+                <button
+                  key={player.id}
+                  onMouseDown={() => selectPlayer(player)}
+                  className="w-full text-left px-3 py-2 text-white hover:bg-[#1a2640] transition-colors text-sm"
+                >
+                  {player.name}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
+        <p className="text-[#5e7190] text-xs mt-2">
+          Select from suggestions or press Enter to add a new name
+        </p>
       </div>
-
-      {/* Selected players list */}
-      {selectedPlayers.length > 0 && (
-        <div className="card p-4">
-          <label className="text-xs text-[#5e7190] uppercase tracking-wider font-medium">Playing Order</label>
-          <div className="mt-3 flex flex-col gap-2">
-            {selectedPlayers.map((id, i) => {
-              const player = knownPlayers.find((p) => p.id === id)!
-              return (
-                <div key={id} className="flex items-center justify-between bg-[#0c1220] rounded-lg px-3 py-2">
-                  <div className="flex items-center gap-3">
-                    <span className="text-[#5e7190] text-sm w-5">{i + 1}</span>
-                    <span className="text-white">{player?.name}</span>
-                  </div>
-                  <button onClick={() => togglePlayer(id)} className="text-[#5e7190] hover:text-red-400">
-                    <X size={16} />
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
 
       {error && <p className="text-red-400 text-sm text-center">{error}</p>}
 
-      <button onClick={startGame} disabled={loading || selectedPlayers.length < 2} className="btn-primary">
-        {loading ? 'Starting...' : 'Start Game'}
-      </button>
-
-      <button onClick={onJoinGame} className="btn-secondary flex items-center justify-center gap-2">
-        <LogIn size={18} />
-        Join Existing Game
+      <button
+        onClick={startGame}
+        disabled={loading || selectedPlayers.length < 2}
+        className="btn-primary"
+      >
+        {loading ? 'Starting…' : 'Start Game'}
       </button>
     </div>
   )
