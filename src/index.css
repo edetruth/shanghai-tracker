@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background-color: #0c1220;
+    color: #e2e8f0;
+    font-family: system-ui, sans-serif;
+    min-height: 100dvh;
+    overscroll-behavior: none;
+  }
+
+  #root {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-[#131d30] rounded-xl border border-[#1a2640];
+  }
+
+  .btn-primary {
+    @apply bg-[#e2b858] text-[#0c1220] font-semibold rounded-xl py-3 px-6
+           active:opacity-80 transition-opacity disabled:opacity-40
+           disabled:cursor-not-allowed w-full text-base;
+  }
+
+  .btn-secondary {
+    @apply bg-[#1a2640] text-[#e2e8f0] font-semibold rounded-xl py-3 px-6
+           active:opacity-80 transition-opacity w-full text-base;
+  }
+
+  .btn-ghost {
+    @apply text-[#5e7190] hover:text-[#e2e8f0] transition-colors py-2 px-4;
+  }
+
+  .input-score {
+    @apply bg-[#0c1220] border border-[#1a2640] rounded-lg px-3 py-2
+           text-center font-mono text-lg text-white w-20
+           focus:outline-none focus:border-[#e2b858] focus:ring-1 focus:ring-[#e2b858];
+  }
+
+  .tab-active {
+    @apply text-[#e2b858];
+  }
+
+  .tab-inactive {
+    @apply text-[#5e7190];
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: #0c1220;
+}
+::-webkit-scrollbar-thumb {
+  background: #1a2640;
+  border-radius: 2px;
+}
+
+/* Safe area insets for notch phones */
+.safe-bottom {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
