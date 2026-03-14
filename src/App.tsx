@@ -6,6 +6,7 @@ import GameSummary from './components/GameSummary'
 import GameHistory from './components/GameHistory'
 import StatsLeaderboard from './components/StatsLeaderboard'
 import JoinGame from './components/JoinGame'
+import PlayerProfileModal from './components/PlayerProfileModal'
 import type { Game, Player } from './lib/types'
 
 type Tab = 'new' | 'history' | 'stats'
@@ -16,6 +17,9 @@ export default function App() {
   const [gameState, setGameState] = useState<NewGameState>('setup')
   const [activeGame, setActiveGame] = useState<Game | null>(null)
   const [activePlayers, setActivePlayers] = useState<Player[]>([])
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
+
+  const handlePlayerClick = (id: string) => setSelectedPlayerId(id)
 
   const handleGameCreated = (game: Game, players: Player[]) => {
     setActiveGame(game)
@@ -23,9 +27,7 @@ export default function App() {
     setGameState('playing')
   }
 
-  const handleRoundsComplete = () => {
-    setGameState('summary')
-  }
+  const handleRoundsComplete = () => setGameState('summary')
 
   const handleGameSaved = () => {
     setActiveGame(null)
@@ -49,7 +51,6 @@ export default function App() {
 
   return (
     <div className="max-w-[480px] mx-auto w-full flex flex-col min-h-[100dvh] relative">
-      {/* Main content area */}
       <main className="flex-1 overflow-auto">
         {activeTab === 'new' && gameState === 'setup' && (
           <PlayerSetup
@@ -73,15 +74,28 @@ export default function App() {
             game={activeGame}
             players={activePlayers}
             onDone={handleGameSaved}
+            onPlayerClick={handlePlayerClick}
           />
         )}
-        {activeTab === 'history' && <GameHistory />}
-        {activeTab === 'stats' && <StatsLeaderboard />}
+        {activeTab === 'history' && (
+          <GameHistory onPlayerClick={handlePlayerClick} />
+        )}
+        {activeTab === 'stats' && (
+          <StatsLeaderboard onPlayerClick={handlePlayerClick} />
+        )}
       </main>
 
-      {/* Hide nav during active game to maximize screen space */}
-      {(gameState !== 'playing' && gameState !== 'summary') && (
+      {/* Hide nav during active game */}
+      {gameState !== 'playing' && gameState !== 'summary' && (
         <BottomNav active={activeTab} onChange={handleTabChange} />
+      )}
+
+      {/* Player profile modal */}
+      {selectedPlayerId && (
+        <PlayerProfileModal
+          playerId={selectedPlayerId}
+          onClose={() => setSelectedPlayerId(null)}
+        />
       )}
     </div>
   )

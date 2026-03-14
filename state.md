@@ -61,9 +61,12 @@ Components manage their own ephemeral UI state with `useState`:
 | Component | Local State |
 |-----------|-------------|
 | `PlayerSetup` | `knownPlayers` (DB fetch), `selectedPlayers` id list, `query` (typeahead text), `showSuggestions`, `date`, `loading`, `error` |
-| `ScoreEntry` | `inputValues` (round × player grid), `expandedRound` |
-| `GameHistory` | `games` list, `expandedGame` id, `confirmDelete` id |
-| `StatsLeaderboard` | `activeView` (leaderboard / trends / records), `games`, `visiblePlayerIds` (Set — trends filter) |
+| `ScoreEntry` | `scores` (7×N string grid), `currentRound`, `saving`, `roundError` |
+| `GameCard` | `expanded`, `confirming` (delete), `editing`, `editDate`, `editNotes`, `editScores` (Record\<playerId, string[]\>), `savingEdit` |
+| `GameHistory` | `games` list, `loading`, `view` (list/export/import) |
+| `StatsLeaderboard` | `view`, `games`, `minGames`, `alsoPlayedOpen`, `dateFilter`, `customStart`/`customEnd`, `trendsView`, `overtimeMode` (raw/rolling), `visiblePlayerIds`, `maxLinesWarning`, `compareA`/`compareB` |
+| `GameSummary` | `notes`, `saving`, `gameData` (fetched), `copied` |
+| `PlayerProfileModal` | `games` (fetched), `loading`, `visible` (slide animation) |
 | `ImportData` | `file`, `preview` rows, `importing` flag, `results` |
 | `ExportData` | `exporting` flag |
 | `JoinGame` | `roomCode` input, `loading`, `error` |
@@ -97,7 +100,7 @@ Components do **not** fetch data themselves on mount (except standalone views: G
 3. Components call callback props to trigger mutations
 4. After mutation, `App.tsx` re-fetches and updates its state
 
-**Exception**: `GameHistory` and `StatsLeaderboard` are self-contained — they fetch their own data on mount because they are read-only views not tied to the active game state.
+**Exception**: `GameHistory`, `StatsLeaderboard`, and `PlayerProfileModal` are self-contained — they fetch their own data on mount because they are read-only views not tied to the active game state.
 
 ## Score Update Flow (Detail)
 
@@ -148,6 +151,65 @@ This is recalculated on every render from `activeGame` — not stored separately
 - Added `visiblePlayerIds: Set<string>` state; initialised to top 5 players by games played on first data load.
 - Player toggle panel above the chart: each player is a pill button colored when active, dimmed when hidden, with game-count hint.
 - Chart and Recharts `<Legend>` only render lines for `visiblePlayers` (filtered from full player list).
+
+### Stats full redesign (`StatsLeaderboard.tsx`, `GameSummary.tsx`)
+
+**Leaderboard tab**
+- `minGames` filter (2/3/5/All, default 3) controls which players appear in the main view vs the "Also Played" section.
+- Top 3 qualifying players rendered as an Olympic podium (2nd left, 1st centre/crown, 3rd right) using `items-end` flex alignment and varying platform heights.
+- Rank 4+ shown in a compact table: Rank / Player / G / W / Avg / Best / Zeros with alternating row shading.
+- Players below threshold shown in a collapsible "Guests & newcomers" section (`alsoPlayedOpen` state).
+
+**Trends tab** — three sub-views (`trendsView` state):
+- `averages`: horizontal Recharts `BarChart` (`layout="vertical"`), sorted best→worst, per-player cell colors, score label at bar end via `LabelList`. Height is dynamic (`barData.length * 44`).
+- `overtime`: existing line chart with player toggle pills; max 5 active lines enforced — attempting a 6th sets `maxLinesWarning` for 2.5s.
+- `compare`: pick 2 players (gold = A, blue = B via `compareA`/`compareB` state); head-to-head stats table with winner highlighted; 2-line chart filtered to games where both played.
+
+**Records tab**
+- Champions group (7): Most Wins, Lowest Avg, Best Single Game (glows if score = 0), Most Zeros, Most Games Played, Longest Win Streak, Most Improved (requires 6+ games: first-3-avg → last-3-avg).
+- Hall of Shame group (2): Worst Single Game, Shanghai Survivor (5+ games, 0 wins).
+- Win streak and improvement computed inline via `getWinStreak()` and `getImprovement()` helpers.
+
+**Game Night Recap** (`GameSummary.tsx`)
+- `GameSummary` renamed to "Game Night Recap" screen.
+- Round MVPs computed per-round (lowest score; 0 = auto MVP) and highlighted inline in the score grid.
+- Game Stats card: total points, margin (1st vs 2nd), zero-round count; flags any 100+ round score as notable.
+- Round MVP summary chips with counts per player.
+- Share button copies formatted results text to clipboard (`copied` state toggles icon/label for 2s).
+- Notes + Save button unchanged at bottom.
+
+### Comprehensive UI overhaul (latest)
+
+**Score entry fixes** (`ScoreEntry.tsx`)
+- 1B: `loadGame` pads `round_scores` to 7 with `''` — future rounds never loaded as `'0'`. `saveCurrentRound` writes only `scores.slice(0, currentRound + 1)`, preventing zero-fill pollution on realtime sync.
+- 1C: `goNext` counts zeros before saving; >1 zero blocks advance with "Only one player can go out per round".
+- 2A: "Prev" button added to footer (visible from Round 2 onward); header back arrow still exits game on Round 1.
+
+**Player setup** (`PlayerSetup.tsx`)
+- 2B: "Join Existing Game" button hidden via `{false && ...}` — code preserved, easily re-enabled.
+
+**Edit historical games** (`GameCard.tsx`, `gameStore.ts`)
+- 2D: Edit button (Pencil) in expanded game card footer. Edit mode shows date input, 7-round score grid, notes textarea, and Save/Cancel. Calls `saveAllRoundScores` per player + new `updateGame(gameId, { date, notes })`. On save, triggers `loadGames()` in `GameHistory`.
+
+**Player profile modal** (`PlayerProfileModal.tsx`, `App.tsx`)
+- 3A: New bottom-sheet component. `App.tsx` holds `selectedPlayerId` state; `handlePlayerClick` passed as `onPlayerClick` prop to `StatsLeaderboard`, `GameHistory` → `GameCard`, and `GameSummary`. Modal fetches its own data, slides up with CSS transform transition. Shows: 4-stat row, recent form sparkline (last 5 games), personal records, H2H top 3 opponents, full game log.
+
+**Trends upgrades** (`StatsLeaderboard.tsx`)
+- 4A: Over Time view has "5-Game Rolling Avg" / "Raw Scores" toggle (`overtimeMode` state). Rolling avg computed per-player with 5-game sliding window over `chronoGames`.
+- 4B: Improvement Tracker section below chart — players with 5+ games, first-5 avg → last-5 avg, sorted by most improved.
+- 4C: Best Nights section in Averages view — top 5 lowest individual scores, gold accent on #1.
+
+**Date filter** (`StatsLeaderboard.tsx`)
+- 5C: Persistent filter above sub-tabs: All Time / This Month / 30 Days / 3 Months / Custom (two date pickers). `filteredGames` drives ALL stats, charts, and records in all three tabs. Shows "Showing: X games" label when filtered.
+
+**Theme brightening** (`index.css`, all components)
+- 5A: Body bg `#1a2332`, card bg `#243447`, borders `#334155`, secondary text `#94a3b8`, primary text `#f1f5f9`, base font-size 15px.
+
+**Rename Round MVP → Round Winner**
+- 5B: "Round MVPs" → "Round Winners" in `GameSummary`; inline marker changed from "MVP" text to "★"; share text updated.
+
+**gameStore additions**
+- `updateGame(gameId, { date?, notes? })` — used by GameCard edit mode.
 
 ### Next Up
 

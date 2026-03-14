@@ -152,7 +152,6 @@ export default function ImportData({ onBack }: Props) {
 
     const wb = XLSX.utils.book_new()
     const ws = XLSX.utils.aoa_to_sheet(ws_data)
-    // Set column widths
     ws['!cols'] = [14, 12, 14, 18, 12, 12, 18, 18, 12, 20].map((w) => ({ wch: w }))
     XLSX.utils.book_append_sheet(wb, ws, 'Shanghai Games')
     XLSX.writeFile(wb, withExample ? 'shanghai-import-example.xlsx' : 'shanghai-import-template.xlsx')
@@ -161,20 +160,20 @@ export default function ImportData({ onBack }: Props) {
   return (
     <div className="flex flex-col gap-4 p-4">
       <div className="flex items-center gap-3 pt-6">
-        <button onClick={onBack} className="text-[#5e7190]">
+        <button onClick={onBack} className="text-[#a08c6e]">
           <ArrowLeft size={24} />
         </button>
-        <h2 className="font-display text-2xl font-semibold text-white">Import Games</h2>
+        <h2 className="font-display text-2xl font-semibold text-[#2c1810]">Import Games</h2>
       </div>
 
       {result ? (
         <div className="card p-6 flex flex-col items-center gap-3 text-center">
-          <div className="w-12 h-12 bg-[#4ade80]/10 rounded-full flex items-center justify-center">
-            <Check size={24} className="text-[#4ade80]" />
+          <div className="w-12 h-12 bg-[#2d7a3a]/10 rounded-full flex items-center justify-center">
+            <Check size={24} className="text-[#2d7a3a]" />
           </div>
           <div>
-            <div className="text-white font-semibold text-lg">Import Complete!</div>
-            <div className="text-[#5e7190] text-sm mt-1">
+            <div className="text-[#2c1810] font-semibold text-lg">Import Complete!</div>
+            <div className="text-[#8b7355] text-sm mt-1">
               Imported {result.games} games with {result.entries} player entries
             </div>
           </div>
@@ -183,20 +182,20 @@ export default function ImportData({ onBack }: Props) {
       ) : preview ? (
         <>
           <div className="card p-4">
-            <h3 className="text-white font-medium mb-3">Preview ({preview.length} games)</h3>
+            <h3 className="text-[#2c1810] font-medium mb-3">Preview ({preview.length} games)</h3>
             <div className="flex flex-col gap-3 max-h-80 overflow-auto">
               {preview.map((g, i) => (
-                <div key={i} className="bg-[#0c1220] rounded-lg p-3">
+                <div key={i} className="bg-[#efe9dd] rounded-lg p-3">
                   <div className="flex justify-between items-start mb-2">
-                    <span className="text-[#e2b858] font-mono text-sm">{g.date}</span>
+                    <span className="text-[#8b6914] font-mono text-sm">{g.date}</span>
                     {g.notes && (
-                      <span className="text-[#5e7190] text-xs truncate ml-2 max-w-[140px]">{g.notes}</span>
+                      <span className="text-[#a08c6e] text-xs truncate ml-2 max-w-[140px]">{g.notes}</span>
                     )}
                   </div>
                   {g.players.map((p, pi) => (
                     <div key={pi} className="flex justify-between text-sm py-0.5">
-                      <span className="text-white">{p.name}</span>
-                      <span className="font-mono text-[#5e7190]">{g.totals[pi]}</span>
+                      <span className="text-[#2c1810]">{p.name}</span>
+                      <span className="font-mono text-[#8b7355]">{g.totals[pi]}</span>
                     </div>
                   ))}
                 </div>
@@ -205,7 +204,7 @@ export default function ImportData({ onBack }: Props) {
           </div>
 
           {error && (
-            <div className="flex items-center gap-2 text-red-400 text-sm">
+            <div className="flex items-center gap-2 text-[#b83232] text-sm">
               <AlertCircle size={16} />
               {error}
             </div>
@@ -224,37 +223,37 @@ export default function ImportData({ onBack }: Props) {
         <>
           {/* Template downloads */}
           <div className="card p-4">
-            <h3 className="text-[#5e7190] text-xs uppercase tracking-wider mb-3">Download Template</h3>
+            <h3 className="text-[#a08c6e] text-xs uppercase tracking-wider mb-3">Download Template</h3>
             <div className="flex flex-col gap-2">
               <button
                 onClick={() => downloadTemplate(false)}
-                className="flex items-center gap-3 bg-[#0c1220] rounded-lg p-3 text-left"
+                className="flex items-center gap-3 bg-[#efe9dd] rounded-lg p-3 text-left"
               >
-                <FileSpreadsheet size={18} className="text-[#6ecfef]" />
+                <FileSpreadsheet size={18} className="text-[#1d7ea8]" />
                 <div>
-                  <div className="text-white text-sm">Blank Template</div>
-                  <div className="text-[#5e7190] text-xs">Empty file with correct headers</div>
+                  <div className="text-[#2c1810] text-sm">Blank Template</div>
+                  <div className="text-[#8b7355] text-xs">Empty file with correct headers</div>
                 </div>
-                <Download size={16} className="text-[#5e7190] ml-auto" />
+                <Download size={16} className="text-[#a08c6e] ml-auto" />
               </button>
               <button
                 onClick={() => downloadTemplate(true)}
-                className="flex items-center gap-3 bg-[#0c1220] rounded-lg p-3 text-left"
+                className="flex items-center gap-3 bg-[#efe9dd] rounded-lg p-3 text-left"
               >
-                <FileSpreadsheet size={18} className="text-[#e2b858]" />
+                <FileSpreadsheet size={18} className="text-[#8b6914]" />
                 <div>
-                  <div className="text-white text-sm">Example with Sample Data</div>
-                  <div className="text-[#5e7190] text-xs">2 sample games filled in</div>
+                  <div className="text-[#2c1810] text-sm">Example with Sample Data</div>
+                  <div className="text-[#8b7355] text-xs">2 sample games filled in</div>
                 </div>
-                <Download size={16} className="text-[#5e7190] ml-auto" />
+                <Download size={16} className="text-[#a08c6e] ml-auto" />
               </button>
             </div>
           </div>
 
           {/* File upload */}
           <div className="card p-4">
-            <h3 className="text-[#5e7190] text-xs uppercase tracking-wider mb-3">Upload File</h3>
-            <p className="text-[#5e7190] text-xs mb-4">
+            <h3 className="text-[#a08c6e] text-xs uppercase tracking-wider mb-3">Upload File</h3>
+            <p className="text-[#8b7355] text-xs mb-4">
               Accepts .xlsx, .xls, or .csv. Rows with the same Date + Notes are grouped into one game.
             </p>
             <input
@@ -272,7 +271,7 @@ export default function ImportData({ onBack }: Props) {
               Choose File
             </button>
             {error && (
-              <div className="flex items-start gap-2 text-red-400 text-sm mt-3">
+              <div className="flex items-start gap-2 text-[#b83232] text-sm mt-3">
                 <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
                 {error}
               </div>

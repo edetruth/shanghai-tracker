@@ -14,35 +14,37 @@ interface Props {
 
 export default function ScoreEntry({ game, players, onComplete, onBack }: Props) {
   const [currentRound, setCurrentRound] = useState(0)
-  // scores[playerIndex][roundIndex]
+  // scores[playerIndex][roundIndex] — '' means not yet entered
   const [scores, setScores] = useState<string[][]>(
     players.map(() => Array(7).fill(''))
   )
   const [saving, setSaving] = useState(false)
+  const [roundError, setRoundError] = useState('')
 
   const loadGame = async () => {
     const g = await getGame(game.id)
     if (g) {
-      setScores((prev) =>
-        players.map((p, pi) => {
+      setScores(
+        players.map((p) => {
           const gs = g.game_scores.find((s) => s.player_id === p.id)
-          if (!gs) return prev[pi]
-          return gs.round_scores.map((v) => String(v))
+          if (!gs) return Array(7).fill('')
+          // Pad to 7 with '' — future rounds stay empty, not '0'
+          return Array(7).fill('').map((_, idx) =>
+            idx < gs.round_scores.length ? String(gs.round_scores[idx]) : ''
+          )
         })
       )
     }
   }
 
-  useEffect(() => {
-    loadGame()
-  }, [game.id])
-
+  useEffect(() => { loadGame() }, [game.id])
   useRealtimeScores(game.id, loadGame)
 
   const round = ROUNDS[currentRound]
 
   const handleScoreChange = (playerIdx: number, value: string) => {
     if (value !== '' && !/^\d+$/.test(value)) return
+    setRoundError('')
     setScores((prev) => {
       const next = prev.map((row) => [...row])
       next[playerIdx][currentRound] = value
@@ -56,9 +58,7 @@ export default function ScoreEntry({ game, players, onComplete, onBack }: Props)
       return sum + (parseInt(v) || 0)
     }, 0)
 
-  const canProceed = players.every(
-    (_, i) => scores[i][currentRound] !== ''
-  )
+  const canProceed = players.every((_, i) => scores[i][currentRound] !== '')
 
   const saveCurrentRound = async () => {
     setSaving(true)
@@ -68,7 +68,8 @@ export default function ScoreEntry({ game, players, onComplete, onBack }: Props)
           saveAllRoundScores(
             game.id,
             p.id,
-            scores[i].map((v) => parseInt(v) || 0)
+            // Only save rounds 0..currentRound — don't write future rounds as 0
+            scores[i].slice(0, currentRound + 1).map((v) => parseInt(v) || 0)
           )
         )
       )
@@ -78,17 +79,24 @@ export default function ScoreEntry({ game, players, onComplete, onBack }: Props)
   }
 
   const goNext = async () => {
+    // Bug 1C: only one player can score 0 per round
+    const zeroCount = players.filter((_, i) => scores[i][currentRound] === '0').length
+    if (zeroCount > 1) {
+      setRoundError('Only one player can go out (score 0) per round')
+      return
+    }
     await saveCurrentRound()
     if (currentRound < 6) {
       setCurrentRound((r) => r + 1)
+      setRoundError('')
     } else {
       onComplete()
     }
   }
 
   const goPrev = () => {
-    if (currentRound > 0) setCurrentRound((r) => r - 1)
-    else onBack()
+    setRoundError('')
+    setCurrentRound((r) => r - 1)
   }
 
   return (
@@ -96,13 +104,13 @@ export default function ScoreEntry({ game, players, onComplete, onBack }: Props)
       {/* Header */}
       <div className="p-4 pt-6">
         <div className="flex items-center justify-between mb-4">
-          <button onClick={goPrev} className="text-[#5e7190] p-1">
+          <button onClick={onBack} className="text-[#a08c6e] p-1" aria-label="Exit game">
             <ChevronLeft size={24} />
           </button>
           <div className="text-center">
-            <div className="text-[#5e7190] text-xs uppercase tracking-wider">Round {round.number} of 7</div>
-            <div className="font-display text-lg font-semibold text-[#e2b858]">{round.name}</div>
-            <div className="text-[#5e7190] text-xs">{round.cards} cards dealt</div>
+            <div className="text-[#a08c6e] text-xs uppercase tracking-wider">Round {round.number} of 7</div>
+            <div className="font-display text-lg font-semibold text-[#8b6914]">{round.name}</div>
+            <div className="text-[#a08c6e] text-xs">{round.cards} cards dealt</div>
           </div>
           <div className="w-8" />
         </div>
@@ -114,10 +122,10 @@ export default function ScoreEntry({ game, players, onComplete, onBack }: Props)
               key={i}
               className={`h-1.5 flex-1 rounded-full transition-colors ${
                 i < currentRound
-                  ? 'bg-[#e2b858]'
+                  ? 'bg-[#8b6914]'
                   : i === currentRound
-                  ? 'bg-[#e2b858]/60'
-                  : 'bg-[#1a2640]'
+                  ? 'bg-[#8b6914]/50'
+                  : 'bg-[#e2ddd2]'
               }`}
             />
           ))}
@@ -126,8 +134,8 @@ export default function ScoreEntry({ game, players, onComplete, onBack }: Props)
 
       {/* Room code */}
       <div className="px-4 mb-2">
-        <p className="text-[#5e7190] text-xs text-center">
-          Room: <span className="font-mono text-[#e2b858]">{game.room_code}</span>
+        <p className="text-[#a08c6e] text-xs text-center">
+          Room: <span className="font-mono text-[#8b6914]">{game.room_code}</span>
         </p>
       </div>
 
@@ -141,29 +149,24 @@ export default function ScoreEntry({ game, players, onComplete, onBack }: Props)
             return (
               <div key={player.id} className="card p-4 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div
-                    className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                    style={{ background: color }}
-                  />
+                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
                   <div className="min-w-0">
-                    <div className="text-white font-medium truncate">{player.name}</div>
-                    <div className="text-[#5e7190] text-xs font-mono">
-                      Running: {total}
-                    </div>
+                    <div className="text-[#2c1810] font-medium text-base truncate">{player.name}</div>
+                    <div className="text-[#8b7355] text-xs font-mono">Running: {total}</div>
                   </div>
                 </div>
                 <div className="flex flex-col items-center gap-1">
                   <input
                     type="number"
                     inputMode="numeric"
-                    placeholder="0"
+                    placeholder="—"
                     value={val}
                     onChange={(e) => handleScoreChange(pi, e.target.value)}
                     className="input-score"
                     min={0}
                   />
                   {val === '0' && (
-                    <span className="text-[#4ade80] text-xs font-medium">Out!</span>
+                    <span className="text-[#2d7a3a] text-xs font-semibold">Out!</span>
                   )}
                 </div>
               </div>
@@ -173,21 +176,37 @@ export default function ScoreEntry({ game, players, onComplete, onBack }: Props)
       </div>
 
       {/* Footer */}
-      <div className="p-4 border-t border-[#1a2640]">
-        <button
-          onClick={goNext}
-          disabled={!canProceed || saving}
-          className="btn-primary flex items-center justify-center gap-2"
-        >
-          {saving ? 'Saving...' : currentRound < 6 ? (
-            <>Next Round <ChevronRight size={18} /></>
-          ) : (
-            'Finish Game'
-          )}
-        </button>
-        {!canProceed && (
-          <p className="text-[#5e7190] text-xs text-center mt-2">Enter all scores to continue</p>
+      <div className="p-4 border-t border-[#e2ddd2]">
+        {roundError && (
+          <p className="text-[#b83232] text-sm text-center mb-3">{roundError}</p>
         )}
+        {!canProceed && !roundError && (
+          <p className="text-[#a08c6e] text-xs text-center mb-2">Enter all scores to continue</p>
+        )}
+        <div className="flex gap-2">
+          {/* Previous button — only visible from Round 2 onward */}
+          {currentRound > 0 && (
+            <button
+              onClick={goPrev}
+              className="flex items-center justify-center gap-1 bg-[#efe9dd] text-[#8b7355] font-semibold
+                         rounded-xl py-3 px-4 active:opacity-80 transition-opacity flex-none"
+            >
+              <ChevronLeft size={18} />
+              Prev
+            </button>
+          )}
+          <button
+            onClick={goNext}
+            disabled={!canProceed || saving}
+            className="btn-primary flex items-center justify-center gap-2"
+          >
+            {saving ? 'Saving…' : currentRound < 6 ? (
+              <>Next Round <ChevronRight size={18} /></>
+            ) : (
+              'Finish Game'
+            )}
+          </button>
+        </div>
       </div>
     </div>
   )

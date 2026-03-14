@@ -50,14 +50,14 @@ export default function JoinGame({ onBack }: Props) {
   return (
     <div className="flex flex-col gap-6 p-4">
       <div className="flex items-center gap-3 pt-6">
-        <button onClick={onBack} className="text-[#5e7190]">
+        <button onClick={onBack} className="text-[#a08c6e]">
           <ArrowLeft size={24} />
         </button>
-        <h2 className="font-display text-2xl font-semibold text-white">Join Game</h2>
+        <h2 className="font-display text-2xl font-semibold text-[#2c1810]">Join Game</h2>
       </div>
 
       <div className="card p-4 flex flex-col gap-4">
-        <p className="text-[#5e7190] text-sm">
+        <p className="text-[#8b7355] text-sm">
           Enter the room code shown on the game host's device to join an active game session.
         </p>
         <input
@@ -66,13 +66,13 @@ export default function JoinGame({ onBack }: Props) {
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
           onKeyDown={(e) => e.key === 'Enter' && join()}
-          className="w-full bg-[#0c1220] border border-[#1a2640] rounded-lg px-4 py-3 text-white
+          className="w-full bg-white border border-[#e2ddd2] rounded-lg px-4 py-3 text-[#2c1810]
                      text-center font-mono text-xl tracking-widest uppercase
-                     placeholder-[#5e7190] focus:outline-none focus:border-[#e2b858]
-                     focus:ring-1 focus:ring-[#e2b858]"
+                     placeholder-[#a08c6e] focus:outline-none focus:border-[#8b6914]
+                     focus:ring-1 focus:ring-[#8b6914]"
           maxLength={9}
         />
-        {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+        {error && <p className="text-[#b83232] text-sm text-center">{error}</p>}
         <button onClick={join} disabled={loading} className="btn-primary flex items-center justify-center gap-2">
           <Search size={18} />
           {loading ? 'Searching...' : 'Find Game'}

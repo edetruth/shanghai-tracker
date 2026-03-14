@@ -90,36 +90,38 @@ export default function PlayerSetup({ onGameCreated, onJoinGame }: Props) {
     <div className="flex flex-col gap-4 p-4">
       {/* Header */}
       <div className="text-center pt-6 pb-1">
-        <h1 className="font-display text-3xl font-bold text-[#e2b858]">Shanghai</h1>
-        <p className="text-[#5e7190] text-sm mt-1">Score Tracker</p>
+        <h1 className="font-display text-3xl font-bold text-[#8b6914]">Shanghai</h1>
+        <p className="text-[#a08c6e] text-sm mt-1">Score Tracker</p>
       </div>
 
-      {/* Join Existing Game — always visible near top */}
-      <button
-        onClick={onJoinGame}
-        className="btn-secondary flex items-center justify-center gap-2"
-      >
-        <LogIn size={18} />
-        Join Existing Game
-      </button>
+      {/* Join Existing Game — hidden for now, re-enable by removing the {false &&} wrapper */}
+      {false && (
+        <button
+          onClick={onJoinGame}
+          className="btn-secondary flex items-center justify-center gap-2"
+        >
+          <LogIn size={18} />
+          Join Existing Game
+        </button>
+      )}
 
       {/* Date picker */}
       <div className="card p-4">
-        <label className="text-xs text-[#5e7190] uppercase tracking-wider font-medium">
+        <label className="text-xs text-[#a08c6e] uppercase tracking-wider font-medium">
           Game Date
         </label>
         <input
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="mt-2 w-full bg-[#0c1220] border border-[#1a2640] rounded-lg px-3 py-2 text-white
-                     focus:outline-none focus:border-[#e2b858] focus:ring-1 focus:ring-[#e2b858]"
+          className="mt-2 w-full bg-white border border-[#e2ddd2] rounded-lg px-3 py-2 text-[#2c1810]
+                     focus:outline-none focus:border-[#8b6914] focus:ring-1 focus:ring-[#8b6914]"
         />
       </div>
 
       {/* Player selection */}
       <div className="card p-4">
-        <label className="text-xs text-[#5e7190] uppercase tracking-wider font-medium">
+        <label className="text-xs text-[#a08c6e] uppercase tracking-wider font-medium">
           Players {selectedPlayers.length > 0 && `(${selectedPlayers.length})`}
         </label>
 
@@ -131,9 +133,9 @@ export default function PlayerSetup({ onGameCreated, onJoinGame }: Props) {
               return (
                 <span
                   key={id}
-                  className="flex items-center gap-1.5 bg-[#e2b858] text-[#0c1220] text-sm font-medium px-2.5 py-1 rounded-full"
+                  className="flex items-center gap-1.5 bg-[#e2b858] text-[#2c1810] text-sm font-medium px-2.5 py-1 rounded-full"
                 >
-                  <span className="text-[#0c1220]/50 text-xs">{i + 1}.</span>
+                  <span className="text-[#2c1810]/50 text-xs">{i + 1}.</span>
                   {player?.name}
                   <button
                     onClick={() => removePlayer(id)}
@@ -164,16 +166,17 @@ export default function PlayerSetup({ onGameCreated, onJoinGame }: Props) {
               if (e.key === 'Enter') addPlayer()
               if (e.key === 'Escape') setShowSuggestions(false)
             }}
-            className="w-full bg-[#0c1220] border border-[#1a2640] rounded-lg px-3 py-2 text-white
-                       placeholder-[#5e7190] focus:outline-none focus:border-[#e2b858] focus:ring-1 focus:ring-[#e2b858]"
+            className="w-full bg-white border border-[#e2ddd2] rounded-lg px-3 py-2 text-[#2c1810]
+                       placeholder-[#a08c6e] focus:outline-none focus:border-[#8b6914] focus:ring-1 focus:ring-[#8b6914]"
           />
           {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute z-10 w-full mt-1 bg-[#131d30] border border-[#1a2640] rounded-lg overflow-hidden shadow-lg">
+            <div className="absolute z-10 w-full mt-1 bg-white border border-[#e2ddd2] rounded-lg overflow-hidden"
+              style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
               {suggestions.map((player) => (
                 <button
                   key={player.id}
                   onMouseDown={() => selectPlayer(player)}
-                  className="w-full text-left px-3 py-2 text-white hover:bg-[#1a2640] transition-colors text-sm"
+                  className="w-full text-left px-3 py-2 text-[#2c1810] hover:bg-[#efe9dd] transition-colors text-sm"
                 >
                   {player.name}
                 </button>
@@ -181,12 +184,12 @@ export default function PlayerSetup({ onGameCreated, onJoinGame }: Props) {
             </div>
           )}
         </div>
-        <p className="text-[#5e7190] text-xs mt-2">
+        <p className="text-[#a08c6e] text-xs mt-2">
           Select from suggestions or press Enter to add a new name
         </p>
       </div>
 
-      {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+      {error && <p className="text-[#b83232] text-sm text-center">{error}</p>}
 
       <button
         onClick={startGame}

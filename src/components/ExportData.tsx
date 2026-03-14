@@ -55,25 +55,25 @@ export default function ExportData({ games, onBack }: Props) {
   return (
     <div className="flex flex-col gap-6 p-4">
       <div className="flex items-center gap-3 pt-6">
-        <button onClick={onBack} className="text-[#5e7190]">
+        <button onClick={onBack} className="text-[#a08c6e]">
           <ArrowLeft size={24} />
         </button>
-        <h2 className="font-display text-2xl font-semibold text-white">Export Data</h2>
+        <h2 className="font-display text-2xl font-semibold text-[#2c1810]">Export Data</h2>
       </div>
 
-      <p className="text-[#5e7190] text-sm">{games.length} games available to export.</p>
+      <p className="text-[#8b7355] text-sm">{games.length} games available to export.</p>
 
       <div className="flex flex-col gap-3">
         <button
           onClick={exportJSON}
           className="card p-4 flex items-center gap-4 text-left active:opacity-80"
         >
-          <div className="w-10 h-10 bg-[#0c1220] rounded-lg flex items-center justify-center flex-shrink-0">
-            <FileJson size={22} className="text-[#e2b858]" />
+          <div className="w-10 h-10 bg-[#efe9dd] rounded-lg flex items-center justify-center flex-shrink-0">
+            <FileJson size={22} className="text-[#8b6914]" />
           </div>
           <div>
-            <div className="text-white font-medium">Export as JSON</div>
-            <div className="text-[#5e7190] text-sm">Full backup with all data</div>
+            <div className="text-[#2c1810] font-medium">Export as JSON</div>
+            <div className="text-[#8b7355] text-sm">Full backup with all data</div>
           </div>
         </button>
 
@@ -81,12 +81,12 @@ export default function ExportData({ games, onBack }: Props) {
           onClick={exportCSV}
           className="card p-4 flex items-center gap-4 text-left active:opacity-80"
         >
-          <div className="w-10 h-10 bg-[#0c1220] rounded-lg flex items-center justify-center flex-shrink-0">
-            <FileText size={22} className="text-[#6ecfef]" />
+          <div className="w-10 h-10 bg-[#efe9dd] rounded-lg flex items-center justify-center flex-shrink-0">
+            <FileText size={22} className="text-[#1d7ea8]" />
           </div>
           <div>
-            <div className="text-white font-medium">Export as CSV</div>
-            <div className="text-[#5e7190] text-sm">Open in Excel or Google Sheets</div>
+            <div className="text-[#2c1810] font-medium">Export as CSV</div>
+            <div className="text-[#8b7355] text-sm">Open in Excel or Google Sheets</div>
           </div>
         </button>
       </div>

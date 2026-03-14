@@ -194,6 +194,14 @@ export async function importGame(
   if (scoresError) throw scoresError
 }
 
+export async function updateGame(
+  gameId: string,
+  updates: { date?: string; notes?: string }
+): Promise<void> {
+  const { error } = await supabase.from('games').update(updates).eq('id', gameId)
+  if (error) throw error
+}
+
 // Stats helpers
 export function computeWinner(scores: GameScore[]): GameScore | null {
   if (!scores.length) return null

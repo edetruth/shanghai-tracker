@@ -37,9 +37,10 @@ src/
     ├── GameHistory.tsx       # Completed games list with expand/delete
     ├── GameCard.tsx          # Scorecard detail for a single game
     ├── StatsLeaderboard.tsx  # Stats tabs: leaderboard / trends / records
-    ├── JoinGame.tsx          # Join a game via SHNG-XXXX room code
+    ├── JoinGame.tsx          # Join a game via SHNG-XXXX room code (button hidden in PlayerSetup, code intact)
     ├── ExportData.tsx        # Export all data to JSON or CSV
-    └── ImportData.tsx        # Bulk import games from Excel/CSV
+    ├── ImportData.tsx        # Bulk import games from Excel/CSV
+    └── PlayerProfileModal.tsx # Bottom-sheet player profile (stats, sparkline, H2H, game log)
 ```
 
 ## Environment Variables
@@ -71,6 +72,8 @@ Three tables — no row-level security (public anon key access):
 
 All DB access goes through `src/lib/gameStore.ts`. Never call Supabase directly from components.
 
+Key functions: `getPlayers`, `upsertPlayer`, `createGame`, `getGame`, `getCompletedGames`, `updateRoundScore`, `saveAllRoundScores`, `completeGame`, `deleteGame`, `updateGame`, `importGame`, `computeWinner`, `generateRoomCode`.
+
 ## Game Rules (Shanghai Rummy)
 
 - 7 rounds total; lowest cumulative score wins
@@ -88,6 +91,10 @@ All DB access goes through `src/lib/gameStore.ts`. Never call Supabase directly 
 - **Dates** are stored as ISO strings; displayed with date-fns, no timezone conversion.
 - **Import** groups rows by date + notes to reconstruct individual games.
 - **No test runner** is configured — there are no tests in this project.
+- **`onPlayerClick`** is threaded from `App.tsx` → `StatsLeaderboard`, `GameHistory`, `GameSummary` to open `PlayerProfileModal`.
+- **`total_score`** is a generated column in Supabase — never insert or update it directly.
+- **`created_by`** column does not exist in the `games` table — do not reference it.
+- **Score entry** only saves rounds 0..currentRound to avoid zero-filling future rounds on realtime sync.
 
 ## Deployment
 

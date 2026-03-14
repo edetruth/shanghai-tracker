@@ -6,7 +6,11 @@ import GameCard from './GameCard'
 import ExportData from './ExportData'
 import ImportData from './ImportData'
 
-export default function GameHistory() {
+interface Props {
+  onPlayerClick?: (playerId: string) => void
+}
+
+export default function GameHistory({ onPlayerClick }: Props) {
   const [games, setGames] = useState<GameWithScores[]>([])
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState<'list' | 'export' | 'import'>('list')
@@ -42,18 +46,18 @@ export default function GameHistory() {
       {/* Header */}
       <div className="p-4 pt-6">
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-2xl font-semibold text-white">Game History</h2>
-          <button onClick={loadGames} className="text-[#5e7190] p-1">
+          <h2 className="font-display text-2xl font-semibold text-[#2c1810]">Game History</h2>
+          <button onClick={loadGames} className="text-[#a08c6e] p-1">
             <RefreshCw size={18} />
           </button>
         </div>
-        <p className="text-[#5e7190] text-sm mt-1">{games.length} games played</p>
+        <p className="text-[#a08c6e] text-sm mt-1">{games.length} games played</p>
 
         {/* Action buttons */}
         <div className="flex gap-2 mt-4">
           <button
             onClick={() => setView('import')}
-            className="flex-1 flex items-center justify-center gap-2 bg-[#1a2640] text-[#e2b858]
+            className="flex-1 flex items-center justify-center gap-2 bg-[#efe9dd] text-[#8b6914]
                        rounded-xl py-2.5 text-sm font-medium"
           >
             <Upload size={16} />
@@ -61,7 +65,7 @@ export default function GameHistory() {
           </button>
           <button
             onClick={() => setView('export')}
-            className="flex-1 flex items-center justify-center gap-2 bg-[#1a2640] text-[#5e7190]
+            className="flex-1 flex items-center justify-center gap-2 bg-[#efe9dd] text-[#a08c6e]
                        rounded-xl py-2.5 text-sm font-medium"
           >
             <Download size={16} />
@@ -73,16 +77,22 @@ export default function GameHistory() {
       {/* Game list */}
       <div className="flex-1 px-4 pb-24 flex flex-col gap-3 overflow-auto">
         {loading ? (
-          <div className="text-center text-[#5e7190] py-12">Loading...</div>
+          <div className="text-center text-[#a08c6e] py-12">Loading...</div>
         ) : games.length === 0 ? (
           <div className="text-center py-16">
             <div className="text-4xl mb-4">🃏</div>
-            <div className="text-[#5e7190]">No games yet</div>
-            <div className="text-[#5e7190] text-sm mt-1">Start a new game or import history</div>
+            <div className="text-[#a08c6e]">No games yet</div>
+            <div className="text-[#a08c6e] text-sm mt-1">Start a new game or import history</div>
           </div>
         ) : (
           games.map((game) => (
-            <GameCard key={game.id} game={game} onDelete={handleDelete} />
+            <GameCard
+              key={game.id}
+              game={game}
+              onDelete={handleDelete}
+              onEdit={loadGames}
+              onPlayerClick={onPlayerClick}
+            />
           ))
         )}
       </div>

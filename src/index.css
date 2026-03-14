@@ -12,9 +12,10 @@
   }
 
   body {
-    background-color: #0c1220;
-    color: #e2e8f0;
+    background-color: #f8f6f1;
+    color: #2c1810;
     font-family: system-ui, sans-serif;
+    font-size: 15px;
     min-height: 100dvh;
     overscroll-behavior: none;
   }
@@ -37,36 +38,37 @@
 
 @layer components {
   .card {
-    @apply bg-[#131d30] rounded-xl border border-[#1a2640];
+    @apply bg-white rounded-xl border border-[#e2ddd2];
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   }
 
   .btn-primary {
-    @apply bg-[#e2b858] text-[#0c1220] font-semibold rounded-xl py-3 px-6
+    @apply bg-[#e2b858] text-[#2c1810] font-semibold rounded-xl py-3 px-6
            active:opacity-80 transition-opacity disabled:opacity-40
            disabled:cursor-not-allowed w-full text-base;
   }
 
   .btn-secondary {
-    @apply bg-[#1a2640] text-[#e2e8f0] font-semibold rounded-xl py-3 px-6
+    @apply bg-white border border-[#e2ddd2] text-[#8b7355] font-semibold rounded-xl py-3 px-6
            active:opacity-80 transition-opacity w-full text-base;
   }
 
   .btn-ghost {
-    @apply text-[#5e7190] hover:text-[#e2e8f0] transition-colors py-2 px-4;
+    @apply text-[#a08c6e] hover:text-[#2c1810] transition-colors py-2 px-4;
   }
 
   .input-score {
-    @apply bg-[#0c1220] border border-[#1a2640] rounded-lg px-3 py-2
-           text-center font-mono text-lg text-white w-20
-           focus:outline-none focus:border-[#e2b858] focus:ring-1 focus:ring-[#e2b858];
+    @apply bg-white border border-[#e2ddd2] rounded-lg px-3 py-2
+           text-center font-mono text-lg font-bold text-[#2c1810] w-20
+           focus:outline-none focus:border-[#8b6914] focus:ring-1 focus:ring-[#8b6914];
   }
 
   .tab-active {
-    @apply text-[#e2b858];
+    @apply text-[#8b6914];
   }
 
   .tab-inactive {
-    @apply text-[#5e7190];
+    @apply text-[#a08c6e];
   }
 }
 
@@ -75,10 +77,10 @@
   width: 4px;
 }
 ::-webkit-scrollbar-track {
-  background: #0c1220;
+  background: #f8f6f1;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1a2640;
+  background: #e2ddd2;
   border-radius: 2px;
 }
 
