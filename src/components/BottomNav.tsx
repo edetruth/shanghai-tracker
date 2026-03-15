@@ -1,6 +1,6 @@
-import { PlusCircle, Clock, BarChart2 } from 'lucide-react'
+import { PlusCircle, Clock, BarChart2, Gamepad2 } from 'lucide-react'
 
-type Tab = 'new' | 'history' | 'stats'
+type Tab = 'new' | 'history' | 'stats' | 'play'
 
 interface Props {
   active: Tab
@@ -11,6 +11,7 @@ const tabs = [
   { id: 'new' as Tab, label: 'New Game', Icon: PlusCircle },
   { id: 'history' as Tab, label: 'History', Icon: Clock },
   { id: 'stats' as Tab, label: 'Stats', Icon: BarChart2 },
+  { id: 'play' as Tab, label: 'Play', Icon: Gamepad2 },
 ]
 
 export default function BottomNav({ active, onChange }: Props) {

@@ -7,9 +7,10 @@ import GameHistory from './components/GameHistory'
 import StatsLeaderboard from './components/StatsLeaderboard'
 import JoinGame from './components/JoinGame'
 import PlayerProfileModal from './components/PlayerProfileModal'
+import PlayTab from './components/PlayTab'
 import type { Game, Player } from './lib/types'
 
-type Tab = 'new' | 'history' | 'stats'
+type Tab = 'new' | 'history' | 'stats' | 'play'
 type NewGameState = 'setup' | 'playing' | 'summary' | 'joining'
 
 export default function App() {
@@ -82,6 +83,9 @@ export default function App() {
         )}
         {activeTab === 'stats' && (
           <StatsLeaderboard onPlayerClick={handlePlayerClick} />
+        )}
+        {activeTab === 'play' && (
+          <PlayTab />
         )}
       </main>
 

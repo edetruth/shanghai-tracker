@@ -40,6 +40,7 @@ src/
     ├── JoinGame.tsx          # Join a game via SHNG-XXXX room code (button hidden in PlayerSetup, code intact)
     ├── ExportData.tsx        # Export all data to JSON or CSV
     ├── ImportData.tsx        # Bulk import games from Excel/CSV
+    ├── DrilldownModal.tsx    # Reusable drilldown bottom sheet (z-60); 6 sub-view types; up to 3-level stack
     └── PlayerProfileModal.tsx # Bottom-sheet player profile (stats, sparkline, H2H, game log)
 ```
 
@@ -74,6 +75,18 @@ All DB access goes through `src/lib/gameStore.ts`. Never call Supabase directly 
 
 Key functions: `getPlayers`, `upsertPlayer`, `createGame`, `getGame`, `getCompletedGames`, `updateRoundScore`, `saveAllRoundScores`, `completeGame`, `deleteGame`, `updateGame`, `importGame`, `computeWinner`, `generateRoomCode`.
 
+## Drilldown System
+
+Every stat number in `StatsLeaderboard` and `PlayerProfileModal` is tappable. Tapping opens a `DrilldownModal` (z-60, above PlayerProfileModal at z-50).
+
+- **`DrilldownView`** — discriminated union in `types.ts` with 6 variants: `game-list`, `game-scorecard`, `score-history`, `zero-rounds`, `win-streak`, `improvement`
+- **`DrilldownModal`** — takes a `stack: DrilldownView[]`, `onPush`, `onPop`, `onClose`, `onPlayerClick` props. Manages its own slide-up animation.
+- **`drilldownStack`** — local `useState` in each host component (`StatsLeaderboard`, `PlayerProfileModal`). No App.tsx threading needed.
+- **`DS` button** — local helper component in each host; renders a dotted-underline button that calls `stopPropagation` then `pushDrilldown`.
+- **Data** is pre-packaged into `DrilldownView` objects inline — no additional Supabase calls on drill.
+- **`getWinStreakGames()`** in `StatsLeaderboard` returns actual `GameWithScores[]` for the streak (used by both win-streak drilldown and `getWinStreak()` count).
+- **`getImprovement()`** returns `firstGames`/`lastGames` arrays alongside averages so the improvement drilldown has its source data.
+
 ## Game Rules (Shanghai Rummy)
 
 - 7 rounds total; lowest cumulative score wins
@@ -91,7 +104,7 @@ Key functions: `getPlayers`, `upsertPlayer`, `createGame`, `getGame`, `getComple
 - **Dates** are stored as ISO strings; displayed with date-fns, no timezone conversion.
 - **Import** groups rows by date + notes to reconstruct individual games.
 - **No test runner** is configured — there are no tests in this project.
-- **`onPlayerClick`** is threaded from `App.tsx` → `StatsLeaderboard`, `GameHistory`, `GameSummary` to open `PlayerProfileModal`.
+- **`onPlayerClick`** is threaded from `App.tsx` → `StatsLeaderboard`, `GameHistory`, `GameSummary` to open `PlayerProfileModal`. Also passed into `DrilldownModal` so player names in drilldown views are tappable.
 - **`total_score`** is a generated column in Supabase — never insert or update it directly.
 - **`created_by`** column does not exist in the `games` table — do not reference it.
 - **Score entry** only saves rounds 0..currentRound to avoid zero-filling future rounds on realtime sync.

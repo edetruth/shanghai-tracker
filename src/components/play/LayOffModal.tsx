@@ -1,0 +1,172 @@
+import { useState } from 'react'
+import { X } from 'lucide-react'
+import type { Card as CardType, Meld } from '../../game/types'
+import { canLayOff, findSwappableJoker } from '../../game/meld-validator'
+import CardComponent from './Card'
+import TableMelds from './TableMelds'
+
+interface Props {
+  hand: CardType[]
+  tablesMelds: Meld[]
+  onLayOff: (card: CardType, meld: Meld) => void
+  onSwapJoker: (naturalCard: CardType, meld: Meld) => void
+  onClose: () => void
+}
+
+type Mode = 'layoff' | 'swap'
+
+export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, onClose }: Props) {
+  const [mode, setMode] = useState<Mode>('layoff')
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
+  const [selectedMeldId, setSelectedMeldId] = useState<string | null>(null)
+
+  const selectedCard = hand.find(c => c.id === selectedCardId) ?? null
+  const selectedMeld = tablesMelds.find(m => m.id === selectedMeldId) ?? null
+
+  // Natural cards only for swap mode
+  const swapableHand = mode === 'swap' ? hand.filter(c => c.suit !== 'joker') : hand
+
+  function handleCardClick(cardId: string) {
+    setSelectedCardId(prev => prev === cardId ? null : cardId)
+    setSelectedMeldId(null)
+  }
+
+  function handleMeldClick(meld: Meld) {
+    setSelectedMeldId(prev => prev === meld.id ? null : meld.id)
+  }
+
+  function handleModeChange(m: Mode) {
+    setMode(m)
+    setSelectedCardId(null)
+    setSelectedMeldId(null)
+  }
+
+  // Validation
+  let isValid = false
+  let validationMessage = ''
+
+  if (selectedCard && selectedMeld) {
+    if (mode === 'layoff') {
+      isValid = canLayOff(selectedCard, selectedMeld)
+      validationMessage = isValid
+        ? 'Valid lay off ✓'
+        : 'This card cannot be laid off on that meld'
+    } else {
+      const joker = findSwappableJoker(selectedCard, selectedMeld)
+      isValid = joker !== null
+      validationMessage = isValid
+        ? 'Valid swap ✓ — you\'ll take the joker'
+        : 'No joker in that meld represents this card'
+    }
+  }
+
+  function handleConfirm() {
+    if (!selectedCard || !selectedMeld || !isValid) return
+    if (mode === 'layoff') {
+      onLayOff(selectedCard, selectedMeld)
+    } else {
+      onSwapJoker(selectedCard, selectedMeld)
+    }
+  }
+
+  return (
+    <>
+      {/* Overlay */}
+      <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
+
+      {/* Bottom sheet */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl max-h-[85vh] flex flex-col">
+        {/* Handle */}
+        <div className="flex justify-center pt-2 pb-1">
+          <div className="w-10 h-1 bg-[#e2ddd2] rounded-full" />
+        </div>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 pb-3 border-b border-[#e2ddd2]">
+          <h2 className="font-bold text-[#2c1810] text-base">Lay Off / Swap</h2>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-[#a08c6e] active:bg-[#efe9dd]">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+          {/* Mode tabs */}
+          <div className="bg-[#efe9dd] rounded-xl p-1 flex gap-1">
+            <button
+              onClick={() => handleModeChange('layoff')}
+              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
+                mode === 'layoff' ? 'bg-white text-[#8b6914] shadow-sm' : 'text-[#8b7355]'
+              }`}
+            >
+              Lay Off
+            </button>
+            <button
+              onClick={() => handleModeChange('swap')}
+              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
+                mode === 'swap' ? 'bg-white text-[#8b6914] shadow-sm' : 'text-[#8b7355]'
+              }`}
+            >
+              Swap Joker
+            </button>
+          </div>
+
+          {/* Step 1: pick card */}
+          <div>
+            <p className="text-xs text-[#8b7355] mb-1.5">
+              Step 1: Pick a card from your hand
+              {mode === 'swap' && ' (natural cards only)'}
+            </p>
+            <div className="flex gap-1.5 overflow-x-auto pb-2" style={{ WebkitOverflowScrolling: 'touch' }}>
+              {swapableHand.map(card => (
+                <CardComponent
+                  key={card.id}
+                  card={card}
+                  selected={selectedCardId === card.id}
+                  onClick={() => handleCardClick(card.id)}
+                />
+              ))}
+              {swapableHand.length === 0 && (
+                <p className="text-sm text-[#a08c6e] italic">No eligible cards</p>
+              )}
+            </div>
+          </div>
+
+          {/* Step 2: pick meld */}
+          {selectedCardId && (
+            <div>
+              <p className="text-xs text-[#8b7355] mb-1.5">Step 2: Pick a meld on the table</p>
+              {tablesMelds.length === 0 ? (
+                <p className="text-sm text-[#a08c6e] italic">No melds on the table yet</p>
+              ) : (
+                <TableMelds
+                  melds={tablesMelds}
+                  onMeldClick={handleMeldClick}
+                  highlightMeldId={selectedMeldId ?? undefined}
+                />
+              )}
+            </div>
+          )}
+
+          {/* Validation message */}
+          {selectedCard && selectedMeld && validationMessage && (
+            <p className={`text-xs font-medium ${isValid ? 'text-[#2d7a3a]' : 'text-[#b83232]'}`}>
+              {validationMessage}
+            </p>
+          )}
+        </div>
+
+        {/* Action buttons */}
+        <div className="px-4 pb-8 pt-3 border-t border-[#e2ddd2] flex gap-3">
+          <button onClick={onClose} className="btn-secondary flex-1">Cancel</button>
+          <button
+            onClick={handleConfirm}
+            disabled={!isValid}
+            className="btn-primary flex-1"
+          >
+            Confirm
+          </button>
+        </div>
+      </div>
+    </>
+  )
+}

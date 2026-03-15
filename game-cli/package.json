@@ -1,0 +1,17 @@
+{
+  "name": "shanghai-game-cli",
+  "version": "1.0.0",
+  "description": "Shanghai Rummy pass-and-play terminal game",
+  "main": "index.ts",
+  "scripts": {
+    "play": "ts-node index.ts"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.0"
+  }
+}
