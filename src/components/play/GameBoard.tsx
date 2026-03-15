@@ -1,10 +1,12 @@
-import { useState } from 'react'
-import { X } from 'lucide-react'
-import type { GameState, Player, Card as CardType, Meld } from '../../game/types'
+import { useState, useEffect, useRef } from 'react'
+import { Pause } from 'lucide-react'
+import type { GameState, Player, Card as CardType, Meld, PlayerConfig } from '../../game/types'
 import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, MAX_BUYS } from '../../game/rules'
 import { createDecks, shuffle, dealHands } from '../../game/deck'
 import { buildMeld, isValidSet, findSwappableJoker } from '../../game/meld-validator'
 import { scoreRound } from '../../game/scoring'
+import { aiFindBestMelds, aiShouldTakeDiscard, aiChooseDiscard, aiShouldBuy, aiFindLayOff } from '../../game/ai'
+import { haptic } from '../../lib/haptics'
 import PrivacyScreen from './PrivacyScreen'
 import MeldModal from './MeldModal'
 import LayOffModal from './LayOffModal'
@@ -16,7 +18,7 @@ import TableMelds from './TableMelds'
 import CardComponent from './Card'
 
 interface Props {
-  initialPlayerNames: string[]
+  initialPlayers: PlayerConfig[]
   onExit: () => void
 }
 
@@ -29,25 +31,32 @@ type UIPhase =
   | 'round-end'
   | 'game-over'
 
+interface UndoState {
+  card: CardType
+  preDiscardState: GameState
+  discarderIdx: number
+  timerId: ReturnType<typeof setTimeout>
+}
+
 // ── Pure helpers ──────────────────────────────────────────────────────────────
 
-function initGame(names: string[]): GameState {
-  const deckCount = 2
-  const players: Player[] = names.map((name, i) => ({
+function initGame(configs: PlayerConfig[]): GameState {
+  const deckCount = configs.length <= 4 ? 2 : 3
+  const players: Player[] = configs.map((cfg, i) => ({
     id: `p${i}`,
-    name,
+    name: cfg.name,
     hand: [],
     melds: [],
     hasLaidDown: false,
     buysRemaining: MAX_BUYS,
     roundScores: [],
+    isAI: cfg.isAI,
   }))
 
   const deck = shuffle(createDecks(deckCount))
   const cardsDealt = CARDS_DEALT[0]
   const { hands, remaining } = dealHands(deck, players.length, cardsDealt)
   players.forEach((p, i) => { p.hand = hands[i] })
-
   const topDiscard = remaining.shift()!
 
   return {
@@ -74,8 +83,7 @@ function setupRound(state: GameState, roundNum: number): GameState {
   const roundIdx = roundNum - 1
   const requirement = ROUND_REQUIREMENTS[roundIdx]
   const cardsDealt = CARDS_DEALT[roundIdx]
-  const deckCount = state.deckCount
-  const deck = shuffle(createDecks(deckCount))
+  const deck = shuffle(createDecks(state.deckCount))
   const { hands, remaining } = dealHands(deck, state.players.length, cardsDealt)
   const topDiscard = remaining.shift()!
 
@@ -116,29 +124,27 @@ function getCurrentPlayer(state: GameState): Player {
 
 function advancePlayer(state: GameState): GameState {
   const next = (state.roundState.currentPlayerIndex + 1) % state.players.length
-  return {
-    ...state,
-    roundState: { ...state.roundState, currentPlayerIndex: next },
-  }
+  return { ...state, roundState: { ...state.roundState, currentPlayerIndex: next } }
 }
 
-// Buy order: other players after the current discarder, in turn order, skip 0 buys
+function nextPhaseForPlayer(player: Player): UIPhase {
+  return player.isAI ? 'draw' : 'privacy'
+}
+
 function buildBuyerOrder(state: GameState, discarderIndex: number): number[] {
   const order: number[] = []
   const count = state.players.length
   for (let i = 1; i < count; i++) {
     const idx = (discarderIndex + i) % count
-    if (state.players[idx].buysRemaining > 0) {
-      order.push(idx)
-    }
+    if (state.players[idx].buysRemaining > 0) order.push(idx)
   }
   return order
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function GameBoard({ initialPlayerNames, onExit }: Props) {
-  const [gameState, setGameState] = useState<GameState>(() => initGame(initialPlayerNames))
+export default function GameBoard({ initialPlayers, onExit }: Props) {
+  const [gameState, setGameState] = useState<GameState>(() => initGame(initialPlayers))
   const [uiPhase, setUiPhase] = useState<UIPhase>('round-start')
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set())
   const [showMeldModal, setShowMeldModal] = useState(false)
@@ -147,12 +153,26 @@ export default function GameBoard({ initialPlayerNames, onExit }: Props) {
   const [buyerStep, setBuyerStep] = useState(0)
   const [roundResults, setRoundResults] = useState<{ playerId: string; score: number; shanghaied: boolean }[] | null>(null)
   const [buyingDiscard, setBuyingDiscard] = useState<CardType | null>(null)
+  const [pendingUndo, setPendingUndo] = useState<UndoState | null>(null)
+  const [showPauseModal, setShowPauseModal] = useState(false)
+  const [reshuffleMsg, setReshuffleMsg] = useState(false)
+  const [aiMessage, setAiMessage] = useState<string | null>(null)
+
+  // Stable refs so AI callbacks always have current values
+  const gameStateRef = useRef(gameState)
+  const uiPhaseRef = useRef(uiPhase)
+  const buyerOrderRef = useRef(buyerOrder)
+  const buyerStepRef = useRef(buyerStep)
+  useEffect(() => { gameStateRef.current = gameState }, [gameState])
+  useEffect(() => { uiPhaseRef.current = uiPhase }, [uiPhase])
+  useEffect(() => { buyerOrderRef.current = buyerOrder }, [buyerOrder])
+  useEffect(() => { buyerStepRef.current = buyerStep }, [buyerStep])
 
   const rs = gameState.roundState
   const currentPlayer = getCurrentPlayer(gameState)
   const topDiscard = rs.discardPile[rs.discardPile.length - 1] ?? null
 
-  // ── Toggle card selection in hand ────────────────────────────────────────
+  // ── Toggle card selection ─────────────────────────────────────────────────
   function toggleCard(cardId: string) {
     setSelectedCardIds(prev => {
       const next = new Set(prev)
@@ -162,19 +182,34 @@ export default function GameBoard({ initialPlayerNames, onExit }: Props) {
     })
   }
 
-  // ── Draw from draw pile ───────────────────────────────────────────────────
+  // ── Draw from pile (with reshuffle if empty) ──────────────────────────────
   function handleDrawFromPile() {
+    const needsReshuffle = gameState.roundState.drawPile.length === 0
     setGameState(prev => {
-      const drawPile = [...prev.roundState.drawPile]
+      let drawPile = [...prev.roundState.drawPile]
+      let discardPile = [...prev.roundState.discardPile]
+
+      if (drawPile.length === 0) {
+        const top = discardPile.pop()
+        drawPile = shuffle([...discardPile])
+        discardPile = top ? [top] : []
+      }
+
       const card = drawPile.shift()
       if (!card) return prev
+
       const players = prev.players.map((p, i) =>
         i === prev.roundState.currentPlayerIndex
           ? { ...p, hand: [...p.hand, card] }
           : p
       )
-      return { ...prev, players, roundState: { ...prev.roundState, drawPile } }
+      return { ...prev, players, roundState: { ...prev.roundState, drawPile, discardPile } }
     })
+
+    if (needsReshuffle) {
+      setReshuffleMsg(true)
+      setTimeout(() => setReshuffleMsg(false), 2500)
+    }
     setUiPhase('action')
   }
 
@@ -194,7 +229,7 @@ export default function GameBoard({ initialPlayerNames, onExit }: Props) {
     setUiPhase('action')
   }
 
-  // ── Start buying window given a state snapshot ────────────────────────────
+  // ── Start buying window ───────────────────────────────────────────────────
   function startBuyingWindow(state: GameState, discarder: number, discardCard: CardType | null) {
     const order = buildBuyerOrder(state, discarder)
     setBuyingDiscard(discardCard)
@@ -202,20 +237,20 @@ export default function GameBoard({ initialPlayerNames, onExit }: Props) {
     setBuyerStep(0)
 
     if (order.length === 0) {
-      // No eligible buyers
       if (state.roundState.goOutPlayerId !== null) {
         endRound(state)
       } else {
         const next = advancePlayer(state)
+        const nextPlayer = next.players[next.roundState.currentPlayerIndex]
         setGameState(next)
-        setUiPhase('privacy')
+        setUiPhase(nextPhaseForPlayer(nextPlayer))
       }
     } else {
       setUiPhase('buying')
     }
   }
 
-  // ── Score and end round ────────────────────────────────────────────────────
+  // ── Score and end round ───────────────────────────────────────────────────
   function endRound(state: GameState) {
     const goOutId = state.roundState.goOutPlayerId
     if (!goOutId) return
@@ -262,6 +297,7 @@ export default function GameBoard({ initialPlayerNames, onExit }: Props) {
 
     setGameState(updated)
     setShowMeldModal(false)
+    haptic(wentOut ? 'success' : 'heavy')
 
     if (wentOut) {
       const top = updated.roundState.discardPile[updated.roundState.discardPile.length - 1] ?? null
@@ -316,31 +352,26 @@ export default function GameBoard({ initialPlayerNames, onExit }: Props) {
       const newMeldCards = meld.cards.map(c => c.id === joker.id ? naturalCard : c)
       const newJokerMappings = meld.jokerMappings.filter(m => m.cardId !== joker.id)
       const updatedMeld: Meld = { ...meld, cards: newMeldCards, jokerMappings: newJokerMappings }
-
       const tablesMelds = prev.roundState.tablesMelds.map(m => m.id === meld.id ? updatedMeld : m)
-
-      // Remove natural from hand, add joker back
       const newHand = player.hand.filter(c => c.id !== naturalCard.id).concat(joker)
-      const players = prev.players.map((p, i) =>
-        i === playerIdx ? { ...p, hand: newHand } : p
-      )
+      const players = prev.players.map((p, i) => i === playerIdx ? { ...p, hand: newHand } : p)
 
       return { ...prev, players, roundState: { ...prev.roundState, tablesMelds } }
     })
     setShowLayOffModal(false)
   }
 
-  // ── Discard ───────────────────────────────────────────────────────────────
-  function handleDiscard() {
-    if (selectedCardIds.size !== 1) return
-    const cardId = [...selectedCardIds][0]
+  // ── Discard (with undo support for human players) ─────────────────────────
+  function handleDiscard(overrideCardId?: string) {
+    const cardId = overrideCardId ?? [...selectedCardIds][0]
+    if (!cardId) return
 
-    // Build next state synchronously
     const playerIdx = rs.currentPlayerIndex
     const player = gameState.players[playerIdx]
     const card = player.hand.find(c => c.id === cardId)
     if (!card) return
 
+    const preDiscardState = gameState
     const newHand = player.hand.filter(c => c.id !== cardId)
     const discardPile = [...rs.discardPile, card]
     const wentOut = newHand.length === 0
@@ -349,7 +380,6 @@ export default function GameBoard({ initialPlayerNames, onExit }: Props) {
     const players = gameState.players.map((p, i) =>
       i === playerIdx ? { ...p, hand: newHand } : p
     )
-
     const afterDiscard: GameState = {
       ...gameState,
       players,
@@ -358,7 +388,26 @@ export default function GameBoard({ initialPlayerNames, onExit }: Props) {
 
     setGameState(afterDiscard)
     setSelectedCardIds(new Set())
-    startBuyingWindow(afterDiscard, playerIdx, card)
+    haptic('heavy')
+
+    if (!player.isAI) {
+      // Show undo toast for 3 seconds before committing the buying window
+      const timerId = setTimeout(() => {
+        setPendingUndo(null)
+        startBuyingWindow(afterDiscard, playerIdx, card)
+      }, 3000)
+      setPendingUndo({ card, preDiscardState, discarderIdx: playerIdx, timerId })
+    } else {
+      startBuyingWindow(afterDiscard, playerIdx, card)
+    }
+  }
+
+  function handleUndoDiscard() {
+    if (!pendingUndo) return
+    clearTimeout(pendingUndo.timerId)
+    setGameState(pendingUndo.preDiscardState)
+    setPendingUndo(null)
+    // Stay in 'action' phase
   }
 
   // ── Buy decision ──────────────────────────────────────────────────────────
@@ -386,22 +435,22 @@ export default function GameBoard({ initialPlayerNames, onExit }: Props) {
       if (withBuy.roundState.goOutPlayerId !== null) {
         endRound(advanced)
       } else {
+        const nextPlayer = advanced.players[advanced.roundState.currentPlayerIndex]
         setGameState(advanced)
-        setUiPhase('privacy')
+        setUiPhase(nextPhaseForPlayer(nextPlayer))
       }
     } else {
-      // Pass — move to next buyer in queue
       const nextStep = buyerStep + 1
       if (nextStep < buyerOrder.length) {
         setBuyerStep(nextStep)
       } else {
-        // All passed — advance turn
         const advanced = advancePlayer(gameState)
         if (gameState.roundState.goOutPlayerId !== null) {
           endRound(advanced)
         } else {
+          const nextPlayer = advanced.players[advanced.roundState.currentPlayerIndex]
           setGameState(advanced)
-          setUiPhase('privacy')
+          setUiPhase(nextPhaseForPlayer(nextPlayer))
         }
       }
     }
@@ -414,11 +463,97 @@ export default function GameBoard({ initialPlayerNames, onExit }: Props) {
       setGameState(prev => ({ ...prev, gameOver: true }))
       setUiPhase('game-over')
     } else {
-      setGameState(prev => setupRound(prev, nextRound))
+      const next = setupRound(gameState, nextRound)
+      setGameState(next)
       setRoundResults(null)
       setUiPhase('round-start')
     }
   }
+
+  // ── AI: execute action phase turn ─────────────────────────────────────────
+  function executeAIAction() {
+    const state = gameStateRef.current
+    const player = getCurrentPlayer(state)
+    const { tablesMelds, requirement } = state.roundState
+
+    // Try to lay down if not yet done
+    if (!player.hasLaidDown) {
+      const melds = aiFindBestMelds(player.hand, requirement)
+      if (melds && melds.length > 0) {
+        setAiMessage(`${player.name} lays down!`)
+        setTimeout(() => setAiMessage(null), 1500)
+        handleMeldConfirm(melds)
+        return
+      }
+    }
+
+    // Try to lay off
+    if (player.hasLaidDown && tablesMelds.length > 0) {
+      const layOff = aiFindLayOff(player.hand, tablesMelds)
+      if (layOff) {
+        setAiMessage(`${player.name} lays off`)
+        setTimeout(() => setAiMessage(null), 1200)
+        handleLayOff(layOff.card, layOff.meld)
+        return
+      }
+    }
+
+    // Discard
+    if (player.hand.length > 0) {
+      const card = aiChooseDiscard(player.hand, requirement)
+      setAiMessage(`${player.name} discards`)
+      setTimeout(() => setAiMessage(null), 1000)
+      handleDiscard(card.id)
+    }
+  }
+
+  // ── AI turn automation (draw + action) ───────────────────────────────────
+  const handLen = currentPlayer.hand.length
+  useEffect(() => {
+    if (!currentPlayer.isAI) return
+    if (uiPhase !== 'draw' && uiPhase !== 'action') return
+
+    const delay = 700 + Math.random() * 500
+    const timerId = setTimeout(() => {
+      if (uiPhaseRef.current === 'draw') {
+        const state = gameStateRef.current
+        const player = getCurrentPlayer(state)
+        const top = state.roundState.discardPile[state.roundState.discardPile.length - 1] ?? null
+        const shouldTake = top !== null &&
+          aiShouldTakeDiscard(player.hand, top, state.roundState.requirement, player.hasLaidDown)
+        setAiMessage(shouldTake
+          ? `${player.name} takes the discard`
+          : `${player.name} draws from pile`)
+        setTimeout(() => setAiMessage(null), 1200)
+        if (shouldTake) handleTakeDiscard()
+        else handleDrawFromPile()
+      } else if (uiPhaseRef.current === 'action') {
+        executeAIAction()
+      }
+    }, delay)
+
+    return () => clearTimeout(timerId)
+  }, [uiPhase, currentPlayer.isAI, handLen, rs.currentPlayerIndex]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── AI buying automation ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (uiPhase !== 'buying') return
+    const buyerIdx = buyerOrder[buyerStep]
+    if (buyerIdx === undefined) return
+    const buyer = gameState.players[buyerIdx]
+    if (!buyer?.isAI) return
+
+    const timerId = setTimeout(() => {
+      const state = gameStateRef.current
+      const currentBuyer = state.players[buyerOrderRef.current[buyerStepRef.current]]
+      const disc = buyingDiscard
+      const req = state.roundState.requirement
+      const shouldBuy = disc && currentBuyer ? aiShouldBuy(currentBuyer.hand, disc, req) : false
+      handleBuyDecision(shouldBuy)
+    }, 700)
+
+    return () => clearTimeout(timerId)
+  }, [uiPhase, buyerStep, buyerOrder]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER
@@ -434,7 +569,10 @@ export default function GameBoard({ initialPlayerNames, onExit }: Props) {
           <h2 className="text-2xl font-bold text-[#2c1810] mb-2">Round {gameState.currentRound}</h2>
           <p className="text-base text-[#8b7355] mb-2">{rs.requirement.description}</p>
           <p className="text-sm text-[#a08c6e] mb-8">{rs.cardsDealt} cards dealt</p>
-          <button onClick={() => setUiPhase('privacy')} className="btn-primary">
+          <button
+            onClick={() => setUiPhase(nextPhaseForPlayer(currentPlayer))}
+            className="btn-primary"
+          >
             Begin Round
           </button>
         </div>
@@ -456,8 +594,17 @@ export default function GameBoard({ initialPlayerNames, onExit }: Props) {
     const buyer = buyerIdx !== undefined ? gameState.players[buyerIdx] : null
     const discardForBuy = buyingDiscard ?? topDiscard
 
-    if (!buyer || !discardForBuy) {
-      return null
+    if (!buyer || !discardForBuy) return null
+
+    // AI buyers are handled by the useEffect above — show a waiting indicator
+    if (buyer.isAI) {
+      return (
+        <div className="min-h-screen bg-[#f8f6f1] flex flex-col items-center justify-center px-6">
+          <div className="text-center">
+            <p className="text-[#8b7355] text-sm animate-pulse">{buyer.name} is deciding…</p>
+          </div>
+        </div>
+      )
     }
 
     return (
@@ -487,57 +634,98 @@ export default function GameBoard({ initialPlayerNames, onExit }: Props) {
       <GameOver
         players={gameState.players}
         onPlayAgain={() => {
-          setGameState(initGame(initialPlayerNames))
+          setGameState(initGame(initialPlayers))
           setUiPhase('round-start')
           setRoundResults(null)
           setSelectedCardIds(new Set())
+          setPendingUndo(null)
         }}
         onBack={onExit}
       />
     )
   }
 
-  // ── Main board: draw / action / discard phases ────────────────────────────
+  // ── Main board: draw / action ─────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#f8f6f1] flex flex-col">
       {/* Top bar */}
       <div className="bg-white border-b border-[#e2ddd2] px-4 py-2 flex items-center justify-between">
         <div>
           <p className="text-xs text-[#a08c6e]">Round {gameState.currentRound} of {TOTAL_ROUNDS}</p>
-          <p className="text-sm font-bold text-[#2c1810]">{currentPlayer.name}'s turn</p>
+          <p className="text-sm font-bold text-[#2c1810]">
+            {currentPlayer.name}'s turn
+            {currentPlayer.isAI && <span className="ml-1 text-xs font-normal text-[#a08c6e]">(AI)</span>}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-[#8b7355] bg-[#efe9dd] px-2 py-1 rounded-full">
-            {currentPlayer.buysRemaining} buys left
+            {currentPlayer.buysRemaining} buys
           </span>
           <button
-            onClick={onExit}
+            onClick={() => setShowPauseModal(true)}
             className="w-7 h-7 flex items-center justify-center rounded-lg text-[#a08c6e] active:bg-[#efe9dd]"
           >
-            <X size={16} />
+            <Pause size={16} />
           </button>
         </div>
       </div>
 
+      {/* Reshuffle notice */}
+      {reshuffleMsg && (
+        <div className="bg-[#e2b858] px-4 py-2 text-center text-sm font-medium text-[#2c1810]">
+          Draw pile reshuffled from discards
+        </div>
+      )}
+
+      {/* AI action message */}
+      {aiMessage && (
+        <div className="bg-[#efe9dd] px-4 py-2 text-center text-sm text-[#8b6914] animate-pulse">
+          {aiMessage}
+        </div>
+      )}
+
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4 pb-36">
-        {/* Round requirement pill */}
+        {/* Round requirement */}
         <div className="bg-[#efe9dd] rounded-lg px-3 py-2 text-xs text-[#8b7355]">
           <span className="font-semibold text-[#8b6914]">Goal: </span>
           {rs.requirement.description}
         </div>
 
+        {/* Scores mini-bar */}
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {gameState.players.map(p => {
+            const total = p.roundScores.reduce((s, n) => s + n, 0)
+            const isCurrent = p.id === currentPlayer.id
+            return (
+              <div
+                key={p.id}
+                className={`flex-shrink-0 rounded-lg px-2.5 py-1.5 text-center min-w-[52px] ${
+                  isCurrent ? 'bg-[#e2b858]' : 'bg-white border border-[#e2ddd2]'
+                }`}
+              >
+                <p className={`text-[10px] font-medium truncate max-w-[48px] ${isCurrent ? 'text-[#2c1810]' : 'text-[#8b7355]'}`}>
+                  {p.name.split(' ')[0]}
+                  {p.isAI && ' 🤖'}
+                </p>
+                <p className={`font-mono text-xs font-bold ${isCurrent ? 'text-[#2c1810]' : 'text-[#a08c6e]'}`}>
+                  {total}
+                </p>
+              </div>
+            )
+          })}
+        </div>
+
         {/* Table melds */}
         <TableMelds melds={rs.tablesMelds} />
 
-        {/* Draw / discard pile area */}
+        {/* Draw / discard area */}
         <div>
           <p className="text-xs font-semibold text-[#a08c6e] uppercase tracking-wider mb-2">
             {uiPhase === 'draw' ? 'Draw a card' : 'Discard pile'}
           </p>
           <div className="flex gap-4 items-end">
-            {/* Draw pile face-down card */}
-            {uiPhase === 'draw' && (
+            {uiPhase === 'draw' && !currentPlayer.isAI && (
               <div className="flex flex-col items-center gap-1">
                 <div
                   onClick={handleDrawFromPile}
@@ -550,15 +738,14 @@ export default function GameBoard({ initialPlayerNames, onExit }: Props) {
               </div>
             )}
 
-            {/* Discard top */}
             {topDiscard && (
               <div className="flex flex-col items-center gap-1">
                 <CardComponent
                   card={topDiscard}
-                  onClick={uiPhase === 'draw' ? handleTakeDiscard : undefined}
+                  onClick={uiPhase === 'draw' && !currentPlayer.isAI ? handleTakeDiscard : undefined}
                 />
                 <p className="text-[10px] text-[#8b7355]">
-                  {uiPhase === 'draw' ? 'Take discard' : 'Last discard'}
+                  {uiPhase === 'draw' && !currentPlayer.isAI ? 'Take discard' : 'Last discard'}
                 </p>
               </div>
             )}
@@ -568,28 +755,49 @@ export default function GameBoard({ initialPlayerNames, onExit }: Props) {
                 Draw pile: {rs.drawPile.length} cards
               </p>
             )}
+
+            {uiPhase === 'draw' && currentPlayer.isAI && (
+              <p className="text-xs text-[#a08c6e] self-center animate-pulse">
+                {currentPlayer.name} is thinking…
+              </p>
+            )}
           </div>
         </div>
 
-        {/* Player hand */}
-        <HandDisplay
-          cards={currentPlayer.hand}
-          selectedIds={selectedCardIds}
-          onToggle={toggleCard}
-          label={`Your hand (${currentPlayer.hand.length} cards)`}
-          disabled={uiPhase !== 'action'}
-        />
+        {/* Player hand — hidden for AI turn */}
+        {!currentPlayer.isAI && (
+          <HandDisplay
+            cards={currentPlayer.hand}
+            selectedIds={selectedCardIds}
+            onToggle={toggleCard}
+            label={`Your hand (${currentPlayer.hand.length} cards)`}
+            disabled={uiPhase !== 'action' || pendingUndo !== null}
+          />
+        )}
       </div>
 
       {/* Fixed action bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#e2ddd2] px-4 pt-3 pb-8 safe-bottom">
-        {uiPhase === 'draw' && (
+        {uiPhase === 'draw' && !currentPlayer.isAI && (
           <p className="text-center text-sm text-[#8b7355] py-1">
-            Tap the draw pile or discard card above to draw
+            Tap the draw pile or discard card above
           </p>
         )}
 
-        {uiPhase === 'action' && (
+        {/* Undo toast */}
+        {pendingUndo && (
+          <div className="flex items-center justify-between bg-[#2c1810] text-white rounded-xl px-4 py-3">
+            <span className="text-sm">Discarded {pendingUndo.card.rank === 0 ? 'Joker' : `${pendingUndo.card.rank}`}</span>
+            <button
+              onClick={handleUndoDiscard}
+              className="text-[#e2b858] text-sm font-bold active:opacity-70"
+            >
+              Undo
+            </button>
+          </div>
+        )}
+
+        {uiPhase === 'action' && !currentPlayer.isAI && !pendingUndo && (
           <div className="space-y-2">
             <div className="flex gap-2">
               {!currentPlayer.hasLaidDown && (
@@ -610,7 +818,7 @@ export default function GameBoard({ initialPlayerNames, onExit }: Props) {
               )}
             </div>
             <button
-              onClick={handleDiscard}
+              onClick={() => handleDiscard()}
               disabled={selectedCardIds.size !== 1}
               className={`w-full rounded-xl py-2.5 text-sm font-semibold transition-all ${
                 selectedCardIds.size === 1
@@ -642,6 +850,36 @@ export default function GameBoard({ initialPlayerNames, onExit }: Props) {
           onSwapJoker={handleJokerSwap}
           onClose={() => setShowLayOffModal(false)}
         />
+      )}
+
+      {/* Pause modal */}
+      {showPauseModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-end">
+          <div className="w-full bg-white rounded-t-2xl px-4 pt-5 pb-10">
+            <h2 className="text-lg font-bold text-[#2c1810] text-center mb-1">Game Paused</h2>
+            <p className="text-sm text-[#8b7355] text-center mb-6">
+              Round {gameState.currentRound} of {TOTAL_ROUNDS} · {currentPlayer.name}'s turn
+            </p>
+            <div className="space-y-2">
+              <button
+                onClick={() => setShowPauseModal(false)}
+                className="btn-primary"
+              >
+                Resume Game
+              </button>
+              <button
+                onClick={() => {
+                  setShowPauseModal(false)
+                  if (pendingUndo) clearTimeout(pendingUndo.timerId)
+                  onExit()
+                }}
+                className="w-full rounded-xl py-3 text-sm font-semibold text-[#b83232] bg-[#fff3f3] active:opacity-80"
+              >
+                Abandon Game
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

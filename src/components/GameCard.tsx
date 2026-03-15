@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ChevronDown, ChevronUp, Trash2, Trophy, Pencil } from 'lucide-react'
 import { format } from 'date-fns'
 import { ROUNDS, PLAYER_COLORS } from '../lib/constants'
-import { computeWinner, saveAllRoundScores, updateGame } from '../lib/gameStore'
-import type { GameWithScores } from '../lib/types'
+import { computeWinner, saveAllRoundScores, updateGame, updatePlayerInGame, upsertPlayer, getPlayers } from '../lib/gameStore'
+import type { GameWithScores, Player } from '../lib/types'
 
 interface Props {
   game: GameWithScores
@@ -20,7 +20,10 @@ export default function GameCard({ game, onDelete, onEdit, onPlayerClick }: Prop
   const [editDate, setEditDate] = useState(game.date)
   const [editNotes, setEditNotes] = useState(game.notes ?? '')
   const [editScores, setEditScores] = useState<Record<string, string[]>>({})
+  const [editNames, setEditNames] = useState<Record<string, string>>({})
   const [savingEdit, setSavingEdit] = useState(false)
+  const [knownPlayers, setKnownPlayers] = useState<Player[]>([])
+  const [mergeWarning, setMergeWarning] = useState<{ oldId: string; newPlayer: Player } | null>(null)
 
   const winner = computeWinner(game.game_scores)
   const sortedScores = [...game.game_scores].sort((a, b) => a.total_score - b.total_score)
@@ -30,12 +33,21 @@ export default function GameCard({ game, onDelete, onEdit, onPlayerClick }: Prop
     onDelete(game.id)
   }
 
+  useEffect(() => {
+    if (editing) {
+      getPlayers().then(setKnownPlayers).catch(console.error)
+    }
+  }, [editing])
+
   const initEdit = () => {
     const initial: Record<string, string[]> = {}
+    const names: Record<string, string> = {}
     game.game_scores.forEach((gs) => {
       initial[gs.player_id] = gs.round_scores.map(String)
+      names[gs.player_id] = gs.player?.name ?? ''
     })
     setEditScores(initial)
+    setEditNames(names)
     setEditDate(game.date)
     setEditNotes(game.notes ?? '')
     setEditing(true)
@@ -53,6 +65,25 @@ export default function GameCard({ game, onDelete, onEdit, onPlayerClick }: Prop
   const saveEdit = async () => {
     setSavingEdit(true)
     try {
+      // Process name changes first
+      for (const gs of game.game_scores) {
+        const origName = gs.player?.name ?? ''
+        const newName = (editNames[gs.player_id] ?? origName).trim()
+        if (newName && newName !== origName) {
+          const newPlayer = await upsertPlayer(newName)
+          if (newPlayer.id !== gs.player_id) {
+            // Check if new player is already in this game
+            const conflict = game.game_scores.find((s) => s.player_id === newPlayer.id)
+            if (conflict) {
+              setMergeWarning({ oldId: gs.player_id, newPlayer })
+              setSavingEdit(false)
+              return
+            }
+            await updatePlayerInGame(game.id, gs.player_id, newPlayer.id)
+          }
+        }
+      }
+      // Save scores (use original player IDs — names may have changed above)
       await Promise.all(
         game.game_scores.map((gs) => {
           const roundScores = (editScores[gs.player_id] ?? gs.round_scores.map(String)).map((v) => parseInt(v) || 0)
@@ -69,6 +100,28 @@ export default function GameCard({ game, onDelete, onEdit, onPlayerClick }: Prop
     }
   }
 
+  const confirmMerge = async () => {
+    if (!mergeWarning) return
+    setSavingEdit(true)
+    try {
+      await updatePlayerInGame(game.id, mergeWarning.oldId, mergeWarning.newPlayer.id)
+      setMergeWarning(null)
+      await Promise.all(
+        game.game_scores.map((gs) => {
+          const roundScores = (editScores[gs.player_id] ?? gs.round_scores.map(String)).map((v) => parseInt(v) || 0)
+          return saveAllRoundScores(game.id, gs.player_id, roundScores)
+        })
+      )
+      await updateGame(game.id, { date: editDate, notes: editNotes || undefined })
+      setEditing(false)
+      onEdit?.()
+    } catch (err) {
+      console.error('confirmMerge error:', err)
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
   let dateLabel = game.date
   try { dateLabel = format(new Date(game.date + 'T12:00:00'), 'MMM d, yyyy') } catch { /* keep raw */ }
 
@@ -80,10 +133,16 @@ export default function GameCard({ game, onDelete, onEdit, onPlayerClick }: Prop
         onClick={() => { setExpanded((e) => !e); setConfirming(false); setEditing(false) }}
       >
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="text-[#2c1810] font-medium text-base">{dateLabel}</span>
             <span className="text-[#a08c6e] text-sm">·</span>
             <span className="text-[#a08c6e] text-sm">{game.game_scores.length} players</span>
+            {game.game_type === 'ai' && (
+              <span className="text-[10px] bg-[#e2b858] text-[#2c1810] px-1.5 py-0.5 rounded-full font-semibold">vs AI</span>
+            )}
+            {game.game_type === 'pass-and-play' && (
+              <span className="text-[10px] bg-[#efe9dd] text-[#8b7355] px-1.5 py-0.5 rounded-full font-medium">Played</span>
+            )}
           </div>
           {winner && (
             <div className="flex items-center gap-1.5">
@@ -191,6 +250,53 @@ export default function GameCard({ game, onDelete, onEdit, onPlayerClick }: Prop
             />
           </div>
 
+          {/* Merge warning */}
+          {mergeWarning && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+              <p className="text-amber-800 text-sm font-medium mb-2">
+                Merge with existing player "{mergeWarning.newPlayer.name}"?
+              </p>
+              <p className="text-amber-700 text-xs mb-3">
+                This will reassign the score row to the existing player record.
+              </p>
+              <div className="flex gap-2">
+                <button onClick={confirmMerge} disabled={savingEdit}
+                  className="px-4 py-1.5 bg-amber-600 text-white text-sm font-medium rounded-lg">
+                  Merge
+                </button>
+                <button onClick={() => setMergeWarning(null)}
+                  className="px-4 py-1.5 bg-[#efe9dd] text-[#8b7355] text-sm font-medium rounded-lg">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Player names */}
+          <div>
+            <label className="text-[#a08c6e] text-xs uppercase tracking-wider mb-2 block">Player Names</label>
+            <datalist id={`players-${game.id}`}>
+              {knownPlayers.map((p) => <option key={p.id} value={p.name} />)}
+            </datalist>
+            <div className="flex flex-col gap-2">
+              {game.game_scores.map((gs) => (
+                <div key={gs.player_id} className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ background: PLAYER_COLORS[game.game_scores.findIndex((s) => s.player_id === gs.player_id) % PLAYER_COLORS.length] }} />
+                  <input
+                    type="text"
+                    list={`players-${game.id}`}
+                    value={editNames[gs.player_id] ?? gs.player?.name ?? ''}
+                    onChange={(e) => setEditNames((prev) => ({ ...prev, [gs.player_id]: e.target.value }))}
+                    className="flex-1 bg-white border border-[#e2ddd2] rounded-lg px-3 py-1.5 text-[#2c1810] text-sm
+                               focus:outline-none focus:border-[#8b6914]"
+                    placeholder="Player name"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Score grid */}
           <div>
             <label className="text-[#a08c6e] text-xs uppercase tracking-wider mb-2 block">Scores</label>
@@ -207,9 +313,10 @@ export default function GameCard({ game, onDelete, onEdit, onPlayerClick }: Prop
                 <tbody>
                   {game.game_scores.map((gs) => {
                     const rowScores = editScores[gs.player_id] ?? gs.round_scores.map(String)
+                    const displayName = (editNames[gs.player_id] ?? gs.player?.name ?? '').split(' ')[0]
                     return (
                       <tr key={gs.player_id} className="border-b border-[#e2ddd2]/30">
-                        <td className="py-2 text-[#2c1810] text-sm pr-3 max-w-[72px] truncate">{gs.player?.name}</td>
+                        <td className="py-2 text-[#2c1810] text-sm pr-3 max-w-[72px] truncate">{displayName}</td>
                         {ROUNDS.map((_, i) => (
                           <td key={i} className="py-1 px-1">
                             <input

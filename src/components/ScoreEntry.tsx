@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Copy, Check, Wifi } from 'lucide-react'
 import { ROUNDS, PLAYER_COLORS } from '../lib/constants'
 import { saveAllRoundScores, getGame } from '../lib/gameStore'
+import { haptic } from '../lib/haptics'
 import { useRealtimeScores } from '../hooks/useRealtimeScores'
 import type { Game, Player } from '../lib/types'
 
@@ -20,6 +21,7 @@ export default function ScoreEntry({ game, players, onComplete, onBack }: Props)
   )
   const [saving, setSaving] = useState(false)
   const [roundError, setRoundError] = useState('')
+  const [codeCopied, setCodeCopied] = useState(false)
 
   const loadGame = async () => {
     const g = await getGame(game.id)
@@ -45,6 +47,7 @@ export default function ScoreEntry({ game, players, onComplete, onBack }: Props)
   const handleScoreChange = (playerIdx: number, value: string) => {
     if (value !== '' && !/^\d+$/.test(value)) return
     setRoundError('')
+    haptic('tap')
     setScores((prev) => {
       const next = prev.map((row) => [...row])
       next[playerIdx][currentRound] = value
@@ -132,12 +135,30 @@ export default function ScoreEntry({ game, players, onComplete, onBack }: Props)
         </div>
       </div>
 
-      {/* Room code */}
-      <div className="px-4 mb-2">
-        <p className="text-[#a08c6e] text-xs text-center">
-          Room: <span className="font-mono text-[#8b6914]">{game.room_code}</span>
-        </p>
-      </div>
+      {/* Room code — tap to copy */}
+      {game.room_code && (
+        <div className="px-4 mb-2">
+          <button
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(game.room_code!)
+                setCodeCopied(true)
+                setTimeout(() => setCodeCopied(false), 2000)
+              } catch { /* fallback: silent */ }
+            }}
+            className="w-full flex items-center justify-center gap-2 bg-[#efe9dd] rounded-xl py-2 px-3 active:opacity-70"
+          >
+            <Wifi size={13} className="text-[#8b6914]" />
+            <span className="text-[#8b7355] text-xs">Room code: </span>
+            <span className="font-mono text-[#8b6914] text-sm font-semibold tracking-wider">{game.room_code}</span>
+            {codeCopied
+              ? <Check size={13} className="text-[#2d7a3a]" />
+              : <Copy size={13} className="text-[#a08c6e]" />
+            }
+          </button>
+          <p className="text-[#a08c6e] text-[10px] text-center mt-1">Tap to copy · Others can join from Score Tracker → Join Game</p>
+        </div>
+      )}
 
       {/* Score entry */}
       <div className="flex-1 px-4 pb-4 overflow-auto">

@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, LogIn } from 'lucide-react'
+import { X, LogIn, ArrowLeft } from 'lucide-react'
 import { getPlayers, upsertPlayer, createGame } from '../lib/gameStore'
 import type { Player, Game } from '../lib/types'
 
 interface Props {
   onGameCreated: (game: Game, players: Player[]) => void
   onJoinGame: () => void
+  onBack?: () => void
 }
 
-export default function PlayerSetup({ onGameCreated, onJoinGame }: Props) {
+export default function PlayerSetup({ onGameCreated, onJoinGame, onBack }: Props) {
   const [knownPlayers, setKnownPlayers] = useState<Player[]>([])
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([])
   const [query, setQuery] = useState('')
@@ -89,21 +90,26 @@ export default function PlayerSetup({ onGameCreated, onJoinGame }: Props) {
   return (
     <div className="flex flex-col gap-4 p-4">
       {/* Header */}
-      <div className="text-center pt-6 pb-1">
-        <h1 className="font-display text-3xl font-bold text-[#8b6914]">Shanghai</h1>
-        <p className="text-[#a08c6e] text-sm mt-1">Score Tracker</p>
+      <div className="pt-6 pb-1">
+        {onBack && (
+          <button onClick={onBack} className="text-[#8b6914] p-1 -ml-1 mb-3 flex items-center gap-2">
+            <ArrowLeft size={22} />
+            <span className="text-sm font-medium text-[#8b7355]">Back</span>
+          </button>
+        )}
+        <div className="text-center">
+          <h1 className="font-display text-2xl font-bold text-[#2c1810]">New Game</h1>
+          <p className="text-[#a08c6e] text-sm mt-1">Set up your score card</p>
+        </div>
       </div>
 
-      {/* Join Existing Game — hidden for now, re-enable by removing the {false &&} wrapper */}
-      {false && (
-        <button
-          onClick={onJoinGame}
-          className="btn-secondary flex items-center justify-center gap-2"
-        >
-          <LogIn size={18} />
-          Join Existing Game
-        </button>
-      )}
+      <button
+        onClick={onJoinGame}
+        className="btn-secondary flex items-center justify-center gap-2"
+      >
+        <LogIn size={18} />
+        Join Existing Game
+      </button>
 
       {/* Date picker */}
       <div className="card p-4">

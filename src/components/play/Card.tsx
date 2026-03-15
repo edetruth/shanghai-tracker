@@ -1,4 +1,5 @@
 import type { Card as CardType } from '../../game/types'
+import { haptic } from '../../lib/haptics'
 
 interface Props {
   card: CardType
@@ -44,7 +45,13 @@ export default function Card({ card, selected, onClick, compact, disabled, joker
     ${sizeClass}
     ${isJoker
       ? 'bg-[#fffbee] border-[#e2b858]'
-      : 'bg-white border-[#e2ddd2]'
+      : card.suit === 'hearts'
+        ? 'bg-[#fff5f5] border-[#e2ddd2]'
+        : card.suit === 'diamonds'
+          ? 'bg-[#f5f8ff] border-[#e2ddd2]'
+          : card.suit === 'clubs'
+            ? 'bg-[#f5fff7] border-[#e2ddd2]'
+            : 'bg-[#f8f8f8] border-[#e2ddd2]'
     }
     ${selected
       ? 'border-[#e2b858] border-2 -translate-y-3 shadow-md'
@@ -65,7 +72,7 @@ export default function Card({ card, selected, onClick, compact, disabled, joker
   return (
     <div
       className={baseClass}
-      onClick={onClick && !disabled ? onClick : undefined}
+      onClick={onClick && !disabled ? () => { haptic('tap'); onClick() } : undefined}
     >
       {isJoker ? (
         <div className="flex flex-col items-center justify-center w-full h-full gap-0.5">

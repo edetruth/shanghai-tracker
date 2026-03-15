@@ -43,7 +43,8 @@ export function generateRoomCode(): string {
 // Games
 export async function createGame(
   playerIds: string[],
-  date: string
+  date: string,
+  gameType: string = 'manual',
 ): Promise<Game> {
   const roomCode = generateRoomCode()
   const { data: game, error: gameError } = await supabase
@@ -52,6 +53,7 @@ export async function createGame(
       date,
       room_code: roomCode,
       is_complete: false,
+      game_type: gameType,
     })
     .select()
     .single()
@@ -177,7 +179,7 @@ export async function importGame(
   const roomCode = generateRoomCode()
   const { data: game, error: gameError } = await supabase
     .from('games')
-    .insert({ date, room_code: roomCode, notes: notes || null, is_complete: true })
+    .insert({ date, room_code: roomCode, notes: notes || null, is_complete: true, game_type: 'manual' })
     .select()
     .single()
   if (gameError) throw gameError
@@ -194,12 +196,64 @@ export async function importGame(
   if (scoresError) throw scoresError
 }
 
+export async function savePlayedGame(
+  players: Array<{ name: string; roundScores: number[] }>,
+  date: string,
+  gameType: string = 'pass-and-play',
+): Promise<string> {
+  const playerRecords = await Promise.all(players.map(p => upsertPlayer(p.name)))
+  const roomCode = generateRoomCode()
+  const { data: game, error: gameError } = await supabase
+    .from('games')
+    .insert({ date, room_code: roomCode, is_complete: true, game_type: gameType })
+    .select()
+    .single()
+  if (gameError) throw gameError
+
+  const scoreRows = playerRecords.map((player, i) => ({
+    game_id: game.id,
+    player_id: player.id,
+    round_scores: players[i].roundScores,
+  }))
+  const { error: scoresError } = await supabase.from('game_scores').insert(scoreRows)
+  if (scoresError) throw scoresError
+  return game.id
+}
+
 export async function updateGame(
   gameId: string,
   updates: { date?: string; notes?: string }
 ): Promise<void> {
   const { error } = await supabase.from('games').update(updates).eq('id', gameId)
   if (error) throw error
+}
+
+export async function updatePlayerInGame(
+  gameId: string,
+  oldPlayerId: string,
+  newPlayerId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('game_scores')
+    .update({ player_id: newPlayerId })
+    .eq('game_id', gameId)
+    .eq('player_id', oldPlayerId)
+  if (error) throw error
+}
+
+export async function saveShanghaiEvents(
+  gameId: string,
+  roundNumber: number,
+  shanghaiPlayerIds: string[],
+): Promise<void> {
+  if (shanghaiPlayerIds.length === 0) return
+  const rows = shanghaiPlayerIds.map(pid => ({
+    game_id: gameId,
+    player_id: pid,
+    round_number: roundNumber,
+  }))
+  // Silently ignore errors (table may not exist yet)
+  await supabase.from('shanghai_events').insert(rows).then(() => {})
 }
 
 // Stats helpers

@@ -37,10 +37,12 @@ function GameListView({ games, focalPlayerId, onPush, onPlayerClick: _onPlayerCl
               <div className={`font-medium text-sm ${isWin ? 'text-[#8b6914]' : 'text-[#2c1810]'}`}>
                 {fmtDate(g.date)}{isWin && ' 🏆'}
               </div>
-              <div className="text-[#a08c6e] text-xs mt-0.5">
-                {g.game_scores.length} players
-                {winner && focalPlayerId && !isWin && ` · ${winner.player?.name} won`}
-                {!focalPlayerId && winner && ` · ${winner.player?.name} won`}
+              <div className="flex items-center gap-1.5 text-[#a08c6e] text-xs mt-0.5 flex-wrap">
+                <span>{g.game_scores.length} players</span>
+                {g.game_type === 'ai' && <span className="bg-[#e2b858] text-[#2c1810] px-1 py-0.5 rounded text-[9px] font-semibold">vs AI</span>}
+                {g.game_type === 'pass-and-play' && <span className="bg-[#efe9dd] text-[#8b7355] px-1 py-0.5 rounded text-[9px]">Played</span>}
+                {winner && focalPlayerId && !isWin && <span>· {winner.player?.name} won</span>}
+                {!focalPlayerId && winner && <span>· {winner.player?.name} won</span>}
               </div>
             </div>
             <div className="text-right flex-shrink-0 ml-3">

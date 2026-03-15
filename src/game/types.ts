@@ -35,6 +35,12 @@ export interface Player {
   hasLaidDown: boolean
   buysRemaining: number // 5 across the whole game
   roundScores: number[] // score per round index 0-6
+  isAI?: boolean
+}
+
+export interface PlayerConfig {
+  name: string
+  isAI: boolean
 }
 
 export interface RoundRequirement {

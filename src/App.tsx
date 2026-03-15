@@ -1,76 +1,101 @@
 import { useState } from 'react'
-import BottomNav from './components/BottomNav'
+import TutorialOverlay, { useTutorial } from './components/TutorialOverlay'
+import HomePage from './components/HomePage'
 import PlayerSetup from './components/PlayerSetup'
 import ScoreEntry from './components/ScoreEntry'
 import GameSummary from './components/GameSummary'
-import GameHistory from './components/GameHistory'
+import ScoreTrackerPage from './components/ScoreTrackerPage'
 import StatsLeaderboard from './components/StatsLeaderboard'
 import JoinGame from './components/JoinGame'
 import PlayerProfileModal from './components/PlayerProfileModal'
 import PlayTab from './components/PlayTab'
 import type { Game, Player } from './lib/types'
 
-type Tab = 'new' | 'history' | 'stats' | 'play'
-type NewGameState = 'setup' | 'playing' | 'summary' | 'joining'
+type Section = 'home' | 'play' | 'scoretracker' | 'stats'
+type ScoreTrackerState = 'list' | 'setup' | 'playing' | 'summary' | 'joining'
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<Tab>('new')
-  const [gameState, setGameState] = useState<NewGameState>('setup')
+  const tutorial = useTutorial()
+  const [section, setSection] = useState<Section>('home')
+  const [scoreTrackerState, setScoreTrackerState] = useState<ScoreTrackerState>('list')
   const [activeGame, setActiveGame] = useState<Game | null>(null)
   const [activePlayers, setActivePlayers] = useState<Player[]>([])
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
 
   const handlePlayerClick = (id: string) => setSelectedPlayerId(id)
 
+  const navigateTo = (s: Section) => {
+    setSection(s)
+    if (s === 'scoretracker' && scoreTrackerState !== 'playing' && scoreTrackerState !== 'summary') {
+      setScoreTrackerState('list')
+    }
+  }
+
   const handleGameCreated = (game: Game, players: Player[]) => {
     setActiveGame(game)
     setActivePlayers(players)
-    setGameState('playing')
+    setScoreTrackerState('playing')
   }
 
-  const handleRoundsComplete = () => setGameState('summary')
+  const handleRoundsComplete = () => setScoreTrackerState('summary')
 
   const handleGameSaved = () => {
     setActiveGame(null)
     setActivePlayers([])
-    setGameState('setup')
-    setActiveTab('history')
+    setScoreTrackerState('list')
   }
 
-  const handleBackToSetup = () => {
-    setGameState('setup')
+  const handleBackToList = () => {
     setActiveGame(null)
     setActivePlayers([])
-  }
-
-  const handleTabChange = (tab: Tab) => {
-    setActiveTab(tab)
-    if (tab === 'new' && gameState !== 'playing' && gameState !== 'summary') {
-      setGameState('setup')
-    }
+    setScoreTrackerState('list')
   }
 
   return (
     <div className="max-w-[480px] mx-auto w-full flex flex-col min-h-[100dvh] relative">
       <main className="flex-1 overflow-auto">
-        {activeTab === 'new' && gameState === 'setup' && (
-          <PlayerSetup
-            onGameCreated={handleGameCreated}
-            onJoinGame={() => setGameState('joining')}
+
+        {section === 'home' && (
+          <HomePage
+            onNavigate={navigateTo}
+            onShowTutorial={tutorial.reopen}
           />
         )}
-        {activeTab === 'new' && gameState === 'joining' && (
-          <JoinGame onBack={handleBackToSetup} />
+
+        {section === 'play' && (
+          <PlayTab onBack={() => navigateTo('home')} />
         )}
-        {activeTab === 'new' && gameState === 'playing' && activeGame && (
+
+        {section === 'scoretracker' && scoreTrackerState === 'list' && (
+          <ScoreTrackerPage
+            onNavigateHome={() => navigateTo('home')}
+            onStartNewGame={() => setScoreTrackerState('setup')}
+            onPlayerClick={handlePlayerClick}
+          />
+        )}
+
+        {section === 'scoretracker' && scoreTrackerState === 'setup' && (
+          <PlayerSetup
+            onGameCreated={handleGameCreated}
+            onJoinGame={() => setScoreTrackerState('joining')}
+            onBack={handleBackToList}
+          />
+        )}
+
+        {section === 'scoretracker' && scoreTrackerState === 'joining' && (
+          <JoinGame onBack={handleBackToList} />
+        )}
+
+        {section === 'scoretracker' && scoreTrackerState === 'playing' && activeGame && (
           <ScoreEntry
             game={activeGame}
             players={activePlayers}
             onComplete={handleRoundsComplete}
-            onBack={handleBackToSetup}
+            onBack={handleBackToList}
           />
         )}
-        {activeTab === 'new' && gameState === 'summary' && activeGame && (
+
+        {section === 'scoretracker' && scoreTrackerState === 'summary' && activeGame && (
           <GameSummary
             game={activeGame}
             players={activePlayers}
@@ -78,28 +103,25 @@ export default function App() {
             onPlayerClick={handlePlayerClick}
           />
         )}
-        {activeTab === 'history' && (
-          <GameHistory onPlayerClick={handlePlayerClick} />
+
+        {section === 'stats' && (
+          <StatsLeaderboard
+            onPlayerClick={handlePlayerClick}
+            onNavigateHome={() => navigateTo('home')}
+          />
         )}
-        {activeTab === 'stats' && (
-          <StatsLeaderboard onPlayerClick={handlePlayerClick} />
-        )}
-        {activeTab === 'play' && (
-          <PlayTab />
-        )}
+
       </main>
 
-      {/* Hide nav during active game */}
-      {gameState !== 'playing' && gameState !== 'summary' && (
-        <BottomNav active={activeTab} onChange={handleTabChange} />
-      )}
-
-      {/* Player profile modal */}
       {selectedPlayerId && (
         <PlayerProfileModal
           playerId={selectedPlayerId}
           onClose={() => setSelectedPlayerId(null)}
         />
+      )}
+
+      {tutorial.show && (
+        <TutorialOverlay onDone={tutorial.dismiss} />
       )}
     </div>
   )

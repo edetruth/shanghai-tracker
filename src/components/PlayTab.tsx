@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Gamepad2 } from 'lucide-react'
+import { Gamepad2, ArrowLeft } from 'lucide-react'
 import GameSetup from './play/GameSetup'
 import GameBoard from './play/GameBoard'
+import type { PlayerConfig } from '../game/types'
 
 type PlayView = 'rules' | 'setup' | 'game'
 
@@ -22,12 +23,16 @@ const CARD_VALUES = [
   { card: 'Jokers', value: '50 pts' },
 ]
 
-export default function PlayTab() {
-  const [view, setView] = useState<PlayView>('rules')
-  const [playerNames, setPlayerNames] = useState<string[]>([])
+interface Props {
+  onBack?: () => void
+}
 
-  function handleStart(names: string[]) {
-    setPlayerNames(names)
+export default function PlayTab({ onBack }: Props) {
+  const [view, setView] = useState<PlayView>('rules')
+  const [playerConfigs, setPlayerConfigs] = useState<PlayerConfig[]>([])
+
+  function handleStart(players: PlayerConfig[]) {
+    setPlayerConfigs(players)
     setView('game')
   }
 
@@ -43,7 +48,7 @@ export default function PlayTab() {
   if (view === 'game') {
     return (
       <GameBoard
-        initialPlayerNames={playerNames}
+        initialPlayers={playerConfigs}
         onExit={() => setView('rules')}
       />
     )
@@ -51,7 +56,14 @@ export default function PlayTab() {
 
   // Rules view
   return (
-    <div className="pb-32 px-4 pt-4">
+    <div className="pb-24 px-4 pt-4">
+      {/* Back button */}
+      {onBack && (
+        <button onClick={onBack} className="flex items-center gap-2 text-[#8b6914] mb-4 -ml-1 p-1">
+          <ArrowLeft size={20} />
+          <span className="text-sm font-medium text-[#8b7355]">Home</span>
+        </button>
+      )}
       {/* Play banner */}
       <div className="card mb-5 text-center py-6">
         <div className="flex justify-center mb-3">
@@ -64,7 +76,7 @@ export default function PlayTab() {
       </div>
 
       {/* Sticky Start button */}
-      <div className="fixed bottom-16 left-0 right-0 px-4 pb-3 pt-2 bg-[#f8f6f1] border-t border-[#e2ddd2] z-10 max-w-[480px] mx-auto">
+      <div className="fixed bottom-0 left-0 right-0 px-4 pb-4 pt-2 bg-[#f8f6f1] border-t border-[#e2ddd2] z-10 max-w-[480px] mx-auto">
         <button onClick={() => setView('setup')} className="btn-primary">
           Start a Game →
         </button>
