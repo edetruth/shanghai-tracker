@@ -51,20 +51,21 @@ export default function PlayTab() {
 
   // Rules view
   return (
-    <div className="pb-24 px-4 pt-4">
+    <div className="pb-32 px-4 pt-4">
       {/* Play banner */}
-      <div className="card mb-5 text-center py-8">
+      <div className="card mb-5 text-center py-6">
         <div className="flex justify-center mb-3">
-          <div className="w-16 h-16 rounded-full bg-[#efe9dd] flex items-center justify-center">
-            <Gamepad2 size={32} strokeWidth={1.5} className="text-[#8b6914]" />
+          <div className="w-14 h-14 rounded-full bg-[#efe9dd] flex items-center justify-center">
+            <Gamepad2 size={28} strokeWidth={1.5} className="text-[#8b6914]" />
           </div>
         </div>
         <h1 className="text-2xl font-bold text-[#2c1810] mb-1">Play Shanghai</h1>
-        <p className="text-[#8b7355] text-sm mb-5">Pass-and-play on one device</p>
-        <button
-          onClick={() => setView('setup')}
-          className="btn-primary max-w-xs mx-auto"
-        >
+        <p className="text-[#8b7355] text-sm">Pass-and-play on one device</p>
+      </div>
+
+      {/* Sticky Start button */}
+      <div className="fixed bottom-16 left-0 right-0 px-4 pb-3 pt-2 bg-[#f8f6f1] border-t border-[#e2ddd2] z-10 max-w-[480px] mx-auto">
+        <button onClick={() => setView('setup')} className="btn-primary">
           Start a Game →
         </button>
       </div>

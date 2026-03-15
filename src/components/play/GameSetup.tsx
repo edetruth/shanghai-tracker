@@ -47,10 +47,17 @@ export default function GameSetup({ onStart, onBack }: Props) {
         >
           <ChevronLeft size={20} />
         </button>
-        <h1 className="text-lg font-bold text-[#2c1810]">New Game</h1>
+        <h1 className="text-lg font-bold text-[#2c1810] flex-1">New Game</h1>
+        <button
+          onClick={handleStart}
+          disabled={!allFilled}
+          className="bg-[#e2b858] text-[#2c1810] font-semibold rounded-xl px-4 py-2 text-sm active:opacity-80 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Start Game
+        </button>
       </div>
 
-      <div className="flex-1 px-4 pt-5 pb-24 space-y-5">
+      <div className="flex-1 px-4 pt-5 pb-8 space-y-5">
         {/* Player count */}
         <div>
           <p className="text-xs font-semibold text-[#a08c6e] uppercase tracking-wider mb-2">
@@ -97,16 +104,6 @@ export default function GameSetup({ onStart, onBack }: Props) {
         </div>
       </div>
 
-      {/* Bottom button */}
-      <div className="px-4 pb-8 pt-3 border-t border-[#e2ddd2] bg-white">
-        <button
-          onClick={handleStart}
-          disabled={!allFilled}
-          className="btn-primary"
-        >
-          Start Game
-        </button>
-      </div>
     </div>
   )
 }

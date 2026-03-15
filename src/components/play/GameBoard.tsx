@@ -25,7 +25,6 @@ type UIPhase =
   | 'privacy'
   | 'draw'
   | 'action'
-  | 'discard'
   | 'buying'
   | 'round-end'
   | 'game-over'
@@ -534,7 +533,7 @@ export default function GameBoard({ initialPlayerNames, onExit }: Props) {
         {/* Draw / discard pile area */}
         <div>
           <p className="text-xs font-semibold text-[#a08c6e] uppercase tracking-wider mb-2">
-            {uiPhase === 'draw' ? 'Draw a card' : 'Discard Pile'}
+            {uiPhase === 'draw' ? 'Draw a card' : 'Discard pile'}
           </p>
           <div className="flex gap-4 items-end">
             {/* Draw pile face-down card */}
@@ -578,7 +577,7 @@ export default function GameBoard({ initialPlayerNames, onExit }: Props) {
           selectedIds={selectedCardIds}
           onToggle={toggleCard}
           label={`Your hand (${currentPlayer.hand.length} cards)`}
-          disabled={uiPhase === 'draw'}
+          disabled={uiPhase !== 'action'}
         />
       </div>
 
@@ -591,52 +590,36 @@ export default function GameBoard({ initialPlayerNames, onExit }: Props) {
         )}
 
         {uiPhase === 'action' && (
-          <div className="flex gap-2">
-            {!currentPlayer.hasLaidDown && (
-              <button
-                onClick={() => setShowMeldModal(true)}
-                className="btn-primary flex-1 text-sm py-2.5"
-              >
-                Lay Down Hand
-              </button>
-            )}
-            {currentPlayer.hasLaidDown && rs.tablesMelds.length > 0 && (
-              <button
-                onClick={() => setShowLayOffModal(true)}
-                className="btn-secondary flex-1 text-sm py-2.5"
-              >
-                Lay Off / Swap
-              </button>
-            )}
-            <button
-              onClick={() => { setUiPhase('discard'); setSelectedCardIds(new Set()) }}
-              className="btn-secondary flex-1 text-sm py-2.5"
-            >
-              Discard
-            </button>
-          </div>
-        )}
-
-        {uiPhase === 'discard' && (
           <div className="space-y-2">
-            <p className="text-xs text-[#8b7355] text-center">
-              Select one card to discard
-            </p>
             <div className="flex gap-2">
-              <button
-                onClick={() => { setUiPhase('action'); setSelectedCardIds(new Set()) }}
-                className="btn-secondary flex-1 text-sm py-2.5"
-              >
-                Back
-              </button>
-              <button
-                onClick={handleDiscard}
-                disabled={selectedCardIds.size !== 1}
-                className="btn-primary flex-1 text-sm py-2.5"
-              >
-                Discard Card
-              </button>
+              {!currentPlayer.hasLaidDown && (
+                <button
+                  onClick={() => setShowMeldModal(true)}
+                  className="btn-primary flex-1 text-sm py-2.5"
+                >
+                  Lay Down Hand
+                </button>
+              )}
+              {currentPlayer.hasLaidDown && rs.tablesMelds.length > 0 && (
+                <button
+                  onClick={() => setShowLayOffModal(true)}
+                  className="btn-secondary flex-1 text-sm py-2.5"
+                >
+                  Lay Off / Swap
+                </button>
+              )}
             </div>
+            <button
+              onClick={handleDiscard}
+              disabled={selectedCardIds.size !== 1}
+              className={`w-full rounded-xl py-2.5 text-sm font-semibold transition-all ${
+                selectedCardIds.size === 1
+                  ? 'bg-[#2c1810] text-white active:opacity-80'
+                  : 'bg-[#efe9dd] text-[#a08c6e]'
+              }`}
+            >
+              {selectedCardIds.size === 1 ? 'Discard Selected Card' : 'Tap a card to discard'}
+            </button>
           </div>
         )}
       </div>
