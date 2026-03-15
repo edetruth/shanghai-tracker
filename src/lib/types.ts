@@ -35,3 +35,11 @@ export interface PlayerStats {
   best_game: number
   zero_rounds: number
 }
+
+export type DrilldownView =
+  | { type: 'game-list';     title: string; games: GameWithScores[]; focalPlayerId?: string }
+  | { type: 'game-scorecard'; title: string; game: GameWithScores; highlightPlayerId?: string }
+  | { type: 'score-history'; title: string; games: GameWithScores[]; focalPlayerId: string; playerColor: string }
+  | { type: 'zero-rounds';   title: string; games: GameWithScores[]; focalPlayerId: string }
+  | { type: 'win-streak';    title: string; games: GameWithScores[]; focalPlayerId: string }
+  | { type: 'improvement';   title: string; focalPlayerId: string; playerColor: string; firstGames: GameWithScores[]; lastGames: GameWithScores[]; firstAvg: number; lastAvg: number }

@@ -2,13 +2,13 @@
 
 ## Project Overview
 
-Progressive Web App (PWA) for tracking Shanghai Rummy card game scores. Mobile-first, dark-themed, with real-time multiplayer and historical stats.
+Progressive Web App (PWA) for tracking Shanghai Rummy card game scores. Mobile-first, warm cream light theme, with real-time multiplayer and historical stats.
 
 ## Tech Stack
 
 - **React 18** + **TypeScript 5** — UI layer
 - **Vite 5** — build tool, dev server, PWA plugin
-- **Tailwind CSS 3** — utility-first styling with custom navy/gold theme
+- **Tailwind CSS 3** — utility-first styling with warm cream/gold light theme
 - **Supabase JS 2** — PostgreSQL backend, real-time subscriptions
 - **Recharts** — score trend line charts
 - **XLSX** — Excel/CSV import and export
@@ -95,6 +95,27 @@ Key functions: `getPlayers`, `upsertPlayer`, `createGame`, `getGame`, `getComple
 - **`total_score`** is a generated column in Supabase — never insert or update it directly.
 - **`created_by`** column does not exist in the `games` table — do not reference it.
 - **Score entry** only saves rounds 0..currentRound to avoid zero-filling future rounds on realtime sync.
+
+## Theme
+
+Light "warm cream" theme. Do not reintroduce dark backgrounds.
+
+| Token | Hex | Usage |
+|-------|-----|-------|
+| Page bg | `#f8f6f1` | `body` background |
+| Card bg | `#ffffff` | `.card` (+ `box-shadow: 0 1px 3px rgba(0,0,0,0.06)`) |
+| Secondary surface | `#efe9dd` | Stat boxes, pill containers, secondary buttons |
+| Border | `#e2ddd2` | All borders |
+| Primary text | `#2c1810` | Body copy, headings |
+| Secondary text | `#8b7355` | Subtext, labels |
+| Tertiary text | `#a08c6e` | Section headers, placeholders |
+| Accent gold (text) | `#8b6914` | Icons, highlights, active states |
+| Accent gold (fill) | `#e2b858` | `.btn-primary` bg, chips |
+| Green | `#2d7a3a` | "Out!", positive stats |
+| Red | `#b83232` | Errors, negative stats |
+| Blue (compare B) | `#1d7ea8` | Head-to-head player B color |
+
+Tab pill pattern: container `bg-[#efe9dd]`, active `bg-white text-[#8b6914] shadow-sm`, inactive `text-[#8b7355]`.
 
 ## Deployment
 

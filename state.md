@@ -64,9 +64,9 @@ Components manage their own ephemeral UI state with `useState`:
 | `ScoreEntry` | `scores` (7×N string grid), `currentRound`, `saving`, `roundError` |
 | `GameCard` | `expanded`, `confirming` (delete), `editing`, `editDate`, `editNotes`, `editScores` (Record\<playerId, string[]\>), `savingEdit` |
 | `GameHistory` | `games` list, `loading`, `view` (list/export/import) |
-| `StatsLeaderboard` | `view`, `games`, `minGames`, `alsoPlayedOpen`, `dateFilter`, `customStart`/`customEnd`, `trendsView`, `overtimeMode` (raw/rolling), `visiblePlayerIds`, `maxLinesWarning`, `compareA`/`compareB` |
+| `StatsLeaderboard` | `view`, `games`, `minGames`, `alsoPlayedOpen`, `dateFilter`, `customStart`/`customEnd`, `trendsView`, `overtimeMode` (raw/rolling), `visiblePlayerIds`, `maxLinesWarning`, `compareA`/`compareB`, `drilldownStack` |
 | `GameSummary` | `notes`, `saving`, `gameData` (fetched), `copied` |
-| `PlayerProfileModal` | `games` (fetched), `loading`, `visible` (slide animation) |
+| `PlayerProfileModal` | `games` (fetched), `loading`, `visible` (slide animation), `drilldownStack` |
 | `ImportData` | `file`, `preview` rows, `importing` flag, `results` |
 | `ExportData` | `exporting` flag |
 | `JoinGame` | `roomCode` input, `loading`, `error` |
@@ -178,7 +178,45 @@ This is recalculated on every render from `activeGame` — not stored separately
 - Share button copies formatted results text to clipboard (`copied` state toggles icon/label for 2s).
 - Notes + Save button unchanged at bottom.
 
-### Comprehensive UI overhaul (latest)
+### Drillable Stats (latest)
+
+**Every stat is now tappable** — opens a `DrilldownModal` (z-60) sliding up from the bottom with up to 3 levels of back navigation.
+
+**New files:**
+- `src/components/DrilldownModal.tsx` — reusable modal shell + 6 sub-view renderers: `GameListView`, `GameScorecardView`, `ScoreHistoryView`, `ZeroRoundsView`, `WinStreakView`, `ImprovementView`
+
+**`src/lib/types.ts`** — added `DrilldownView` discriminated union (6 variants: game-list, game-scorecard, score-history, zero-rounds, win-streak, improvement)
+
+**`StatsLeaderboard.tsx`** drilldowns wired:
+- Podium: wins (→ game-list of wins), avg (→ score-history), games (→ full game-list)
+- Table rows: G / W / Avg / Best / 0s columns all tappable (Best → scorecard of that game, 0s → zero-rounds)
+- Best Nights: score badge → game-scorecard
+- Improvement Tracker rows: delta → improvement drilldown (first 5 vs last 5 games)
+- Records: each value badge → relevant drilldown (wins→list, avg→history, best→scorecard, zeros→zero-rounds, games→list, streak→win-streak, improved→improvement, worst→scorecard, survivor→list)
+- Local helpers: `getWinStreakGames()` (returns `GameWithScores[]`), `DS` button component (dotted underline), drilldown builder functions
+
+**`PlayerProfileModal.tsx`** drilldowns wired:
+- Stat tiles: Wins / Avg / Best / Win% all tappable
+- Personal records: Best game / Worst game / Zeros / Win streak all tappable
+- Game log rows converted from `div` to `button` (→ game-scorecard)
+
+**Visual affordance:** `DS` button component adds `decoration-dotted underline-offset-2` to tappable numbers.
+
+### Light theme overhaul
+
+**Full switch from dark navy to warm cream** (`index.css`, all 11 components)
+- Page bg: `#f8f6f1`, card bg: `#ffffff` with subtle shadow, secondary surface: `#efe9dd`
+- Primary text: `#2c1810` (dark warm brown), secondary: `#8b7355`, tertiary: `#a08c6e`
+- Gold accent on light: `#8b6914` (text/icons); `#e2b858` unchanged for button fills and chips
+- Green `#4ade80` → `#2d7a3a`; red `text-red-400` → `#b83232`; compare blue `#6ecfef` → `#1d7ea8`
+- `.card` now uses `box-shadow: 0 1px 3px rgba(0,0,0,0.06)` instead of dark border
+- Tab pills: `bg-[#efe9dd]` container, active `bg-white shadow-sm text-[#8b6914]`
+- Recharts tooltips: white bg, `#e2ddd2` border, `#2c1810` text
+- BottomNav: white bg with subtle top shadow
+
+---
+
+### Comprehensive UI overhaul
 
 **Score entry fixes** (`ScoreEntry.tsx`)
 - 1B: `loadGame` pads `round_scores` to 7 with `''` — future rounds never loaded as `'0'`. `saveCurrentRound` writes only `scores.slice(0, currentRound + 1)`, preventing zero-fill pollution on realtime sync.

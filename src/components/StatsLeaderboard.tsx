@@ -9,8 +9,9 @@ import {
 } from 'lucide-react'
 import { getCompletedGames, computeWinner } from '../lib/gameStore'
 import { PLAYER_COLORS } from '../lib/constants'
-import type { GameWithScores, Player } from '../lib/types'
+import type { GameWithScores, Player, DrilldownView } from '../lib/types'
 import { format } from 'date-fns'
+import DrilldownModal from './DrilldownModal'
 
 type MinGames = 0 | 2 | 3 | 5
 type TrendsView = 'averages' | 'overtime' | 'compare'
@@ -38,6 +39,11 @@ export default function StatsLeaderboard({ onPlayerClick }: Props) {
   const [maxLinesWarning, setMaxLinesWarning] = useState(false)
   const [compareA, setCompareA] = useState<string | null>(null)
   const [compareB, setCompareB] = useState<string | null>(null)
+  // Drilldown
+  const [drilldownStack, setDrilldownStack] = useState<DrilldownView[]>([])
+  const pushDrilldown = (v: DrilldownView) => setDrilldownStack((s) => [...s, v])
+  const popDrilldown = () => setDrilldownStack((s) => s.slice(0, -1))
+  const closeDrilldowns = () => setDrilldownStack([])
 
   useEffect(() => {
     getCompletedGames().then((g) => { setGames(g); setLoading(false) })
@@ -169,9 +175,9 @@ export default function StatsLeaderboard({ onPlayerClick }: Props) {
         const scores = gs.map((g) => g.game_scores.find((x) => x.player_id === s.player.id)?.total_score ?? 0)
         return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
       }
-      const first5avg = getAvg(pg.slice(0, 5))
-      const last5avg = getAvg(pg.slice(-5))
-      return { player: s.player, first5avg, last5avg, diff: first5avg - last5avg }
+      const first5Games = pg.slice(0, 5), last5Games = pg.slice(-5)
+      const first5avg = getAvg(first5Games), last5avg = getAvg(last5Games)
+      return { player: s.player, first5avg, last5avg, diff: first5avg - last5avg, first5Games, last5Games }
     })
     .filter((x) => x.diff !== 0)
     .sort((a, b) => b.diff - a.diff)
@@ -186,14 +192,18 @@ export default function StatsLeaderboard({ onPlayerClick }: Props) {
     .slice(0, 5)
 
   // Records helpers
-  const getWinStreak = (playerId: string) => {
-    let max = 0, cur = 0
+  const getWinStreakGames = (playerId: string): GameWithScores[] => {
+    let maxGames: GameWithScores[] = [], curGames: GameWithScores[] = []
     for (const g of chronoGames) {
       if (!g.game_scores.some((gs) => gs.player_id === playerId)) continue
-      if (computeWinner(g.game_scores)?.player_id === playerId) { cur++; max = Math.max(max, cur) } else cur = 0
+      if (computeWinner(g.game_scores)?.player_id === playerId) {
+        curGames.push(g)
+        if (curGames.length > maxGames.length) maxGames = [...curGames]
+      } else { curGames = [] }
     }
-    return max
+    return maxGames
   }
+  const getWinStreak = (playerId: string) => getWinStreakGames(playerId).length
   const getImprovement = (playerId: string) => {
     const pg = chronoGames.filter((g) => g.game_scores.some((gs) => gs.player_id === playerId))
     if (pg.length < 6) return null
@@ -201,8 +211,9 @@ export default function StatsLeaderboard({ onPlayerClick }: Props) {
       const scores = gs.map((g) => g.game_scores.find((s) => s.player_id === playerId)!.total_score)
       return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
     }
-    const first3avg = avg(pg.slice(0, 3)), last3avg = avg(pg.slice(-3))
-    return { first3avg, last3avg, diff: first3avg - last3avg }
+    const firstGames = pg.slice(0, 3), lastGames = pg.slice(-3)
+    const first3avg = avg(firstGames), last3avg = avg(lastGames)
+    return { first3avg, last3avg, diff: first3avg - last3avg, firstGames, lastGames }
   }
 
   // Records
@@ -238,6 +249,49 @@ export default function StatsLeaderboard({ onPlayerClick }: Props) {
       {name}
     </button>
   )
+
+  // Drillable stat button — dotted underline affordance
+  const DS = ({ onClick, children, className = '', style }: { onClick: () => void; children: React.ReactNode; className?: string; style?: React.CSSProperties }) => (
+    <button
+      onClick={(e) => { e.stopPropagation(); onClick() }}
+      className={`underline decoration-dotted underline-offset-2 hover:opacity-70 transition-opacity ${className}`}
+      style={style}
+    >
+      {children}
+    </button>
+  )
+
+  // Drilldown view builder helpers
+  const localFmtDate = (d: string) => { try { return format(new Date(d + 'T12:00:00'), 'MMM d, yyyy') } catch { return d } }
+  const winsGamesList = (pid: string, name: string): DrilldownView => ({
+    type: 'game-list', title: `${name}'s Wins`,
+    games: filteredGames.filter((g) => computeWinner(g.game_scores)?.player_id === pid), focalPlayerId: pid,
+  })
+  const allGamesList = (pid: string, name: string): DrilldownView => ({
+    type: 'game-list', title: `${name}'s Games`,
+    games: filteredGames.filter((g) => g.game_scores.some((gs) => gs.player_id === pid)), focalPlayerId: pid,
+  })
+  const scoreHistoryDrill = (pid: string, name: string): DrilldownView => ({
+    type: 'score-history', title: `${name} — Score History`,
+    games: filteredGames.filter((g) => g.game_scores.some((gs) => gs.player_id === pid)),
+    focalPlayerId: pid, playerColor: playerColor(pid),
+  })
+  const bestGameDrill = (pid: string, bestScore: number): DrilldownView | null => {
+    const g = filteredGames.find((g) => g.game_scores.some((gs) => gs.player_id === pid && gs.total_score === bestScore))
+    return g ? { type: 'game-scorecard', title: localFmtDate(g.date), game: g, highlightPlayerId: pid } : null
+  }
+  const worstGameDrill = (pid: string, worstScore: number): DrilldownView | null => {
+    const g = filteredGames.find((g) => g.game_scores.some((gs) => gs.player_id === pid && gs.total_score === worstScore))
+    return g ? { type: 'game-scorecard', title: localFmtDate(g.date), game: g, highlightPlayerId: pid } : null
+  }
+  const zeroRoundsDrill = (pid: string, name: string): DrilldownView => ({
+    type: 'zero-rounds', title: `${name}'s Zero Rounds`,
+    games: filteredGames.filter((g) => g.game_scores.some((gs) => gs.player_id === pid && gs.round_scores.some((s) => s === 0))),
+    focalPlayerId: pid,
+  })
+  const winStreakDrill = (pid: string, name: string): DrilldownView => ({
+    type: 'win-streak', title: `${name}'s Win Streak`, games: getWinStreakGames(pid), focalPlayerId: pid,
+  })
 
   return (
     <div className="flex flex-col min-h-[100dvh]">
@@ -320,9 +374,11 @@ export default function StatsLeaderboard({ onPlayerClick }: Props) {
                         {isFirst && <div className="text-lg mb-1">👑</div>}
                         <PlayerName id={s.player.id} name={s.player.name}
                           className="text-[#2c1810] font-medium text-sm leading-tight truncate block w-full" />
-                        <div className="font-mono font-bold mt-1" style={{ color }}>{s.wins}W</div>
-                        <div className="text-[#8b7355] text-xs">avg {s.avg_score}</div>
-                        <div className="text-[#a08c6e] text-xs">{s.games_played}g</div>
+                        <div className="font-mono font-bold mt-1">
+                          <DS onClick={() => pushDrilldown(winsGamesList(s.player.id, s.player.name))} className="font-mono font-bold" style={{ color }}>{s.wins}W</DS>
+                        </div>
+                        <div className="text-[#8b7355] text-xs">avg <DS onClick={() => pushDrilldown(scoreHistoryDrill(s.player.id, s.player.name))} className="text-[#8b7355] text-xs">{s.avg_score}</DS></div>
+                        <div className="text-[#a08c6e] text-xs"><DS onClick={() => pushDrilldown(allGamesList(s.player.id, s.player.name))} className="text-[#a08c6e] text-xs">{s.games_played}g</DS></div>
                       </div>
                       <div className={`w-full ${podiumPlatformH[rankIdx]} rounded-b-lg flex items-center justify-center`}
                         style={{ background: `${color}18` }}>
@@ -355,11 +411,23 @@ export default function StatsLeaderboard({ onPlayerClick }: Props) {
                             <PlayerName id={s.player.id} name={s.player.name} className="text-[#2c1810] truncate max-w-[80px] text-sm" />
                           </div>
                         </td>
-                        <td className="px-2 py-2 text-center font-mono text-[#8b7355] text-xs">{s.games_played}</td>
-                        <td className="px-2 py-2 text-center font-mono text-[#8b6914] text-xs font-semibold">{s.wins}</td>
-                        <td className="px-2 py-2 text-center font-mono text-[#2c1810] text-xs">{s.avg_score}</td>
-                        <td className="px-2 py-2 text-center font-mono text-[#2d7a3a] text-xs">{s.best_game}</td>
-                        <td className="px-2 py-2 text-center font-mono text-[#7c3aed] text-xs">{s.zero_rounds}</td>
+                        <td className="px-2 py-2 text-center font-mono text-[#8b7355] text-xs">
+                          <DS onClick={() => pushDrilldown(allGamesList(s.player.id, s.player.name))} className="font-mono text-[#8b7355] text-xs">{s.games_played}</DS>
+                        </td>
+                        <td className="px-2 py-2 text-center font-mono text-[#8b6914] text-xs font-semibold">
+                          <DS onClick={() => pushDrilldown(winsGamesList(s.player.id, s.player.name))} className="font-mono text-[#8b6914] text-xs font-semibold">{s.wins}</DS>
+                        </td>
+                        <td className="px-2 py-2 text-center font-mono text-[#2c1810] text-xs">
+                          <DS onClick={() => pushDrilldown(scoreHistoryDrill(s.player.id, s.player.name))} className="font-mono text-[#2c1810] text-xs">{s.avg_score}</DS>
+                        </td>
+                        <td className="px-2 py-2 text-center font-mono text-[#2d7a3a] text-xs">
+                          <DS onClick={() => { const v = bestGameDrill(s.player.id, s.best_game); if (v) pushDrilldown(v) }} className="font-mono text-[#2d7a3a] text-xs">{s.best_game}</DS>
+                        </td>
+                        <td className="px-2 py-2 text-center font-mono text-[#7c3aed] text-xs">
+                          {s.zero_rounds > 0
+                            ? <DS onClick={() => pushDrilldown(zeroRoundsDrill(s.player.id, s.player.name))} className="font-mono text-[#7c3aed] text-xs">{s.zero_rounds}</DS>
+                            : s.zero_rounds}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -448,7 +516,14 @@ export default function StatsLeaderboard({ onPlayerClick }: Props) {
                             </button>
                             <div className="text-[#a08c6e] text-xs">{dateStr} · {bn.playerCount} players</div>
                           </div>
-                          <span className="font-mono font-bold" style={{ color: i === 0 ? '#8b6914' : '#2c1810' }}>{bn.score} pts</span>
+                          <DS
+                        onClick={() => {
+                          const g = filteredGames.find((g) => g.date === bn.date && g.game_scores.some((gs) => gs.player_id === bn.playerId && gs.total_score === bn.score))
+                          if (g) pushDrilldown({ type: 'game-scorecard', title: localFmtDate(g.date), game: g, highlightPlayerId: bn.playerId })
+                        }}
+                        className="font-mono font-bold"
+                        style={{ color: i === 0 ? '#8b6914' : '#2c1810' } as React.CSSProperties}
+                      >{bn.score} pts</DS>
                         </div>
                       )
                     })}
@@ -531,9 +606,12 @@ export default function StatsLeaderboard({ onPlayerClick }: Props) {
                         <div className="flex-1 text-xs text-[#8b7355] font-mono">
                           {d.first5avg} → {d.last5avg}
                         </div>
-                        <div className={`text-xs font-semibold font-mono flex-shrink-0 ${d.diff > 0 ? 'text-[#2d7a3a]' : 'text-[#b83232]'}`}>
+                        <DS
+                          onClick={() => pushDrilldown({ type: 'improvement', title: `${d.player.name} — Improvement`, focalPlayerId: d.player.id, playerColor: playerColor(d.player.id), firstGames: d.first5Games, lastGames: d.last5Games, firstAvg: d.first5avg, lastAvg: d.last5avg })}
+                          className={`text-xs font-semibold font-mono flex-shrink-0 ${d.diff > 0 ? 'text-[#2d7a3a]' : 'text-[#b83232]'}`}
+                        >
                           {d.diff > 0 ? '↓' : '↑'} {Math.abs(d.diff)} pts
-                        </div>
+                        </DS>
                       </div>
                     ))}
                   </div>
@@ -621,13 +699,20 @@ export default function StatsLeaderboard({ onPlayerClick }: Props) {
               <p className="text-[#a08c6e] text-xs uppercase tracking-wider mb-2">Champions</p>
               <div className="flex flex-col gap-2">
                 {[
-                  { icon: <Trophy size={18} className="text-[#8b6914]" />, label: 'Most Wins', id: mostWins?.player.id, name: mostWins?.player.name, value: `${mostWins?.wins} wins`, accent: '#8b6914' },
-                  { icon: <TrendingDown size={18} className="text-[#1d7ea8]" />, label: 'Lowest Average', id: lowestAvg?.player.id, name: lowestAvg?.player.name, value: lowestAvg ? `${lowestAvg.avg_score} avg` : 'Need 2+ games', accent: '#1d7ea8' },
-                  { icon: <Star size={18} className="text-[#2d7a3a]" />, label: 'Best Single Game', id: bestSingle?.player.id, name: bestSingle?.player.name, value: bestSingle ? `${bestSingle.best_game} pts` : '—', accent: '#2d7a3a', glow: bestSingle?.best_game === 0 },
-                  { icon: <Zap size={18} className="text-[#7c3aed]" />, label: 'Most Zeros', id: mostZeros?.player.id, name: mostZeros?.player.name, value: `${mostZeros?.zero_rounds ?? 0} rounds`, accent: '#7c3aed' },
-                  { icon: <Calendar size={18} className="text-[#2d7a3a]" />, label: 'Most Games Played', id: mostGamesPlayed?.player.id, name: mostGamesPlayed?.player.name, value: `${mostGamesPlayed?.games_played ?? 0} games`, accent: '#2d7a3a' },
-                  { icon: <Award size={18} className="text-[#8b6914]" />, label: 'Longest Win Streak', id: longestStreak?.s.player.id, name: longestStreak?.s.player.name, value: longestStreak ? `${longestStreak.streak} in a row` : '—', accent: '#8b6914' },
-                  mostImproved ? { icon: <TrendingUp size={18} className="text-[#2d7a3a]" />, label: 'Most Improved', id: mostImproved.s.player.id, name: mostImproved.s.player.name, value: `${mostImproved.imp!.first3avg} → ${mostImproved.imp!.last3avg}`, accent: '#2d7a3a' } : null,
+                  { icon: <Trophy size={18} className="text-[#8b6914]" />, label: 'Most Wins', id: mostWins?.player.id, name: mostWins?.player.name, value: `${mostWins?.wins} wins`, accent: '#8b6914',
+                    onDrill: mostWins ? () => pushDrilldown(winsGamesList(mostWins.player.id, mostWins.player.name)) : undefined },
+                  { icon: <TrendingDown size={18} className="text-[#1d7ea8]" />, label: 'Lowest Average', id: lowestAvg?.player.id, name: lowestAvg?.player.name, value: lowestAvg ? `${lowestAvg.avg_score} avg` : 'Need 2+ games', accent: '#1d7ea8',
+                    onDrill: lowestAvg ? () => pushDrilldown(scoreHistoryDrill(lowestAvg.player.id, lowestAvg.player.name)) : undefined },
+                  { icon: <Star size={18} className="text-[#2d7a3a]" />, label: 'Best Single Game', id: bestSingle?.player.id, name: bestSingle?.player.name, value: bestSingle ? `${bestSingle.best_game} pts` : '—', accent: '#2d7a3a', glow: bestSingle?.best_game === 0,
+                    onDrill: bestSingle ? () => { const v = bestGameDrill(bestSingle.player.id, bestSingle.best_game); if (v) pushDrilldown(v) } : undefined },
+                  { icon: <Zap size={18} className="text-[#7c3aed]" />, label: 'Most Zeros', id: mostZeros?.player.id, name: mostZeros?.player.name, value: `${mostZeros?.zero_rounds ?? 0} rounds`, accent: '#7c3aed',
+                    onDrill: mostZeros?.zero_rounds ? () => pushDrilldown(zeroRoundsDrill(mostZeros.player.id, mostZeros.player.name)) : undefined },
+                  { icon: <Calendar size={18} className="text-[#2d7a3a]" />, label: 'Most Games Played', id: mostGamesPlayed?.player.id, name: mostGamesPlayed?.player.name, value: `${mostGamesPlayed?.games_played ?? 0} games`, accent: '#2d7a3a',
+                    onDrill: mostGamesPlayed ? () => pushDrilldown(allGamesList(mostGamesPlayed.player.id, mostGamesPlayed.player.name)) : undefined },
+                  { icon: <Award size={18} className="text-[#8b6914]" />, label: 'Longest Win Streak', id: longestStreak?.s.player.id, name: longestStreak?.s.player.name, value: longestStreak ? `${longestStreak.streak} in a row` : '—', accent: '#8b6914',
+                    onDrill: longestStreak?.streak ? () => pushDrilldown(winStreakDrill(longestStreak.s.player.id, longestStreak.s.player.name)) : undefined },
+                  mostImproved ? { icon: <TrendingUp size={18} className="text-[#2d7a3a]" />, label: 'Most Improved', id: mostImproved.s.player.id, name: mostImproved.s.player.name, value: `${mostImproved.imp!.first3avg} → ${mostImproved.imp!.last3avg}`, accent: '#2d7a3a',
+                    onDrill: () => pushDrilldown({ type: 'improvement', title: `${mostImproved.s.player.name} — Improvement`, focalPlayerId: mostImproved.s.player.id, playerColor: playerColor(mostImproved.s.player.id), firstGames: mostImproved.imp!.firstGames, lastGames: mostImproved.imp!.lastGames, firstAvg: mostImproved.imp!.first3avg, lastAvg: mostImproved.imp!.last3avg }) } : null,
                 ].filter(Boolean).map((rec) => {
                   const r = rec!
                   return (
@@ -640,7 +725,11 @@ export default function StatsLeaderboard({ onPlayerClick }: Props) {
                           ? <PlayerName id={r.id} name={r.name ?? '—'} className="text-[#2c1810] font-medium text-sm truncate block" />
                           : <div className="text-[#2c1810] font-medium text-sm">—</div>}
                       </div>
-                      <div className="font-mono text-xs font-semibold flex-shrink-0" style={{ color: r.accent }}>{r.value}</div>
+                      <div className="font-mono text-xs font-semibold flex-shrink-0" style={{ color: r.accent }}>
+                        {r.onDrill
+                          ? <DS onClick={r.onDrill} className="font-mono text-xs font-semibold" style={{ color: r.accent } as React.CSSProperties}>{r.value}</DS>
+                          : r.value}
+                      </div>
                     </div>
                   )
                 })}
@@ -651,8 +740,10 @@ export default function StatsLeaderboard({ onPlayerClick }: Props) {
               <p className="text-[#a08c6e] text-xs uppercase tracking-wider mb-2">Hall of Shame</p>
               <div className="flex flex-col gap-2">
                 {[
-                  { icon: <Flame size={18} className="text-orange-500" />, label: 'Worst Single Game', id: worstSingle?.player.id, name: worstSingle?.player.name, value: worstSingle ? `${worstSingle.worst_game} pts` : '—', accent: '#b83232' },
-                  shanghaiSurvivor ? { icon: <Shield size={18} className="text-[#8b7355]" />, label: 'Shanghai Survivor', id: shanghaiSurvivor.player.id, name: shanghaiSurvivor.player.name, value: `${shanghaiSurvivor.games_played}g, 0 wins`, accent: '#8b7355' } : null,
+                  { icon: <Flame size={18} className="text-orange-500" />, label: 'Worst Single Game', id: worstSingle?.player.id, name: worstSingle?.player.name, value: worstSingle ? `${worstSingle.worst_game} pts` : '—', accent: '#b83232',
+                    onDrill: worstSingle ? () => { const v = worstGameDrill(worstSingle.player.id, worstSingle.worst_game); if (v) pushDrilldown(v) } : undefined },
+                  shanghaiSurvivor ? { icon: <Shield size={18} className="text-[#8b7355]" />, label: 'Shanghai Survivor', id: shanghaiSurvivor.player.id, name: shanghaiSurvivor.player.name, value: `${shanghaiSurvivor.games_played}g, 0 wins`, accent: '#8b7355',
+                    onDrill: () => pushDrilldown(allGamesList(shanghaiSurvivor.player.id, shanghaiSurvivor.player.name)) } : null,
                 ].filter(Boolean).map((rec) => {
                   const r = rec!
                   return (
@@ -664,7 +755,11 @@ export default function StatsLeaderboard({ onPlayerClick }: Props) {
                           ? <PlayerName id={r.id} name={r.name ?? '—'} className="text-[#2c1810] font-medium text-sm truncate block" />
                           : <div className="text-[#2c1810] font-medium text-sm">—</div>}
                       </div>
-                      <div className="font-mono text-xs font-semibold flex-shrink-0" style={{ color: r.accent }}>{r.value}</div>
+                      <div className="font-mono text-xs font-semibold flex-shrink-0" style={{ color: r.accent }}>
+                        {r.onDrill
+                          ? <DS onClick={r.onDrill} className="font-mono text-xs font-semibold" style={{ color: r.accent } as React.CSSProperties}>{r.value}</DS>
+                          : r.value}
+                      </div>
                     </div>
                   )
                 })}
@@ -676,6 +771,16 @@ export default function StatsLeaderboard({ onPlayerClick }: Props) {
           </div>
         )}
       </div>
+
+      {drilldownStack.length > 0 && (
+        <DrilldownModal
+          stack={drilldownStack}
+          onPush={pushDrilldown}
+          onPop={popDrilldown}
+          onClose={closeDrilldowns}
+          onPlayerClick={onPlayerClick}
+        />
+      )}
     </div>
   )
 }
