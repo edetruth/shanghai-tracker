@@ -71,7 +71,7 @@ create table game_scores (
 ### Installation
 
 ```bash
-git clone https://github.com/your-username/shanghai-tracker.git
+git clone https://github.com/edetruth/shanghai-tracker.git
 cd shanghai-tracker
 npm install
 ```
