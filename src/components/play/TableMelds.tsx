@@ -5,6 +5,7 @@ interface Props {
   melds: Meld[]
   onMeldClick?: (meld: Meld) => void
   highlightMeldId?: string
+  jokerMeldIds?: Set<string>
 }
 
 function getJokerLabel(meld: Meld, cardId: string): string | undefined {
@@ -27,7 +28,7 @@ function getJokerLabel(meld: Meld, cardId: string): string | undefined {
   return `${rankStr}${suitSymbols[mapping.representsSuit] ?? ''}`
 }
 
-export default function TableMelds({ melds, onMeldClick, highlightMeldId }: Props) {
+export default function TableMelds({ melds, onMeldClick, highlightMeldId, jokerMeldIds }: Props) {
   return (
     <div>
       <p className="text-xs font-semibold text-[#a08c6e] uppercase tracking-wider mb-2">Table</p>
@@ -41,7 +42,9 @@ export default function TableMelds({ melds, onMeldClick, highlightMeldId }: Prop
               className={`rounded-lg p-2 border transition-colors ${
                 highlightMeldId === meld.id
                   ? 'border-[#e2b858] bg-[#fffbee]'
-                  : 'border-[#e2ddd2] bg-[#f8f6f1]'
+                  : jokerMeldIds?.has(meld.id)
+                    ? 'border-[#e2b858]/60 bg-[#fffbee]/50 shadow-[0_0_6px_rgba(226,184,88,0.4)]'
+                    : 'border-[#e2ddd2] bg-[#f8f6f1]'
               } ${onMeldClick ? 'cursor-pointer active:opacity-70' : ''}`}
               onClick={onMeldClick ? () => onMeldClick(meld) : undefined}
             >
@@ -53,6 +56,11 @@ export default function TableMelds({ melds, onMeldClick, highlightMeldId }: Prop
                 <span className="text-[10px] text-[#a08c6e] bg-[#efe9dd] px-1.5 py-0.5 rounded-full">
                   {meld.type}
                 </span>
+                {jokerMeldIds?.has(meld.id) && (
+                  <span className="text-[10px] text-[#8b6914] bg-[#fffbee] px-1.5 py-0.5 rounded-full border border-[#e2b858]/40">
+                    swap
+                  </span>
+                )}
               </div>
               <div className="flex gap-1 overflow-x-auto pb-1" style={{ WebkitOverflowScrolling: 'touch' }}>
                 {meld.cards.map(card => (

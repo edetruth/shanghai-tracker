@@ -67,6 +67,9 @@ export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, 
     } else {
       onSwapJoker(selectedCard, selectedMeld)
     }
+    // Reset selections so player can do another action
+    setSelectedCardId(null)
+    setSelectedMeldId(null)
   }
 
   return (
@@ -90,6 +93,14 @@ export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, 
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+          {/* Empty melds message */}
+          {tablesMelds.length === 0 && (
+            <div className="text-center py-4">
+              <p className="text-sm text-[#a08c6e] italic">No melds on the table yet.</p>
+              <p className="text-xs text-[#a08c6e] mt-1">Lay off once other players have laid down melds.</p>
+            </div>
+          )}
+
           {/* Mode tabs */}
           <div className="bg-[#efe9dd] rounded-xl p-1 flex gap-1">
             <button
@@ -109,6 +120,13 @@ export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, 
               Swap Joker
             </button>
           </div>
+
+          {/* Swap mode hint when no melds have jokers */}
+          {mode === 'swap' && tablesMelds.filter(m => m.jokerMappings.length > 0).length === 0 && tablesMelds.length > 0 && (
+            <p className="text-sm text-[#a08c6e] italic text-center py-2">
+              No melds with jokers on the table
+            </p>
+          )}
 
           {/* Step 1: pick card */}
           <div>
@@ -142,6 +160,7 @@ export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, 
                   melds={tablesMelds}
                   onMeldClick={handleMeldClick}
                   highlightMeldId={selectedMeldId ?? undefined}
+                  jokerMeldIds={mode === 'swap' ? new Set(tablesMelds.filter(m => m.jokerMappings.length > 0).map(m => m.id)) : undefined}
                 />
               )}
             </div>

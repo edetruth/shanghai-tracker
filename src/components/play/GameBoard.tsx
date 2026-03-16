@@ -174,7 +174,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
   const [showPauseModal, setShowPauseModal] = useState(false)
   const [reshuffleMsg, setReshuffleMsg] = useState(false)
   const [aiMessage, setAiMessage] = useState<string | null>(null)
-  const [newCardId, setNewCardId] = useState<string | null>(null)
+  const [newCardIds, setNewCardIds] = useState<Set<string>>(new Set())
   const [aiActionTick, setAiActionTick] = useState(0)
   const [gameSpeed, setGameSpeed] = useState<GameSpeed>('normal')
   // Stalemate tracking (turns without any meld)
@@ -201,10 +201,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
 
   // Auto-clear new card indicator after 3 seconds
   useEffect(() => {
-    if (!newCardId) return
-    const timer = setTimeout(() => setNewCardId(null), 3000)
+    if (newCardIds.size === 0) return
+    const timer = setTimeout(() => setNewCardIds(new Set()), 3000)
     return () => clearTimeout(timer)
-  }, [newCardId])
+  }, [newCardIds])
 
   const rs = gameState.roundState
   const currentPlayer = getCurrentPlayer(gameState)
@@ -226,7 +226,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
 
   // ── Toggle card selection ─────────────────────────────────────────────────
   function toggleCard(cardId: string) {
-    setNewCardId(null) // clear new badge on any action
+    setNewCardIds(new Set()) // clear new badge on any action
     setSelectedCardIds(prev => {
       const next = new Set(prev)
       if (next.has(cardId)) next.delete(cardId)
@@ -269,7 +269,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
       return updatedState
     })
 
-    if (drawnCard) setNewCardId((drawnCard as CardType).id)
+    if (drawnCard) setNewCardIds(new Set([(drawnCard as CardType).id]))
 
     if (needsReshuffle) {
       setReshuffleMsg(true)
@@ -291,7 +291,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
     if (!card) return
 
     setPendingBuyDiscard(null) // clear pending buy — card is taken
-    setNewCardId(card.id)
+    setNewCardIds(new Set([card.id]))
 
     setGameState(prev => {
       const discardPile = [...prev.roundState.discardPile]
@@ -494,10 +494,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
 
     const updated: GameState = { ...prev, players, roundState: { ...prev.roundState, tablesMelds, goOutPlayerId } }
     setGameState(updated)
-    setShowLayOffModal(false)
     setSelectedCardIds(new Set())
 
     if (wentOut) {
+      setShowLayOffModal(false)
       const topCard = updated.roundState.discardPile[updated.roundState.discardPile.length - 1] ?? null
       startBuyingWindow(updated, playerIdx, topCard)
     }
@@ -520,7 +520,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
 
       return { ...prev, players, roundState: { ...prev.roundState, tablesMelds } }
     })
-    setShowLayOffModal(false)
     setSelectedCardIds(new Set())
   }
 
@@ -617,6 +616,12 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
         players,
         roundState: { ...gameState.roundState, drawPile, discardPile },
       }
+
+      // Highlight newly received buy cards
+      const buyNewIds = new Set<string>()
+      if (buyingDiscard) buyNewIds.add(buyingDiscard.id)
+      if (penaltyCard) buyNewIds.add(penaltyCard.id)
+      if (buyNewIds.size > 0) setNewCardIds(buyNewIds)
 
       if (isPostDraw) {
         // Post-draw buy: current player (who drew from pile) still acts after this
@@ -906,6 +911,18 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
   // During human buying: display buyer's hand; otherwise: display current player's hand
   const displayPlayer = isHumanBuyerTurn ? activeBuyer : currentPlayer
 
+  // When AI is playing, find the next human player so they can see their hand and plan
+  const aiTurnHumanViewer = useMemo(() => {
+    if (!currentPlayer.isAI) return null
+    if (isHumanBuyerTurn) return null
+    const count = gameState.players.length
+    for (let i = 1; i < count; i++) {
+      const idx = (rs.currentPlayerIndex + i) % count
+      if (!gameState.players[idx].isAI) return gameState.players[idx]
+    }
+    return null
+  }, [currentPlayer.isAI, isHumanBuyerTurn, gameState.players, rs.currentPlayerIndex])
+
   // ── Main board: draw / action / buying ────────────────────────────────────
   return (
     <div className="min-h-screen bg-[#1a3a2a] flex flex-col">
@@ -1017,6 +1034,12 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
                 }`}>
                   {p.hand.length}🃏
                 </p>
+                <p className={`text-[9px] ${
+                  p.buysRemaining === 0 ? 'text-[#f87171]' :
+                  isBuyer || isCurrent ? 'text-[#2c1810]' : 'text-[#6aad7a]'
+                }`}>
+                  {p.buysRemaining}🛒
+                </p>
               </div>
             )
           })}
@@ -1092,7 +1115,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
         )}
 
         {/* Player hand */}
-        {!displayPlayer.isAI && (
+        {!displayPlayer.isAI ? (
           <HandDisplay
             cards={displayPlayer.hand}
             selectedIds={selectedCardIds}
@@ -1104,9 +1127,20 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
             }
             sort={handSort}
             onSortChange={setHandSort}
-            newCardId={newCardId}
+            newCardIds={newCardIds}
           />
-        )}
+        ) : aiTurnHumanViewer ? (
+          <HandDisplay
+            cards={aiTurnHumanViewer.hand}
+            selectedIds={new Set()}
+            onToggle={() => {}}
+            label={`${aiTurnHumanViewer.name}'s hand (${aiTurnHumanViewer.hand.length} cards) — planning`}
+            disabled={true}
+            sort={handSort}
+            onSortChange={setHandSort}
+            newCardIds={new Set()}
+          />
+        ) : null}
       </div>
 
       {/* Fixed action bar */}
@@ -1141,15 +1175,14 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
                   Lay Down Hand
                 </button>
               )}
-              {currentPlayer.hasLaidDown && rs.tablesMelds.length > 0 && (
+              {currentPlayer.hasLaidDown ? (
                 <button
-                  onClick={() => { setNewCardId(null); setShowLayOffModal(true) }}
+                  onClick={() => { setNewCardIds(new Set()); setShowLayOffModal(true) }}
                   className="bg-[#2d5a3c] text-[#a8d0a8] font-semibold border border-[#3d7a4c] rounded-xl flex-1 text-sm py-2.5 active:opacity-80"
                 >
                   Lay Off / Swap
                 </button>
-              )}
-              {!currentPlayer.hasLaidDown && rs.tablesMelds.length > 0 && (
+              ) : (
                 <button
                   disabled
                   title="Lay down your hand first"
@@ -1161,7 +1194,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
             </div>
             <button
               onClick={() => {
-                setNewCardId(null)
+                setNewCardIds(new Set())
                 if (currentPlayer.hand.length === 1) {
                   handleDiscard(currentPlayer.hand[0].id)
                 } else {

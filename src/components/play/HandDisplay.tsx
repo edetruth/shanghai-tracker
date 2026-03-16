@@ -12,7 +12,7 @@ interface Props {
   disabled?: boolean
   sort?: SortMode
   onSortChange?: (sort: SortMode) => void
-  newCardId?: string | null
+  newCardIds?: Set<string>
 }
 
 export const SUIT_ORDER: Record<string, number> = { hearts: 0, diamonds: 1, clubs: 2, spades: 3, joker: 4 }
@@ -26,7 +26,7 @@ function cardOffset(count: number): number {
   return 24
 }
 
-export default function HandDisplay({ cards, selectedIds, onToggle, label, disabled, sort: sortProp, onSortChange, newCardId }: Props) {
+export default function HandDisplay({ cards, selectedIds, onToggle, label, disabled, sort: sortProp, onSortChange, newCardIds }: Props) {
   const [sortInternal, setSortInternal] = useState<SortMode>('rank')
   const sort = sortProp ?? sortInternal
 
@@ -90,7 +90,7 @@ export default function HandDisplay({ cards, selectedIds, onToggle, label, disab
           >
             {sorted.map((card, index) => {
               const isSelected = selectedIds.has(card.id)
-              const isNewCard = card.id === newCardId
+              const isNewCard = newCardIds?.has(card.id) ?? false
               return (
                 <div
                   key={card.id}

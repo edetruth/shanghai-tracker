@@ -56,7 +56,7 @@ export default function Card({ card, selected, onClick, compact, disabled, joker
     ${selected ? 'border-[#e2b858] border-2 -translate-y-3 shadow-md' : ''}
     ${isNew && !selected ? 'ring-2 ring-[#e2b858] shadow-[0_0_10px_rgba(226,184,88,0.6)]' : ''}
     ${onClick && !disabled ? 'cursor-pointer active:opacity-70' : ''}
-    ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
+    ${disabled ? 'cursor-default' : ''}
     transition-transform duration-100
     p-0.5
   `
