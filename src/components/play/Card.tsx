@@ -43,7 +43,7 @@ export default function Card({ card, selected, onClick, compact, disabled, joker
     : card.suit === 'hearts'
       ? 'bg-[#fff0f0] border-[#e2ddd2]'
       : card.suit === 'diamonds'
-        ? 'bg-[#fffbeb] border-[#e2ddd2]'
+        ? 'bg-[#ecfeff] border-[#e2ddd2]'
         : card.suit === 'clubs'
           ? 'bg-[#e0f7e8] border-[#e2ddd2]'
           : 'bg-[#eeecff] border-[#e2ddd2]' // spades: lavender
@@ -67,7 +67,7 @@ export default function Card({ card, selected, onClick, compact, disabled, joker
     : card.suit === 'hearts'
       ? 'text-[#c0393b]'
       : card.suit === 'diamonds'
-        ? 'text-[#b45309]'
+        ? 'text-[#0891b2]'
         : card.suit === 'clubs'
           ? 'text-[#1a6b3a]'
           : 'text-[#3d2b8e]' // spades: dark purple
