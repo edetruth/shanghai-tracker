@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Progressive Web App (PWA) for tracking Shanghai Rummy card game scores. Mobile-first, warm cream light theme, with real-time multiplayer and historical stats.
+Progressive Web App (PWA) for playing and tracking Shanghai Rummy card games. Mobile-first, warm cream light theme, with a full digital card game (pass-and-play + AI), real-time score tracker multiplayer, and historical stats.
 
 ## Tech Stack
 
@@ -19,29 +19,56 @@ Progressive Web App (PWA) for tracking Shanghai Rummy card game scores. Mobile-f
 
 ```
 src/
-├── App.tsx                  # Root: tab switching, game state machine, prop wiring
+├── App.tsx                  # Root: section routing, scoreTrackerState machine, prop wiring
 ├── main.tsx                 # React entry point
 ├── index.css                # Tailwind directives + custom scrollbar/safe-area styles
 ├── lib/
-│   ├── types.ts             # All TypeScript interfaces
+│   ├── types.ts             # All TypeScript interfaces (score tracker + stats layer)
 │   ├── constants.ts         # Round definitions, player colors, import templates
 │   ├── supabase.ts          # Supabase client (reads VITE_SUPABASE_URL/ANON_KEY)
-│   └── gameStore.ts         # Every database operation (single module, no ORM)
+│   ├── gameStore.ts         # Every database operation (single module, no ORM)
+│   └── haptics.ts           # haptic() utility — navigator.vibrate wrapper, silent no-op on iOS
+├── game/                    # Digital card game engine (no Supabase calls)
+│   ├── types.ts             # Card, Meld, RoundState, GameState, PlayerConfig
+│   ├── deck.ts              # Deck creation, shuffle, deal
+│   ├── meld-validator.ts    # Set/run/joker validation, round requirements, canLayOff
+│   ├── scoring.ts           # Hand point calculation, Shanghai detection
+│   ├── turn-manager.ts      # Draw, meld, lay-off, discard turn flow
+│   ├── buy-manager.ts       # Buy requests, priority, penalty cards
+│   ├── round-manager.ts     # Round setup and progression
+│   ├── game-manager.ts      # Full game flow across 7 rounds
+│   ├── rules.ts             # Point values, round requirement constants
+│   └── ai.ts                # Medium + Hard AI: aiFindBestMelds, aiFindAllMelds, canFormAnyValidMeld,
+│                            #   aiShouldTakeDiscard, aiChooseDiscard, aiChooseDiscardHard,
+│                            #   aiShouldBuy, aiShouldBuyHard, aiFindLayOff, aiFindJokerSwap
 ├── hooks/
-│   └── useRealtimeScores.ts # Supabase Realtime subscriptions for multiplayer
+│   └── useRealtimeScores.ts # Supabase Realtime subscriptions for score tracker multiplayer
 └── components/
-    ├── BottomNav.tsx         # Tab bar: New Game / History / Stats
-    ├── PlayerSetup.tsx       # Player selection + game date picker
-    ├── ScoreEntry.tsx        # Round-by-round score input (7 rounds)
-    ├── GameSummary.tsx       # End-of-game results with winner highlight
-    ├── GameHistory.tsx       # Completed games list with expand/delete
-    ├── GameCard.tsx          # Scorecard detail for a single game
-    ├── StatsLeaderboard.tsx  # Stats tabs: leaderboard / trends / records
-    ├── JoinGame.tsx          # Join a game via SHNG-XXXX room code (button hidden in PlayerSetup, code intact)
+    ├── HomePage.tsx          # Landing screen: 3 nav cards + HelpCircle tutorial button
+    ├── PlayTab.tsx           # Hosts play mode flow: GameSetup → GameBoard → GameOver
+    ├── ScoreTrackerPage.tsx  # Score tracker home: game list, import/export
+    ├── PlayerSetup.tsx       # Player selection + game date picker (score tracker)
+    ├── ScoreEntry.tsx        # Round-by-round score input (7 rounds) + room code copy bar
+    ├── GameSummary.tsx       # End-of-game results with winner highlight (score tracker)
+    ├── GameCard.tsx          # Scorecard detail for a single game + game_type badge
+    ├── StatsLeaderboard.tsx  # Stats tabs: leaderboard / trends / records; game-type filter
+    ├── JoinGame.tsx          # Join a score-tracked game via SHNG-XXXX room code
     ├── ExportData.tsx        # Export all data to JSON or CSV
     ├── ImportData.tsx        # Bulk import games from Excel/CSV
-    ├── DrilldownModal.tsx    # Reusable drilldown bottom sheet (z-60); 6 sub-view types; up to 3-level stack
-    └── PlayerProfileModal.tsx # Bottom-sheet player profile (stats, sparkline, H2H, game log)
+    ├── DrilldownModal.tsx    # Reusable drilldown bottom sheet (z-60); 6 sub-view types; 3-level stack
+    ├── PlayerProfileModal.tsx # Bottom-sheet player profile (z-50): stats, sparkline, H2H, game log
+    ├── TutorialOverlay.tsx   # 4-slide first-run tutorial + useTutorial hook (localStorage gate)
+    └── play/                 # Digital game UI
+        ├── GameSetup.tsx     # 2–8 players, Human/AI toggle per slot, name autocomplete, difficulty selector
+        ├── GameBoard.tsx     # Main game board: hand, melds, piles, AI automation, pause
+        ├── GameOver.tsx      # End-of-game results + auto-save badge
+        ├── Card.tsx          # Card component: suit tints, haptic on tap
+        ├── MeldModal.tsx     # Step-through meld builder: required melds → bonus-prompt → bonus phase
+        └── HandDisplay.tsx   # Scrollable hand with controlled sort (Rank / Suit) + fade gradient
+
+supabase/
+├── add_game_type.sql         # Migration: ALTER TABLE games ADD COLUMN game_type text DEFAULT 'manual'
+└── add_shanghai_events.sql   # Migration: CREATE TABLE shanghai_events (optional, for future tracking)
 ```
 
 ## Environment Variables
@@ -63,17 +90,39 @@ npm run lint      # ESLint check
 
 ## Database (Supabase)
 
-Three tables — no row-level security (public anon key access):
+Four tables — no row-level security (public anon key access):
 
 | Table | Key columns |
 |-------|-------------|
 | `players` | `id`, `name`, `created_at` |
-| `games` | `id`, `date`, `room_code`, `notes`, `is_complete`, `created_by`, `created_at` |
-| `game_scores` | `id`, `game_id`, `player_id`, `round_scores` (number[]), `total_score` |
+| `games` | `id`, `date`, `room_code`, `notes`, `is_complete`, `game_type`, `created_at` |
+| `game_scores` | `id`, `game_id`, `player_id`, `round_scores` (number[]), `total_score` (generated) |
+| `shanghai_events` | `id`, `game_id`, `player_id`, `round_number`, `created_at` (optional) |
 
 All DB access goes through `src/lib/gameStore.ts`. Never call Supabase directly from components.
 
-Key functions: `getPlayers`, `upsertPlayer`, `createGame`, `getGame`, `getCompletedGames`, `updateRoundScore`, `saveAllRoundScores`, `completeGame`, `deleteGame`, `updateGame`, `importGame`, `computeWinner`, `generateRoomCode`.
+Key functions: `getPlayers`, `upsertPlayer`, `createGame(playerIds, date, gameType?)`, `getGame`, `getCompletedGames`, `updateRoundScore`, `saveAllRoundScores`, `completeGame`, `deleteGame`, `updateGame`, `importGame`, `savePlayedGame(players, date, gameType)`, `saveShanghaiEvents(gameId, roundNumber, playerIds)`, `computeWinner`, `generateRoomCode`.
+
+## Play Mode
+
+Play mode (`section === 'play'`) runs entirely in `PlayTab` → `GameBoard`. State machine:
+
+```
+GameSetup (PlayerConfig[] configured)
+  → GameBoard (full game engine, AI automation)
+    → GameOver (auto-save → savePlayedGame())
+```
+
+- **`PlayerConfig`** — `{ name: string; isAI: boolean }` — in `src/game/types.ts`
+- **`AIDifficulty`** — `'medium' | 'hard'` — exported from `src/game/types.ts`; passed from `GameSetup` → `PlayTab` → `GameBoard` prop (`aiDifficulty?: AIDifficulty`, default `'medium'`)
+- **AI automation** — two `useEffect` blocks in `GameBoard` watch `uiPhase` + `currentPlayer.isAI`. Uses `useRef` refs (`gameStateRef`, `uiPhaseRef`, `buyerOrderRef`, `buyerStepRef`) to read fresh state inside `setTimeout` callbacks without stale closures.
+- **`nextPhaseForPlayer(player)`** — returns `'draw'` for AI (skips privacy screen), `'privacy'` for humans.
+- **`aiLayOffDoneRef`** — ref in `GameBoard`; Medium AI is capped at 1 lay-off per turn before being forced to discard. Hard AI has no cap.
+- **`aiActionTick`** — state counter bumped after Hard AI joker swaps (hand length unchanged, so this re-triggers the AI action effect).
+- **Extra melds rule** — `MeldModal` has a 3-phase flow: `required` → `bonus-prompt` → `bonus`. After the required melds are confirmed, `canFormAnyValidMeld` checks remaining cards; if a bonus meld is possible the player is prompted. AI uses `aiFindAllMelds` (finds required + all bonus melds greedily).
+- **Sort order in MeldModal** — `GameBoard` owns `handSort` state; passes it to `HandDisplay` (controlled) and passes `sortedCurrentHand` to `MeldModal` so both show cards in the same order.
+- **Undo discard** — 3s timer after human discard; buying window not started until timer expires or undo tapped.
+- **Draw pile reshuffle** — when empty, all discard cards except the top are shuffled into a new draw pile.
 
 ## Drilldown System
 
@@ -93,21 +142,28 @@ Every stat number in `StatsLeaderboard` and `PlayerProfileModal` is tappable. Ta
 - Rounds 1–4: 10 cards; Rounds 5–7: 12 cards
 - A score of 0 for a round = "Out!" (went out first)
 - Round requirements defined in `src/lib/constants.ts` (`ROUNDS` array)
+- 5 buys per player per game (out-of-turn draw + 1 penalty card from draw pile)
+- Players **must** meet the minimum round requirement to lay down, but **may** lay down additional valid melds (sets or runs) beyond the requirement in the same turn
 
 ## Key Conventions
 
 - **State lives in `App.tsx`** — no Context or Redux. Components receive props.
-- **`gameState` drives the UI**: `'setup' | 'playing' | 'summary' | 'joining'`
+- **`section`** drives top-level navigation: `'home' | 'play' | 'scoretracker' | 'stats'`
+- **`scoreTrackerState`** drives the score tracker sub-machine: `'list' | 'setup' | 'playing' | 'summary' | 'joining'`
+- **Play mode state** is self-contained in `GameBoard` — does not touch App.tsx.
 - **Player colors** are assigned deterministically from `PLAYER_COLORS` in constants.
 - **Room codes** use format `SHNG-XXXX` (4 random uppercase chars).
-- **Winner** = player with the lowest total score (`computeWinner()` in App.tsx).
+- **Winner** = player with the lowest total score (`computeWinner()` in gameStore.ts).
 - **Dates** are stored as ISO strings; displayed with date-fns, no timezone conversion.
 - **Import** groups rows by date + notes to reconstruct individual games.
 - **No test runner** is configured — there are no tests in this project.
-- **`onPlayerClick`** is threaded from `App.tsx` → `StatsLeaderboard`, `GameHistory`, `GameSummary` to open `PlayerProfileModal`. Also passed into `DrilldownModal` so player names in drilldown views are tappable.
+- **`onPlayerClick`** is threaded from `App.tsx` → `StatsLeaderboard`, `GameSummary` to open `PlayerProfileModal`. Also passed into `DrilldownModal` so player names in drilldown views are tappable.
 - **`total_score`** is a generated column in Supabase — never insert or update it directly.
 - **`created_by`** column does not exist in the `games` table — do not reference it.
 - **Score entry** only saves rounds 0..currentRound to avoid zero-filling future rounds on realtime sync.
+- **`game_type`** values: `'manual'` (score tracker), `'pass-and-play'` (play mode, all human), `'ai'` (play mode with AI). Legacy rows may be `null`.
+- **`saveShanghaiEvents()`** silently no-ops if the `shanghai_events` table doesn't exist.
+- **`haptic(type)`** — call with `'tap' | 'success' | 'error' | 'heavy'`; silent no-op on iOS/desktop.
 
 ## Theme
 
@@ -127,6 +183,8 @@ Light "warm cream" theme. Do not reintroduce dark backgrounds.
 | Green | `#2d7a3a` | "Out!", positive stats |
 | Red | `#b83232` | Errors, negative stats |
 | Blue (compare B) | `#1d7ea8` | Head-to-head player B color |
+
+Colorblind suit tints (cards): hearts `#fff5f5`, diamonds `#f5f8ff`, clubs `#f5fff7`, spades `#f8f8f8`.
 
 Tab pill pattern: container `bg-[#efe9dd]`, active `bg-white text-[#8b6914] shadow-sm`, inactive `text-[#8b7355]`.
 

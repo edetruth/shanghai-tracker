@@ -30,7 +30,7 @@
 
 ### Turn Flow
 1. **Draw** — Take the top card from either the draw pile or the discard pile
-2. **Meld (optional)** — Lay down your required hand if you have it
+2. **Meld (optional)** — Lay down your required hand if you have it. You **must** meet the minimum round requirement, but you **may** lay down additional valid sets or runs beyond the requirement in the same turn to reduce your hand size.
 3. **Lay off (optional)** — After laying down your required hand, you may add cards to ANY player's existing melds on the table
 4. **Discard** — Place one card on the discard pile
 
@@ -321,28 +321,61 @@ A working game engine with:
 
 ---
 
-## Future Phases (Preview)
+## Completed Phases
 
-### Phase 2: Pass-and-Play UI
-- Mobile-friendly card display (fan of cards in hand)
-- Tap to select, drag to meld
-- Visual table showing all melds
-- Turn indicator and buy prompt
-- Round summary screen with scores
+### Phase 2: Pass-and-Play UI ✅
+- Mobile-friendly card display with scrollable hand fan
+- Tap to select cards, tap piles to draw, tap melds to lay off
+- Visual table showing all melds laid down by all players
+- Turn indicator, privacy screen between turns, buying window prompt
+- Round summary screen with scores; 7-round progression
+- Sort toggle: order hand by Rank or Suit
+- Colorblind-friendly suit tints: hearts `#fff5f5`, diamonds `#f5f8ff`, clubs `#f5fff7`, spades `#f8f8f8`
+- Draw pile auto-reshuffle when empty (all but top discard card)
+- Undo discard: 3-second toast window for human players
+- Pause modal: Resume or Abandon
 
-### Phase 3: Online Multiplayer
-- Supabase Realtime for game state sync
-- Room codes (reuse score tracker pattern)
-- Hidden hands (each player sees only their own cards)
-- Buy request system with 5-second timer
-- Reconnection handling
+### Phase 3: Online Multiplayer — Score Tracker ✅
+- Supabase Realtime for live score sync in the score tracker (not digital play mode)
+- Room codes (`SHNG-XXXX`) generated on game creation; displayed as tap-to-copy bar in ScoreEntry
+- Join Game enabled: enter a room code to follow scores on a secondary device
+- Score entry only writes rounds 0..currentRound to prevent zero-fill pollution on sync
 
-### Phase 4: AI Opponents
-- Rule-based AI for single-player practice
-- Difficulty levels: Easy (random valid plays), Medium (optimize for low hand), Hard (track discards, strategic buying)
+### Phase 4: AI Opponents ✅
+- Medium and Hard difficulty rule-based AI (`src/game/ai.ts`)
+- `aiFindBestMelds` — finds optimal meld combination for the round requirement
+- `aiFindAllMelds` — finds required melds + greedily finds all additional valid melds (used for AI lay-down)
+- `canFormAnyValidMeld` — utility: returns true if any set or run is possible from given cards
+- `aiShouldTakeDiscard` — evaluates if top discard improves AI's hand
+- `aiChooseDiscard` / `aiChooseDiscardHard` — Medium/Hard discard strategies (Hard has stronger weighting against breaking pairs/runs)
+- `aiShouldBuy` / `aiShouldBuyHard` — Medium/Hard buy decisions (Hard buys on any pair, not just 2+)
+- `aiFindLayOff` — extends existing table melds after laying down
+- `aiFindJokerSwap` — Hard AI only: finds jokers on the table the AI can reclaim by swapping in a natural card
+- Medium AI capped at 1 lay-off per turn to prevent dumping all same-rank cards onto one meld; Hard AI has no cap
+- Per-slot AI toggle in `GameSetup`: Human/Bot icon, auto-fills "AI {n}" name, at least 1 human enforced
+- **Difficulty selector** in `GameSetup` (shown when any AI player added): Easy (Coming Soon), Medium, Hard
+- AI skips the privacy screen; turns automated with 700–1200ms delays via `useEffect` + `useRef` (fresh state)
 
-### Phase 5: Polish
+### Phase 5: Polish ✅
+- Haptic feedback utility (`src/lib/haptics.ts`): `tap`, `heavy`, `success`, `error` patterns via `navigator.vibrate`
+- First-run tutorial overlay: 4 slides (Welcome / Play Game / Score Tracker / Stats), slide dots, Skip/Next/Get Started
+- Tutorial re-openable via `HelpCircle` button on the home screen
+- Auto-save to Supabase on game over: `savePlayedGame()` creates game record with `game_type` tag (`pass-and-play` or `ai`)
+- Save status badge in `GameOver`: Loader → CheckCircle | AlertCircle
+- `game_type` column on `games` table enables filter in Stats leaderboard (All / Tracker / Played)
+- Game type badges ("vs AI", "Played") on game cards and in drilldown lists
+
+### Phase 6: Gameplay Fixes & AI Difficulty ✅
+- **Extra melds rule**: players may lay down additional valid melds beyond the round requirement in one turn; `MeldModal` walks required melds, then prompts "Lay Down More?" if further melds are possible
+- **Meld builder sort order**: `MeldModal` receives the player's sorted hand so cards appear in the same Rank/Suit order as the hand display
+- **Discard selection reset**: selecting cards in `HandDisplay` is now cleared after every lay-off action; 1-card hand auto-activates the discard button
+- **AI difficulty selector**: Easy (Coming Soon), Medium, Hard — shown in `GameSetup` when any AI player is added
+- **Hard AI**: smarter discard (stronger pair/run weighting), more aggressive buying, joker-swap reclaim, unlimited lay-offs per turn
+- **Pause button**: enlarged to 44px touch target with gold background for visibility
+
+### Remaining / Future
 - Card animations (deal, draw, discard, meld)
 - Sound effects
-- Post-game recap (reuse score tracker pattern)
-- Integration with score tracker (auto-log games)
+- Online multiplayer for digital play mode (hidden hands per device, real-time game state sync)
+- Easy AI difficulty
+- Shanghai event leaderboard (requires `shanghai_events` table — migration included, tracking not yet wired to play mode)
