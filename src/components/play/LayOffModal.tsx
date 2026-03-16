@@ -11,11 +11,18 @@ interface Props {
   onLayOff: (card: CardType, meld: Meld) => void
   onSwapJoker: (naturalCard: CardType, meld: Meld) => void
   onClose: () => void
+  errorMsg?: string | null
+}
+
+function cardName(card: CardType): string {
+  const ranks: Record<number, string> = { 0: 'Joker', 1: 'A', 11: 'J', 12: 'Q', 13: 'K' }
+  const suits: Record<string, string> = { hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠' }
+  return `${ranks[card.rank] ?? String(card.rank)}${suits[card.suit] ?? ''}`
 }
 
 type Mode = 'layoff' | 'swap'
 
-export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, onClose }: Props) {
+export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, onClose, errorMsg }: Props) {
   const [mode, setMode] = useState<Mode>('layoff')
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
   const [selectedMeldId, setSelectedMeldId] = useState<string | null>(null)
@@ -51,6 +58,21 @@ export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, 
       validationMessage = isValid
         ? 'Valid lay off ✓'
         : 'This card cannot be laid off on that meld'
+
+      // Pre-validate: would this lay-off leave exactly 1 card that can't be played?
+      if (isValid) {
+        const handAfter = hand.filter(c => c.id !== selectedCard.id)
+        if (handAfter.length === 1) {
+          const remaining = handAfter[0]
+          const canRemainPlay = tablesMelds.some(m => canLayOff(remaining, m))
+          if (!canRemainPlay) {
+            isValid = false
+            validationMessage = `Can't lay off — your remaining ${cardName(remaining)} can't be played anywhere, and you can't go out by discarding. Keep both cards and discard one instead.`
+          } else {
+            validationMessage = `Valid lay off ✓ — you can go out by laying off ${cardName(remaining)} next!`
+          }
+        }
+      }
     } else {
       const joker = findSwappableJoker(selectedCard, selectedMeld)
       isValid = joker !== null
@@ -173,6 +195,15 @@ export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, 
             </p>
           )}
         </div>
+
+        {/* External error (safety-net undo message) */}
+        {errorMsg && (
+          <div className="px-4 pb-2">
+            <p className="text-xs text-[#b83232] bg-[#fff0f0] border border-[#f0c0c0] rounded-lg px-3 py-2">
+              {errorMsg}
+            </p>
+          </div>
+        )}
 
         {/* Action buttons */}
         <div className="px-4 pb-8 pt-3 border-t border-[#e2ddd2] flex gap-3">

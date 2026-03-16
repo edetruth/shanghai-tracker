@@ -3,7 +3,7 @@ import { Pause } from 'lucide-react'
 import type { GameState, Player, Card as CardType, Meld, PlayerConfig, AIDifficulty } from '../../game/types'
 import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, MAX_BUYS } from '../../game/rules'
 import { createDecks, shuffle, dealHands } from '../../game/deck'
-import { buildMeld, isValidSet, findSwappableJoker, getNextJokerOptions } from '../../game/meld-validator'
+import { buildMeld, isValidSet, canLayOff, findSwappableJoker, getNextJokerOptions } from '../../game/meld-validator'
 import { scoreRound } from '../../game/scoring'
 import {
   aiFindBestMelds, aiFindAllMelds, aiShouldTakeDiscard, aiChooseDiscard, aiChooseDiscardHard, aiChooseDiscardEasy,
@@ -178,6 +178,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
   const [aiActionTick, setAiActionTick] = useState(0)
   const [gameSpeed, setGameSpeed] = useState<GameSpeed>('normal')
   const [discardError, setDiscardError] = useState<string | null>(null)
+  const [layOffError, setLayOffError] = useState<string | null>(null)
   // Stalemate tracking (turns without any meld)
   const noProgressTurnsRef = useRef(0)
   const drawPileDepletionsRef = useRef(0)
@@ -509,9 +510,19 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
     const goOutPlayerId = wentOut ? player.id : prev.roundState.goOutPlayerId
     const players = prev.players.map((p, i) => i === playerIdx ? { ...p, hand: newHand } : p)
 
+    // Safety net: if lay-off would leave exactly 1 card that can't be played anywhere,
+    // block it before committing — player would be stuck (can't discard last card, can't go out)
+    if (newHand.length === 1 && !tablesMelds.some(m => canLayOff(newHand[0], m))) {
+      setLayOffError('Lay-off blocked — your remaining card can\'t be played anywhere, and you can\'t go out by discarding. Keep at least 2 cards so you can discard.')
+      haptic('error')
+      setTimeout(() => setLayOffError(null), 4000)
+      return
+    }
+
     const updated: GameState = { ...prev, players, roundState: { ...prev.roundState, tablesMelds, goOutPlayerId } }
     setGameState(updated)
     setSelectedCardIds(new Set())
+    setLayOffError(null)
 
     if (wentOut) {
       setShowLayOffModal(false)
@@ -1296,7 +1307,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
           tablesMelds={rs.tablesMelds}
           onLayOff={handleLayOff}
           onSwapJoker={handleJokerSwap}
-          onClose={() => setShowLayOffModal(false)}
+          onClose={() => { setShowLayOffModal(false); setLayOffError(null) }}
+          errorMsg={layOffError}
         />
       )}
 

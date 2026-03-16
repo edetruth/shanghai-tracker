@@ -275,11 +275,19 @@ export function aiFindAllMelds(hand: Card[], requirement: RoundRequirement): Car
   return allMelds
 }
 
-// Find a card in hand that can be laid off on any of the given melds
+// Find a card in hand that can be laid off on any of the given melds.
+// Skips lay-offs that would leave exactly 1 card that can't itself be laid off
+// anywhere (which would strand the AI — can't discard last card, can't go out).
 export function aiFindLayOff(hand: Card[], tablesMelds: Meld[]): { card: Card; meld: Meld } | null {
   for (const card of hand) {
     for (const meld of tablesMelds) {
-      if (canLayOff(card, meld)) return { card, meld }
+      if (canLayOff(card, meld)) {
+        const remaining = hand.filter(c => c.id !== card.id)
+        if (remaining.length === 1 && !tablesMelds.some(m => canLayOff(remaining[0], m))) {
+          continue // would leave 1 unplayable card — skip
+        }
+        return { card, meld }
+      }
     }
   }
   return null
