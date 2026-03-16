@@ -177,6 +177,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
   const [newCardIds, setNewCardIds] = useState<Set<string>>(new Set())
   const [aiActionTick, setAiActionTick] = useState(0)
   const [gameSpeed, setGameSpeed] = useState<GameSpeed>('normal')
+  const [discardError, setDiscardError] = useState<string | null>(null)
   // Stalemate tracking (turns without any meld)
   const noProgressTurnsRef = useRef(0)
   const drawPileDepletionsRef = useRef(0)
@@ -555,11 +556,27 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
     const card = player.hand.find(c => c.id === cardId)
     if (!card) return
 
-    const preDiscardState = gameState
     const newHand = player.hand.filter(c => c.id !== cardId)
+
+    // Rule: you cannot go out by discarding — discard is blocked when it would empty your hand
+    if (newHand.length === 0 && !player.isAI) {
+      setDiscardError('You cannot go out by discarding. You must lay off your last card to go out.')
+      haptic('error')
+      setTimeout(() => setDiscardError(null), 3500)
+      return
+    }
+    // AI with 1 card: skip discard, increment stalemate counter, advance turn
+    if (newHand.length === 0 && player.isAI) {
+      noProgressTurnsRef.current += 1
+      const advanced = advancePlayer(gameState)
+      const nextPlayer = advanced.players[advanced.roundState.currentPlayerIndex]
+      setGameState(advanced)
+      setUiPhase(nextPhaseForPlayer(nextPlayer))
+      return
+    }
+
+    const preDiscardState = gameState
     const discardPile = [...rs.discardPile, card]
-    const wentOut = newHand.length === 0
-    const goOutPlayerId = wentOut ? player.id : rs.goOutPlayerId
 
     const players = gameState.players.map((p, i) =>
       i === playerIdx ? { ...p, hand: newHand } : p
@@ -567,7 +584,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
     const afterDiscard: GameState = {
       ...gameState,
       players,
-      roundState: { ...rs, discardPile, goOutPlayerId },
+      roundState: { ...rs, discardPile },
     }
 
     setGameState(afterDiscard)
@@ -579,25 +596,19 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
 
     // Check stalemate conditions
     const totalPlayers = gameState.players.length
-    if (!wentOut && drawPileDepletionsRef.current >= 2 && noProgressTurnsRef.current > totalPlayers * 8) {
-      // Force-end the round
+    if (drawPileDepletionsRef.current >= 2 && noProgressTurnsRef.current > totalPlayers * 8) {
       setTimeout(() => forceEndRound(afterDiscard), 500)
       return
     }
 
     function afterUndoExpires() {
       setPendingUndo(null)
-      if (wentOut) {
-        // Someone went out by discarding — immediate buying window (no rule 9A)
-        startBuyingWindow(afterDiscard, playerIdx, card!)
-      } else {
-        // Rule 9A: advance to next player who gets first right to take the discard
-        const advanced = advancePlayer(afterDiscard)
-        const nextPlayer = advanced.players[advanced.roundState.currentPlayerIndex]
-        setPendingBuyDiscard(card!)
-        setGameState(advanced)
-        setUiPhase(nextPhaseForPlayer(nextPlayer))
-      }
+      // Rule 9A: advance to next player who gets first right to take the discard
+      const advanced = advancePlayer(afterDiscard)
+      const nextPlayer = advanced.players[advanced.roundState.currentPlayerIndex]
+      setPendingBuyDiscard(card!)
+      setGameState(advanced)
+      setUiPhase(nextPhaseForPlayer(nextPlayer))
     }
 
     if (!player.isAI) {
@@ -1233,25 +1244,23 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
                 </button>
               )}
             </div>
+            {discardError && (
+              <p className="text-center text-xs text-[#e87070] bg-[#2c1810]/60 rounded-lg px-3 py-2 border border-[#e87070]/30">
+                {discardError}
+              </p>
+            )}
             <button
-              onClick={() => {
-                setNewCardIds(new Set())
-                if (currentPlayer.hand.length === 1) {
-                  handleDiscard(currentPlayer.hand[0].id)
-                } else {
-                  handleDiscard()
-                }
-              }}
-              disabled={currentPlayer.hand.length !== 1 && selectedCardIds.size !== 1}
+              onClick={() => { setNewCardIds(new Set()); handleDiscard() }}
+              disabled={selectedCardIds.size !== 1}
               className={`w-full rounded-xl py-2.5 text-sm font-semibold transition-all ${
-                currentPlayer.hand.length === 1 || selectedCardIds.size === 1
+                selectedCardIds.size === 1
                   ? 'bg-white text-[#2c1810] active:opacity-80'
                   : 'bg-[#1e4a2e] text-[#4a7a5a]'
               }`}
             >
-              {currentPlayer.hand.length === 1
-                ? 'Discard Last Card'
-                : selectedCardIds.size === 1 ? 'Discard Selected Card' : 'Tap a card to select, then discard'}
+              {selectedCardIds.size === 1
+                ? (currentPlayer.hand.length === 1 ? 'Discard — lay off to go out instead' : 'Discard Selected Card')
+                : 'Tap a card to select, then discard'}
             </button>
           </div>
         )}

@@ -32,12 +32,15 @@
 1. **Draw** — Take the top card from either the draw pile or the discard pile
 2. **Meld (optional)** — Lay down your required hand if you have it. You **must** meet the minimum round requirement, but you **may** lay down additional valid sets or runs beyond the requirement in the same turn to reduce your hand size.
 3. **Lay off (optional)** — After laying down your required hand, you may add cards to ANY player's existing melds on the table
-4. **Discard** — Place one card on the discard pile
+4. **Check: hand empty?** — If all cards were melded/laid off, you go out. The round ends immediately.
+5. **Discard (mandatory)** — If your hand is not empty, you **must** discard one card. You cannot end your turn without discarding.
 
 ### Going Out
-- A player goes out when they play ALL remaining cards in their hand
-- No final discard is required — if you can meld/lay off every card, you're out
+- A player goes out when they meld or lay off ALL remaining cards in their hand (step 4 above)
+- **You CANNOT go out by discarding.** Discarding your last card is not allowed — you must have a meld or lay-off opportunity for every remaining card.
+- No final discard is required when going out — if you can meld/lay off every card, you're out immediately
 - The round ends immediately when someone goes out
+- A player with 1 card who cannot lay it off anywhere is "stuck" — they must draw on their next turn and try again
 
 ### Buying (Out-of-Turn Draws)
 - **5 buys per player per game** (not per round — across all 7 rounds)
@@ -254,9 +257,8 @@ swapJoker(playerId: string, naturalCard: Card, targetMeldId: string, jokerIndex:
 
 discardCard(playerId: string, card: Card, state: RoundState): RoundState
   - Remove card from hand, add to discard pile
-  - Check if player has 0 cards → they went out
-  - If went out, trigger round end
-  - Otherwise, advance to next player (or buying phase)
+  - Cannot discard if it would empty the hand (going out via discard is not allowed)
+  - Advance to next player (Rule 9A: next player gets first right to take the discard)
 
 checkGoOut(playerId: string, state: RoundState): boolean
   - Can this player play ALL remaining cards?

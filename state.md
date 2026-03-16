@@ -338,6 +338,12 @@ Room code bar and Join Game enabled (see Phase G above).
 - If draw pile depletes twice AND no progress for many turns: round is force-ended.
 - All players score their remaining hands; "Round ended — no one went out" shown.
 
+**Cannot go out by discarding** (`GameBoard.tsx`)
+- `handleDiscard` no longer sets `goOutPlayerId` — discard never ends the round.
+- Going out is only checked in `handleMeldConfirm` and `handleLayOff` (after meld/lay-off phase).
+- Human players: discard blocked when hand would be empty; error toast shown.
+- AI players: when stuck with 1 card, turn advances without discarding; stalemate counter increments.
+
 **Lay Off / Swap gating** (`GameBoard.tsx`)
 - "Lay Off / Swap" button is disabled (greyed, with tooltip) when player hasn't laid down yet.
 - Shows as an enabled button only after `hasLaidDown = true`.
