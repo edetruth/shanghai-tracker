@@ -1,18 +1,18 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
 import type { Card as CardType, RoundRequirement } from '../../game/types'
-import { isValidSet, isValidRun } from '../../game/meld-validator'
+import { isValidSet, isValidRun, getNextJokerOptions } from '../../game/meld-validator'
 import { canFormAnyValidMeld } from '../../game/ai'
 import CardComponent from './Card'
 
 interface Props {
   hand: CardType[]
   requirement: RoundRequirement
-  onConfirm: (meldGroups: CardType[][]) => void
+  onConfirm: (meldGroups: CardType[][], jokerPositions: Map<string, number>) => void
   onClose: () => void
 }
 
-type ModalPhase = 'required' | 'bonus-prompt' | 'bonus'
+type ModalPhase = 'required' | 'bonus-prompt' | 'bonus' | 'joker-placement'
 type AllowedMeldType = 'set' | 'run' | 'both'
 
 function getAllowedBonusTypes(requirement: RoundRequirement): AllowedMeldType {
@@ -59,7 +59,6 @@ function validateBonus(cards: CardType[], allowedTypes: AllowedMeldType): { vali
   if (canBeSet) return { valid: true, message: 'Valid set ✓' }
   if (canBeRun) return { valid: true, message: 'Valid run ✓' }
 
-  // Type-specific error messages
   if (allowedTypes === 'set') {
     if (isValidRun(cards)) return { valid: false, message: 'This round only allows extra Sets, not Runs' }
     if (cards.length < 3) return { valid: false, message: `Need at least 3 cards for a set (have ${cards.length})` }
@@ -72,6 +71,23 @@ function validateBonus(cards: CardType[], allowedTypes: AllowedMeldType): { vali
   }
   if (cards.length < 3) return { valid: false, message: 'Need at least 3 cards for a set, or 4 for a run' }
   return { valid: false, message: 'Not a valid set or run' }
+}
+
+function rankLabel(rank: number): string {
+  if (rank === 0 || rank === 14) return 'A'
+  if (rank === 1) return 'A'
+  if (rank === 11) return 'J'
+  if (rank === 12) return 'Q'
+  if (rank === 13) return 'K'
+  return String(rank)
+}
+
+function suitSymbol(suit: string): string {
+  if (suit === 'hearts') return '♥'
+  if (suit === 'diamonds') return '♦'
+  if (suit === 'clubs') return '♣'
+  if (suit === 'spades') return '♠'
+  return ''
 }
 
 // ─── Shared shell ─────────────────────────────────────────────────────────────
@@ -100,6 +116,11 @@ export default function MeldModal({ hand, requirement, onConfirm, onClose }: Pro
   const [groups, setGroups] = useState<CardType[][]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
+  // Joker placement state
+  const [jokerPositions, setJokerPositions] = useState<Map<string, number>>(new Map())
+  const [pendingGroup, setPendingGroup] = useState<CardType[] | null>(null)
+  const [pendingPhaseAfterJoker, setPendingPhaseAfterJoker] = useState<'required' | 'bonus' | null>(null)
+
   const usedIds = new Set(groups.flatMap(g => g.map(c => c.id)))
   const selectedCards = hand.filter(c => selectedIds.has(c.id))
 
@@ -113,51 +134,202 @@ export default function MeldModal({ hand, requirement, onConfirm, onClose }: Pro
     })
   }
 
-  // ── Confirm a meld (required or bonus) ──────────────────────────────────
-  function handleConfirmMeld() {
-    const newGroups = [...groups, selectedCards]
+  // ── Finalize a group (after joker placement if needed) ───────────────────
+  function finalizeGroup(group: CardType[], positions: Map<string, number>, sourcePhase: 'required' | 'bonus') {
+    const newGroups = [...groups, group]
     setGroups(newGroups)
     setSelectedIds(new Set())
+    setPendingGroup(null)
+    setPendingPhaseAfterJoker(null)
 
-    if (phase === 'required') {
+    if (sourcePhase === 'required') {
       if (step + 1 < total) {
         setStep(step + 1)
+        setPhase('required')
         return
       }
-      // All required melds met — check for bonus opportunities (matching round type)
       const usedIdsNow = new Set(newGroups.flatMap(g => g.map(c => c.id)))
       const remaining = hand.filter(c => !usedIdsNow.has(c.id))
       if (remaining.length > 0 && canFormAnyValidMeld(remaining, allowedBonusTypes)) {
         setPhase('bonus-prompt')
       } else {
-        onConfirm(newGroups)
+        onConfirm(newGroups, positions)
       }
     } else {
-      // Bonus phase — check if more melds are still possible (matching round type)
       const usedIdsNow = new Set(newGroups.flatMap(g => g.map(c => c.id)))
       const remaining = hand.filter(c => !usedIdsNow.has(c.id))
       if (remaining.length === 0 || !canFormAnyValidMeld(remaining, allowedBonusTypes)) {
-        onConfirm(newGroups)
+        onConfirm(newGroups, positions)
+      } else {
+        setPhase('bonus')
       }
-      // else: stay in bonus phase for another meld
     }
+  }
+
+  // ── Confirm a meld — check for joker placement before finalizing ─────────
+  function handleConfirmMeld() {
+    const isRun = isValidRun(selectedCards) && !isValidSet(selectedCards)
+    const hasJoker = selectedCards.some(c => c.suit === 'joker')
+
+    if (isRun && hasJoker) {
+      const placement = getNextJokerOptions(selectedCards, new Map())
+      if (placement) {
+        // Enter joker placement mode
+        setPendingGroup(selectedCards)
+        setPendingPhaseAfterJoker(phase === 'required' ? 'required' : 'bonus')
+        setJokerPositions(new Map())
+        setPhase('joker-placement')
+        setSelectedIds(new Set())
+        return
+      }
+    }
+
+    // No ambiguous jokers — finalize immediately
+    finalizeGroup(selectedCards, jokerPositions, phase === 'required' ? 'required' : 'bonus')
+  }
+
+  // ── Player picks a joker position ────────────────────────────────────────
+  function handleJokerPick(jokerCardId: string, rank: number) {
+    if (!pendingGroup) return
+    const newPositions = new Map(jokerPositions)
+    newPositions.set(jokerCardId, rank)
+    setJokerPositions(newPositions)
+
+    // Check if there are more ambiguous jokers
+    const next = getNextJokerOptions(pendingGroup, newPositions)
+    if (next) {
+      // Re-render with updated positions (state update triggers this)
+      return
+    }
+
+    // All jokers placed — finalize
+    finalizeGroup(pendingGroup, newPositions, pendingPhaseAfterJoker ?? 'required')
   }
 
   // ── Back navigation ──────────────────────────────────────────────────────
   function handleBack() {
-    setSelectedIds(new Set())
-    if (phase === 'bonus') {
+    if (phase === 'joker-placement' && pendingGroup) {
+      // Restore selection so player can adjust their card picks
+      setSelectedIds(new Set(pendingGroup.map(c => c.id)))
+      setPendingGroup(null)
+      setJokerPositions(new Map())
+      setPhase(pendingPhaseAfterJoker ?? 'required')
+      setPendingPhaseAfterJoker(null)
+    } else if (phase === 'bonus') {
       setPhase('bonus-prompt')
+      setSelectedIds(new Set())
     } else if (phase === 'bonus-prompt') {
       setGroups(groups.slice(0, total - 1))
       setStep(total - 1)
       setPhase('required')
+      setSelectedIds(new Set())
     } else if (step === 0) {
       onClose()
     } else {
       setGroups(groups.slice(0, -1))
       setStep(step - 1)
+      setSelectedIds(new Set())
     }
+  }
+
+  // ─── Joker placement screen ───────────────────────────────────────────────
+  if (phase === 'joker-placement' && pendingGroup) {
+    const placement = getNextJokerOptions(pendingGroup, jokerPositions)
+
+    // Shouldn't happen, but if all placed, finalize
+    if (!placement) {
+      finalizeGroup(pendingGroup, jokerPositions, pendingPhaseAfterJoker ?? 'required')
+      return null
+    }
+
+    const sym = suitSymbol(placement.suit)
+    const placedCount = jokerPositions.size
+    const totalAmbiguous = (() => {
+      let count = 0
+      const temp = new Map<string, number>()
+      let p = getNextJokerOptions(pendingGroup, temp)
+      while (p) {
+        count++
+        temp.set(p.joker.id, p.options[0].rank) // dummy pick to count
+        p = getNextJokerOptions(pendingGroup, temp)
+      }
+      return count
+    })()
+
+    return (
+      <ModalShell onClose={onClose}>
+        <div className="flex items-center justify-between px-4 pb-3 border-b border-[#e2ddd2]">
+          <div>
+            <h2 className="font-bold text-[#2c1810] text-base">Place Your Joker</h2>
+            <p className="text-xs text-[#8b7355] mt-0.5">
+              {totalAmbiguous > 1 ? `Joker ${placedCount + 1} of ${totalAmbiguous} — ` : ''}
+              Choose where it goes in your run
+            </p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-[#a08c6e] active:bg-[#efe9dd]">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+          <p className="text-xs text-[#a08c6e]">
+            Tap the position you want. Choosing a lower position lets you extend the run further later.
+          </p>
+
+          {placement.options.map(option => (
+            <button
+              key={option.rank}
+              onClick={() => handleJokerPick(placement.joker.id, option.rank)}
+              className="w-full text-left rounded-xl border-2 border-[#e2ddd2] p-3 active:border-[#e2b858] active:bg-[#fffbee] transition-colors"
+            >
+              {/* Option label */}
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-[10px] font-bold bg-[#e2b858] text-[#2c1810] px-2 py-0.5 rounded-full">
+                  Joker = {rankLabel(option.displayRank)}{sym}
+                </span>
+                <span className="text-[10px] text-[#a08c6e]">
+                  {option.rank === placement.options[0].rank ? '← extend low' : 'extend high →'}
+                </span>
+              </div>
+
+              {/* Run preview */}
+              <div className="flex gap-1 overflow-x-auto pb-1">
+                {option.sequence.map(pos => {
+                  if (pos.isNatural) {
+                    // Find the actual card from pendingGroup
+                    const card = pendingGroup.find(c => {
+                      if (c.suit === 'joker') return false
+                      const r = placement.aceHigh && c.rank === 1 ? 14 : c.rank
+                      return r === pos.rank
+                    })
+                    if (card) return <CardComponent key={pos.rank} card={card} compact />
+                  }
+                  // Joker position — show as chip
+                  const isChosen = pos.rank === option.rank
+                  return (
+                    <div
+                      key={pos.rank}
+                      className={`rounded-lg border flex flex-col items-center justify-center w-10 h-16 flex-shrink-0 ${
+                        isChosen
+                          ? 'bg-[#fffbee] border-[#e2b858] shadow-sm'
+                          : 'bg-[#f8f6f1] border-[#e2ddd2] opacity-60'
+                      }`}
+                    >
+                      <span className="text-[8px] font-bold text-[#8b6914] leading-tight">JKR</span>
+                      <span className="text-[8px] text-[#8b6914] leading-tight">{rankLabel(pos.displayRank)}{sym}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </button>
+          ))}
+        </div>
+
+        <div className="px-4 pb-8 pt-3 border-t border-[#e2ddd2]">
+          <button onClick={handleBack} className="btn-secondary w-full">Back</button>
+        </div>
+      </ModalShell>
+    )
   }
 
   // ─── Bonus prompt screen ──────────────────────────────────────────────────
@@ -197,7 +369,7 @@ export default function MeldModal({ hand, requirement, onConfirm, onClose }: Pro
         </div>
 
         <div className="px-4 pb-8 pt-3 border-t border-[#e2ddd2] flex gap-3">
-          <button onClick={() => onConfirm(groups)} className="btn-secondary flex-1">
+          <button onClick={() => onConfirm(groups, jokerPositions)} className="btn-secondary flex-1">
             No, I'm done
           </button>
           <button onClick={() => setPhase('bonus')} className="btn-primary flex-1">
@@ -293,7 +465,7 @@ export default function MeldModal({ hand, requirement, onConfirm, onClose }: Pro
           {phase === 'required' && step === 0 ? 'Cancel' : 'Back'}
         </button>
         {phase === 'bonus' && (
-          <button onClick={() => onConfirm(groups)} className="btn-secondary flex-1">
+          <button onClick={() => onConfirm(groups, jokerPositions)} className="btn-secondary flex-1">
             Done
           </button>
         )}

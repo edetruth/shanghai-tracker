@@ -3,7 +3,7 @@ import { Pause } from 'lucide-react'
 import type { GameState, Player, Card as CardType, Meld, PlayerConfig, AIDifficulty } from '../../game/types'
 import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, MAX_BUYS } from '../../game/rules'
 import { createDecks, shuffle, dealHands } from '../../game/deck'
-import { buildMeld, isValidSet, findSwappableJoker } from '../../game/meld-validator'
+import { buildMeld, isValidSet, findSwappableJoker, getNextJokerOptions } from '../../game/meld-validator'
 import { scoreRound } from '../../game/scoring'
 import {
   aiFindBestMelds, aiFindAllMelds, aiShouldTakeDiscard, aiChooseDiscard, aiChooseDiscardHard, aiChooseDiscardEasy,
@@ -401,7 +401,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
   }
 
   // ── Meld confirmation ─────────────────────────────────────────────────────
-  function handleMeldConfirm(meldGroups: CardType[][]) {
+  function handleMeldConfirm(meldGroups: CardType[][], jokerPositions?: Map<string, number>) {
     const prev = gameState
     let counter = prev.roundState.meldIdCounter
     const playerIdx = prev.roundState.currentPlayerIndex
@@ -411,7 +411,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
     const newMelds: Meld[] = meldGroups.map(cards => {
       const type = isValidSet(cards) ? 'set' : 'run'
       const meldId = `meld-${counter++}`
-      return buildMeld(cards, type, player.id, player.name, meldId)
+      return buildMeld(cards, type, player.id, player.name, meldId, jokerPositions)
     })
 
     const tablesMelds = [...prev.roundState.tablesMelds, ...newMelds]
@@ -717,6 +717,25 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
     const isHard = aiDifficulty === 'hard'
     const isEasy = aiDifficulty === 'easy'
 
+    // Build joker positions for AI runs: place extra jokers at the low end
+    function aiJokerPositions(meldGroups: CardType[][]): Map<string, number> {
+      const positions = new Map<string, number>()
+      for (const cards of meldGroups) {
+        if (isValidSet(cards)) continue
+        // Iteratively resolve ambiguous jokers, always picking the low-end option
+        let placed = new Map<string, number>()
+        for (;;) {
+          const placement = getNextJokerOptions(cards, placed)
+          if (!placement) break
+          // options[0] is low-end, options[1] is high-end — pick low end
+          const choice = placement.options[0]
+          placed.set(placement.joker.id, choice.rank)
+        }
+        placed.forEach((rank, id) => positions.set(id, rank))
+      }
+      return positions
+    }
+
     // Easy AI: only lay down required melds (no bonus), never lay off
     if (isEasy) {
       if (!player.hasLaidDown) {
@@ -724,7 +743,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
         if (melds && melds.length > 0) {
           setAiMessage(`${player.name} lays down`)
           setTimeout(() => setAiMessage(null), 1200)
-          handleMeldConfirm(melds)
+          handleMeldConfirm(melds, aiJokerPositions(melds))
           return
         }
       }
@@ -745,7 +764,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
         noProgressTurnsRef.current = 0
         setAiMessage(`${player.name} lays down!`)
         setTimeout(() => setAiMessage(null), 1500)
-        handleMeldConfirm(melds)
+        handleMeldConfirm(melds, aiJokerPositions(melds))
         return
       }
     }

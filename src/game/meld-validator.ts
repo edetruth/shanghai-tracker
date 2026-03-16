@@ -62,9 +62,121 @@ export function meetsRoundRequirement(meldCards: Card[][], requirement: RoundReq
   return setCount >= requirement.sets && runCount >= requirement.runs
 }
 
+// ── Joker placement helpers ───────────────────────────────────────────────
+
+export interface JokerPlacementOption {
+  rank: number        // actual rank (14 = ace-high)
+  displayRank: number // display rank (14 → 1 for "A")
+  // Full sequence preview: each position is natural or joker
+  sequence: Array<{ rank: number; displayRank: number; isNatural: boolean }>
+}
+
+export interface JokerPlacement {
+  joker: Card
+  suit: string
+  aceHigh: boolean
+  options: JokerPlacementOption[]
+}
+
+// For a run containing extra jokers (beyond gap-filling), returns the NEXT ambiguous
+// joker and its valid placement options. Call iteratively until null.
+// alreadyPlaced maps jokerCardId → explicit rank chosen by the player.
+export function getNextJokerOptions(
+  cards: Card[],
+  alreadyPlaced: Map<string, number>
+): JokerPlacement | null {
+  const naturals = cards.filter(c => c.suit !== 'joker')
+  const jokers = cards.filter(c => c.suit === 'joker')
+  if (naturals.length === 0 || jokers.length === 0) return null
+
+  const suit = naturals[0].suit
+  const naturalRanks = naturals.map(c => c.rank).sort((a, b) => a - b)
+
+  // Determine ace-high
+  let useNaturalRanks = naturalRanks
+  let aceHigh = false
+  if (naturalRanks.includes(1)) {
+    const hiRanks = naturalRanks.map(r => (r === 1 ? 14 : r)).sort((a, b) => a - b)
+    if (hiRanks[0] >= 10 && canFormRun(hiRanks, jokers.length)) {
+      useNaturalRanks = hiRanks
+      aceHigh = true
+    }
+  }
+
+  // Build known ranks: naturals + already-placed joker ranks
+  const knownRanks = new Set(useNaturalRanks)
+  alreadyPlaced.forEach(rank => knownRanks.add(rank))
+
+  const allKnown = [...knownRanks].sort((a, b) => a - b)
+  const seqMin = allKnown[0]
+  const seqMax = allKnown[allKnown.length - 1]
+
+  // Find gaps within current span
+  const gaps: number[] = []
+  for (let r = seqMin; r <= seqMax; r++) {
+    if (!knownRanks.has(r)) gaps.push(r)
+  }
+
+  // Unplaced jokers
+  const unplaced = jokers.filter(j => !alreadyPlaced.has(j.id))
+  if (unplaced.length === 0) return null
+
+  // How many are needed to fill gaps?
+  const gapFillers = Math.min(gaps.length, unplaced.length)
+  if (gapFillers >= unplaced.length) return null // all fill gaps — no ambiguity
+
+  // First extra (ambiguous) joker
+  const ambiguousJoker = unplaced[gapFillers]
+
+  const options: JokerPlacementOption[] = []
+
+  // Low-end option
+  const lowRank = seqMin - 1
+  if (lowRank >= 1 && !knownRanks.has(lowRank)) {
+    const choiceKnown = new Set([...knownRanks, lowRank])
+    options.push({
+      rank: lowRank,
+      displayRank: lowRank === 14 ? 1 : lowRank,
+      sequence: buildSequencePreview(choiceKnown, useNaturalRanks),
+    })
+  }
+
+  // High-end option
+  const highRank = seqMax + 1
+  const highValid = (highRank <= 13) || (highRank === 14 && seqMax === 13)
+  if (highValid && !knownRanks.has(highRank)) {
+    const choiceKnown = new Set([...knownRanks, highRank])
+    options.push({
+      rank: highRank,
+      displayRank: highRank === 14 ? 1 : highRank,
+      sequence: buildSequencePreview(choiceKnown, useNaturalRanks),
+    })
+  }
+
+  if (options.length < 2) return null // only one valid spot → no choice needed
+
+  return { joker: ambiguousJoker, suit, aceHigh: aceHigh || options.some(o => o.rank === 14), options }
+}
+
+function buildSequencePreview(
+  knownRanks: Set<number>,
+  naturalRanks: number[]
+): Array<{ rank: number; displayRank: number; isNatural: boolean }> {
+  const sorted = [...knownRanks].sort((a, b) => a - b)
+  const seqMin = sorted[0]
+  const seqMax = sorted[sorted.length - 1]
+  const naturalSet = new Set(naturalRanks)
+  const result: Array<{ rank: number; displayRank: number; isNatural: boolean }> = []
+  for (let r = seqMin; r <= seqMax; r++) {
+    result.push({ rank: r, displayRank: r === 14 ? 1 : r, isNatural: naturalSet.has(r) })
+  }
+  return result
+}
+
 // Build a Meld object from validated cards, computing joker mappings
 // For runs: cards array is sorted into correct sequence order (jokers at their logical position)
-export function buildMeld(cards: Card[], type: 'set' | 'run', ownerId: string, ownerName: string, id: string): Meld {
+// jokerPositions: optional explicit rank assignments for jokers (from player picker)
+export function buildMeld(cards: Card[], type: 'set' | 'run', ownerId: string, ownerName: string, id: string, jokerPositions?: Map<string, number>): Meld {
   const jokerMappings: JokerMapping[] = []
   const naturals = cards.filter(c => c.suit !== 'joker')
   const jokers = cards.filter(c => c.suit === 'joker')
@@ -103,14 +215,27 @@ export function buildMeld(cards: Card[], type: 'set' | 'run', ownerId: string, o
     }
     runAceHigh = aceHigh
 
-    const min = useRanks[0]
-    const max = useRanks[useRanks.length - 1]
-    const span = max - min + 1
-    const gaps = span - useRanks.length
-    const extraJokers = jokers.length - gaps
-    // Extra jokers extend at the high end
-    const seqMin = min
-    const seqMax = max + extraJokers
+    // Split jokers into explicitly placed (player chose position) vs auto-placed
+    const explicitJokers = jokers.filter(j => jokerPositions?.has(j.id))
+    const autoJokers = jokers.filter(j => !jokerPositions?.has(j.id))
+
+    // All known ranks: naturals + explicit joker positions
+    const allKnownRanks = [...useRanks, ...explicitJokers.map(j => jokerPositions!.get(j.id)!)]
+      .sort((a, b) => a - b)
+    const allKnownSet = new Set(allKnownRanks)
+
+    const knownMin = allKnownRanks[0]
+    const knownMax = allKnownRanks[allKnownRanks.length - 1]
+
+    // Gaps within the known span that auto-jokers will fill
+    const remainingGaps: number[] = []
+    for (let r = knownMin; r <= knownMax; r++) {
+      if (!allKnownSet.has(r)) remainingGaps.push(r)
+    }
+
+    const extraAuto = autoJokers.length - remainingGaps.length
+    const seqMin = knownMin
+    const seqMax = knownMax + Math.max(0, extraAuto)
 
     runMin = seqMin
     runMax = seqMax
@@ -119,14 +244,21 @@ export function buildMeld(cards: Card[], type: 'set' | 'run', ownerId: string, o
     const fullSeq: number[] = []
     for (let r = seqMin; r <= seqMax; r++) fullSeq.push(r)
 
-    // Map jokers to missing positions
-    const naturalRankSet = new Set(useRanks)
-    const missingPositions = fullSeq.filter(r => !naturalRankSet.has(r))
-
-    jokers.forEach((j, i) => {
+    // Explicit joker mappings
+    explicitJokers.forEach(j => {
       jokerMappings.push({
         cardId: j.id,
-        representsRank: missingPositions[i] ?? seqMax,
+        representsRank: jokerPositions!.get(j.id)!,
+        representsSuit: suit,
+      })
+    })
+
+    // Auto-joker mappings: fill remaining gaps then extend at high end
+    const autoFillPositions = fullSeq.filter(r => !allKnownSet.has(r))
+    autoJokers.forEach((j, i) => {
+      jokerMappings.push({
+        cardId: j.id,
+        representsRank: autoFillPositions[i] ?? seqMax,
         representsSuit: suit,
       })
     })
