@@ -10,6 +10,7 @@ interface Props {
   requirement: RoundRequirement
   onConfirm: (meldGroups: CardType[][], jokerPositions: Map<string, number>) => void
   onClose: () => void
+  mustLayDown?: boolean  // true when player swapped a joker pre-lay-down and MUST lay down now
 }
 
 type ModalPhase = 'required' | 'bonus-prompt' | 'bonus' | 'joker-placement'
@@ -92,10 +93,10 @@ function suitSymbol(suit: string): string {
 
 // ─── Shared shell ─────────────────────────────────────────────────────────────
 
-function ModalShell({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+function ModalShell({ children, onClose, locked }: { children: React.ReactNode; onClose: () => void; locked?: boolean }) {
   return (
     <>
-      <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/40 z-40" onClick={locked ? undefined : onClose} />
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl max-h-[85vh] flex flex-col">
         <div className="flex justify-center pt-2 pb-1">
           <div className="w-10 h-1 bg-[#e2ddd2] rounded-full" />
@@ -108,7 +109,7 @@ function ModalShell({ children, onClose }: { children: React.ReactNode; onClose:
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function MeldModal({ hand, requirement, onConfirm, onClose }: Props) {
+export default function MeldModal({ hand, requirement, onConfirm, onClose, mustLayDown }: Props) {
   const total = totalRequired(requirement)
   const allowedBonusTypes = getAllowedBonusTypes(requirement)
   const [phase, setPhase] = useState<ModalPhase>('required')
@@ -257,7 +258,12 @@ export default function MeldModal({ hand, requirement, onConfirm, onClose }: Pro
     })()
 
     return (
-      <ModalShell onClose={onClose}>
+      <ModalShell onClose={onClose} locked={mustLayDown}>
+        {mustLayDown && (
+          <div className="mx-4 mt-1 mb-0 bg-[#fffbee] border border-[#e2b858] rounded-xl px-3 py-2">
+            <p className="text-xs font-semibold text-[#8b6914]">You swapped a joker — you must lay down your hand this turn!</p>
+          </div>
+        )}
         <div className="flex items-center justify-between px-4 pb-3 border-b border-[#e2ddd2]">
           <div>
             <h2 className="font-bold text-[#2c1810] text-base">Place Your Joker</h2>
@@ -266,9 +272,11 @@ export default function MeldModal({ hand, requirement, onConfirm, onClose }: Pro
               Choose where it goes in your run
             </p>
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-[#a08c6e] active:bg-[#efe9dd]">
-            <X size={18} />
-          </button>
+          {!mustLayDown && (
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-[#a08c6e] active:bg-[#efe9dd]">
+              <X size={18} />
+            </button>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
@@ -335,7 +343,7 @@ export default function MeldModal({ hand, requirement, onConfirm, onClose }: Pro
   // ─── Bonus prompt screen ──────────────────────────────────────────────────
   if (phase === 'bonus-prompt') {
     return (
-      <ModalShell onClose={onClose}>
+      <ModalShell onClose={onClose} locked={mustLayDown}>
         <div className="flex items-center justify-between px-4 pb-3 border-b border-[#e2ddd2]">
           <div>
             <h2 className="font-bold text-[#2c1810] text-base">Lay Down More?</h2>
@@ -343,9 +351,11 @@ export default function MeldModal({ hand, requirement, onConfirm, onClose }: Pro
               Requirement met · {groups.length} meld{groups.length !== 1 ? 's' : ''} confirmed
             </p>
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-[#a08c6e] active:bg-[#efe9dd]">
-            <X size={18} />
-          </button>
+          {!mustLayDown && (
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-[#a08c6e] active:bg-[#efe9dd]">
+              <X size={18} />
+            </button>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
@@ -389,7 +399,13 @@ export default function MeldModal({ hand, requirement, onConfirm, onClose }: Pro
   const bonusHint = phase === 'bonus' ? ` — ${bonusTypeLabel(allowedBonusTypes)}` : ''
 
   return (
-    <ModalShell onClose={onClose}>
+    <ModalShell onClose={onClose} locked={mustLayDown}>
+      {/* Must-lay-down banner */}
+      {mustLayDown && (
+        <div className="mx-4 mt-1 mb-0 bg-[#fffbee] border border-[#e2b858] rounded-xl px-3 py-2">
+          <p className="text-xs font-semibold text-[#8b6914]">You swapped a joker — you must lay down your hand this turn!</p>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between px-4 pb-3 border-b border-[#e2ddd2]">
         <div>
@@ -400,9 +416,11 @@ export default function MeldModal({ hand, requirement, onConfirm, onClose }: Pro
               : `Extra meld ${bonusMeldNumber}${bonusHint}`}
           </p>
         </div>
-        <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-[#a08c6e] active:bg-[#efe9dd]">
-          <X size={18} />
-        </button>
+        {!mustLayDown && (
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-[#a08c6e] active:bg-[#efe9dd]">
+            <X size={18} />
+          </button>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
@@ -461,9 +479,11 @@ export default function MeldModal({ hand, requirement, onConfirm, onClose }: Pro
 
       {/* Action buttons */}
       <div className="px-4 pb-8 pt-3 border-t border-[#e2ddd2] flex gap-3">
-        <button onClick={handleBack} className="btn-secondary flex-1">
-          {phase === 'required' && step === 0 ? 'Cancel' : 'Back'}
-        </button>
+        {!(mustLayDown && phase === 'required' && step === 0) && (
+          <button onClick={handleBack} className="btn-secondary flex-1">
+            {phase === 'required' && step === 0 ? 'Cancel' : 'Back'}
+          </button>
+        )}
         {phase === 'bonus' && (
           <button onClick={() => onConfirm(groups, jokerPositions)} className="btn-secondary flex-1">
             Done

@@ -8,7 +8,7 @@ import { scoreRound } from '../../game/scoring'
 import {
   aiFindBestMelds, aiFindAllMelds, aiShouldTakeDiscard, aiChooseDiscard, aiChooseDiscardHard, aiChooseDiscardEasy,
   aiShouldBuy, aiShouldBuyHard,
-  aiFindLayOff, aiFindJokerSwap
+  aiFindLayOff, aiFindJokerSwap, aiFindPreLayDownJokerSwap
 } from '../../game/ai'
 import { SUIT_ORDER } from './HandDisplay'
 import { haptic } from '../../lib/haptics'
@@ -179,6 +179,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
   const [gameSpeed, setGameSpeed] = useState<GameSpeed>('normal')
   const [discardError, setDiscardError] = useState<string | null>(null)
   const [layOffError, setLayOffError] = useState<string | null>(null)
+  const [preLayDownSwap, setPreLayDownSwap] = useState(false)
+  const [showPreLayDownSwapModal, setShowPreLayDownSwapModal] = useState(false)
   // Stalemate tracking (turns without any meld)
   const noProgressTurnsRef = useRef(0)
   const drawPileDepletionsRef = useRef(0)
@@ -437,6 +439,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
     noProgressTurnsRef.current = 0
     setGameState(updated)
     setShowMeldModal(false)
+    setPreLayDownSwap(false)
     setSelectedCardIds(new Set()) // always reset selection after meld
     haptic(wentOut ? 'success' : 'heavy')
 
@@ -778,6 +781,18 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
       return
     }
 
+    // Medium/Hard: try pre-lay-down joker swap if it unlocks laying down
+    if (!player.hasLaidDown && tablesMelds.length > 0) {
+      const swap = aiFindPreLayDownJokerSwap(player.hand, tablesMelds, requirement)
+      if (swap) {
+        setAiMessage(`${player.name} swaps a joker to lay down`)
+        setTimeout(() => setAiMessage(null), 1500)
+        handleJokerSwap(swap.card, swap.meld)
+        setAiActionTick(t => t + 1) // re-trigger AI so it can now meld
+        return
+      }
+    }
+
     // Medium/Hard: try to lay down including bonus melds
     if (!player.hasLaidDown) {
       const melds = aiFindAllMelds(player.hand, requirement)
@@ -915,6 +930,17 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────
+
+  // True when the current human player (before laying down) holds a natural card
+  // that can swap for a joker in a table meld — enabling the pre-lay-down swap button
+  const hasSwappableJokersBeforeLayDown =
+    uiPhase === 'action' &&
+    !currentPlayer.hasLaidDown &&
+    !currentPlayer.isAI &&
+    rs.tablesMelds.some(meld =>
+      meld.jokerMappings.length > 0 &&
+      currentPlayer.hand.some(c => c.suit !== 'joker' && findSwappableJoker(c, meld) !== null)
+    )
 
   if (uiPhase === 'round-start') {
     // Show round info + first player's starting state
@@ -1245,6 +1271,13 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
                 >
                   Lay Off / Swap
                 </button>
+              ) : hasSwappableJokersBeforeLayDown ? (
+                <button
+                  onClick={() => { setNewCardIds(new Set()); setShowPreLayDownSwapModal(true) }}
+                  className="bg-[#2d5a3c] text-[#a8d0a8] font-semibold border border-[#3d7a4c] rounded-xl flex-1 text-sm py-2.5 active:opacity-80"
+                >
+                  Swap Joker
+                </button>
               ) : (
                 <button
                   disabled
@@ -1297,7 +1330,26 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
           hand={sortedCurrentHand}
           requirement={rs.requirement}
           onConfirm={handleMeldConfirm}
-          onClose={() => setShowMeldModal(false)}
+          onClose={() => { if (!preLayDownSwap) setShowMeldModal(false) }}
+          mustLayDown={preLayDownSwap}
+        />
+      )}
+
+      {showPreLayDownSwapModal && (
+        <LayOffModal
+          hand={currentPlayer.hand}
+          tablesMelds={rs.tablesMelds}
+          onLayOff={handleLayOff}
+          onSwapJoker={handleJokerSwap}
+          onClose={() => setShowPreLayDownSwapModal(false)}
+          preLayDown
+          requirement={rs.requirement}
+          onPreLayDownSwap={(card, meld) => {
+            handleJokerSwap(card, meld)
+            setShowPreLayDownSwapModal(false)
+            setPreLayDownSwap(true)
+            setShowMeldModal(true)
+          }}
         />
       )}
 

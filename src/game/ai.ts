@@ -275,6 +275,25 @@ export function aiFindAllMelds(hand: Card[], requirement: RoundRequirement): Car
   return allMelds
 }
 
+// Before laying down: check if swapping a joker from a table meld would enable
+// meeting the round requirement. Returns the swap to make, or null.
+export function aiFindPreLayDownJokerSwap(
+  hand: Card[],
+  tablesMelds: Meld[],
+  requirement: RoundRequirement
+): { card: Card; meld: Meld } | null {
+  for (const card of hand) {
+    if (isJoker(card)) continue
+    for (const meld of tablesMelds) {
+      const joker = findSwappableJoker(card, meld)
+      if (!joker) continue
+      const simulatedHand = [...hand.filter(c => c.id !== card.id), joker]
+      if (aiFindBestMelds(simulatedHand, requirement)) return { card, meld }
+    }
+  }
+  return null
+}
+
 // Find a card in hand that can be laid off on any of the given melds.
 // Skips lay-offs that would leave exactly 1 card that can't itself be laid off
 // anywhere (which would strand the AI — can't discard last card, can't go out).

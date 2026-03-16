@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
-import type { Card as CardType, Meld } from '../../game/types'
+import type { Card as CardType, Meld, RoundRequirement } from '../../game/types'
 import { canLayOff, findSwappableJoker } from '../../game/meld-validator'
+import { aiFindBestMelds } from '../../game/ai'
 import CardComponent from './Card'
 import TableMelds from './TableMelds'
 
@@ -12,6 +13,10 @@ interface Props {
   onSwapJoker: (naturalCard: CardType, meld: Meld) => void
   onClose: () => void
   errorMsg?: string | null
+  // Pre-lay-down swap mode: player hasn't laid down yet, must lay down after swap
+  preLayDown?: boolean
+  requirement?: RoundRequirement
+  onPreLayDownSwap?: (card: CardType, meld: Meld) => void
 }
 
 function cardName(card: CardType): string {
@@ -22,8 +27,8 @@ function cardName(card: CardType): string {
 
 type Mode = 'layoff' | 'swap'
 
-export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, onClose, errorMsg }: Props) {
-  const [mode, setMode] = useState<Mode>('layoff')
+export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, onClose, errorMsg, preLayDown, requirement, onPreLayDownSwap }: Props) {
+  const [mode, setMode] = useState<Mode>(preLayDown ? 'swap' : 'layoff')
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
   const [selectedMeldId, setSelectedMeldId] = useState<string | null>(null)
 
@@ -76,9 +81,23 @@ export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, 
     } else {
       const joker = findSwappableJoker(selectedCard, selectedMeld)
       isValid = joker !== null
-      validationMessage = isValid
-        ? 'Valid swap ✓ — you\'ll take the joker'
-        : 'No joker in that meld represents this card'
+      if (isValid && joker) {
+        if (preLayDown && requirement) {
+          // Pre-lay-down swap: verify the player can lay down after getting this joker
+          const simulatedHand = [...hand.filter(c => c.id !== selectedCard.id), joker]
+          const canLayDown = aiFindBestMelds(simulatedHand, requirement) !== null
+          if (!canLayDown) {
+            isValid = false
+            validationMessage = "You can't lay down even with this joker. Swap not allowed."
+          } else {
+            validationMessage = 'Valid swap ✓ — you\'ll take the joker and must lay down'
+          }
+        } else {
+          validationMessage = 'Valid swap ✓ — you\'ll take the joker'
+        }
+      } else if (!isValid) {
+        validationMessage = 'No joker in that meld represents this card'
+      }
     }
   }
 
@@ -86,6 +105,9 @@ export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, 
     if (!selectedCard || !selectedMeld || !isValid) return
     if (mode === 'layoff') {
       onLayOff(selectedCard, selectedMeld)
+    } else if (preLayDown && onPreLayDownSwap) {
+      onPreLayDownSwap(selectedCard, selectedMeld)
+      return // parent closes the modal
     } else {
       onSwapJoker(selectedCard, selectedMeld)
     }
@@ -108,7 +130,14 @@ export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, 
 
         {/* Header */}
         <div className="flex items-center justify-between px-4 pb-3 border-b border-[#e2ddd2]">
-          <h2 className="font-bold text-[#2c1810] text-base">Lay Off / Swap</h2>
+          <div>
+            <h2 className="font-bold text-[#2c1810] text-base">
+              {preLayDown ? 'Swap Joker' : 'Lay Off / Swap'}
+            </h2>
+            {preLayDown && (
+              <p className="text-xs text-[#e2b858] font-semibold mt-0.5">You must lay down after this swap</p>
+            )}
+          </div>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-[#a08c6e] active:bg-[#efe9dd]">
             <X size={18} />
           </button>
@@ -123,25 +152,27 @@ export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, 
             </div>
           )}
 
-          {/* Mode tabs */}
-          <div className="bg-[#efe9dd] rounded-xl p-1 flex gap-1">
-            <button
-              onClick={() => handleModeChange('layoff')}
-              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
-                mode === 'layoff' ? 'bg-white text-[#8b6914] shadow-sm' : 'text-[#8b7355]'
-              }`}
-            >
-              Lay Off
-            </button>
-            <button
-              onClick={() => handleModeChange('swap')}
-              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
-                mode === 'swap' ? 'bg-white text-[#8b6914] shadow-sm' : 'text-[#8b7355]'
-              }`}
-            >
-              Swap Joker
-            </button>
-          </div>
+          {/* Mode tabs — hidden in pre-lay-down mode (swap only) */}
+          {!preLayDown && (
+            <div className="bg-[#efe9dd] rounded-xl p-1 flex gap-1">
+              <button
+                onClick={() => handleModeChange('layoff')}
+                className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  mode === 'layoff' ? 'bg-white text-[#8b6914] shadow-sm' : 'text-[#8b7355]'
+                }`}
+              >
+                Lay Off
+              </button>
+              <button
+                onClick={() => handleModeChange('swap')}
+                className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  mode === 'swap' ? 'bg-white text-[#8b6914] shadow-sm' : 'text-[#8b7355]'
+                }`}
+              >
+                Swap Joker
+              </button>
+            </div>
+          )}
 
           {/* Swap mode hint when no melds have jokers */}
           {mode === 'swap' && tablesMelds.filter(m => m.jokerMappings.length > 0).length === 0 && tablesMelds.length > 0 && (
@@ -213,7 +244,7 @@ export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, 
             disabled={!isValid}
             className="btn-primary flex-1"
           >
-            Confirm
+            {preLayDown ? 'Swap & Lay Down' : 'Confirm'}
           </button>
         </div>
       </div>
