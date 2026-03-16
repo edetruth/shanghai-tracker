@@ -830,6 +830,25 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
     return () => clearTimeout(timerId)
   }, [uiPhase, buyerStep, buyerOrder]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Determine display for buying phase ────────────────────────────────────
+  const buyerIdx = buyerOrder[buyerStep]
+  const activeBuyer = buyerIdx !== undefined ? gameState.players[buyerIdx] : null
+  const isHumanBuyerTurn = uiPhase === 'buying' && activeBuyer !== null && !activeBuyer.isAI
+  // During human buying: display buyer's hand; otherwise: display current player's hand
+  const displayPlayer = isHumanBuyerTurn ? activeBuyer : currentPlayer
+
+  // When AI is playing, find the next human player so they can see their hand and plan
+  const aiTurnHumanViewer = useMemo(() => {
+    if (!currentPlayer.isAI) return null
+    if (isHumanBuyerTurn) return null
+    const count = gameState.players.length
+    for (let i = 1; i < count; i++) {
+      const idx = (rs.currentPlayerIndex + i) % count
+      if (!gameState.players[idx].isAI) return gameState.players[idx]
+    }
+    return null
+  }, [currentPlayer.isAI, isHumanBuyerTurn, gameState.players, rs.currentPlayerIndex])
+
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────
@@ -903,25 +922,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
       />
     )
   }
-
-  // ── Determine display for buying phase ────────────────────────────────────
-  const buyerIdx = buyerOrder[buyerStep]
-  const activeBuyer = buyerIdx !== undefined ? gameState.players[buyerIdx] : null
-  const isHumanBuyerTurn = uiPhase === 'buying' && activeBuyer !== null && !activeBuyer.isAI
-  // During human buying: display buyer's hand; otherwise: display current player's hand
-  const displayPlayer = isHumanBuyerTurn ? activeBuyer : currentPlayer
-
-  // When AI is playing, find the next human player so they can see their hand and plan
-  const aiTurnHumanViewer = useMemo(() => {
-    if (!currentPlayer.isAI) return null
-    if (isHumanBuyerTurn) return null
-    const count = gameState.players.length
-    for (let i = 1; i < count; i++) {
-      const idx = (rs.currentPlayerIndex + i) % count
-      if (!gameState.players[idx].isAI) return gameState.players[idx]
-    }
-    return null
-  }, [currentPlayer.isAI, isHumanBuyerTurn, gameState.players, rs.currentPlayerIndex])
 
   // ── Main board: draw / action / buying ────────────────────────────────────
   return (
