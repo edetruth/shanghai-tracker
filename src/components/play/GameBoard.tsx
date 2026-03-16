@@ -242,7 +242,17 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
     const currentIdx = rs.currentPlayerIndex
     const needsReshuffle = gameState.roundState.drawPile.length === 0
 
-    let drawnCard: CardType | null = null
+    // Determine the card that will be drawn BEFORE calling setGameState,
+    // so setNewCardIds is never dependent on a value captured inside the updater.
+    let drawPileSnapshot = [...gameState.roundState.drawPile]
+    let discardPileSnapshot = [...gameState.roundState.discardPile]
+    if (drawPileSnapshot.length === 0) {
+      const top = discardPileSnapshot.pop()
+      drawPileSnapshot = shuffle([...discardPileSnapshot])
+      discardPileSnapshot = top ? [top] : []
+    }
+    const drawnCard = drawPileSnapshot[0] ?? null
+
     let updatedState: GameState | null = null
 
     setGameState(prev => {
@@ -258,7 +268,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
 
       const card = drawPile.shift()
       if (!card) return prev
-      drawnCard = card
 
       const players = prev.players.map((p, i) =>
         i === prev.roundState.currentPlayerIndex
@@ -269,7 +278,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
       return updatedState
     })
 
-    if (drawnCard) setNewCardIds(new Set([(drawnCard as CardType).id]))
+    if (drawnCard) setNewCardIds(new Set([drawnCard.id]))
 
     if (needsReshuffle) {
       setReshuffleMsg(true)
