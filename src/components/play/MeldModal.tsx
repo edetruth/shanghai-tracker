@@ -13,6 +13,19 @@ interface Props {
 }
 
 type ModalPhase = 'required' | 'bonus-prompt' | 'bonus'
+type AllowedMeldType = 'set' | 'run' | 'both'
+
+function getAllowedBonusTypes(requirement: RoundRequirement): AllowedMeldType {
+  if (requirement.sets > 0 && requirement.runs > 0) return 'both'
+  if (requirement.sets > 0) return 'set'
+  return 'run'
+}
+
+function bonusTypeLabel(t: AllowedMeldType): string {
+  if (t === 'set') return 'Sets only'
+  if (t === 'run') return 'Runs only'
+  return 'Sets or Runs'
+}
 
 function getMeldTypeHint(requirement: RoundRequirement, step: number): string {
   const meldTypes: string[] = []
@@ -39,10 +52,24 @@ function validateRequired(cards: CardType[], requirement: RoundRequirement, step
   }
 }
 
-function validateBonus(cards: CardType[]): { valid: boolean; message: string } {
+function validateBonus(cards: CardType[], allowedTypes: AllowedMeldType): { valid: boolean; message: string } {
   if (cards.length === 0) return { valid: false, message: '' }
-  if (isValidSet(cards)) return { valid: true, message: 'Valid set ✓' }
-  if (isValidRun(cards)) return { valid: true, message: 'Valid run ✓' }
+  const canBeSet = allowedTypes !== 'run' && isValidSet(cards)
+  const canBeRun = allowedTypes !== 'set' && isValidRun(cards)
+  if (canBeSet) return { valid: true, message: 'Valid set ✓' }
+  if (canBeRun) return { valid: true, message: 'Valid run ✓' }
+
+  // Type-specific error messages
+  if (allowedTypes === 'set') {
+    if (isValidRun(cards)) return { valid: false, message: 'This round only allows extra Sets, not Runs' }
+    if (cards.length < 3) return { valid: false, message: `Need at least 3 cards for a set (have ${cards.length})` }
+    return { valid: false, message: 'Not a valid set — cards must share the same rank' }
+  }
+  if (allowedTypes === 'run') {
+    if (isValidSet(cards)) return { valid: false, message: 'This round only allows extra Runs, not Sets' }
+    if (cards.length < 4) return { valid: false, message: `Need at least 4 cards for a run (have ${cards.length})` }
+    return { valid: false, message: 'Not a valid run — cards must be same suit in sequence' }
+  }
   if (cards.length < 3) return { valid: false, message: 'Need at least 3 cards for a set, or 4 for a run' }
   return { valid: false, message: 'Not a valid set or run' }
 }
@@ -67,6 +94,7 @@ function ModalShell({ children, onClose }: { children: React.ReactNode; onClose:
 
 export default function MeldModal({ hand, requirement, onConfirm, onClose }: Props) {
   const total = totalRequired(requirement)
+  const allowedBonusTypes = getAllowedBonusTypes(requirement)
   const [phase, setPhase] = useState<ModalPhase>('required')
   const [step, setStep] = useState(0)
   const [groups, setGroups] = useState<CardType[][]>([])
@@ -96,19 +124,19 @@ export default function MeldModal({ hand, requirement, onConfirm, onClose }: Pro
         setStep(step + 1)
         return
       }
-      // All required melds met — check for bonus opportunities
+      // All required melds met — check for bonus opportunities (matching round type)
       const usedIdsNow = new Set(newGroups.flatMap(g => g.map(c => c.id)))
       const remaining = hand.filter(c => !usedIdsNow.has(c.id))
-      if (remaining.length > 0 && canFormAnyValidMeld(remaining)) {
+      if (remaining.length > 0 && canFormAnyValidMeld(remaining, allowedBonusTypes)) {
         setPhase('bonus-prompt')
       } else {
         onConfirm(newGroups)
       }
     } else {
-      // Bonus phase — check if more melds are still possible
+      // Bonus phase — check if more melds are still possible (matching round type)
       const usedIdsNow = new Set(newGroups.flatMap(g => g.map(c => c.id)))
       const remaining = hand.filter(c => !usedIdsNow.has(c.id))
-      if (remaining.length === 0 || !canFormAnyValidMeld(remaining)) {
+      if (remaining.length === 0 || !canFormAnyValidMeld(remaining, allowedBonusTypes)) {
         onConfirm(newGroups)
       }
       // else: stay in bonus phase for another meld
@@ -121,7 +149,6 @@ export default function MeldModal({ hand, requirement, onConfirm, onClose }: Pro
     if (phase === 'bonus') {
       setPhase('bonus-prompt')
     } else if (phase === 'bonus-prompt') {
-      // Un-commit last required meld, go back to it
       setGroups(groups.slice(0, total - 1))
       setStep(total - 1)
       setPhase('required')
@@ -153,11 +180,10 @@ export default function MeldModal({ hand, requirement, onConfirm, onClose }: Pro
           <div className="bg-[#f0fdf4] border border-[#a3e6b4] rounded-xl px-4 py-3">
             <p className="text-sm font-semibold text-[#2d7a3a] mb-1">Requirement met! ✓</p>
             <p className="text-sm text-[#8b7355]">
-              You have cards for additional melds. Laying down more reduces your hand and lowers your score.
+              You can lay down additional melds ({bonusTypeLabel(allowedBonusTypes)}). Laying down more reduces your hand score.
             </p>
           </div>
 
-          {/* Show confirmed melds */}
           {groups.map((group, i) => (
             <div key={i} className="opacity-50">
               <p className="text-xs text-[#8b7355] mb-1">Meld {i + 1} (confirmed)</p>
@@ -185,9 +211,10 @@ export default function MeldModal({ hand, requirement, onConfirm, onClose }: Pro
   // ─── Required / bonus selection screen ───────────────────────────────────
   const validation = phase === 'required'
     ? validateRequired(selectedCards, requirement, step)
-    : validateBonus(selectedCards)
+    : validateBonus(selectedCards, allowedBonusTypes)
 
   const bonusMeldNumber = groups.length - total + 1
+  const bonusHint = phase === 'bonus' ? ` — ${bonusTypeLabel(allowedBonusTypes)}` : ''
 
   return (
     <ModalShell onClose={onClose}>
@@ -198,7 +225,7 @@ export default function MeldModal({ hand, requirement, onConfirm, onClose }: Pro
           <p className="text-xs text-[#8b7355] mt-0.5">
             {phase === 'required'
               ? `Meld ${step + 1} of ${total} — ${getMeldTypeHint(requirement, step)}`
-              : `Extra meld ${bonusMeldNumber} — Set or Run`}
+              : `Extra meld ${bonusMeldNumber}${bonusHint}`}
           </p>
         </div>
         <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-[#a08c6e] active:bg-[#efe9dd]">

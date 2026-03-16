@@ -5,13 +5,16 @@ import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, MAX_BUYS } from '../../g
 import { createDecks, shuffle, dealHands } from '../../game/deck'
 import { buildMeld, isValidSet, findSwappableJoker } from '../../game/meld-validator'
 import { scoreRound } from '../../game/scoring'
-import { aiFindAllMelds, aiShouldTakeDiscard, aiChooseDiscard, aiChooseDiscardHard, aiShouldBuy, aiShouldBuyHard, aiFindLayOff, aiFindJokerSwap } from '../../game/ai'
+import {
+  aiFindBestMelds, aiFindAllMelds, aiShouldTakeDiscard, aiChooseDiscard, aiChooseDiscardHard, aiChooseDiscardEasy,
+  aiShouldBuy, aiShouldBuyHard,
+  aiFindLayOff, aiFindJokerSwap
+} from '../../game/ai'
 import { SUIT_ORDER } from './HandDisplay'
 import { haptic } from '../../lib/haptics'
 import PrivacyScreen from './PrivacyScreen'
 import MeldModal from './MeldModal'
 import LayOffModal from './LayOffModal'
-import BuyPrompt from './BuyPrompt'
 import RoundSummary from './RoundSummary'
 import GameOver from './GameOver'
 import HandDisplay from './HandDisplay'
@@ -32,6 +35,8 @@ type UIPhase =
   | 'buying'
   | 'round-end'
   | 'game-over'
+
+type GameSpeed = 'fast' | 'normal' | 'slow'
 
 interface UndoState {
   card: CardType
@@ -93,11 +98,13 @@ function setupRound(state: GameState, roundNum: number): GameState {
   const nextDealer = (dealerIndex + 1) % state.players.length
   const firstPlayer = (nextDealer + 1) % state.players.length
 
+  // Reset buys to MAX_BUYS for each new round
   const players = state.players.map((p, i) => ({
     ...p,
     hand: hands[i],
     melds: [],
     hasLaidDown: false,
+    buysRemaining: MAX_BUYS,
   }))
 
   return {
@@ -143,6 +150,12 @@ function buildBuyerOrder(state: GameState, discarderIndex: number): number[] {
   return order
 }
 
+function getAIDelay(speed: GameSpeed): number {
+  if (speed === 'fast') return 200 + Math.random() * 200
+  if (speed === 'slow') return 2000 + Math.random() * 1000
+  return 700 + Math.random() * 500
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onExit }: Props) {
@@ -157,30 +170,47 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
   const [roundResults, setRoundResults] = useState<{ playerId: string; score: number; shanghaied: boolean }[] | null>(null)
   const [buyingDiscard, setBuyingDiscard] = useState<CardType | null>(null)
   const [pendingUndo, setPendingUndo] = useState<UndoState | null>(null)
+  const [pendingBuyDiscard, setPendingBuyDiscard] = useState<CardType | null>(null)
   const [showPauseModal, setShowPauseModal] = useState(false)
   const [reshuffleMsg, setReshuffleMsg] = useState(false)
   const [aiMessage, setAiMessage] = useState<string | null>(null)
-  // Bumped after joker swaps (handLen unchanged, need a separate re-trigger)
+  const [newCardId, setNewCardId] = useState<string | null>(null)
   const [aiActionTick, setAiActionTick] = useState(0)
+  const [gameSpeed, setGameSpeed] = useState<GameSpeed>('normal')
+  // Stalemate tracking (turns without any meld)
+  const noProgressTurnsRef = useRef(0)
+  const drawPileDepletionsRef = useRef(0)
+
+  // Post-draw buying: when true, after buying window resolves the CURRENT player acts (they already drew)
+  const buyingIsPostDrawRef = useRef(false)
 
   // Stable refs so AI callbacks always have current values
   const gameStateRef = useRef(gameState)
   const uiPhaseRef = useRef(uiPhase)
   const buyerOrderRef = useRef(buyerOrder)
   const buyerStepRef = useRef(buyerStep)
+  const pendingBuyDiscardRef = useRef(pendingBuyDiscard)
   useEffect(() => { gameStateRef.current = gameState }, [gameState])
   useEffect(() => { uiPhaseRef.current = uiPhase }, [uiPhase])
   useEffect(() => { buyerOrderRef.current = buyerOrder }, [buyerOrder])
   useEffect(() => { buyerStepRef.current = buyerStep }, [buyerStep])
+  useEffect(() => { pendingBuyDiscardRef.current = pendingBuyDiscard }, [pendingBuyDiscard])
 
-  // Tracks whether AI has already laid off once this turn (Medium: max 1 lay-off per turn)
+  // Medium AI: max 1 lay-off per turn
   const aiLayOffDoneRef = useRef(false)
+
+  // Auto-clear new card indicator after 3 seconds
+  useEffect(() => {
+    if (!newCardId) return
+    const timer = setTimeout(() => setNewCardId(null), 3000)
+    return () => clearTimeout(timer)
+  }, [newCardId])
 
   const rs = gameState.roundState
   const currentPlayer = getCurrentPlayer(gameState)
   const topDiscard = rs.discardPile[rs.discardPile.length - 1] ?? null
 
-  // Hand sorted to match player's chosen sort order — passed to MeldModal too
+  // Hand sorted to match player's chosen sort order
   const sortedCurrentHand = useMemo(() => {
     return [...currentPlayer.hand].sort((a, b) => {
       if (handSort === 'suit') {
@@ -196,6 +226,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
 
   // ── Toggle card selection ─────────────────────────────────────────────────
   function toggleCard(cardId: string) {
+    setNewCardId(null) // clear new badge on any action
     setSelectedCardIds(prev => {
       const next = new Set(prev)
       if (next.has(cardId)) next.delete(cardId)
@@ -206,7 +237,14 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
 
   // ── Draw from pile (with reshuffle if empty) ──────────────────────────────
   function handleDrawFromPile() {
+    const hasPendingBuy = pendingBuyDiscard !== null
+    const pendingCard = pendingBuyDiscard
+    const currentIdx = rs.currentPlayerIndex
     const needsReshuffle = gameState.roundState.drawPile.length === 0
+
+    let drawnCard: CardType | null = null
+    let updatedState: GameState | null = null
+
     setGameState(prev => {
       let drawPile = [...prev.roundState.drawPile]
       let discardPile = [...prev.roundState.discardPile]
@@ -215,32 +253,49 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
         const top = discardPile.pop()
         drawPile = shuffle([...discardPile])
         discardPile = top ? [top] : []
+        drawPileDepletionsRef.current += 1
       }
 
       const card = drawPile.shift()
       if (!card) return prev
+      drawnCard = card
 
       const players = prev.players.map((p, i) =>
         i === prev.roundState.currentPlayerIndex
           ? { ...p, hand: [...p.hand, card] }
           : p
       )
-      return { ...prev, players, roundState: { ...prev.roundState, drawPile, discardPile } }
+      updatedState = { ...prev, players, roundState: { ...prev.roundState, drawPile, discardPile } }
+      return updatedState
     })
+
+    if (drawnCard) setNewCardId((drawnCard as CardType).id)
 
     if (needsReshuffle) {
       setReshuffleMsg(true)
       setTimeout(() => setReshuffleMsg(false), 2500)
     }
-    setUiPhase('action')
+
+    if (hasPendingBuy && pendingCard && updatedState) {
+      setPendingBuyDiscard(null)
+      // Player passed on the discard — open buying window for players AFTER current
+      startBuyingWindowPostDraw(updatedState, currentIdx, pendingCard)
+    } else {
+      setUiPhase('action')
+    }
   }
 
   // ── Take top discard ──────────────────────────────────────────────────────
   function handleTakeDiscard() {
+    const card = gameState.roundState.discardPile[gameState.roundState.discardPile.length - 1]
+    if (!card) return
+
+    setPendingBuyDiscard(null) // clear pending buy — card is taken
+    setNewCardId(card.id)
+
     setGameState(prev => {
       const discardPile = [...prev.roundState.discardPile]
-      const card = discardPile.pop()
-      if (!card) return prev
+      discardPile.pop()
       const players = prev.players.map((p, i) =>
         i === prev.roundState.currentPlayerIndex
           ? { ...p, hand: [...p.hand, card] }
@@ -251,12 +306,13 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
     setUiPhase('action')
   }
 
-  // ── Start buying window ───────────────────────────────────────────────────
+  // ── Start buying window (normal — before next player draws) ───────────────
   function startBuyingWindow(state: GameState, discarder: number, discardCard: CardType | null) {
     const order = buildBuyerOrder(state, discarder)
     setBuyingDiscard(discardCard)
     setBuyerOrder(order)
     setBuyerStep(0)
+    buyingIsPostDrawRef.current = false
 
     if (order.length === 0) {
       if (state.roundState.goOutPlayerId !== null) {
@@ -272,10 +328,40 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
     }
   }
 
+  // ── Start buying window AFTER current player drew from pile (Rule 9A) ─────
+  // Buyers are players AFTER currentPlayerIdx; current player will act after buying resolves
+  function startBuyingWindowPostDraw(state: GameState, drewPlayerIdx: number, discardCard: CardType) {
+    const order: number[] = []
+    const count = state.players.length
+    for (let i = 1; i < count; i++) {
+      const idx = (drewPlayerIdx + i) % count
+      if (state.players[idx].buysRemaining > 0) order.push(idx)
+    }
+
+    setBuyingDiscard(discardCard)
+    setBuyerOrder(order)
+    setBuyerStep(0)
+    buyingIsPostDrawRef.current = true
+
+    if (order.length === 0) {
+      buyingIsPostDrawRef.current = false
+      if (state.roundState.goOutPlayerId !== null) {
+        endRound(state)
+      } else {
+        setGameState(state)
+        setUiPhase('action')
+      }
+    } else {
+      setUiPhase('buying')
+    }
+  }
+
   // ── Score and end round ───────────────────────────────────────────────────
   function endRound(state: GameState) {
     const goOutId = state.roundState.goOutPlayerId
     if (!goOutId) return
+    noProgressTurnsRef.current = 0
+    drawPileDepletionsRef.current = 0
     const results = scoreRound(state.players, goOutId)
     const players = state.players.map(p => {
       const result = results.find(r => r.playerId === p.id)
@@ -284,6 +370,25 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
     setGameState({ ...state, players })
     setRoundResults(results)
     setUiPhase('round-end')
+  }
+
+  // ── Force end round (stalemate) ───────────────────────────────────────────
+  function forceEndRound(state: GameState) {
+    // If nobody has gone out, score all remaining hands (nobody gets 0)
+    const results = state.players.map(p => ({
+      playerId: p.id,
+      score: p.hand.reduce((sum, c) => sum + (c.rank === 0 ? 50 : c.rank === 1 ? 20 : c.rank >= 11 ? 10 : c.rank), 0),
+      shanghaied: !p.hasLaidDown,
+    }))
+    const players = state.players.map(p => {
+      const result = results.find(r => r.playerId === p.id)
+      return result ? { ...p, roundScores: [...p.roundScores, result.score] } : p
+    })
+    setGameState({ ...state, players })
+    setRoundResults(results)
+    setUiPhase('round-end')
+    setAiMessage('Round ended — no one went out (stalemate)')
+    setTimeout(() => setAiMessage(null), 4000)
   }
 
   // ── Meld confirmation ─────────────────────────────────────────────────────
@@ -317,13 +422,16 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
       roundState: { ...prev.roundState, tablesMelds, meldIdCounter: counter, goOutPlayerId },
     }
 
+    // Reset progress counter when a meld happens
+    noProgressTurnsRef.current = 0
     setGameState(updated)
     setShowMeldModal(false)
+    setSelectedCardIds(new Set()) // always reset selection after meld
     haptic(wentOut ? 'success' : 'heavy')
 
     if (wentOut) {
-      const top = updated.roundState.discardPile[updated.roundState.discardPile.length - 1] ?? null
-      startBuyingWindow(updated, playerIdx, top)
+      const topCard = updated.roundState.discardPile[updated.roundState.discardPile.length - 1] ?? null
+      startBuyingWindow(updated, playerIdx, topCard)
     }
   }
 
@@ -336,18 +444,49 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
 
     let updatedRunMin = meld.runMin
     let updatedRunMax = meld.runMax
+    let updatedRunAceHigh = meld.runAceHigh
+    let newJokerMappings = [...meld.jokerMappings]
+    let newMeldCards: CardType[]
+
     if (meld.type === 'run') {
       if (card.suit === 'joker') {
-        updatedRunMax = (meld.runMax ?? 0) + 1
+        // Joker extends at high end
+        const newMax = (meld.runMax ?? 0) + 1
+        updatedRunMax = newMax
+        newJokerMappings.push({ cardId: card.id, representsRank: newMax, representsSuit: meld.runSuit! })
+        newMeldCards = [...meld.cards, card]
       } else {
         let r = card.rank
-        if (meld.runAceHigh && card.rank === 1) r = 14
-        if (r < (meld.runMin ?? 999)) updatedRunMin = r
-        if (r > (meld.runMax ?? 0)) updatedRunMax = r
+        const isAceHighExt = card.rank === 1 && meld.runMax === 13
+        if (isAceHighExt) {
+          // Ace going at the high end (K-A)
+          r = 14
+          updatedRunMax = 14
+          updatedRunAceHigh = true
+          newMeldCards = [...meld.cards, card] // append ace at end
+        } else {
+          if (meld.runAceHigh && card.rank === 1) r = 14
+          if (r < (meld.runMin ?? 999)) {
+            updatedRunMin = r
+            newMeldCards = [card, ...meld.cards] // prepend at low end
+          } else {
+            if (r > (meld.runMax ?? 0)) updatedRunMax = r
+            newMeldCards = [...meld.cards, card] // append at high end
+          }
+        }
       }
+    } else {
+      newMeldCards = [...meld.cards, card]
     }
 
-    const updatedMeld: Meld = { ...meld, cards: [...meld.cards, card], runMin: updatedRunMin, runMax: updatedRunMax }
+    const updatedMeld: Meld = {
+      ...meld,
+      cards: newMeldCards,
+      jokerMappings: newJokerMappings,
+      runMin: updatedRunMin,
+      runMax: updatedRunMax,
+      runAceHigh: updatedRunAceHigh,
+    }
     const tablesMelds = prev.roundState.tablesMelds.map(m => m.id === meld.id ? updatedMeld : m)
     const wentOut = newHand.length === 0
     const goOutPlayerId = wentOut ? player.id : prev.roundState.goOutPlayerId
@@ -359,8 +498,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
     setSelectedCardIds(new Set())
 
     if (wentOut) {
-      const top = updated.roundState.discardPile[updated.roundState.discardPile.length - 1] ?? null
-      startBuyingWindow(updated, playerIdx, top)
+      const topCard = updated.roundState.discardPile[updated.roundState.discardPile.length - 1] ?? null
+      startBuyingWindow(updated, playerIdx, topCard)
     }
   }
 
@@ -382,6 +521,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
       return { ...prev, players, roundState: { ...prev.roundState, tablesMelds } }
     })
     setShowLayOffModal(false)
+    setSelectedCardIds(new Set())
   }
 
   // ── Discard (with undo support for human players) ─────────────────────────
@@ -413,15 +553,37 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
     setSelectedCardIds(new Set())
     haptic('heavy')
 
+    // Increment no-progress counter
+    if (!player.hasLaidDown) noProgressTurnsRef.current += 1
+
+    // Check stalemate conditions
+    const totalPlayers = gameState.players.length
+    if (!wentOut && drawPileDepletionsRef.current >= 2 && noProgressTurnsRef.current > totalPlayers * 8) {
+      // Force-end the round
+      setTimeout(() => forceEndRound(afterDiscard), 500)
+      return
+    }
+
+    function afterUndoExpires() {
+      setPendingUndo(null)
+      if (wentOut) {
+        // Someone went out by discarding — immediate buying window (no rule 9A)
+        startBuyingWindow(afterDiscard, playerIdx, card!)
+      } else {
+        // Rule 9A: advance to next player who gets first right to take the discard
+        const advanced = advancePlayer(afterDiscard)
+        const nextPlayer = advanced.players[advanced.roundState.currentPlayerIndex]
+        setPendingBuyDiscard(card!)
+        setGameState(advanced)
+        setUiPhase(nextPhaseForPlayer(nextPlayer))
+      }
+    }
+
     if (!player.isAI) {
-      // Show undo toast for 3 seconds before committing the buying window
-      const timerId = setTimeout(() => {
-        setPendingUndo(null)
-        startBuyingWindow(afterDiscard, playerIdx, card)
-      }, 3000)
+      const timerId = setTimeout(afterUndoExpires, 3000)
       setPendingUndo({ card, preDiscardState, discarderIdx: playerIdx, timerId })
     } else {
-      startBuyingWindow(afterDiscard, playerIdx, card)
+      afterUndoExpires()
     }
   }
 
@@ -435,6 +597,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
 
   // ── Buy decision ──────────────────────────────────────────────────────────
   function handleBuyDecision(wantsToBuy: boolean) {
+    const isPostDraw = buyingIsPostDrawRef.current
+
     if (wantsToBuy) {
       const buyerIdx = buyerOrder[buyerStep]
       const buyer = gameState.players[buyerIdx]
@@ -453,27 +617,50 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
         players,
         roundState: { ...gameState.roundState, drawPile, discardPile },
       }
-      const advanced = advancePlayer(withBuy)
 
-      if (withBuy.roundState.goOutPlayerId !== null) {
-        endRound(advanced)
+      if (isPostDraw) {
+        // Post-draw buy: current player (who drew from pile) still acts after this
+        buyingIsPostDrawRef.current = false
+        setBuyerOrder([])
+        setBuyerStep(0)
+        if (withBuy.roundState.goOutPlayerId !== null) {
+          endRound(withBuy)
+        } else {
+          setGameState(withBuy)
+          setUiPhase('action')
+        }
       } else {
-        const nextPlayer = advanced.players[advanced.roundState.currentPlayerIndex]
-        setGameState(advanced)
-        setUiPhase(nextPhaseForPlayer(nextPlayer))
+        const advanced = advancePlayer(withBuy)
+        if (withBuy.roundState.goOutPlayerId !== null) {
+          endRound(advanced)
+        } else {
+          const nextPlayer = advanced.players[advanced.roundState.currentPlayerIndex]
+          setGameState(advanced)
+          setUiPhase(nextPhaseForPlayer(nextPlayer))
+        }
       }
     } else {
       const nextStep = buyerStep + 1
       if (nextStep < buyerOrder.length) {
         setBuyerStep(nextStep)
       } else {
-        const advanced = advancePlayer(gameState)
-        if (gameState.roundState.goOutPlayerId !== null) {
-          endRound(advanced)
+        // All buyers passed
+        if (isPostDraw) {
+          buyingIsPostDrawRef.current = false
+          if (gameState.roundState.goOutPlayerId !== null) {
+            endRound(gameState)
+          } else {
+            setUiPhase('action')
+          }
         } else {
-          const nextPlayer = advanced.players[advanced.roundState.currentPlayerIndex]
-          setGameState(advanced)
-          setUiPhase(nextPhaseForPlayer(nextPlayer))
+          const advanced = advancePlayer(gameState)
+          if (gameState.roundState.goOutPlayerId !== null) {
+            endRound(advanced)
+          } else {
+            const nextPlayer = advanced.players[advanced.roundState.currentPlayerIndex]
+            setGameState(advanced)
+            setUiPhase(nextPhaseForPlayer(nextPlayer))
+          }
         }
       }
     }
@@ -489,6 +676,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
       const next = setupRound(gameState, nextRound)
       setGameState(next)
       setRoundResults(null)
+      setSelectedCardIds(new Set())
+      setPendingBuyDiscard(null)
       setUiPhase('round-start')
     }
   }
@@ -499,12 +688,34 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
     const player = getCurrentPlayer(state)
     const { tablesMelds, requirement } = state.roundState
     const isHard = aiDifficulty === 'hard'
+    const isEasy = aiDifficulty === 'easy'
 
-    // Try to lay down if not yet done — include any bonus melds beyond the requirement
+    // Easy AI: only lay down required melds (no bonus), never lay off
+    if (isEasy) {
+      if (!player.hasLaidDown) {
+        const melds = aiFindBestMelds(player.hand, requirement)
+        if (melds && melds.length > 0) {
+          setAiMessage(`${player.name} lays down`)
+          setTimeout(() => setAiMessage(null), 1200)
+          handleMeldConfirm(melds)
+          return
+        }
+      }
+      // Easy: discard highest-value card
+      aiLayOffDoneRef.current = false
+      const card = aiChooseDiscardEasy(player.hand)
+      setAiMessage(`${player.name} discards`)
+      setTimeout(() => setAiMessage(null), 800)
+      handleDiscard(card.id)
+      return
+    }
+
+    // Medium/Hard: try to lay down including bonus melds
     if (!player.hasLaidDown) {
       const melds = aiFindAllMelds(player.hand, requirement)
       if (melds && melds.length > 0) {
         aiLayOffDoneRef.current = false
+        noProgressTurnsRef.current = 0
         setAiMessage(`${player.name} lays down!`)
         setTimeout(() => setAiMessage(null), 1500)
         handleMeldConfirm(melds)
@@ -512,41 +723,38 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
       }
     }
 
-    // Hard only: try joker swap to reclaim a joker for future use
+    // Hard only: try joker swap to reclaim a joker
     if (isHard && player.hasLaidDown && tablesMelds.length > 0) {
       const swap = aiFindJokerSwap(player.hand, tablesMelds)
       if (swap) {
         setAiMessage(`${player.name} swaps a joker`)
         setTimeout(() => setAiMessage(null), 1200)
         handleJokerSwap(swap.card, swap.meld)
-        // handLen unchanged after swap — bump tick so the AI effect re-fires
         setAiActionTick(t => t + 1)
         return
       }
     }
 
-    // Try to lay off
-    // Medium: max 1 lay-off per turn to prevent dumping all cards onto one meld
-    // Hard: unlimited lay-offs per turn
+    // Try to lay off (Medium: max 1 per turn; Hard: unlimited)
     if (player.hasLaidDown && tablesMelds.length > 0 && (isHard || !aiLayOffDoneRef.current)) {
       const layOff = aiFindLayOff(player.hand, tablesMelds)
       if (layOff) {
         aiLayOffDoneRef.current = true
         setAiMessage(`${player.name} lays off`)
-        setTimeout(() => setAiMessage(null), 1200)
+        setTimeout(() => setAiMessage(null), 1000)
         handleLayOff(layOff.card, layOff.meld)
         return
       }
     }
 
-    // Discard — reset lay-off tracker for next turn
+    // Discard
     if (player.hand.length > 0) {
       aiLayOffDoneRef.current = false
       const card = isHard
         ? aiChooseDiscardHard(player.hand)
         : aiChooseDiscard(player.hand, requirement)
       setAiMessage(`${player.name} discards`)
-      setTimeout(() => setAiMessage(null), 1000)
+      setTimeout(() => setAiMessage(null), 800)
       handleDiscard(card.id)
     }
   }
@@ -557,18 +765,22 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
     if (!currentPlayer.isAI) return
     if (uiPhase !== 'draw' && uiPhase !== 'action') return
 
-    const delay = 700 + Math.random() * 500
+    const delay = getAIDelay(gameSpeed)
     const timerId = setTimeout(() => {
       if (uiPhaseRef.current === 'draw') {
         const state = gameStateRef.current
         const player = getCurrentPlayer(state)
         const top = state.roundState.discardPile[state.roundState.discardPile.length - 1] ?? null
-        const shouldTake = top !== null &&
+
+        const isEasy = aiDifficulty === 'easy'
+        const shouldTake = !isEasy && top !== null &&
           aiShouldTakeDiscard(player.hand, top, state.roundState.requirement, player.hasLaidDown)
+
         setAiMessage(shouldTake
           ? `${player.name} takes the discard`
           : `${player.name} draws from pile`)
-        setTimeout(() => setAiMessage(null), 1200)
+        setTimeout(() => setAiMessage(null), 1000)
+
         if (shouldTake) handleTakeDiscard()
         else handleDrawFromPile()
       } else if (uiPhaseRef.current === 'action') {
@@ -587,18 +799,28 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
     const buyer = gameState.players[buyerIdx]
     if (!buyer?.isAI) return
 
+    const delay = getAIDelay(gameSpeed)
     const timerId = setTimeout(() => {
       const state = gameStateRef.current
       const currentBuyer = state.players[buyerOrderRef.current[buyerStepRef.current]]
       const disc = buyingDiscard
       const req = state.roundState.requirement
-      const shouldBuy = disc && currentBuyer
-        ? (aiDifficulty === 'hard'
-            ? aiShouldBuyHard(currentBuyer.hand, disc, req)
-            : aiShouldBuy(currentBuyer.hand, disc, req))
-        : false
+      if (!disc || !currentBuyer) {
+        handleBuyDecision(false)
+        return
+      }
+      const isEasy = aiDifficulty === 'easy'
+      const shouldBuy = isEasy
+        ? false
+        : aiDifficulty === 'hard'
+          ? aiShouldBuyHard(currentBuyer.hand, disc, req)
+          : aiShouldBuy(currentBuyer.hand, disc, req)
+
+      if (shouldBuy) setAiMessage(`${currentBuyer.name} buys!`)
+      else setAiMessage(`${currentBuyer.name} passes`)
+      setTimeout(() => setAiMessage(null), 800)
       handleBuyDecision(shouldBuy)
-    }, 700)
+    }, Math.min(delay, 900))
 
     return () => clearTimeout(timerId)
   }, [uiPhase, buyerStep, buyerOrder]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -608,18 +830,27 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
   // ─────────────────────────────────────────────────────────────────────────
 
   if (uiPhase === 'round-start') {
+    // Show round info + first player's starting state
+    const firstHumanPlayer = gameState.players.find(p => !p.isAI)
     return (
-      <div className="min-h-screen bg-[#f8f6f1] flex flex-col items-center justify-center px-6">
+      <div className="min-h-screen bg-[#1a3a2a] flex flex-col items-center justify-center px-6">
         <div className="w-full max-w-xs text-center">
           <div className="w-16 h-16 rounded-full bg-[#e2b858] flex items-center justify-center mx-auto mb-4">
             <span className="text-2xl font-bold text-[#2c1810]">{gameState.currentRound}</span>
           </div>
-          <h2 className="text-2xl font-bold text-[#2c1810] mb-2">Round {gameState.currentRound}</h2>
-          <p className="text-base text-[#8b7355] mb-2">{rs.requirement.description}</p>
-          <p className="text-sm text-[#a08c6e] mb-8">{rs.cardsDealt} cards dealt</p>
+          <h2 className="text-2xl font-bold text-white mb-2">Round {gameState.currentRound}</h2>
+          <p className="text-base text-[#a8d0a8] mb-1">{rs.requirement.description}</p>
+          <p className="text-sm text-[#6aad7a] mb-6">{rs.cardsDealt} cards dealt · {MAX_BUYS} buys available</p>
+
+          {firstHumanPlayer && (
+            <p className="text-xs text-[#6aad7a] mb-4">
+              Starting player: {gameState.players[rs.currentPlayerIndex]?.name}
+            </p>
+          )}
+
           <button
             onClick={() => setUiPhase(nextPhaseForPlayer(currentPlayer))}
-            className="btn-primary"
+            className="bg-[#e2b858] text-[#2c1810] font-bold rounded-xl px-8 py-3 text-base active:opacity-80 w-full"
           >
             Begin Round
           </button>
@@ -633,34 +864,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
       <PrivacyScreen
         playerName={currentPlayer.name}
         onReady={() => setUiPhase('draw')}
-      />
-    )
-  }
-
-  if (uiPhase === 'buying') {
-    const buyerIdx = buyerOrder[buyerStep]
-    const buyer = buyerIdx !== undefined ? gameState.players[buyerIdx] : null
-    const discardForBuy = buyingDiscard ?? topDiscard
-
-    if (!buyer || !discardForBuy) return null
-
-    // AI buyers are handled by the useEffect above — show a waiting indicator
-    if (buyer.isAI) {
-      return (
-        <div className="min-h-screen bg-[#f8f6f1] flex flex-col items-center justify-center px-6">
-          <div className="text-center">
-            <p className="text-[#8b7355] text-sm animate-pulse">{buyer.name} is deciding…</p>
-          </div>
-        </div>
-      )
-    }
-
-    return (
-      <BuyPrompt
-        buyerName={buyer.name}
-        discardCard={discardForBuy}
-        buysRemaining={buyer.buysRemaining}
-        onDecision={handleBuyDecision}
       />
     )
   }
@@ -687,78 +890,132 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
           setRoundResults(null)
           setSelectedCardIds(new Set())
           setPendingUndo(null)
+          setPendingBuyDiscard(null)
+          noProgressTurnsRef.current = 0
+          drawPileDepletionsRef.current = 0
         }}
         onBack={onExit}
       />
     )
   }
 
-  // ── Main board: draw / action ─────────────────────────────────────────────
+  // ── Determine display for buying phase ────────────────────────────────────
+  const buyerIdx = buyerOrder[buyerStep]
+  const activeBuyer = buyerIdx !== undefined ? gameState.players[buyerIdx] : null
+  const isHumanBuyerTurn = uiPhase === 'buying' && activeBuyer !== null && !activeBuyer.isAI
+  // During human buying: display buyer's hand; otherwise: display current player's hand
+  const displayPlayer = isHumanBuyerTurn ? activeBuyer : currentPlayer
+
+  // ── Main board: draw / action / buying ────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#f8f6f1] flex flex-col">
+    <div className="min-h-screen bg-[#1a3a2a] flex flex-col">
       {/* Top bar */}
-      <div className="bg-white border-b border-[#e2ddd2] px-4 py-2 flex items-center justify-between">
+      <div className="bg-[#0f2218] border-b border-[#2d5a3c] px-4 py-2 flex items-center justify-between">
         <div>
-          <p className="text-xs text-[#a08c6e]">Round {gameState.currentRound} of {TOTAL_ROUNDS}</p>
-          <p className="text-sm font-bold text-[#2c1810]">
-            {currentPlayer.name}'s turn
-            {currentPlayer.isAI && <span className="ml-1 text-xs font-normal text-[#a08c6e]">(AI)</span>}
+          <p className="text-xs text-[#6aad7a]">Round {gameState.currentRound} of {TOTAL_ROUNDS} · {rs.requirement.description}</p>
+          <p className="text-sm font-bold text-white">
+            {uiPhase === 'buying' ? (
+              isHumanBuyerTurn
+                ? `${activeBuyer?.name} — Buy decision`
+                : `${activeBuyer?.name ?? '...'} deciding...`
+            ) : (
+              <>
+                {currentPlayer.name}'s turn
+                {currentPlayer.isAI && <span className="ml-1 text-xs font-normal text-[#6aad7a]">(AI)</span>}
+              </>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-[#8b7355] bg-[#efe9dd] px-2 py-1 rounded-full">
-            {currentPlayer.buysRemaining} buys
+          <span className="text-xs text-[#a8d0a8] bg-[#1e4a2e] px-2 py-1 rounded-full">
+            {currentPlayer.buysRemaining}/{MAX_BUYS} buys
           </span>
           <button
             onClick={() => setShowPauseModal(true)}
             aria-label="Pause game"
-            className="w-11 h-11 flex items-center justify-center rounded-xl bg-[#efe9dd] text-[#8b6914] active:bg-[#e2ddd2]"
+            className="w-10 h-10 flex items-center justify-center rounded-xl bg-[#1e4a2e] text-[#a8d0a8] active:bg-[#2d5a3c]"
           >
-            <Pause size={20} />
+            <Pause size={18} />
           </button>
         </div>
       </div>
 
-      {/* Reshuffle notice */}
+      {/* Toast messages */}
       {reshuffleMsg && (
         <div className="bg-[#e2b858] px-4 py-2 text-center text-sm font-medium text-[#2c1810]">
           Draw pile reshuffled from discards
         </div>
       )}
-
-      {/* AI action message */}
       {aiMessage && (
-        <div className="bg-[#efe9dd] px-4 py-2 text-center text-sm text-[#8b6914] animate-pulse">
+        <div className="bg-[#1e4a2e] px-4 py-2 text-center text-sm text-[#a8d0a8] animate-pulse">
           {aiMessage}
         </div>
       )}
 
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4 pb-36">
-        {/* Round requirement */}
-        <div className="bg-[#efe9dd] rounded-lg px-3 py-2 text-xs text-[#8b7355]">
-          <span className="font-semibold text-[#8b6914]">Goal: </span>
-          {rs.requirement.description}
+      {/* Human buy banner (slim, pinned at top when human needs to decide) */}
+      {isHumanBuyerTurn && buyingDiscard && (
+        <div className="bg-[#fffbee] border-b-2 border-[#e2b858] px-4 py-3">
+          <div className="flex items-center gap-3">
+            <div className="flex-shrink-0 scale-90 origin-left">
+              <CardComponent card={buyingDiscard} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-[#2c1810]">{activeBuyer?.name} — Buy this card?</p>
+              <p className="text-[10px] text-[#8b7355]">+ 1 penalty card · {activeBuyer?.buysRemaining}/{MAX_BUYS} buys left</p>
+            </div>
+            <div className="flex gap-2 flex-shrink-0">
+              <button
+                onClick={() => handleBuyDecision(false)}
+                className="bg-[#efe9dd] text-[#8b7355] font-semibold rounded-lg px-3 py-2 text-sm active:opacity-80"
+              >
+                Pass
+              </button>
+              <button
+                onClick={() => handleBuyDecision(true)}
+                disabled={!activeBuyer || activeBuyer.buysRemaining <= 0}
+                className="bg-[#e2b858] text-[#2c1810] font-semibold rounded-lg px-3 py-2 text-sm active:opacity-80 disabled:opacity-40"
+              >
+                Buy
+              </button>
+            </div>
+          </div>
         </div>
+      )}
 
-        {/* Scores mini-bar */}
-        <div className="flex gap-2 overflow-x-auto pb-1">
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4 pb-44">
+
+        {/* Player cards mini-bar with card counts */}
+        <div className="flex gap-1.5 overflow-x-auto pb-1">
           {gameState.players.map(p => {
             const total = p.roundScores.reduce((s, n) => s + n, 0)
             const isCurrent = p.id === currentPlayer.id
+            const isBuyer = uiPhase === 'buying' && activeBuyer?.id === p.id
+            const isLow = p.hand.length <= 3 && p.hand.length > 0
             return (
               <div
                 key={p.id}
-                className={`flex-shrink-0 rounded-lg px-2.5 py-1.5 text-center min-w-[52px] ${
-                  isCurrent ? 'bg-[#e2b858]' : 'bg-white border border-[#e2ddd2]'
+                className={`flex-shrink-0 rounded-lg px-2 py-1.5 text-center min-w-[52px] ${
+                  isBuyer ? 'bg-[#e2b858]' :
+                  isCurrent ? 'bg-[#2d5a3c]' : 'bg-[#1e4a2e]'
                 }`}
               >
-                <p className={`text-[10px] font-medium truncate max-w-[48px] ${isCurrent ? 'text-[#2c1810]' : 'text-[#8b7355]'}`}>
+                <p className={`text-[10px] font-medium truncate max-w-[48px] ${
+                  isBuyer || isCurrent ? 'text-[#2c1810]' : 'text-[#a8d0a8]'
+                }`}>
                   {p.name.split(' ')[0]}
                   {p.isAI && ' 🤖'}
                 </p>
-                <p className={`font-mono text-xs font-bold ${isCurrent ? 'text-[#2c1810]' : 'text-[#a08c6e]'}`}>
+                <p className={`font-mono text-xs font-bold ${
+                  isBuyer || isCurrent ? 'text-[#2c1810]' : 'text-[#6aad7a]'
+                }`}>
                   {total}
+                </p>
+                <p className={`text-[9px] font-semibold ${
+                  isLow ? 'text-[#f87171]' :
+                  isBuyer || isCurrent ? 'text-[#2c1810]' : 'text-[#6aad7a]'
+                }`}>
+                  {p.hand.length}🃏
                 </p>
               </div>
             )
@@ -768,69 +1025,94 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
         {/* Table melds */}
         <TableMelds melds={rs.tablesMelds} />
 
-        {/* Draw / discard area */}
-        <div>
-          <p className="text-xs font-semibold text-[#a08c6e] uppercase tracking-wider mb-2">
-            {uiPhase === 'draw' ? 'Draw a card' : 'Discard pile'}
-          </p>
-          <div className="flex gap-4 items-end">
-            {uiPhase === 'draw' && !currentPlayer.isAI && (
-              <div className="flex flex-col items-center gap-1">
-                <div
-                  onClick={handleDrawFromPile}
-                  className="w-12 h-[4.5rem] rounded-lg bg-[#e2b858] border-2 border-[#8b6914] flex items-center justify-center cursor-pointer active:opacity-70 select-none"
-                >
-                  <span className="text-xl">🂠</span>
+        {/* Draw / discard area — visible for the current player's draw phase */}
+        {(uiPhase === 'draw' || uiPhase === 'action' || (uiPhase === 'buying' && !isHumanBuyerTurn)) && (
+          <div>
+            <p className="text-xs font-semibold text-[#6aad7a] uppercase tracking-wider mb-2">
+              {uiPhase === 'draw' && !currentPlayer.isAI ? 'Draw a card' : 'Discard pile'}
+            </p>
+            <div className="flex gap-4 items-end">
+              {uiPhase === 'draw' && !currentPlayer.isAI && (
+                <div className="flex flex-col items-center gap-1">
+                  <div
+                    onClick={handleDrawFromPile}
+                    className="w-12 h-[4.5rem] rounded-lg bg-[#2d5a3c] border-2 border-[#e2b858] flex items-center justify-center cursor-pointer active:opacity-70 select-none"
+                  >
+                    <span className="text-xl">🂠</span>
+                  </div>
+                  <p className="text-[10px] text-[#8bc48b]">Draw pile</p>
+                  <p className="text-[10px] text-[#6aad7a]">{rs.drawPile.length} cards</p>
                 </div>
-                <p className="text-[10px] text-[#8b7355]">Draw pile</p>
-                <p className="text-[10px] text-[#a08c6e]">{rs.drawPile.length} cards</p>
-              </div>
-            )}
+              )}
 
-            {topDiscard && (
-              <div className="flex flex-col items-center gap-1">
-                <CardComponent
-                  card={topDiscard}
-                  onClick={uiPhase === 'draw' && !currentPlayer.isAI ? handleTakeDiscard : undefined}
-                />
-                <p className="text-[10px] text-[#8b7355]">
-                  {uiPhase === 'draw' && !currentPlayer.isAI ? 'Take discard' : 'Last discard'}
+              {topDiscard && (
+                <div className="flex flex-col items-center gap-1">
+                  <CardComponent
+                    card={topDiscard}
+                    onClick={uiPhase === 'draw' && !currentPlayer.isAI ? handleTakeDiscard : undefined}
+                  />
+                  <p className="text-[10px] text-[#8bc48b]">
+                    {uiPhase === 'draw' && !currentPlayer.isAI ? 'Take discard' : 'Last discard'}
+                  </p>
+                  {pendingBuyDiscard && uiPhase === 'draw' && !currentPlayer.isAI && (
+                    <p className="text-[9px] text-[#e2b858] font-semibold">← buyable</p>
+                  )}
+                </div>
+              )}
+
+              {uiPhase !== 'draw' && (
+                <p className="text-xs text-[#6aad7a] self-center">
+                  Draw pile: {rs.drawPile.length} cards
                 </p>
-              </div>
-            )}
+              )}
 
-            {uiPhase !== 'draw' && (
-              <p className="text-xs text-[#a08c6e] self-center">
+              {uiPhase === 'draw' && currentPlayer.isAI && (
+                <p className="text-xs text-[#6aad7a] self-center animate-pulse">
+                  {currentPlayer.name} is thinking…
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Show buying discard during human buy decision */}
+        {isHumanBuyerTurn && topDiscard && (
+          <div>
+            <p className="text-xs font-semibold text-[#6aad7a] uppercase tracking-wider mb-2">Discard pile</p>
+            <div className="flex gap-4 items-end">
+              <div className="flex flex-col items-center gap-1">
+                <CardComponent card={buyingDiscard ?? topDiscard} />
+                <p className="text-[10px] text-[#8bc48b]">Card up for sale</p>
+              </div>
+              <p className="text-xs text-[#6aad7a] self-center">
                 Draw pile: {rs.drawPile.length} cards
               </p>
-            )}
-
-            {uiPhase === 'draw' && currentPlayer.isAI && (
-              <p className="text-xs text-[#a08c6e] self-center animate-pulse">
-                {currentPlayer.name} is thinking…
-              </p>
-            )}
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Player hand — hidden for AI turn */}
-        {!currentPlayer.isAI && (
+        {/* Player hand */}
+        {!displayPlayer.isAI && (
           <HandDisplay
-            cards={currentPlayer.hand}
+            cards={displayPlayer.hand}
             selectedIds={selectedCardIds}
             onToggle={toggleCard}
-            label={`Your hand (${currentPlayer.hand.length} cards)`}
-            disabled={uiPhase !== 'action' || pendingUndo !== null}
+            label={`${isHumanBuyerTurn ? displayPlayer.name + "'s " : 'Your '}hand (${displayPlayer.hand.length} cards)`}
+            disabled={
+              (uiPhase !== 'action' && !isHumanBuyerTurn) ||
+              pendingUndo !== null
+            }
             sort={handSort}
             onSortChange={setHandSort}
+            newCardId={newCardId}
           />
         )}
       </div>
 
       {/* Fixed action bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#e2ddd2] px-4 pt-3 pb-8 safe-bottom">
+      <div className="fixed bottom-0 left-0 right-0 bg-[#0f2218] border-t border-[#2d5a3c] px-4 pt-3 pb-8 safe-bottom">
         {uiPhase === 'draw' && !currentPlayer.isAI && (
-          <p className="text-center text-sm text-[#8b7355] py-1">
+          <p className="text-center text-sm text-[#6aad7a] py-1">
             Tap the draw pile or discard card above
           </p>
         )}
@@ -838,7 +1120,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
         {/* Undo toast */}
         {pendingUndo && (
           <div className="flex items-center justify-between bg-[#2c1810] text-white rounded-xl px-4 py-3">
-            <span className="text-sm">Discarded {pendingUndo.card.rank === 0 ? 'Joker' : `${pendingUndo.card.rank}`}</span>
+            <span className="text-sm">Discarded {pendingUndo.card.rank === 0 ? 'Joker' : rankLabel(pendingUndo.card)}</span>
             <button
               onClick={handleUndoDiscard}
               className="text-[#e2b858] text-sm font-bold active:opacity-70"
@@ -854,15 +1136,24 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
               {!currentPlayer.hasLaidDown && (
                 <button
                   onClick={() => setShowMeldModal(true)}
-                  className="btn-primary flex-1 text-sm py-2.5"
+                  className="bg-[#e2b858] text-[#2c1810] font-bold rounded-xl flex-1 text-sm py-2.5 active:opacity-80"
                 >
                   Lay Down Hand
                 </button>
               )}
               {currentPlayer.hasLaidDown && rs.tablesMelds.length > 0 && (
                 <button
-                  onClick={() => setShowLayOffModal(true)}
-                  className="btn-secondary flex-1 text-sm py-2.5"
+                  onClick={() => { setNewCardId(null); setShowLayOffModal(true) }}
+                  className="bg-[#2d5a3c] text-[#a8d0a8] font-semibold border border-[#3d7a4c] rounded-xl flex-1 text-sm py-2.5 active:opacity-80"
+                >
+                  Lay Off / Swap
+                </button>
+              )}
+              {!currentPlayer.hasLaidDown && rs.tablesMelds.length > 0 && (
+                <button
+                  disabled
+                  title="Lay down your hand first"
+                  className="bg-[#1e4a2e] text-[#4a7a5a] font-semibold border border-[#2d5a3c] rounded-xl flex-1 text-sm py-2.5 opacity-50 cursor-not-allowed"
                 >
                   Lay Off / Swap
                 </button>
@@ -870,6 +1161,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
             </div>
             <button
               onClick={() => {
+                setNewCardId(null)
                 if (currentPlayer.hand.length === 1) {
                   handleDiscard(currentPlayer.hand[0].id)
                 } else {
@@ -879,15 +1171,29 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
               disabled={currentPlayer.hand.length !== 1 && selectedCardIds.size !== 1}
               className={`w-full rounded-xl py-2.5 text-sm font-semibold transition-all ${
                 currentPlayer.hand.length === 1 || selectedCardIds.size === 1
-                  ? 'bg-[#2c1810] text-white active:opacity-80'
-                  : 'bg-[#efe9dd] text-[#a08c6e]'
+                  ? 'bg-white text-[#2c1810] active:opacity-80'
+                  : 'bg-[#1e4a2e] text-[#4a7a5a]'
               }`}
             >
               {currentPlayer.hand.length === 1
                 ? 'Discard Last Card'
-                : selectedCardIds.size === 1 ? 'Discard Selected Card' : 'Tap a card to discard'}
+                : selectedCardIds.size === 1 ? 'Discard Selected Card' : 'Tap a card to select, then discard'}
             </button>
           </div>
+        )}
+
+        {/* AI turn indicator in action bar */}
+        {(uiPhase === 'draw' || uiPhase === 'action') && currentPlayer.isAI && !aiMessage && (
+          <p className="text-center text-sm text-[#6aad7a] py-1 animate-pulse">
+            {currentPlayer.name} is playing...
+          </p>
+        )}
+
+        {/* Buying phase — AI deciding (non-banner) */}
+        {uiPhase === 'buying' && !isHumanBuyerTurn && activeBuyer?.isAI && !aiMessage && (
+          <p className="text-center text-sm text-[#6aad7a] py-1 animate-pulse">
+            {activeBuyer.name} deciding on buy...
+          </p>
         )}
       </div>
 
@@ -914,15 +1220,30 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
       {/* Pause modal */}
       {showPauseModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-end">
-          <div className="w-full bg-white rounded-t-2xl px-4 pt-5 pb-10">
-            <h2 className="text-lg font-bold text-[#2c1810] text-center mb-1">Game Paused</h2>
-            <p className="text-sm text-[#8b7355] text-center mb-6">
+          <div className="w-full bg-[#0f2218] border-t border-[#2d5a3c] rounded-t-2xl px-4 pt-5 pb-10">
+            <h2 className="text-lg font-bold text-white text-center mb-1">Game Paused</h2>
+            <p className="text-sm text-[#6aad7a] text-center mb-4">
               Round {gameState.currentRound} of {TOTAL_ROUNDS} · {currentPlayer.name}'s turn
             </p>
+            {/* Game speed */}
+            <p className="text-xs text-[#6aad7a] text-center mb-2">AI Speed</p>
+            <div className="bg-[#1e4a2e] rounded-xl p-1 flex gap-1 mb-4">
+              {(['fast', 'normal', 'slow'] as GameSpeed[]).map(s => (
+                <button
+                  key={s}
+                  onClick={() => setGameSpeed(s)}
+                  className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all capitalize ${
+                    gameSpeed === s ? 'bg-[#e2b858] text-[#2c1810] shadow-sm' : 'text-[#8bc48b]'
+                  }`}
+                >
+                  {s.charAt(0).toUpperCase() + s.slice(1)}
+                </button>
+              ))}
+            </div>
             <div className="space-y-2">
               <button
                 onClick={() => setShowPauseModal(false)}
-                className="btn-primary"
+                className="bg-[#e2b858] text-[#2c1810] font-bold rounded-xl w-full py-3 text-sm active:opacity-80"
               >
                 Resume Game
               </button>
@@ -932,7 +1253,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
                   if (pendingUndo) clearTimeout(pendingUndo.timerId)
                   onExit()
                 }}
-                className="w-full rounded-xl py-3 text-sm font-semibold text-[#b83232] bg-[#fff3f3] active:opacity-80"
+                className="w-full rounded-xl py-3 text-sm font-semibold text-[#f87171] bg-[#1e4a2e] active:opacity-80"
               >
                 Abandon Game
               </button>
@@ -942,4 +1263,14 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
       )}
     </div>
   )
+}
+
+// Helper for undo discard label
+function rankLabel(card: CardType): string {
+  const r = card.rank
+  if (r === 1) return 'A'
+  if (r === 11) return 'J'
+  if (r === 12) return 'Q'
+  if (r === 13) return 'K'
+  return String(r)
 }

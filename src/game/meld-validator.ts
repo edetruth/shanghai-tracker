@@ -63,6 +63,7 @@ export function meetsRoundRequirement(meldCards: Card[][], requirement: RoundReq
 }
 
 // Build a Meld object from validated cards, computing joker mappings
+// For runs: cards array is sorted into correct sequence order (jokers at their logical position)
 export function buildMeld(cards: Card[], type: 'set' | 'run', ownerId: string, ownerName: string, id: string): Meld {
   const jokerMappings: JokerMapping[] = []
   const naturals = cards.filter(c => c.suit !== 'joker')
@@ -72,6 +73,7 @@ export function buildMeld(cards: Card[], type: 'set' | 'run', ownerId: string, o
   let runMax: number | undefined
   let runSuit: import('./types').Suit | undefined
   let runAceHigh: boolean | undefined
+  let orderedCards: Card[] = cards
 
   if (type === 'set') {
     const rank = naturals[0].rank
@@ -82,6 +84,7 @@ export function buildMeld(cards: Card[], type: 'set' | 'run', ownerId: string, o
         representsSuit: naturals[0]?.suit ?? 'spades',
       })
     })
+    orderedCards = cards
   } else {
     // Run: compute full sequence
     const suit = naturals[0].suit as import('./types').Suit
@@ -105,9 +108,9 @@ export function buildMeld(cards: Card[], type: 'set' | 'run', ownerId: string, o
     const span = max - min + 1
     const gaps = span - useRanks.length
     const extraJokers = jokers.length - gaps
-    // Extra jokers extend at the low end first
-    const seqMin = min - extraJokers
-    const seqMax = max
+    // Extra jokers extend at the high end
+    const seqMin = min
+    const seqMax = max + extraJokers
 
     runMin = seqMin
     runMax = seqMax
@@ -123,13 +126,31 @@ export function buildMeld(cards: Card[], type: 'set' | 'run', ownerId: string, o
     jokers.forEach((j, i) => {
       jokerMappings.push({
         cardId: j.id,
-        representsRank: missingPositions[i] ?? 0,
+        representsRank: missingPositions[i] ?? seqMax,
         representsSuit: suit,
       })
     })
+
+    // Build ordered cards array: place cards in sequence position order
+    orderedCards = []
+    for (let r = seqMin; r <= seqMax; r++) {
+      const natural = naturals.find(c => (aceHigh ? (c.rank === 1 ? 14 : c.rank) : c.rank) === r)
+      if (natural) {
+        orderedCards.push(natural)
+      } else {
+        const mapping = jokerMappings.find(m => m.representsRank === r)
+        if (mapping) {
+          const jokerCard = jokers.find(c => c.id === mapping.cardId)
+          if (jokerCard) orderedCards.push(jokerCard)
+        }
+      }
+    }
+    // Fallback: include any cards not placed (shouldn't happen)
+    const placedIds = new Set(orderedCards.map(c => c.id))
+    cards.forEach(c => { if (!placedIds.has(c.id)) orderedCards.push(c) })
   }
 
-  return { id, type, cards, ownerId, ownerName, jokerMappings, runMin, runMax, runSuit, runAceHigh }
+  return { id, type, cards: orderedCards, ownerId, ownerName, jokerMappings, runMin, runMax, runSuit, runAceHigh }
 }
 
 // For a run meld, determine min and max rank of the full sequence
@@ -155,6 +176,10 @@ export function canLayOff(card: Card, meld: Meld): boolean {
     if (card.suit !== meld.runSuit) return false
     const min = meld.runMin!
     const max = meld.runMax!
+
+    // Ace can be placed at end of K-high run (ace-high extension: ...Q-K-A)
+    if (card.rank === 1 && max === 13) return true
+
     // Extend at either end
     let cardRank = card.rank
     if (meld.runAceHigh && card.rank === 1) cardRank = 14

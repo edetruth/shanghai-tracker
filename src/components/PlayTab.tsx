@@ -133,6 +133,7 @@ export default function PlayTab({ onBack }: Props) {
                   ['Run', '4+ in sequence, same suit'],
                   ['Aces', 'High or low — A-2-3-4 or J-Q-K-A, no wrap'],
                   ['🃏', 'Jokers are wild — no limit per meld'],
+                  ['Extra', 'May lay down additional melds matching the round type (sets-only round = sets only, etc.)'],
                 ].map(([label, desc]) => (
                   <div key={label} className="flex gap-2">
                     <span className="font-semibold text-[#8b6914] w-8 flex-shrink-0 text-xs leading-5">{label}</span>
@@ -164,7 +165,7 @@ export default function PlayTab({ onBack }: Props) {
               <p className="text-sm text-[#8b7355]">
                 Out-of-turn players can buy a discarded card — they get it{' '}
                 <span className="font-semibold text-[#2c1810]">plus a penalty card</span> from the draw pile.{' '}
-                <span className="font-semibold text-[#8b6914]">5 buys per player</span> across the whole game.
+                <span className="font-semibold text-[#8b6914]">5 buys per player per round</span> (resets each round).
                 Joker swaps: if a meld has a joker, swap in the natural card and take the joker back.
               </p>
             </div>

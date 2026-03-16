@@ -164,16 +164,7 @@ export default function GameSetup({ onStart, onBack }: Props) {
                 AI Difficulty
               </p>
               <div className="bg-[#efe9dd] rounded-xl p-1 flex gap-1">
-                <button
-                  disabled
-                  className="flex-1 py-2 rounded-lg text-sm font-semibold text-[#c0b090] relative"
-                >
-                  Easy
-                  <span className="absolute -top-1 -right-1 bg-[#a08c6e] text-white text-[8px] font-bold px-1 rounded-full leading-4">
-                    Soon
-                  </span>
-                </button>
-                {(['medium', 'hard'] as AIDifficulty[]).map(level => (
+                {(['easy', 'medium', 'hard'] as AIDifficulty[]).map(level => (
                   <button
                     key={level}
                     onClick={() => setAiDifficulty(level)}
@@ -188,9 +179,11 @@ export default function GameSetup({ onStart, onBack }: Props) {
                 ))}
               </div>
               <p className="text-xs text-[#a08c6e] mt-1.5">
-                {aiDifficulty === 'medium'
-                  ? 'Makes solid plays — good for casual games'
-                  : 'Smarter discards, aggressive buying — a real challenge'}
+                {aiDifficulty === 'easy'
+                  ? 'Random plays, never buys — good for learning the game flow'
+                  : aiDifficulty === 'medium'
+                    ? 'Strategic drawing, commits to runs — good for casual games'
+                    : 'Smarter discards, aggressive buying — a real challenge'}
               </p>
             </div>
           )}

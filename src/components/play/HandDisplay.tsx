@@ -12,14 +12,23 @@ interface Props {
   disabled?: boolean
   sort?: SortMode
   onSortChange?: (sort: SortMode) => void
+  newCardId?: string | null
 }
 
 export const SUIT_ORDER: Record<string, number> = { hearts: 0, diamonds: 1, clubs: 2, spades: 3, joker: 4 }
 
-export default function HandDisplay({ cards, selectedIds, onToggle, label, disabled, sort: sortProp, onSortChange }: Props) {
+// Compute horizontal offset per card based on hand size
+function cardOffset(count: number): number {
+  if (count <= 5) return 56
+  if (count <= 7) return 48
+  if (count <= 10) return 36
+  if (count <= 12) return 28
+  return 24
+}
+
+export default function HandDisplay({ cards, selectedIds, onToggle, label, disabled, sort: sortProp, onSortChange, newCardId }: Props) {
   const [sortInternal, setSortInternal] = useState<SortMode>('rank')
   const sort = sortProp ?? sortInternal
-  const selectedCount = selectedIds.size
 
   function setSort(mode: SortMode) {
     if (onSortChange) onSortChange(mode)
@@ -40,21 +49,26 @@ export default function HandDisplay({ cards, selectedIds, onToggle, label, disab
     })
   }, [cards, sort])
 
+  const offset = cardOffset(sorted.length)
+  const containerWidth = sorted.length > 0 ? (sorted.length - 1) * offset + 48 : 48
+  // Card height = 72px, selected lift = 12px (translate-y-3), new badge = 8px above
+  const containerHeight = 88
+
   return (
     <div>
-      <div className="flex items-center justify-between mb-1.5">
+      <div className="flex items-center justify-between mb-2">
         {label && (
-          <p className="text-xs text-[#8b7355]">
-            {label}{selectedCount > 0 ? ` · ${selectedCount} selected` : ''}
+          <p className="text-xs text-[#a8d0a8]">
+            {label}
           </p>
         )}
-        <div className="bg-[#efe9dd] rounded-lg p-0.5 flex gap-0.5 ml-auto">
+        <div className="bg-[#1e4a2e] rounded-lg p-0.5 flex gap-0.5 ml-auto">
           {(['rank', 'suit'] as SortMode[]).map(mode => (
             <button
               key={mode}
               onClick={() => setSort(mode)}
               className={`px-2 py-0.5 text-[10px] font-semibold rounded transition-all ${
-                sort === mode ? 'bg-white text-[#8b6914] shadow-sm' : 'text-[#8b7355]'
+                sort === mode ? 'bg-[#e2b858] text-[#2c1810] shadow-sm' : 'text-[#8bc48b]'
               }`}
             >
               {mode.charAt(0).toUpperCase() + mode.slice(1)}
@@ -64,25 +78,40 @@ export default function HandDisplay({ cards, selectedIds, onToggle, label, disab
       </div>
 
       {cards.length === 0 ? (
-        <p className="text-sm text-[#a08c6e] italic py-2">No cards</p>
+        <p className="text-sm text-[#8bc48b] italic py-2">No cards</p>
       ) : (
-        <div className="relative">
+        <div
+          className="relative overflow-x-auto pb-2"
+          style={{ height: `${containerHeight}px` }}
+        >
           <div
-            className="flex overflow-x-auto gap-1.5 pb-2"
-            style={{ WebkitOverflowScrolling: 'touch' }}
+            className="relative"
+            style={{ width: `${containerWidth}px`, height: `${containerHeight}px` }}
           >
-            {sorted.map(card => (
-              <CardComponent
-                key={card.id}
-                card={card}
-                selected={selectedIds.has(card.id)}
-                onClick={disabled ? undefined : () => onToggle(card.id)}
-                disabled={disabled}
-              />
-            ))}
+            {sorted.map((card, index) => {
+              const isSelected = selectedIds.has(card.id)
+              const isNewCard = card.id === newCardId
+              return (
+                <div
+                  key={card.id}
+                  className="absolute bottom-0"
+                  style={{
+                    left: `${index * offset}px`,
+                    zIndex: isSelected ? sorted.length + 10 : index + 1,
+                    transition: 'left 150ms ease',
+                  }}
+                >
+                  <CardComponent
+                    card={card}
+                    selected={isSelected}
+                    isNew={isNewCard}
+                    onClick={disabled ? undefined : () => onToggle(card.id)}
+                    disabled={disabled}
+                  />
+                </div>
+              )
+            })}
           </div>
-          {/* Right fade gradient to hint at scroll */}
-          <div className="absolute right-0 top-0 bottom-2 w-8 bg-gradient-to-l from-[#f8f6f1] to-transparent pointer-events-none" />
         </div>
       )}
     </div>

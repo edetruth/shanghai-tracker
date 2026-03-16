@@ -33,12 +33,12 @@ export interface Player {
   hand: Card[]
   melds: Meld[]         // melds this player has laid down this round
   hasLaidDown: boolean
-  buysRemaining: number // 5 across the whole game
+  buysRemaining: number // 5 per round, resets each new round
   roundScores: number[] // score per round index 0-6
   isAI?: boolean
 }
 
-export type AIDifficulty = 'medium' | 'hard'
+export type AIDifficulty = 'easy' | 'medium' | 'hard'
 
 export interface PlayerConfig {
   name: string

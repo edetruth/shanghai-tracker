@@ -114,8 +114,15 @@ GameSetup (PlayerConfig[] configured)
 ```
 
 - **`PlayerConfig`** — `{ name: string; isAI: boolean }` — in `src/game/types.ts`
-- **`AIDifficulty`** — `'medium' | 'hard'` — exported from `src/game/types.ts`; passed from `GameSetup` → `PlayTab` → `GameBoard` prop (`aiDifficulty?: AIDifficulty`, default `'medium'`)
-- **AI automation** — two `useEffect` blocks in `GameBoard` watch `uiPhase` + `currentPlayer.isAI`. Uses `useRef` refs (`gameStateRef`, `uiPhaseRef`, `buyerOrderRef`, `buyerStepRef`) to read fresh state inside `setTimeout` callbacks without stale closures.
+- **`AIDifficulty`** — `'easy' | 'medium' | 'hard'` — exported from `src/game/types.ts`; passed from `GameSetup` → `PlayTab` → `GameBoard` prop (`aiDifficulty?: AIDifficulty`, default `'medium'`)
+  - Easy: never buys/takes discard, discards highest-value card, lays down required melds only
+  - Medium: commits to top-2 suits for runs, run-aware drawing/buying/discarding
+  - Hard: all Medium + joker swaps, unlimited lay-offs, very aggressive buying
+- **AI automation** — two `useEffect` blocks in `GameBoard` watch `uiPhase` + `currentPlayer.isAI`. Uses `useRef` refs (`gameStateRef`, `uiPhaseRef`, `buyerOrderRef`, `buyerStepRef`, `pendingBuyDiscardRef`, `buyingIsPostDrawRef`) to read fresh state inside `setTimeout` callbacks without stale closures.
+- **Game speed** — `gameSpeed: 'fast' | 'normal' | 'slow'` state in `GameBoard`; toggleable from pause menu. Controls AI action delays.
+- **Dark table** — GameBoard uses `bg-[#1a3a2a]` (dark green felt) for the game screen; all text/icons adjusted for dark background.
+- **Fan hand layout** — `HandDisplay` uses absolute positioning with overlap offset computed by hand size. All cards visible without scrolling. Selected cards lift via Card's `-translate-y-3`.
+- **Rule 9A** — After any non-going-out discard, game advances to next player for a free draw decision. If they draw from pile, `startBuyingWindowPostDraw()` opens buying for remaining players. `buyingIsPostDrawRef` tracks this mode; after buying resolves the drew-player goes to action phase directly.
 - **`nextPhaseForPlayer(player)`** — returns `'draw'` for AI (skips privacy screen), `'privacy'` for humans.
 - **`aiLayOffDoneRef`** — ref in `GameBoard`; Medium AI is capped at 1 lay-off per turn before being forced to discard. Hard AI has no cap.
 - **`aiActionTick`** — state counter bumped after Hard AI joker swaps (hand length unchanged, so this re-triggers the AI action effect).
@@ -142,8 +149,10 @@ Every stat number in `StatsLeaderboard` and `PlayerProfileModal` is tappable. Ta
 - Rounds 1–4: 10 cards; Rounds 5–7: 12 cards
 - A score of 0 for a round = "Out!" (went out first)
 - Round requirements defined in `src/lib/constants.ts` (`ROUNDS` array)
-- 5 buys per player per game (out-of-turn draw + 1 penalty card from draw pile)
-- Players **must** meet the minimum round requirement to lay down, but **may** lay down additional valid melds (sets or runs) beyond the requirement in the same turn
+- 5 buys per player **per round** (resets to 5 at the start of each new round)
+- Players **must** meet the minimum round requirement to lay down, but **may** lay down additional valid melds beyond the requirement — extra melds must match the **round type** (sets-only round = extra sets only; runs-only round = extra runs only; mixed round = either)
+- Aces can be used **ace-low** (A-2-3-4) or **ace-high** (...Q-K-A) in runs; lay-off at either end of a run is allowed
+- The next player in turn order gets **first right** to take a discarded card as their normal draw (no buy used). Only if they draw from the pile does a buying window open for the remaining players.
 
 ## Key Conventions
 
@@ -184,7 +193,9 @@ Light "warm cream" theme. Do not reintroduce dark backgrounds.
 | Red | `#b83232` | Errors, negative stats |
 | Blue (compare B) | `#1d7ea8` | Head-to-head player B color |
 
-Colorblind suit tints (cards): hearts `#fff5f5`, diamonds `#f5f8ff`, clubs `#f5fff7`, spades `#f8f8f8`.
+Suit backgrounds (cards): hearts `#fff0f0` pink, diamonds `#f0f5ff` blue, clubs `#e0f7e8` strong green, spades `#eeecff` lavender. Text: hearts `#c0393b`, diamonds `#2158b8`, clubs `#1a6b3a`, spades `#3d2b8e`.
+
+Game table background: `bg-[#1a3a2a]` (dark green felt). Top bar: `bg-[#0f2218]`. In-game secondary surface: `bg-[#1e4a2e]`. In-game text: white / `#a8d0a8` / `#6aad7a`.
 
 Tab pill pattern: container `bg-[#efe9dd]`, active `bg-white text-[#8b6914] shadow-sm`, inactive `text-[#8b7355]`.
 
