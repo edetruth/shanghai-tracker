@@ -37,13 +37,13 @@ export default function Card({ card, selected, onClick, compact, disabled, joker
 
   const sizeClass = compact ? 'w-10 h-16' : 'w-12 h-[4.5rem]'
 
-  // Suit backgrounds: hearts=pink, diamonds=blue, clubs=strong green, spades=lavender
+  // Suit backgrounds: hearts=pink, diamonds=yellow, clubs=green, spades=lavender
   const suitBg = isJoker
     ? 'bg-[#fffbee] border-[#e2b858]'
     : card.suit === 'hearts'
       ? 'bg-[#fff0f0] border-[#e2ddd2]'
       : card.suit === 'diamonds'
-        ? 'bg-[#f0f5ff] border-[#e2ddd2]'
+        ? 'bg-[#fffbeb] border-[#e2ddd2]'
         : card.suit === 'clubs'
           ? 'bg-[#e0f7e8] border-[#e2ddd2]'
           : 'bg-[#eeecff] border-[#e2ddd2]' // spades: lavender
@@ -67,7 +67,7 @@ export default function Card({ card, selected, onClick, compact, disabled, joker
     : card.suit === 'hearts'
       ? 'text-[#c0393b]'
       : card.suit === 'diamonds'
-        ? 'text-[#2158b8]'
+        ? 'text-[#b45309]'
         : card.suit === 'clubs'
           ? 'text-[#1a6b3a]'
           : 'text-[#3d2b8e]' // spades: dark purple

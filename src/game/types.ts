@@ -20,6 +20,8 @@ export interface Meld {
   ownerId: string
   ownerName: string
   jokerMappings: JokerMapping[]
+  // cardId → playerName for cards laid off onto this meld by other players
+  cardOwners?: Record<string, string>
   // For runs: minRank and maxRank of the full sequence (including joker positions)
   runMin?: number       // actual min rank in sequence
   runMax?: number       // actual max rank in sequence

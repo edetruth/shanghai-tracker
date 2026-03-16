@@ -63,14 +63,23 @@ export default function TableMelds({ melds, onMeldClick, highlightMeldId, jokerM
                 )}
               </div>
               <div className="flex gap-1 overflow-x-auto pb-1" style={{ WebkitOverflowScrolling: 'touch' }}>
-                {meld.cards.map(card => (
-                  <CardComponent
-                    key={card.id}
-                    card={card}
-                    compact
-                    jokerLabel={card.suit === 'joker' ? getJokerLabel(meld, card.id) : undefined}
-                  />
-                ))}
+                {meld.cards.map(card => {
+                  const layOffName = meld.cardOwners?.[card.id]
+                  return (
+                    <div key={card.id} className="flex flex-col items-center gap-0.5">
+                      <CardComponent
+                        card={card}
+                        compact
+                        jokerLabel={card.suit === 'joker' ? getJokerLabel(meld, card.id) : undefined}
+                      />
+                      {layOffName && (
+                        <span className="text-[8px] font-semibold bg-[#2d5a3c] text-[#a8d0a8] px-1 rounded leading-tight max-w-[40px] truncate">
+                          {layOffName.split(' ')[0]}
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           ))}

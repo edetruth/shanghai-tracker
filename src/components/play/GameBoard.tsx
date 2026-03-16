@@ -488,10 +488,17 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
       newMeldCards = [...meld.cards, card]
     }
 
+    // Track who laid off this card (only if it's onto someone else's meld)
+    const newCardOwners = { ...meld.cardOwners }
+    if (player.id !== meld.ownerId) {
+      newCardOwners[card.id] = player.name
+    }
+
     const updatedMeld: Meld = {
       ...meld,
       cards: newMeldCards,
       jokerMappings: newJokerMappings,
+      cardOwners: newCardOwners,
       runMin: updatedRunMin,
       runMax: updatedRunMax,
       runAceHigh: updatedRunAceHigh,
@@ -522,7 +529,13 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
 
       const newMeldCards = meld.cards.map(c => c.id === joker.id ? naturalCard : c)
       const newJokerMappings = meld.jokerMappings.filter(m => m.cardId !== joker.id)
-      const updatedMeld: Meld = { ...meld, cards: newMeldCards, jokerMappings: newJokerMappings }
+      const newCardOwners = { ...meld.cardOwners }
+      if (player.id !== meld.ownerId) {
+        newCardOwners[naturalCard.id] = player.name
+      }
+      // Remove joker from cardOwners if it was tracked
+      delete newCardOwners[joker.id]
+      const updatedMeld: Meld = { ...meld, cards: newMeldCards, jokerMappings: newJokerMappings, cardOwners: newCardOwners }
       const tablesMelds = prev.roundState.tablesMelds.map(m => m.id === meld.id ? updatedMeld : m)
       const newHand = player.hand.filter(c => c.id !== naturalCard.id).concat(joker)
       const players = prev.players.map((p, i) => i === playerIdx ? { ...p, hand: newHand } : p)
