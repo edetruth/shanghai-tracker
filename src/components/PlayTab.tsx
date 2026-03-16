@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Gamepad2, ArrowLeft } from 'lucide-react'
+import { Gamepad2, ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react'
 import GameSetup from './play/GameSetup'
 import GameBoard from './play/GameBoard'
 import type { PlayerConfig, AIDifficulty } from '../game/types'
@@ -31,6 +31,7 @@ export default function PlayTab({ onBack }: Props) {
   const [view, setView] = useState<PlayView>('rules')
   const [playerConfigs, setPlayerConfigs] = useState<PlayerConfig[]>([])
   const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>('medium')
+  const [showFullRules, setShowFullRules] = useState(false)
 
   function handleStart(players: PlayerConfig[], difficulty: AIDifficulty) {
     setPlayerConfigs(players)
@@ -85,133 +86,104 @@ export default function PlayTab({ onBack }: Props) {
         </button>
       </div>
 
-      {/* Rules summary */}
-      <h2 className="text-xs font-semibold text-[#a08c6e] uppercase tracking-wider mb-3">House Rules</h2>
-
-      {/* The 7 Rounds */}
-      <div className="card mb-4">
-        <h3 className="text-sm font-semibold text-[#2c1810] mb-3">The 7 Rounds</h3>
-        <div className="space-y-0">
+      {/* House Rules */}
+      <div className="card mb-2">
+        {/* 7 Rounds — always visible */}
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-[#2c1810]">The 7 Rounds</h2>
+          <span className="text-xs text-[#a08c6e]">Lowest total wins</span>
+        </div>
+        <div className="space-y-0 mb-3">
           {ROUNDS.map((r, i) => (
             <div
               key={r.num}
-              className={`flex items-center gap-3 py-2 ${i < ROUNDS.length - 1 ? 'border-b border-[#e2ddd2]' : ''}`}
+              className={`flex items-center gap-3 py-1.5 ${i < ROUNDS.length - 1 ? 'border-b border-[#e2ddd2]' : ''}`}
             >
-              <span className="w-6 h-6 rounded-full bg-[#e2b858] text-[#2c1810] text-xs font-bold flex items-center justify-center flex-shrink-0">
+              <span className="w-5 h-5 rounded-full bg-[#e2b858] text-[#2c1810] text-[10px] font-bold flex items-center justify-center flex-shrink-0">
                 {r.num}
               </span>
               <span className="flex-1 text-sm text-[#2c1810]">{r.req}</span>
-              <span className="text-xs text-[#8b7355] bg-[#efe9dd] px-2 py-0.5 rounded-full">
-                {r.cards} cards
-              </span>
+              <span className="text-xs text-[#8b7355]">{r.cards}c</span>
             </div>
           ))}
         </div>
-      </div>
 
-      {/* Melds */}
-      <div className="card mb-4">
-        <h3 className="text-sm font-semibold text-[#2c1810] mb-3">Melds</h3>
-        <div className="space-y-2 text-sm text-[#2c1810]">
-          <div className="flex gap-2">
-            <span className="font-semibold text-[#8b6914] w-10 flex-shrink-0">Set</span>
-            <span className="text-[#8b7355]">3+ cards of the same rank (any suits)</span>
-          </div>
-          <div className="flex gap-2">
-            <span className="font-semibold text-[#8b6914] w-10 flex-shrink-0">Run</span>
-            <span className="text-[#8b7355]">4+ cards in sequence, same suit</span>
-          </div>
-          <div className="flex gap-2">
-            <span className="font-semibold text-[#8b6914] w-10 flex-shrink-0">Aces</span>
-            <span className="text-[#8b7355]">High or low — A-2-3-4 or J-Q-K-A, no wrap</span>
-          </div>
-          <div className="flex gap-2">
-            <span className="font-semibold text-[#8b6914] w-10 flex-shrink-0">🃏</span>
-            <span className="text-[#8b7355]">Jokers are wild — no limit per meld</span>
-          </div>
-        </div>
-      </div>
+        {/* Toggle button */}
+        <button
+          onClick={() => setShowFullRules(v => !v)}
+          className="w-full flex items-center justify-center gap-1.5 pt-2 border-t border-[#e2ddd2] text-xs font-medium text-[#8b6914] active:opacity-70"
+        >
+          {showFullRules ? (
+            <><ChevronUp size={14} /> Hide full rules</>
+          ) : (
+            <><ChevronDown size={14} /> Melds · Turn · Buying · Scoring</>
+          )}
+        </button>
 
-      {/* Turn flow */}
-      <div className="card mb-4">
-        <h3 className="text-sm font-semibold text-[#2c1810] mb-3">Turn Flow</h3>
-        <div className="space-y-2">
-          {[
-            'Draw from draw pile or discard pile',
-            'Meld — lay down your required hand (optional)',
-            'Lay off — add cards to any meld on the table (optional)',
-            'Discard — place one card on the discard pile',
-          ].map((step, i) => (
-            <div key={i} className="flex gap-3 text-sm">
-              <span className="w-5 h-5 rounded-full border border-[#e2ddd2] text-[#8b7355] text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
-                {i + 1}
-              </span>
-              <span className="text-[#8b7355]">{step}</span>
+        {/* Expandable detail */}
+        {showFullRules && (
+          <div className="mt-3 space-y-4 border-t border-[#e2ddd2] pt-3">
+
+            {/* Melds */}
+            <div>
+              <p className="text-xs font-semibold text-[#a08c6e] uppercase tracking-wider mb-2">Melds</p>
+              <div className="space-y-1.5 text-sm">
+                {[
+                  ['Set', '3+ same rank (any suit)'],
+                  ['Run', '4+ in sequence, same suit'],
+                  ['Aces', 'High or low — A-2-3-4 or J-Q-K-A, no wrap'],
+                  ['🃏', 'Jokers are wild — no limit per meld'],
+                ].map(([label, desc]) => (
+                  <div key={label} className="flex gap-2">
+                    <span className="font-semibold text-[#8b6914] w-8 flex-shrink-0 text-xs leading-5">{label}</span>
+                    <span className="text-[#8b7355]">{desc}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          ))}
-        </div>
-        <p className="mt-3 text-xs text-[#a08c6e] border-t border-[#e2ddd2] pt-3">
-          Going out: play ALL remaining cards (meld + lay off). No final discard needed. Round ends immediately.
-        </p>
-      </div>
 
-      {/* Buying */}
-      <div className="card mb-4">
-        <h3 className="text-sm font-semibold text-[#2c1810] mb-2">Buying</h3>
-        <p className="text-sm text-[#8b7355] mb-2">
-          When a card is discarded, any out-of-turn player can buy it — they get the discard{' '}
-          <span className="font-semibold">plus one penalty card</span> from the draw pile.
-        </p>
-        <div className="bg-[#efe9dd] rounded-lg px-3 py-2 text-sm">
-          <span className="font-semibold text-[#8b6914]">5 buys per player</span>
-          <span className="text-[#8b7355]">
-            {' '}— across the whole game, not per round. Closest player in turn order wins priority.
-          </span>
-        </div>
-      </div>
-
-      {/* Joker swaps */}
-      <div className="card mb-4">
-        <h3 className="text-sm font-semibold text-[#2c1810] mb-2">Joker Swaps</h3>
-        <p className="text-sm text-[#8b7355]">
-          If a meld on the table has a joker, any player who has already laid down their hand can swap in the natural
-          card the joker represents — and take the joker back into their hand to use elsewhere.
-        </p>
-      </div>
-
-      {/* Scoring */}
-      <div className="card mb-4">
-        <h3 className="text-sm font-semibold text-[#2c1810] mb-3">Scoring</h3>
-        <div className="space-y-0 mb-3">
-          {CARD_VALUES.map((row, i) => (
-            <div
-              key={row.card}
-              className={`flex justify-between items-center py-2 text-sm ${i < CARD_VALUES.length - 1 ? 'border-b border-[#e2ddd2]' : ''}`}
-            >
-              <span className="text-[#8b7355]">{row.card}</span>
-              <span className="font-semibold text-[#2c1810]">{row.value}</span>
+            {/* Turn flow */}
+            <div>
+              <p className="text-xs font-semibold text-[#a08c6e] uppercase tracking-wider mb-2">Turn Flow</p>
+              <div className="space-y-1.5 text-sm text-[#8b7355]">
+                {['Draw', 'Meld (optional)', 'Lay off (optional)', 'Discard'].map((step, i) => (
+                  <div key={i} className="flex gap-2 items-baseline">
+                    <span className="w-4 h-4 rounded-full border border-[#e2ddd2] text-[#a08c6e] text-[10px] flex items-center justify-center flex-shrink-0">
+                      {i + 1}
+                    </span>
+                    <span>{step}</span>
+                  </div>
+                ))}
+                <p className="text-xs text-[#a08c6e] pl-6">Going out: play ALL cards — no final discard needed.</p>
+              </div>
             </div>
-          ))}
-        </div>
-        <div className="bg-[#fff3f3] border border-[#f5c6c6] rounded-lg px-3 py-2 text-sm">
-          <span className="font-semibold text-[#b83232]">Shanghai penalty: </span>
-          <span className="text-[#8b7355]">
-            If you haven't laid down when someone goes out, all cards in your hand count — typically 100–200+ points.
-          </span>
-        </div>
-        <p className="mt-3 text-xs text-[#a08c6e]">
-          Score of 0 = went out first. Lowest total across all 7 rounds wins.
-        </p>
-      </div>
 
-      {/* Decks */}
-      <div className="card mb-2">
-        <h3 className="text-sm font-semibold text-[#2c1810] mb-2">Setup</h3>
-        <div className="space-y-1 text-sm text-[#8b7355]">
-          <p>2–4 players: 2 decks with jokers (108 cards)</p>
-          <p>5–8 players: 3 decks with jokers (162 cards)</p>
-          <p>Dealer rotates clockwise each round. Player left of dealer goes first.</p>
-        </div>
+            {/* Buying */}
+            <div>
+              <p className="text-xs font-semibold text-[#a08c6e] uppercase tracking-wider mb-2">Buying</p>
+              <p className="text-sm text-[#8b7355]">
+                Out-of-turn players can buy a discarded card — they get it{' '}
+                <span className="font-semibold text-[#2c1810]">plus a penalty card</span> from the draw pile.{' '}
+                <span className="font-semibold text-[#8b6914]">5 buys per player</span> across the whole game.
+                Joker swaps: if a meld has a joker, swap in the natural card and take the joker back.
+              </p>
+            </div>
+
+            {/* Scoring */}
+            <div>
+              <p className="text-xs font-semibold text-[#a08c6e] uppercase tracking-wider mb-2">Scoring</p>
+              <div className="flex gap-4 text-sm text-[#8b7355] flex-wrap">
+                {CARD_VALUES.map(row => (
+                  <span key={row.card}><span className="font-semibold text-[#2c1810]">{row.value}</span> {row.card}</span>
+                ))}
+              </div>
+              <p className="text-xs text-[#a08c6e] mt-1.5">
+                Not laid down when someone goes out = Shanghai (all cards count, typically 100–200+ pts).
+              </p>
+            </div>
+
+          </div>
+        )}
       </div>
     </div>
   )
