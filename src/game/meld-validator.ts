@@ -239,6 +239,8 @@ export function buildMeld(cards: Card[], type: 'set' | 'run', ownerId: string, o
 
     runMin = seqMin
     runMax = seqMax
+    // If the sequence extends to rank 14 (joker placed as ace-high), mark runAceHigh
+    if (seqMax === 14) runAceHigh = true
 
     // Build the full sequence
     const fullSeq: number[] = []

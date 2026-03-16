@@ -241,8 +241,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
 
   // ── Draw from pile (with reshuffle if empty) ──────────────────────────────
   function handleDrawFromPile() {
-    const hasPendingBuy = pendingBuyDiscard !== null
-    const pendingCard = pendingBuyDiscard
+    // Use ref to avoid stale closure in AI setTimeout callbacks
+    const hasPendingBuy = pendingBuyDiscardRef.current !== null
+    const pendingCard = pendingBuyDiscardRef.current
     const currentIdx = rs.currentPlayerIndex
     const needsReshuffle = gameState.roundState.drawPile.length === 0
 

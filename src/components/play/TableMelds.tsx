@@ -1,4 +1,4 @@
-import type { Meld } from '../../game/types'
+import type { Card, Meld } from '../../game/types'
 import CardComponent from './Card'
 
 interface Props {
@@ -7,6 +7,7 @@ interface Props {
   highlightMeldId?: string
   jokerMeldIds?: Set<string>
   validLayOffMeldIds?: Set<string>  // melds that are valid lay-off targets for the selected card
+  layOffCard?: Card | null          // the card being laid off (used to show joker extension hint)
 }
 
 function getJokerLabel(meld: Meld, cardId: string): string | undefined {
@@ -31,7 +32,18 @@ function getJokerLabel(meld: Meld, cardId: string): string | undefined {
   return `${rankStr}${suitSymbols[mapping.representsSuit] ?? ''}`
 }
 
-export default function TableMelds({ melds, onMeldClick, highlightMeldId, jokerMeldIds, validLayOffMeldIds }: Props) {
+function getJokerExtensionLabel(meld: Meld, jokerCard: Card): string | undefined {
+  if (meld.type !== 'run' || jokerCard.suit !== 'joker') return undefined
+  const rankLabels: Record<number, string> = { 1: 'A', 11: 'J', 12: 'Q', 13: 'K', 14: 'A' }
+  const newRank = (meld.runMax ?? 0) + 1
+  const label = rankLabels[newRank] ?? String(newRank)
+  const suitSymbols: Record<string, string> = { hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠' }
+  const suit = suitSymbols[meld.runSuit ?? ''] ?? ''
+  if (newRank > 14) return undefined
+  return `→ ${label}${suit}`
+}
+
+export default function TableMelds({ melds, onMeldClick, highlightMeldId, jokerMeldIds, validLayOffMeldIds, layOffCard }: Props) {
   const hasTargetSet = validLayOffMeldIds !== undefined && validLayOffMeldIds.size >= 0
   return (
     <div>
@@ -65,11 +77,14 @@ export default function TableMelds({ melds, onMeldClick, highlightMeldId, jokerM
                 <span className="text-[10px] text-[#a08c6e] bg-[#efe9dd] px-1.5 py-0.5 rounded-full">
                   {meld.type}
                 </span>
-                {isValidTarget && (
-                  <span className="text-[10px] text-[#2d7a3a] bg-[#e6faf0] px-1.5 py-0.5 rounded-full border border-[#a3e6b4]">
-                    tap to lay off ✓
-                  </span>
-                )}
+                {isValidTarget && (() => {
+                  const jokerExt = layOffCard?.suit === 'joker' ? getJokerExtensionLabel(meld, layOffCard) : undefined
+                  return (
+                    <span className="text-[10px] text-[#2d7a3a] bg-[#e6faf0] px-1.5 py-0.5 rounded-full border border-[#a3e6b4]">
+                      {jokerExt ? jokerExt : 'tap to lay off ✓'}
+                    </span>
+                  )
+                })()}
                 {!isValidTarget && jokerMeldIds?.has(meld.id) && (
                   <span className="text-[10px] text-[#8b6914] bg-[#fffbee] px-1.5 py-0.5 rounded-full border border-[#e2b858]/40">
                     swap

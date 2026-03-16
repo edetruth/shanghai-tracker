@@ -94,7 +94,24 @@ export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, 
         const handAfter = hand.filter(c => c.id !== selectedCard.id)
         if (handAfter.length === 1) {
           const remaining = handAfter[0]
-          const canRemainPlay = tablesMelds.some(m => canLayOff(remaining, m))
+          // Check against SIMULATED updated melds (after the lay-off extends the target meld)
+          const simulatedMelds = tablesMelds.map(m => {
+            if (m.id !== selectedMeld.id || m.type !== 'run') return m
+            let runMin = m.runMin, runMax = m.runMax, runAceHigh = m.runAceHigh
+            if (selectedCard.suit === 'joker') {
+              runMax = (runMax ?? 0) + 1
+            } else {
+              let r = selectedCard.rank
+              if (selectedCard.rank === 1 && runMax === 13) { runMax = 14; runAceHigh = true }
+              else {
+                if (m.runAceHigh && selectedCard.rank === 1) r = 14
+                if (r < (runMin ?? 999)) runMin = r
+                else if (r > (runMax ?? 0)) runMax = r
+              }
+            }
+            return { ...m, runMin, runMax, runAceHigh }
+          })
+          const canRemainPlay = simulatedMelds.some(m => canLayOff(remaining, m))
           if (!canRemainPlay) {
             isValid = false
             validationMessage = `Can't lay off — your remaining ${cardName(remaining)} can't be played anywhere, and you can't go out by discarding. Keep both cards and discard one instead.`
@@ -161,6 +178,16 @@ export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, 
             </h2>
             {preLayDown && (
               <p className="text-xs text-[#e2b858] font-semibold mt-0.5">You must lay down after this swap</p>
+            )}
+            {!preLayDown && mode === 'layoff' && hand.length > 1 && (
+              <p className="text-xs text-[#8b7355] mt-0.5">
+                Lay off one card at a time — keep going until you're ready to discard
+              </p>
+            )}
+            {!preLayDown && mode === 'layoff' && hand.length === 1 && (
+              <p className="text-xs text-[#2d7a3a] font-semibold mt-0.5">
+                Last card — lay it off to go out!
+              </p>
             )}
           </div>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-[#a08c6e] active:bg-[#efe9dd]">
@@ -245,6 +272,7 @@ export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, 
                   highlightMeldId={selectedMeldId ?? undefined}
                   jokerMeldIds={mode === 'swap' ? swapRunMeldIds : undefined}
                   validLayOffMeldIds={mode === 'layoff' ? validLayOffMeldIds : undefined}
+                  layOffCard={mode === 'layoff' ? selectedCard : null}
                 />
               )}
             </div>
