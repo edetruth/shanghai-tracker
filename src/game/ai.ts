@@ -1,5 +1,5 @@
 import type { Card, Meld, RoundRequirement } from './types'
-import { isValidRun, canLayOff } from './meld-validator'
+import { isValidRun, canLayOff, findSwappableJoker } from './meld-validator'
 import { cardPoints, MIN_SET_SIZE, MIN_RUN_SIZE } from './rules'
 
 function isJoker(c: Card): boolean { return c.suit === 'joker' }
@@ -134,11 +134,98 @@ export function aiShouldBuy(hand: Card[], discardCard: Card, requirement: RoundR
   return withCard !== null && without === null
 }
 
+// Check whether any valid meld (set or run) can be formed from the given cards
+export function canFormAnyValidMeld(cards: Card[]): boolean {
+  const jokers = cards.filter(isJoker)
+  const naturals = cards.filter(c => !isJoker(c))
+  return tryFindSet(naturals, jokers, 0) !== null || tryFindRun(naturals, jokers, 0) !== null
+}
+
+// Find required melds PLUS any additional valid melds from remaining cards (AI lay-down)
+export function aiFindAllMelds(hand: Card[], requirement: RoundRequirement): Card[][] | null {
+  const requiredMelds = aiFindBestMelds(hand, requirement)
+  if (!requiredMelds) return null
+
+  const allMelds = [...requiredMelds]
+  const usedIds = new Set(requiredMelds.flatMap(m => m.map(c => c.id)))
+
+  // Greedily find additional melds from remaining cards
+  let found = true
+  while (found) {
+    found = false
+    const remaining = hand.filter(c => !usedIds.has(c.id))
+    const jokers = remaining.filter(isJoker)
+    const naturals = remaining.filter(c => !isJoker(c))
+
+    const set = tryFindSet(naturals, jokers, 0)
+    if (set) {
+      set.forEach(c => usedIds.add(c.id))
+      allMelds.push(set)
+      found = true
+      continue
+    }
+
+    const run = tryFindRun(naturals, jokers, 0)
+    if (run) {
+      run.forEach(c => usedIds.add(c.id))
+      allMelds.push(run)
+      found = true
+    }
+  }
+
+  return allMelds
+}
+
 // Find a card in hand that can be laid off on any of the given melds
 export function aiFindLayOff(hand: Card[], tablesMelds: Meld[]): { card: Card; meld: Meld } | null {
   for (const card of hand) {
     for (const meld of tablesMelds) {
       if (canLayOff(card, meld)) return { card, meld }
+    }
+  }
+  return null
+}
+
+// Hard mode: smarter discard — strongly avoids breaking potential sets/runs
+export function aiChooseDiscardHard(hand: Card[]): Card {
+  if (hand.length === 0) throw new Error('Empty hand')
+
+  function utility(card: Card): number {
+    if (isJoker(card)) return 10000
+    const sameRank = hand.filter(c => !isJoker(c) && c.rank === card.rank && c.id !== card.id).length
+    const sameSuit = hand.filter(c => !isJoker(c) && c.suit === card.suit && c.id !== card.id)
+    const adjacent = sameSuit.filter(c => Math.abs(c.rank - card.rank) <= 3).length
+    // Hard: much stronger weighting — a pair is almost never discarded
+    return sameRank * 120 + adjacent * 60 - cardPoints(card.rank)
+  }
+
+  return hand.reduce((worst, card) => utility(card) < utility(worst) ? card : worst)
+}
+
+// Hard mode: more aggressive buying — buy on any pair or run potential
+export function aiShouldBuyHard(hand: Card[], discardCard: Card, requirement: RoundRequirement): boolean {
+  if (isJoker(discardCard)) return true
+  const withCard = aiFindBestMelds([...hand, discardCard], requirement)
+  const without = aiFindBestMelds(hand, requirement)
+  if (withCard !== null && without === null) return true
+  // Buy if card pairs with any existing card (more aggressive than medium's sameRank >= 2)
+  const sameRank = hand.filter(c => !isJoker(c) && c.rank === discardCard.rank).length
+  if (sameRank >= 1) return true
+  // Buy if card extends an existing suit run
+  const sameSuit = hand.filter(c => !isJoker(c) && c.suit === discardCard.suit)
+  const close = sameSuit.filter(c => Math.abs(c.rank - discardCard.rank) <= 2)
+  if (close.length >= 2) return true
+  return false
+}
+
+// Find a natural card in hand that can be swapped with a joker on the table
+export function aiFindJokerSwap(hand: Card[], tablesMelds: Meld[]): { card: Card; meld: Meld } | null {
+  for (const card of hand.filter(c => c.suit !== 'joker')) {
+    for (const meld of tablesMelds) {
+      if (meld.jokerMappings.length > 0) {
+        const joker = findSwappableJoker(card, meld)
+        if (joker) return { card, meld }
+      }
     }
   }
   return null

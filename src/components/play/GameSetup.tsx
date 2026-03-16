@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react'
 import { ChevronLeft, Bot, User } from 'lucide-react'
 import { getPlayers } from '../../lib/gameStore'
 import type { Player as DBPlayer } from '../../lib/types'
-import type { PlayerConfig } from '../../game/types'
+import type { PlayerConfig, AIDifficulty } from '../../game/types'
 
 interface Props {
-  onStart: (players: PlayerConfig[]) => void
+  onStart: (players: PlayerConfig[], difficulty: AIDifficulty) => void
   onBack: () => void
 }
 
@@ -18,6 +18,7 @@ export default function GameSetup({ onStart, onBack }: Props) {
     { name: '', isAI: false },
   ])
   const [knownPlayers, setKnownPlayers] = useState<DBPlayer[]>([])
+  const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>('medium')
 
   useEffect(() => {
     getPlayers().then(setKnownPlayers).catch(console.error)
@@ -71,7 +72,7 @@ export default function GameSetup({ onStart, onBack }: Props) {
         </button>
         <h1 className="text-lg font-bold text-[#2c1810] flex-1">New Game</h1>
         <button
-          onClick={() => allFilled && onStart(players.map(p => ({ name: p.name.trim(), isAI: p.isAI })))}
+          onClick={() => allFilled && onStart(players.map(p => ({ name: p.name.trim(), isAI: p.isAI })), aiDifficulty)}
           disabled={!allFilled}
           className="bg-[#e2b858] text-[#2c1810] font-semibold rounded-xl px-4 py-2 text-sm active:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed"
         >
@@ -152,15 +153,46 @@ export default function GameSetup({ onStart, onBack }: Props) {
               )
             })}
           </div>
-          {aiCount > 0 && (
-            <p className="text-xs text-[#a08c6e] mt-2">
-              {aiCount} AI opponent{aiCount > 1 ? 's' : ''} · Medium difficulty
-            </p>
-          )}
           {aiCount === 0 && (
             <p className="text-xs text-[#a08c6e] mt-2">
               Tap <Bot size={10} className="inline" /> to add an AI opponent
             </p>
+          )}
+          {aiCount > 0 && (
+            <div className="mt-3">
+              <p className="text-xs font-semibold text-[#a08c6e] uppercase tracking-wider mb-2">
+                AI Difficulty
+              </p>
+              <div className="bg-[#efe9dd] rounded-xl p-1 flex gap-1">
+                <button
+                  disabled
+                  className="flex-1 py-2 rounded-lg text-sm font-semibold text-[#c0b090] relative"
+                >
+                  Easy
+                  <span className="absolute -top-1 -right-1 bg-[#a08c6e] text-white text-[8px] font-bold px-1 rounded-full leading-4">
+                    Soon
+                  </span>
+                </button>
+                {(['medium', 'hard'] as AIDifficulty[]).map(level => (
+                  <button
+                    key={level}
+                    onClick={() => setAiDifficulty(level)}
+                    className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all capitalize ${
+                      aiDifficulty === level
+                        ? 'bg-white text-[#8b6914] shadow-sm'
+                        : 'text-[#8b7355]'
+                    }`}
+                  >
+                    {level.charAt(0).toUpperCase() + level.slice(1)}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-[#a08c6e] mt-1.5">
+                {aiDifficulty === 'medium'
+                  ? 'Makes solid plays — good for casual games'
+                  : 'Smarter discards, aggressive buying — a real challenge'}
+              </p>
+            </div>
           )}
         </div>
       </div>

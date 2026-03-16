@@ -1,11 +1,12 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { Pause } from 'lucide-react'
-import type { GameState, Player, Card as CardType, Meld, PlayerConfig } from '../../game/types'
+import type { GameState, Player, Card as CardType, Meld, PlayerConfig, AIDifficulty } from '../../game/types'
 import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, MAX_BUYS } from '../../game/rules'
 import { createDecks, shuffle, dealHands } from '../../game/deck'
 import { buildMeld, isValidSet, findSwappableJoker } from '../../game/meld-validator'
 import { scoreRound } from '../../game/scoring'
-import { aiFindBestMelds, aiShouldTakeDiscard, aiChooseDiscard, aiShouldBuy, aiFindLayOff } from '../../game/ai'
+import { aiFindAllMelds, aiShouldTakeDiscard, aiChooseDiscard, aiChooseDiscardHard, aiShouldBuy, aiShouldBuyHard, aiFindLayOff, aiFindJokerSwap } from '../../game/ai'
+import { SUIT_ORDER } from './HandDisplay'
 import { haptic } from '../../lib/haptics'
 import PrivacyScreen from './PrivacyScreen'
 import MeldModal from './MeldModal'
@@ -19,6 +20,7 @@ import CardComponent from './Card'
 
 interface Props {
   initialPlayers: PlayerConfig[]
+  aiDifficulty?: AIDifficulty
   onExit: () => void
 }
 
@@ -143,10 +145,11 @@ function buildBuyerOrder(state: GameState, discarderIndex: number): number[] {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function GameBoard({ initialPlayers, onExit }: Props) {
+export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onExit }: Props) {
   const [gameState, setGameState] = useState<GameState>(() => initGame(initialPlayers))
   const [uiPhase, setUiPhase] = useState<UIPhase>('round-start')
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set())
+  const [handSort, setHandSort] = useState<'rank' | 'suit'>('rank')
   const [showMeldModal, setShowMeldModal] = useState(false)
   const [showLayOffModal, setShowLayOffModal] = useState(false)
   const [buyerOrder, setBuyerOrder] = useState<number[]>([])
@@ -157,6 +160,8 @@ export default function GameBoard({ initialPlayers, onExit }: Props) {
   const [showPauseModal, setShowPauseModal] = useState(false)
   const [reshuffleMsg, setReshuffleMsg] = useState(false)
   const [aiMessage, setAiMessage] = useState<string | null>(null)
+  // Bumped after joker swaps (handLen unchanged, need a separate re-trigger)
+  const [aiActionTick, setAiActionTick] = useState(0)
 
   // Stable refs so AI callbacks always have current values
   const gameStateRef = useRef(gameState)
@@ -168,9 +173,26 @@ export default function GameBoard({ initialPlayers, onExit }: Props) {
   useEffect(() => { buyerOrderRef.current = buyerOrder }, [buyerOrder])
   useEffect(() => { buyerStepRef.current = buyerStep }, [buyerStep])
 
+  // Tracks whether AI has already laid off once this turn (Medium: max 1 lay-off per turn)
+  const aiLayOffDoneRef = useRef(false)
+
   const rs = gameState.roundState
   const currentPlayer = getCurrentPlayer(gameState)
   const topDiscard = rs.discardPile[rs.discardPile.length - 1] ?? null
+
+  // Hand sorted to match player's chosen sort order — passed to MeldModal too
+  const sortedCurrentHand = useMemo(() => {
+    return [...currentPlayer.hand].sort((a, b) => {
+      if (handSort === 'suit') {
+        const s = (SUIT_ORDER[a.suit] ?? 4) - (SUIT_ORDER[b.suit] ?? 4)
+        if (s !== 0) return s
+        return a.rank - b.rank
+      }
+      if (a.suit === 'joker') return 1
+      if (b.suit === 'joker') return -1
+      return a.rank - b.rank
+    })
+  }, [currentPlayer.hand, handSort])
 
   // ── Toggle card selection ─────────────────────────────────────────────────
   function toggleCard(cardId: string) {
@@ -334,6 +356,7 @@ export default function GameBoard({ initialPlayers, onExit }: Props) {
     const updated: GameState = { ...prev, players, roundState: { ...prev.roundState, tablesMelds, goOutPlayerId } }
     setGameState(updated)
     setShowLayOffModal(false)
+    setSelectedCardIds(new Set())
 
     if (wentOut) {
       const top = updated.roundState.discardPile[updated.roundState.discardPile.length - 1] ?? null
@@ -475,11 +498,13 @@ export default function GameBoard({ initialPlayers, onExit }: Props) {
     const state = gameStateRef.current
     const player = getCurrentPlayer(state)
     const { tablesMelds, requirement } = state.roundState
+    const isHard = aiDifficulty === 'hard'
 
-    // Try to lay down if not yet done
+    // Try to lay down if not yet done — include any bonus melds beyond the requirement
     if (!player.hasLaidDown) {
-      const melds = aiFindBestMelds(player.hand, requirement)
+      const melds = aiFindAllMelds(player.hand, requirement)
       if (melds && melds.length > 0) {
+        aiLayOffDoneRef.current = false
         setAiMessage(`${player.name} lays down!`)
         setTimeout(() => setAiMessage(null), 1500)
         handleMeldConfirm(melds)
@@ -487,10 +512,26 @@ export default function GameBoard({ initialPlayers, onExit }: Props) {
       }
     }
 
+    // Hard only: try joker swap to reclaim a joker for future use
+    if (isHard && player.hasLaidDown && tablesMelds.length > 0) {
+      const swap = aiFindJokerSwap(player.hand, tablesMelds)
+      if (swap) {
+        setAiMessage(`${player.name} swaps a joker`)
+        setTimeout(() => setAiMessage(null), 1200)
+        handleJokerSwap(swap.card, swap.meld)
+        // handLen unchanged after swap — bump tick so the AI effect re-fires
+        setAiActionTick(t => t + 1)
+        return
+      }
+    }
+
     // Try to lay off
-    if (player.hasLaidDown && tablesMelds.length > 0) {
+    // Medium: max 1 lay-off per turn to prevent dumping all cards onto one meld
+    // Hard: unlimited lay-offs per turn
+    if (player.hasLaidDown && tablesMelds.length > 0 && (isHard || !aiLayOffDoneRef.current)) {
       const layOff = aiFindLayOff(player.hand, tablesMelds)
       if (layOff) {
+        aiLayOffDoneRef.current = true
         setAiMessage(`${player.name} lays off`)
         setTimeout(() => setAiMessage(null), 1200)
         handleLayOff(layOff.card, layOff.meld)
@@ -498,9 +539,12 @@ export default function GameBoard({ initialPlayers, onExit }: Props) {
       }
     }
 
-    // Discard
+    // Discard — reset lay-off tracker for next turn
     if (player.hand.length > 0) {
-      const card = aiChooseDiscard(player.hand, requirement)
+      aiLayOffDoneRef.current = false
+      const card = isHard
+        ? aiChooseDiscardHard(player.hand)
+        : aiChooseDiscard(player.hand, requirement)
       setAiMessage(`${player.name} discards`)
       setTimeout(() => setAiMessage(null), 1000)
       handleDiscard(card.id)
@@ -533,7 +577,7 @@ export default function GameBoard({ initialPlayers, onExit }: Props) {
     }, delay)
 
     return () => clearTimeout(timerId)
-  }, [uiPhase, currentPlayer.isAI, handLen, rs.currentPlayerIndex]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [uiPhase, currentPlayer.isAI, handLen, rs.currentPlayerIndex, aiActionTick]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── AI buying automation ──────────────────────────────────────────────────
   useEffect(() => {
@@ -548,7 +592,11 @@ export default function GameBoard({ initialPlayers, onExit }: Props) {
       const currentBuyer = state.players[buyerOrderRef.current[buyerStepRef.current]]
       const disc = buyingDiscard
       const req = state.roundState.requirement
-      const shouldBuy = disc && currentBuyer ? aiShouldBuy(currentBuyer.hand, disc, req) : false
+      const shouldBuy = disc && currentBuyer
+        ? (aiDifficulty === 'hard'
+            ? aiShouldBuyHard(currentBuyer.hand, disc, req)
+            : aiShouldBuy(currentBuyer.hand, disc, req))
+        : false
       handleBuyDecision(shouldBuy)
     }, 700)
 
@@ -663,9 +711,10 @@ export default function GameBoard({ initialPlayers, onExit }: Props) {
           </span>
           <button
             onClick={() => setShowPauseModal(true)}
-            className="w-7 h-7 flex items-center justify-center rounded-lg text-[#a08c6e] active:bg-[#efe9dd]"
+            aria-label="Pause game"
+            className="w-11 h-11 flex items-center justify-center rounded-xl bg-[#efe9dd] text-[#8b6914] active:bg-[#e2ddd2]"
           >
-            <Pause size={16} />
+            <Pause size={20} />
           </button>
         </div>
       </div>
@@ -772,6 +821,8 @@ export default function GameBoard({ initialPlayers, onExit }: Props) {
             onToggle={toggleCard}
             label={`Your hand (${currentPlayer.hand.length} cards)`}
             disabled={uiPhase !== 'action' || pendingUndo !== null}
+            sort={handSort}
+            onSortChange={setHandSort}
           />
         )}
       </div>
@@ -818,15 +869,23 @@ export default function GameBoard({ initialPlayers, onExit }: Props) {
               )}
             </div>
             <button
-              onClick={() => handleDiscard()}
-              disabled={selectedCardIds.size !== 1}
+              onClick={() => {
+                if (currentPlayer.hand.length === 1) {
+                  handleDiscard(currentPlayer.hand[0].id)
+                } else {
+                  handleDiscard()
+                }
+              }}
+              disabled={currentPlayer.hand.length !== 1 && selectedCardIds.size !== 1}
               className={`w-full rounded-xl py-2.5 text-sm font-semibold transition-all ${
-                selectedCardIds.size === 1
+                currentPlayer.hand.length === 1 || selectedCardIds.size === 1
                   ? 'bg-[#2c1810] text-white active:opacity-80'
                   : 'bg-[#efe9dd] text-[#a08c6e]'
               }`}
             >
-              {selectedCardIds.size === 1 ? 'Discard Selected Card' : 'Tap a card to discard'}
+              {currentPlayer.hand.length === 1
+                ? 'Discard Last Card'
+                : selectedCardIds.size === 1 ? 'Discard Selected Card' : 'Tap a card to discard'}
             </button>
           </div>
         )}
@@ -835,7 +894,7 @@ export default function GameBoard({ initialPlayers, onExit }: Props) {
       {/* Modals */}
       {showMeldModal && (
         <MeldModal
-          hand={currentPlayer.hand}
+          hand={sortedCurrentHand}
           requirement={rs.requirement}
           onConfirm={handleMeldConfirm}
           onClose={() => setShowMeldModal(false)}

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Gamepad2, ArrowLeft } from 'lucide-react'
 import GameSetup from './play/GameSetup'
 import GameBoard from './play/GameBoard'
-import type { PlayerConfig } from '../game/types'
+import type { PlayerConfig, AIDifficulty } from '../game/types'
 
 type PlayView = 'rules' | 'setup' | 'game'
 
@@ -30,9 +30,11 @@ interface Props {
 export default function PlayTab({ onBack }: Props) {
   const [view, setView] = useState<PlayView>('rules')
   const [playerConfigs, setPlayerConfigs] = useState<PlayerConfig[]>([])
+  const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>('medium')
 
-  function handleStart(players: PlayerConfig[]) {
+  function handleStart(players: PlayerConfig[], difficulty: AIDifficulty) {
     setPlayerConfigs(players)
+    setAiDifficulty(difficulty)
     setView('game')
   }
 
@@ -49,6 +51,7 @@ export default function PlayTab({ onBack }: Props) {
     return (
       <GameBoard
         initialPlayers={playerConfigs}
+        aiDifficulty={aiDifficulty}
         onExit={() => setView('rules')}
       />
     )

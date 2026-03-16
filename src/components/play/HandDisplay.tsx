@@ -10,13 +10,21 @@ interface Props {
   onToggle: (cardId: string) => void
   label?: string
   disabled?: boolean
+  sort?: SortMode
+  onSortChange?: (sort: SortMode) => void
 }
 
-const SUIT_ORDER: Record<string, number> = { hearts: 0, diamonds: 1, clubs: 2, spades: 3, joker: 4 }
+export const SUIT_ORDER: Record<string, number> = { hearts: 0, diamonds: 1, clubs: 2, spades: 3, joker: 4 }
 
-export default function HandDisplay({ cards, selectedIds, onToggle, label, disabled }: Props) {
-  const [sort, setSort] = useState<SortMode>('rank')
+export default function HandDisplay({ cards, selectedIds, onToggle, label, disabled, sort: sortProp, onSortChange }: Props) {
+  const [sortInternal, setSortInternal] = useState<SortMode>('rank')
+  const sort = sortProp ?? sortInternal
   const selectedCount = selectedIds.size
+
+  function setSort(mode: SortMode) {
+    if (onSortChange) onSortChange(mode)
+    else setSortInternal(mode)
+  }
 
   const sorted = useMemo(() => {
     return [...cards].sort((a, b) => {

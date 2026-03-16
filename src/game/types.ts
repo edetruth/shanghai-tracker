@@ -38,6 +38,8 @@ export interface Player {
   isAI?: boolean
 }
 
+export type AIDifficulty = 'medium' | 'hard'
+
 export interface PlayerConfig {
   name: string
   isAI: boolean
