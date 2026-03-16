@@ -153,6 +153,7 @@ Every stat number in `StatsLeaderboard` and `PlayerProfileModal` is tappable. Ta
 - Players **must** meet the minimum round requirement to lay down, but **may** lay down additional valid melds beyond the requirement — extra melds must match the **round type** (sets-only round = extra sets only; runs-only round = extra runs only; mixed round = either)
 - Aces can be used **ace-low** (A-2-3-4) or **ace-high** (...Q-K-A) in runs; lay-off at either end of a run is allowed
 - **Going out** is ONLY possible by melding or laying off ALL remaining cards — discarding your last card does NOT end the round. Going out is checked after meld/lay-off, never after discard. A player with 1 card they can't lay off is "stuck" — they draw on their next turn and try again.
+- **Joker swaps are from RUNS only** — jokers in sets cannot be swapped (their suit is ambiguous). Only jokers in runs have a fixed identity (position-based) and can be replaced by the natural card they represent. `findSwappableJoker` enforces this.
 - The next player in turn order gets **first right** to take a discarded card as their normal draw (no buy used). Only if they draw from the pile does a buying window open for the remaining players.
 
 ## Key Conventions

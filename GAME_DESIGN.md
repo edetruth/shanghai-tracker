@@ -26,7 +26,7 @@
 - **Aces:** Can be high OR low in runs (A-2-3-4 or J-Q-K-A both valid)
 - **Jokers:** Wild — can substitute for any card. No limit on jokers per meld.
 - **Melds are permanent** — once placed on the table, they cannot be rearranged
-- **Joker swaps allowed** — if a meld on the table contains a joker, any player (who has already laid down their required hand) can swap in the natural card the joker represents and take the joker into their hand. The joker can then be used in a new meld or laid off elsewhere.
+- **Joker swaps allowed (runs only)** — if a RUN on the table contains a joker, any player (who has already laid down their required hand) can swap in the natural card the joker represents and take the joker into their hand. Jokers in SETS cannot be swapped — their suit is ambiguous (a 7-set joker could be 7♣ or 7♠). The joker from a run can then be used in a new meld or laid off elsewhere.
 
 ### Turn Flow
 1. **Draw** — Take the top card from either the draw pile or the discard pile
@@ -247,9 +247,9 @@ layOffCard(playerId: string, card: Card, targetMeldId: string, state: RoundState
   - Remove card from hand, add to meld
 
 swapJoker(playerId: string, naturalCard: Card, targetMeldId: string, jokerIndex: number, state: RoundState): RoundState | Error
-  - Verify player has laid down (hasLaidDown must be true)
-  - Verify the natural card is the EXACT card the joker represents in that meld
-  - For a set: natural card must match the set's rank
+  - Verify player has laid down (hasLaidDown must be true), OR verify they can lay down after the swap (pre-lay-down swap)
+  - Target meld must be a RUN — joker swaps from sets are not allowed (suit is ambiguous)
+  - Verify the natural card matches the exact rank AND suit the joker represents in the run
   - For a run: natural card must be the specific rank+suit the joker is filling
   - Remove natural card from hand, place it in the meld at joker's position
   - Move the joker into the player's hand
@@ -290,11 +290,11 @@ A player might hold cards that could form multiple valid meld combinations. For 
 - Or auto-suggest the best option (lowest remaining hand points)
 
 #### 2. Joker Ambiguity and Swapping
-A joker in a run could represent different cards depending on context. The engine needs to track what a joker "represents" in each meld, especially for laying off and swapping. If a run is 5♠-Joker-7♠, the joker represents 6♠. A player holding the natural 6♠ can swap it in and take the joker back into their hand. This means:
-- Every meld must track what each joker represents
-- In sets, a joker could represent any suit of that rank — if someone swaps in a specific suit, the joker's identity was flexible
-- In runs, a joker's identity is fixed by its position in the sequence
-- After a swap, the player gains a joker (50-point card) but can use it immediately to meld or lay off — this creates powerful chain plays
+A joker in a run has a fixed identity based on its position. If a run is 5♠-Joker-7♠, the joker represents 6♠. A player holding the natural 6♠ can swap it in and take the joker back into their hand. Key rules:
+- Every meld tracks what each joker represents (via `jokerMappings`)
+- **Runs only**: a joker's identity is fixed by its position in the sequence — swappable
+- **Sets excluded**: a joker in a set has ambiguous suit (could be any suit of that rank) — NOT swappable per house rules
+- After a swap from a run, the player gains a joker and can use it immediately to meld or lay off — this creates powerful chain plays
 
 #### 3. Buying Window
 After each discard, there's a brief window where any player can request a buy. In multiplayer this is real-time. In pass-and-play it can be a prompt. The engine needs a state for this: `turnPhase: 'buying'`.

@@ -6,9 +6,12 @@ interface Props {
   onMeldClick?: (meld: Meld) => void
   highlightMeldId?: string
   jokerMeldIds?: Set<string>
+  validLayOffMeldIds?: Set<string>  // melds that are valid lay-off targets for the selected card
 }
 
 function getJokerLabel(meld: Meld, cardId: string): string | undefined {
+  // Only show identity label for run jokers — set jokers have ambiguous suit, can't be swapped
+  if (meld.type !== 'run') return undefined
   const mapping = meld.jokerMappings.find(m => m.cardId === cardId)
   if (!mapping) return undefined
   const suitSymbols: Record<string, string> = {
@@ -28,7 +31,8 @@ function getJokerLabel(meld: Meld, cardId: string): string | undefined {
   return `${rankStr}${suitSymbols[mapping.representsSuit] ?? ''}`
 }
 
-export default function TableMelds({ melds, onMeldClick, highlightMeldId, jokerMeldIds }: Props) {
+export default function TableMelds({ melds, onMeldClick, highlightMeldId, jokerMeldIds, validLayOffMeldIds }: Props) {
+  const hasTargetSet = validLayOffMeldIds !== undefined && validLayOffMeldIds.size >= 0
   return (
     <div>
       <p className="text-xs font-semibold text-[#a08c6e] uppercase tracking-wider mb-2">Table</p>
@@ -36,16 +40,21 @@ export default function TableMelds({ melds, onMeldClick, highlightMeldId, jokerM
         <p className="text-sm text-[#a08c6e] italic">No melds yet</p>
       ) : (
         <div className="space-y-2">
-          {melds.map((meld, idx) => (
+          {melds.map((meld, idx) => {
+            const isValidTarget = validLayOffMeldIds?.has(meld.id)
+            const isDimmed = hasTargetSet && validLayOffMeldIds!.size > 0 && !isValidTarget
+            return (
             <div
               key={meld.id}
               className={`rounded-lg p-2 border transition-colors ${
                 highlightMeldId === meld.id
                   ? 'border-[#e2b858] bg-[#fffbee]'
-                  : jokerMeldIds?.has(meld.id)
-                    ? 'border-[#e2b858]/60 bg-[#fffbee]/50 shadow-[0_0_6px_rgba(226,184,88,0.4)]'
-                    : 'border-[#e2ddd2] bg-[#f8f6f1]'
-              } ${onMeldClick ? 'cursor-pointer active:opacity-70' : ''}`}
+                  : isValidTarget
+                    ? 'border-[#2d7a3a] bg-[#f0fdf4] shadow-[0_0_6px_rgba(45,122,58,0.25)]'
+                    : jokerMeldIds?.has(meld.id)
+                      ? 'border-[#e2b858]/60 bg-[#fffbee]/50 shadow-[0_0_6px_rgba(226,184,88,0.4)]'
+                      : 'border-[#e2ddd2] bg-[#f8f6f1]'
+              } ${isDimmed ? 'opacity-40' : ''} ${onMeldClick ? 'cursor-pointer active:opacity-70' : ''}`}
               onClick={onMeldClick ? () => onMeldClick(meld) : undefined}
             >
               <div className="flex items-center gap-1.5 mb-1.5">
@@ -56,7 +65,12 @@ export default function TableMelds({ melds, onMeldClick, highlightMeldId, jokerM
                 <span className="text-[10px] text-[#a08c6e] bg-[#efe9dd] px-1.5 py-0.5 rounded-full">
                   {meld.type}
                 </span>
-                {jokerMeldIds?.has(meld.id) && (
+                {isValidTarget && (
+                  <span className="text-[10px] text-[#2d7a3a] bg-[#e6faf0] px-1.5 py-0.5 rounded-full border border-[#a3e6b4]">
+                    tap to lay off ✓
+                  </span>
+                )}
+                {!isValidTarget && jokerMeldIds?.has(meld.id) && (
                   <span className="text-[10px] text-[#8b6914] bg-[#fffbee] px-1.5 py-0.5 rounded-full border border-[#e2b858]/40">
                     swap
                   </span>
@@ -82,7 +96,8 @@ export default function TableMelds({ melds, onMeldClick, highlightMeldId, jokerM
                 })}
               </div>
             </div>
-          ))}
+          )
+          })}
         </div>
       )}
     </div>

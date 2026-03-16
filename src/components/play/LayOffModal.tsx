@@ -53,6 +53,31 @@ export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, 
     setSelectedMeldId(null)
   }
 
+  // Smart meld sorting: when a card is selected, bubble valid targets to the top
+  const validLayOffMeldIds: Set<string> | undefined = (() => {
+    if (!selectedCard || mode !== 'layoff') return undefined
+    return new Set(tablesMelds.filter(m => canLayOff(selectedCard, m)).map(m => m.id))
+  })()
+
+  const displayMelds = (() => {
+    if (!selectedCard) return tablesMelds
+    if (mode === 'layoff') {
+      const valid = tablesMelds.filter(m => validLayOffMeldIds!.has(m.id))
+      const invalid = tablesMelds.filter(m => !validLayOffMeldIds!.has(m.id))
+      return [...valid, ...invalid]
+    }
+    if (mode === 'swap') {
+      // Runs with jokers swappable for this card go first
+      const validSwap = tablesMelds.filter(m => m.type === 'run' && findSwappableJoker(selectedCard, m))
+      const rest = tablesMelds.filter(m => !(m.type === 'run' && findSwappableJoker(selectedCard, m)))
+      return [...validSwap, ...rest]
+    }
+    return tablesMelds
+  })()
+
+  // Joker swap targets: only runs (sets excluded per house rules)
+  const swapRunMeldIds = new Set(tablesMelds.filter(m => m.type === 'run' && m.jokerMappings.length > 0).map(m => m.id))
+
   // Validation
   let isValid = false
   let validationMessage = ''
@@ -174,10 +199,10 @@ export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, 
             </div>
           )}
 
-          {/* Swap mode hint when no melds have jokers */}
-          {mode === 'swap' && tablesMelds.filter(m => m.jokerMappings.length > 0).length === 0 && tablesMelds.length > 0 && (
+          {/* Swap mode hint when no RUNS have jokers */}
+          {mode === 'swap' && swapRunMeldIds.size === 0 && tablesMelds.length > 0 && (
             <p className="text-sm text-[#a08c6e] italic text-center py-2">
-              No melds with jokers on the table
+              No runs with jokers on the table (jokers in sets cannot be swapped)
             </p>
           )}
 
@@ -205,15 +230,21 @@ export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, 
           {/* Step 2: pick meld */}
           {selectedCardId && (
             <div>
-              <p className="text-xs text-[#8b7355] mb-1.5">Step 2: Pick a meld on the table</p>
+              <p className="text-xs text-[#8b7355] mb-1.5">
+                Step 2: Pick a meld on the table
+                {mode === 'layoff' && validLayOffMeldIds!.size === 0 && (
+                  <span className="text-[#b83232] ml-1">— this card can't be laid off on any meld</span>
+                )}
+              </p>
               {tablesMelds.length === 0 ? (
                 <p className="text-sm text-[#a08c6e] italic">No melds on the table yet</p>
               ) : (
                 <TableMelds
-                  melds={tablesMelds}
+                  melds={displayMelds}
                   onMeldClick={handleMeldClick}
                   highlightMeldId={selectedMeldId ?? undefined}
-                  jokerMeldIds={mode === 'swap' ? new Set(tablesMelds.filter(m => m.jokerMappings.length > 0).map(m => m.id)) : undefined}
+                  jokerMeldIds={mode === 'swap' ? swapRunMeldIds : undefined}
+                  validLayOffMeldIds={mode === 'layoff' ? validLayOffMeldIds : undefined}
                 />
               )}
             </div>

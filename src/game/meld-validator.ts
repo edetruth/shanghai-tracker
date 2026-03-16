@@ -319,24 +319,17 @@ export function canLayOff(card: Card, meld: Meld): boolean {
   }
 }
 
-// For joker swaps: find joker mappings in a meld that match the given natural card
+// For joker swaps: find a joker in a RUN meld that the natural card can replace.
+// Joker swaps from sets are NOT allowed — the joker's suit is ambiguous in a set.
 export function findSwappableJoker(naturalCard: Card, meld: Meld): Card | null {
+  if (meld.type !== 'run') return null   // sets: swap not allowed
   for (const mapping of meld.jokerMappings) {
-    if (meld.type === 'set') {
-      // For set: natural card must match the set rank
-      const setRank = meld.cards.find(c => c.suit !== 'joker')?.rank
-      if (naturalCard.rank === setRank) {
-        const joker = meld.cards.find(c => c.id === mapping.cardId)
-        return joker ?? null
-      }
-    } else {
-      // For run: natural must match exact rank AND suit of what joker represents
-      let naturalRank = naturalCard.rank
-      if (meld.runAceHigh && naturalCard.rank === 1) naturalRank = 14
-      if (naturalCard.suit === mapping.representsSuit && naturalRank === mapping.representsRank) {
-        const joker = meld.cards.find(c => c.id === mapping.cardId)
-        return joker ?? null
-      }
+    // Natural must match exact rank AND suit of what joker represents in the run
+    let naturalRank = naturalCard.rank
+    if (meld.runAceHigh && naturalCard.rank === 1) naturalRank = 14
+    if (naturalCard.suit === mapping.representsSuit && naturalRank === mapping.representsRank) {
+      const joker = meld.cards.find(c => c.id === mapping.cardId)
+      return joker ?? null
     }
   }
   return null
