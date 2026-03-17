@@ -1,5 +1,5 @@
 import type { Card, Meld, RoundRequirement } from './types'
-import { isValidRun, canLayOff, simulateLayOff, findSwappableJoker } from './meld-validator'
+import { isValidRun, canLayOff, simulateLayOff, findSwappableJoker, canGoOutViaChainLayOff } from './meld-validator'
 import { cardPoints, MIN_SET_SIZE, MIN_RUN_SIZE } from './rules'
 
 function isJoker(c: Card): boolean { return c.suit === 'joker' }
@@ -154,13 +154,24 @@ export function aiShouldTakeDiscard(
 }
 
 // Pick the best card to discard (lowest meld utility, highest point cost)
-export function aiChooseDiscard(hand: Card[], requirement?: RoundRequirement): Card {
+// tablesMelds: melds currently on the table — used to prevent discarding jokers when runs exist
+export function aiChooseDiscard(hand: Card[], requirement?: RoundRequirement, tablesMelds: Meld[] = []): Card {
   if (hand.length === 0) throw new Error('Empty hand')
+
+  // Never discard a joker if there are any runs on the table to lay it off on.
+  // If somehow a joker can't be laid off (no runs), hold it as last resort only.
+  const runsOnTable = tablesMelds.filter(m => m.type === 'run')
+  const nonJokerHand = hand.filter(c => !isJoker(c))
+
+  // If hand has only jokers, we can't avoid discarding one — but this should be extremely rare
+  const candidateHand = (runsOnTable.length > 0 || nonJokerHand.length > 0)
+    ? (nonJokerHand.length > 0 ? nonJokerHand : hand)
+    : hand
 
   const isRunHeavy = requirement && requirement.runs > requirement.sets
 
   if (isRunHeavy) {
-    return aiChooseDiscardForRuns(hand)
+    return aiChooseDiscardForRuns(candidateHand)
   }
 
   function utility(card: Card): number {
@@ -171,7 +182,7 @@ export function aiChooseDiscard(hand: Card[], requirement?: RoundRequirement): C
     return sameRank * 50 + adjacent * 30 - cardPoints(card.rank)
   }
 
-  return hand.reduce((worst, card) => utility(card) < utility(worst) ? card : worst)
+  return candidateHand.reduce((worst, card) => utility(card) < utility(worst) ? card : worst)
 }
 
 // Discard strategy for run-heavy rounds: dump cards from non-committed suits
@@ -275,22 +286,54 @@ export function aiFindAllMelds(hand: Card[], requirement: RoundRequirement): Car
   return allMelds
 }
 
-// Before laying down: check if swapping a joker from a table meld would enable
-// meeting the round requirement. Returns the swap to make, or null.
+// Before laying down: check if swapping jokers from table melds would enable
+// meeting the round requirement. Tries single swaps first, then pairs.
+// Returns the FIRST swap to execute (re-evaluation after each swap finds the next).
 export function aiFindPreLayDownJokerSwap(
   hand: Card[],
   tablesMelds: Meld[],
   requirement: RoundRequirement
 ): { card: Card; meld: Meld } | null {
+  // Collect all possible swap candidates
+  const candidates: { card: Card; meld: Meld; joker: Card }[] = []
   for (const card of hand) {
     if (isJoker(card)) continue
     for (const meld of tablesMelds) {
       const joker = findSwappableJoker(card, meld)
       if (!joker) continue
-      const simulatedHand = [...hand.filter(c => c.id !== card.id), joker]
-      if (aiFindBestMelds(simulatedHand, requirement)) return { card, meld }
+      candidates.push({ card, meld, joker })
     }
   }
+
+  // Try single swaps first
+  for (const { card, meld, joker } of candidates) {
+    const simulatedHand = [...hand.filter(c => c.id !== card.id), joker]
+    if (aiFindBestMelds(simulatedHand, requirement)) return { card, meld }
+  }
+
+  // Try pairs of swaps — two swaps together might enable laying down
+  for (let i = 0; i < candidates.length; i++) {
+    const { card: c1, meld: m1, joker: j1 } = candidates[i]
+    // Simulate hand and melds after first swap
+    const hand1 = [...hand.filter(c => c.id !== c1.id), j1]
+    const melds1 = tablesMelds.map(m => {
+      if (m.id !== m1.id) return m
+      const newCards = m.cards.map(c => c.id === j1.id ? c1 : c)
+      const newMappings = m.jokerMappings.filter(jm => jm.cardId !== j1.id)
+      return { ...m, cards: newCards, jokerMappings: newMappings }
+    })
+    for (let k = i + 1; k < candidates.length; k++) {
+      const { card: c2, meld: m2 } = candidates[k]
+      if (c2.id === c1.id) continue // can't use same card twice
+      const targetMeld2 = melds1.find(m => m.id === m2.id)
+      if (!targetMeld2) continue
+      const joker2 = findSwappableJoker(c2, targetMeld2)
+      if (!joker2) continue
+      const hand2 = [...hand1.filter(c => c.id !== c2.id), joker2]
+      if (aiFindBestMelds(hand2, requirement)) return { card: c1, meld: m1 }
+    }
+  }
+
   return null
 }
 
@@ -303,10 +346,16 @@ export function aiChooseJokerLayOffPosition(meld: Meld): 'low' | 'high' {
 }
 
 // Find a card in hand that can be laid off on any of the given melds.
+// Jokers are prioritised first — AI should never hold a joker when it can lay one off.
 // Skips lay-offs that would leave exactly 1 card that can't itself be laid off
 // anywhere (which would strand the AI — can't discard last card, can't go out).
 export function aiFindLayOff(hand: Card[], tablesMelds: Meld[]): { card: Card; meld: Meld; jokerPosition?: 'low' | 'high' } | null {
-  for (const card of hand) {
+  // Prioritise jokers: always lay off jokers before other cards
+  const jokers = hand.filter(c => c.suit === 'joker')
+  const nonJokers = hand.filter(c => c.suit !== 'joker')
+  const prioritisedHand = [...jokers, ...nonJokers]
+
+  for (const card of prioritisedHand) {
     for (const meld of tablesMelds) {
       if (canLayOff(card, meld)) {
         const jokerPosition = (card.suit === 'joker' && meld.type === 'run')
@@ -316,8 +365,9 @@ export function aiFindLayOff(hand: Card[], tablesMelds: Meld[]): { card: Card; m
         if (remaining.length === 1) {
           // Check against the SIMULATED post-lay-off meld bounds — a chain lay-off
           // (e.g. 4♥ onto 5-9 run) updates runMin/runMax, enabling the next card (3♥).
+          // Use canGoOutViaChainLayOff so that any 1-card lay-off is properly validated.
           const updatedMelds = tablesMelds.map(m => m.id === meld.id ? simulateLayOff(card, meld, jokerPosition) : m)
-          if (!updatedMelds.some(m => canLayOff(remaining[0], m))) {
+          if (!canGoOutViaChainLayOff(remaining, updatedMelds)) {
             continue // would leave 1 unplayable card — skip
           }
         }
@@ -329,8 +379,16 @@ export function aiFindLayOff(hand: Card[], tablesMelds: Meld[]): { card: Card; m
 }
 
 // Hard mode: smarter discard — strongly avoids breaking potential sets/runs
-export function aiChooseDiscardHard(hand: Card[]): Card {
+// tablesMelds: melds currently on the table — used to prevent discarding jokers when runs exist
+export function aiChooseDiscardHard(hand: Card[], tablesMelds: Meld[] = []): Card {
   if (hand.length === 0) throw new Error('Empty hand')
+
+  // Never discard a joker if there are any runs on the table to lay it off on.
+  const runsOnTable = tablesMelds.filter(m => m.type === 'run')
+  const nonJokerHand = hand.filter(c => !isJoker(c))
+  const candidateHand = (runsOnTable.length > 0 || nonJokerHand.length > 0)
+    ? (nonJokerHand.length > 0 ? nonJokerHand : hand)
+    : hand
 
   function utility(card: Card): number {
     if (isJoker(card)) return 10000
@@ -341,7 +399,7 @@ export function aiChooseDiscardHard(hand: Card[]): Card {
     return sameRank * 120 + adjacent * 60 - cardPoints(card.rank)
   }
 
-  return hand.reduce((worst, card) => utility(card) < utility(worst) ? card : worst)
+  return candidateHand.reduce((worst, card) => utility(card) < utility(worst) ? card : worst)
 }
 
 // Hard mode: more aggressive buying — buy on any pair or run potential

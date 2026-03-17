@@ -160,9 +160,10 @@ export default function GameSetup({ onStart, onBack }: Props) {
           )}
           {aiCount > 0 && (
             <div className="mt-3">
-              <p className="text-xs font-semibold text-[#a08c6e] uppercase tracking-wider mb-2">
+              <p className="text-xs font-semibold text-[#a08c6e] uppercase tracking-wider mb-1">
                 AI Difficulty
               </p>
+              <p className="text-xs text-[#8b7355] mb-2">Applies to all AI players</p>
               <div className="bg-[#efe9dd] rounded-xl p-1 flex gap-1">
                 {(['easy', 'medium', 'hard'] as AIDifficulty[]).map(level => (
                   <button

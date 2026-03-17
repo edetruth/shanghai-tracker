@@ -181,6 +181,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
   const [layOffError, setLayOffError] = useState<string | null>(null)
   const [preLayDownSwap, setPreLayDownSwap] = useState(false)
   const [showPreLayDownSwapModal, setShowPreLayDownSwapModal] = useState(false)
+  // Snapshot of game state BEFORE any pre-lay-down joker swaps — used to undo if player can't lay down after all swaps
+  const preLayDownSwapBaseStateRef = useRef<GameState | null>(null)
   // Stalemate tracking (turns without any meld)
   const noProgressTurnsRef = useRef(0)
   const drawPileDepletionsRef = useRef(0)
@@ -351,6 +353,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
       const idx = (drewPlayerIdx + i) % count
       if (state.players[idx].buysRemaining > 0) order.push(idx)
     }
+
+    const drewPlayer = state.players[drewPlayerIdx]
+    const buyerNames = order.map(i => state.players[i].name).join(', ')
+    console.log(`[Buy] ${drewPlayer.name} (next-in-turn) passed on discard [${discardCard.rank === 0 ? 'Joker' : `${discardCard.rank}${discardCard.suit}`}]. Buy window open for: ${buyerNames || 'nobody'}`)
 
     setBuyingDiscard(discardCard)
     setBuyerOrder(order)
@@ -542,29 +548,30 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
     }
   }
 
+  // ── Joker swap — pure computation (used by both human and AI paths) ────────
+  function computeJokerSwap(state: GameState, naturalCard: CardType, meld: Meld): GameState | null {
+    const playerIdx = state.roundState.currentPlayerIndex
+    const player = state.players[playerIdx]
+    const joker = findSwappableJoker(naturalCard, meld)
+    if (!joker) return null
+
+    const newMeldCards = meld.cards.map(c => c.id === joker.id ? naturalCard : c)
+    const newJokerMappings = meld.jokerMappings.filter(m => m.cardId !== joker.id)
+    const newCardOwners = { ...meld.cardOwners }
+    if (player.id !== meld.ownerId) {
+      newCardOwners[naturalCard.id] = player.name
+    }
+    delete newCardOwners[joker.id]
+    const updatedMeld: Meld = { ...meld, cards: newMeldCards, jokerMappings: newJokerMappings, cardOwners: newCardOwners }
+    const tablesMelds = state.roundState.tablesMelds.map(m => m.id === meld.id ? updatedMeld : m)
+    const newHand = player.hand.filter(c => c.id !== naturalCard.id).concat(joker)
+    const players = state.players.map((p, i) => i === playerIdx ? { ...p, hand: newHand } : p)
+    return { ...state, players, roundState: { ...state.roundState, tablesMelds } }
+  }
+
   // ── Joker swap ────────────────────────────────────────────────────────────
   function handleJokerSwap(naturalCard: CardType, meld: Meld) {
-    setGameState(prev => {
-      const playerIdx = prev.roundState.currentPlayerIndex
-      const player = prev.players[playerIdx]
-      const joker = findSwappableJoker(naturalCard, meld)
-      if (!joker) return prev
-
-      const newMeldCards = meld.cards.map(c => c.id === joker.id ? naturalCard : c)
-      const newJokerMappings = meld.jokerMappings.filter(m => m.cardId !== joker.id)
-      const newCardOwners = { ...meld.cardOwners }
-      if (player.id !== meld.ownerId) {
-        newCardOwners[naturalCard.id] = player.name
-      }
-      // Remove joker from cardOwners if it was tracked
-      delete newCardOwners[joker.id]
-      const updatedMeld: Meld = { ...meld, cards: newMeldCards, jokerMappings: newJokerMappings, cardOwners: newCardOwners }
-      const tablesMelds = prev.roundState.tablesMelds.map(m => m.id === meld.id ? updatedMeld : m)
-      const newHand = player.hand.filter(c => c.id !== naturalCard.id).concat(joker)
-      const players = prev.players.map((p, i) => i === playerIdx ? { ...p, hand: newHand } : p)
-
-      return { ...prev, players, roundState: { ...prev.roundState, tablesMelds } }
-    })
+    setGameState(prev => computeJokerSwap(prev, naturalCard, meld) ?? prev)
     setSelectedCardIds(new Set())
   }
 
@@ -842,8 +849,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
     if (player.hand.length > 0) {
       aiLayOffDoneRef.current = false
       const card = isHard
-        ? aiChooseDiscardHard(player.hand)
-        : aiChooseDiscard(player.hand, requirement)
+        ? aiChooseDiscardHard(player.hand, tablesMelds)
+        : aiChooseDiscard(player.hand, requirement, tablesMelds)
+      console.log(`[Buy] AI ${player.name} discarded [${card.rank === 0 ? 'Joker' : `${card.rank}${card.suit}`}]`)
       setAiMessage(`${player.name} discards`)
       setTimeout(() => setAiMessage(null), 800)
       handleDiscard(card.id)
@@ -1024,7 +1032,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
   return (
     <div className="min-h-screen bg-[#1a3a2a] flex flex-col">
       {/* Top bar */}
-      <div className="bg-[#0f2218] border-b border-[#2d5a3c] px-4 py-2 flex items-center justify-between">
+      <div
+        className="bg-[#0f2218] border-b border-[#2d5a3c] px-4 py-2 flex items-center justify-between"
+        style={{ paddingTop: 'max(8px, env(safe-area-inset-top))' }}
+      >
         <div>
           <p className="text-xs text-[#6aad7a]">Round {gameState.currentRound} of {TOTAL_ROUNDS} · {rs.requirement.description}</p>
           <p className="text-sm font-bold text-white">
@@ -1349,15 +1360,65 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
           tablesMelds={rs.tablesMelds}
           onLayOff={handleLayOff}
           onSwapJoker={handleJokerSwap}
-          onClose={() => setShowPreLayDownSwapModal(false)}
+          onClose={() => {
+            // If player closes without completing a required lay-down, undo any accumulated swaps
+            if (preLayDownSwapBaseStateRef.current) {
+              setGameState(preLayDownSwapBaseStateRef.current)
+              preLayDownSwapBaseStateRef.current = null
+            }
+            setShowPreLayDownSwapModal(false)
+          }}
           preLayDown
           requirement={rs.requirement}
           onPreLayDownSwap={(card, meld) => {
-            handleJokerSwap(card, meld)
-            setShowPreLayDownSwapModal(false)
-            setPreLayDownSwap(true)
-            setShowMeldModal(true)
+            // Save the original state (before any pre-lay-down swaps) for potential undo
+            if (!preLayDownSwapBaseStateRef.current) {
+              preLayDownSwapBaseStateRef.current = gameState
+            }
+
+            // Compute the swap result synchronously to check if lay-down is now possible
+            const afterSwap = computeJokerSwap(gameState, card, meld)
+            if (!afterSwap) return // joker not found — should not happen
+
+            const playerIdx = afterSwap.roundState.currentPlayerIndex
+            const newHand = afterSwap.players[playerIdx].hand
+            const canLayDown = aiFindBestMelds(newHand, rs.requirement) !== null
+
+            if (canLayDown) {
+              // Player can now lay down — apply the swap and open MeldModal
+              setGameState(afterSwap)
+              setSelectedCardIds(new Set())
+              preLayDownSwapBaseStateRef.current = null
+              setShowPreLayDownSwapModal(false)
+              setPreLayDownSwap(true)
+              setShowMeldModal(true)
+            } else {
+              // Check if another swap is still possible from the new hand
+              const newTablesMelds = afterSwap.roundState.tablesMelds
+              const moreSwapsPossible = newTablesMelds.some(m =>
+                m.type === 'run' && m.jokerMappings.length > 0 &&
+                newHand.some(c => c.suit !== 'joker' && findSwappableJoker(c, m) !== null)
+              )
+
+              if (moreSwapsPossible) {
+                // Apply this swap and stay in the swap modal for the next swap
+                setGameState(afterSwap)
+                setSelectedCardIds(new Set())
+                // Modal stays open (showPreLayDownSwapModal remains true)
+              } else {
+                // No more swaps possible and still can't lay down — undo ALL swaps in this sequence
+                const baseState = preLayDownSwapBaseStateRef.current
+                setGameState(baseState ?? gameState)
+                preLayDownSwapBaseStateRef.current = null
+                setSelectedCardIds(new Set())
+                setShowPreLayDownSwapModal(false)
+                // Show error briefly — use layOffError as a reusable error channel
+                setLayOffError('You can only swap jokers if you can lay down afterwards.')
+                setTimeout(() => setLayOffError(null), 4000)
+              }
+            }
           }}
+          errorMsg={layOffError}
         />
       )}
 

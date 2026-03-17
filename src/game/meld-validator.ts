@@ -345,6 +345,40 @@ export function canLayOff(card: Card, meld: Meld): boolean {
   }
 }
 
+// Recursively check whether a hand of cards can ALL be laid off on the given melds,
+// one card at a time in any order, with meld state updated between each lay-off.
+// Returns true if the hand can be emptied entirely via sequential lay-offs (going out).
+//
+// Algorithm:
+//   Base case: hand is empty → true (all cards successfully laid off)
+//   Recursive step: for each card in hand, for each meld, try to lay the card off.
+//     If it fits, remove it from the hand, update the meld, and recurse.
+//     If any branch returns true → return true.
+//   If no card fits anywhere → return false (stuck).
+//
+// Jokers in hand can extend any run at either end; for the chain check we always
+// prefer high (simpleLayoff default), which is sufficient to detect feasibility.
+export function canGoOutViaChainLayOff(hand: Card[], melds: Meld[]): boolean {
+  if (hand.length === 0) return true
+  for (let ci = 0; ci < hand.length; ci++) {
+    const card = hand[ci]
+    for (let mi = 0; mi < melds.length; mi++) {
+      const meld = melds[mi]
+      if (canLayOff(card, meld)) {
+        const jokerPosition = (card.suit === 'joker' && meld.type === 'run')
+          ? 'high' as const
+          : undefined
+        const updatedMelds = melds.map((m, i) =>
+          i === mi ? simulateLayOff(card, meld, jokerPosition) : m
+        )
+        const remainingHand = hand.filter((_, i) => i !== ci)
+        if (canGoOutViaChainLayOff(remainingHand, updatedMelds)) return true
+      }
+    }
+  }
+  return false
+}
+
 // For joker swaps: find a joker in a RUN meld that the natural card can replace.
 // Joker swaps from sets are NOT allowed — the joker's suit is ambiguous in a set.
 export function findSwappableJoker(naturalCard: Card, meld: Meld): Card | null {
