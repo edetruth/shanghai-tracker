@@ -81,6 +81,72 @@ function getCommittedSuits(hand: Card[], topN = 2): Set<string> {
   return new Set(scores.slice(0, topN).map(s => s[0]))
 }
 
+// ── Run-window helpers ────────────────────────────────────────────────────────
+
+interface RunWindow {
+  cards: Card[]    // actual Card refs from the hand, sorted ascending by rank
+  gaps: number[]   // missing ranks within the span (e.g. [6] if you have 5 and 7)
+  minRank: number
+  maxRank: number
+}
+
+/**
+ * Find the best contiguous run-building cluster in a set of same-suit cards.
+ * "Contiguous" allows single-rank gaps (diff ≤ 2 between consecutive sorted cards).
+ * Returns actual Card references so callers can use card IDs for protection logic.
+ */
+function findBestRunWindow(suitCards: Card[]): RunWindow {
+  if (suitCards.length === 0) return { cards: [], gaps: [], minRank: 0, maxRank: 0 }
+  const sorted = [...suitCards].sort((a, b) => a.rank - b.rank)
+  if (sorted.length === 1) return { cards: sorted, gaps: [], minRank: sorted[0].rank, maxRank: sorted[0].rank }
+
+  // Try every starting card; extend while consecutive rank-diff ≤ 2 (allows 1-rank gaps)
+  let bestCards: Card[] = [sorted[0]]
+  let bestScore = 1
+
+  for (let start = 0; start < sorted.length; start++) {
+    const current: Card[] = [sorted[start]]
+    for (let end = start + 1; end < sorted.length; end++) {
+      if (sorted[end].rank - sorted[end - 1].rank <= 2) {
+        current.push(sorted[end])
+      } else {
+        break
+      }
+    }
+    const gapCount = (current[current.length - 1].rank - current[0].rank + 1) - current.length
+    const score = current.length * 2 - gapCount
+    if (score > bestScore || (score === bestScore && current.length > bestCards.length)) {
+      bestCards = current
+      bestScore = score
+    }
+  }
+
+  const minRank = bestCards[0].rank
+  const maxRank = bestCards[bestCards.length - 1].rank
+  const rankSet = new Set(bestCards.map(c => c.rank))
+  const gaps: number[] = []
+  for (let r = minRank + 1; r < maxRank; r++) {
+    if (!rankSet.has(r)) gaps.push(r)
+  }
+  return { cards: bestCards, gaps, minRank, maxRank }
+}
+
+/**
+ * Classify how a candidate rank contributes to an existing same-suit run window.
+ * 'gap-fill'  — fills a missing rank inside the existing span (highest value)
+ * 'extension' — directly adjacent to the low or high edge
+ * 'near'      — within ±2 of the window edges (potential bridge)
+ * null        — too far away to be useful
+ */
+function getRunContribution(sameSuitCards: Card[], rank: number): 'gap-fill' | 'extension' | 'near' | null {
+  const window = findBestRunWindow(sameSuitCards)
+  if (window.cards.length === 0) return null
+  if (window.gaps.includes(rank)) return 'gap-fill'
+  if (rank === window.minRank - 1 || rank === window.maxRank + 1) return 'extension'
+  if (rank >= window.minRank - 2 && rank <= window.maxRank + 2) return 'near'
+  return null
+}
+
 // Try to find meld groups satisfying the round requirement
 export function aiFindBestMelds(hand: Card[], requirement: RoundRequirement): Card[][] | null {
   const jokers = hand.filter(isJoker)
@@ -140,11 +206,12 @@ export function aiShouldTakeDiscard(
   if (committedSuits.has(discardCard.suit)) {
     const sameSuit = hand.filter(c => !isJoker(c) && c.suit === discardCard.suit)
     if (hasRunReq) {
-      // Any round with a run requirement: take within ±2 gap with 1+ same-suit card
+      // Take if card directly advances the committed run window (gap-fill, extension, or
+      // near-bridge with 2+ existing same-suit cards already in hand)
       if (sameSuit.length >= 1) {
-        for (const c of sameSuit) {
-          if (Math.abs(discardCard.rank - c.rank) <= 2) return true
-        }
+        const contribution = getRunContribution(sameSuit, discardCard.rank)
+        if (contribution === 'gap-fill' || contribution === 'extension') return true
+        if (contribution === 'near' && sameSuit.length >= 2) return true
       }
     } else {
       // Pure set rounds: only take if directly adjacent and have 2+ same-suit
@@ -207,26 +274,45 @@ export function aiChooseDiscard(hand: Card[], requirement?: RoundRequirement, ta
   return candidateHand.reduce((worst, card) => utility(card) < utility(worst) ? card : worst)
 }
 
-// Discard strategy for rounds with run requirements: dump cards from non-committed suits.
-// runsNeeded: how many runs the round requires (determines how many suits to commit to).
+// Discard strategy for rounds with run requirements: dump cards from non-committed suits,
+// then committed-suit cards that are isolated from the best run window, then lowest-utility.
 function aiChooseDiscardForRuns(hand: Card[], runsNeeded: number): Card {
   if (hand.length === 0) throw new Error('Empty hand')
 
+  const nonJokers = hand.filter(c => !isJoker(c))
   const committedSuits = getCommittedSuits(hand, Math.min(runsNeeded + 1, 3))
 
-  // Find non-committed non-joker cards
-  const nonCommitted = hand.filter(c => !isJoker(c) && !committedSuits.has(c.suit))
+  // 1. Discard highest-point card from non-committed suits first
+  const nonCommitted = nonJokers.filter(c => !committedSuits.has(c.suit))
   if (nonCommitted.length > 0) {
-    // Discard highest-point non-committed card
     return nonCommitted.reduce((max, c) => cardPoints(c.rank) > cardPoints(max.rank) ? c : max)
   }
 
-  // All cards are in committed suits — discard lowest-utility card
+  // 2. Within committed suits: protect cards that are IN the best run window per suit.
+  //    Cards in a committed suit but outside the window (e.g. lone 3♥ when the
+  //    run kernel is 9♥-10♥-11♥) are treated as expendable.
+  const protectedIds = new Set<string>()
+  for (const suit of committedSuits) {
+    const suitCards = nonJokers.filter(c => c.suit === suit)
+    const window = findBestRunWindow(suitCards)
+    window.cards.forEach(c => protectedIds.add(c.id))
+  }
+
+  const unprotected = nonJokers.filter(c => !protectedIds.has(c.id))
+  if (unprotected.length > 0) {
+    return unprotected.reduce((max, c) => cardPoints(c.rank) > cardPoints(max.rank) ? c : max)
+  }
+
+  // 3. All cards are in run windows — discard lowest-utility card from the windows
   function runUtility(card: Card): number {
     if (isJoker(card)) return 10000
-    const sameSuit = hand.filter(c => !isJoker(c) && c.suit === card.suit && c.id !== card.id)
-    const adjacent = sameSuit.filter(c => Math.abs(c.rank - card.rank) <= 2).length
-    return adjacent * 40 - cardPoints(card.rank)
+    const sameSuit = nonJokers.filter(c => c.suit === card.suit && c.id !== card.id)
+    const contribution = getRunContribution(sameSuit, card.rank)
+    const baseUtility = contribution === 'gap-fill' ? 80
+      : contribution === 'extension' ? 60
+      : contribution === 'near' ? 40
+      : 0
+    return baseUtility - cardPoints(card.rank)
   }
 
   return hand.reduce((worst, card) => runUtility(card) < runUtility(worst) ? card : worst)
@@ -239,15 +325,17 @@ export function aiShouldBuy(hand: Card[], discardCard: Card, requirement: RoundR
   const without = aiFindBestMelds(hand, requirement)
   if (withCard !== null && without === null) return true
 
-  // For rounds with run requirements, buy if card fits a committed run suit
+  // For rounds with run requirements, buy based on how precisely the card advances the run
   if (requirement.runs >= 1) {
     const commitN = Math.min(requirement.runs + 1, 3)
     const committedSuits = getCommittedSuits(hand, commitN)
     if (committedSuits.has(discardCard.suit)) {
       const sameSuit = hand.filter(c => !isJoker(c) && c.suit === discardCard.suit)
       if (sameSuit.length >= 1) {
-        const close = sameSuit.filter(c => Math.abs(c.rank - discardCard.rank) <= 2)
-        if (close.length >= 1) return true
+        const contribution = getRunContribution(sameSuit, discardCard.rank)
+        // Always buy gap-fills and direct extensions; buy 'near' only with 2+ existing cards
+        if (contribution === 'gap-fill' || contribution === 'extension') return true
+        if (contribution === 'near' && sameSuit.length >= 2) return true
       }
     }
   }
