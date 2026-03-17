@@ -588,15 +588,17 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
 
     const newHand = player.hand.filter(c => c.id !== cardId)
 
-    // Rule: you cannot go out by discarding — discard is blocked when it would empty your hand
-    if (newHand.length === 0 && !player.isAI) {
+    // Rule: you cannot go out by discarding — only applies before laying down.
+    // If the player has already laid down but has 1 stuck card with no valid lay-off,
+    // they ARE allowed to discard it; they just don't go out — they draw next turn.
+    if (newHand.length === 0 && !player.hasLaidDown && !player.isAI) {
       setDiscardError('You cannot go out by discarding. You must lay off your last card to go out.')
       haptic('error')
       setTimeout(() => setDiscardError(null), 3500)
       return
     }
-    // AI with 1 card: skip discard, increment stalemate counter, advance turn
-    if (newHand.length === 0 && player.isAI) {
+    // AI with 1 card that hasn't laid down: skip discard, increment stalemate counter, advance turn
+    if (newHand.length === 0 && !player.hasLaidDown && player.isAI) {
       noProgressTurnsRef.current += 1
       const advanced = advancePlayer(gameState)
       const nextPlayer = advanced.players[advanced.roundState.currentPlayerIndex]
@@ -1357,7 +1359,13 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
               }`}
             >
               {selectedCardIds.size === 1
-                ? (currentPlayer.hand.length === 1 ? 'Discard — lay off to go out instead' : 'Discard Selected Card')
+                ? (currentPlayer.hand.length === 1 && !currentPlayer.hasLaidDown
+                    ? 'Discard — lay off to go out instead'
+                    : currentPlayer.hand.length === 1 && currentPlayer.hasLaidDown && !rs.tablesMelds.some(m => canLayOff(currentPlayer.hand[0], m))
+                      ? 'Discard (continue next turn)'
+                      : currentPlayer.hand.length === 1 && currentPlayer.hasLaidDown
+                        ? 'Discard — lay off to go out instead'
+                        : 'Discard Selected Card')
                 : 'Tap a card to select, then discard'}
             </button>
           </div>

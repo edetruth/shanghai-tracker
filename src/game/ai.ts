@@ -71,14 +71,15 @@ function scoreSuitForRun(suitCards: Card[]): number {
 }
 
 // Get the top committed suits (best run-building opportunities).
-// Adds a sticky progress bonus (window.cards.length * 200) so a near-complete run
-// is never de-committed when a new competing suit appears mid-round.
+// Progress bonus: 50 * window.cards.length adds mild stickiness so a suit with
+// more cards already in a window is preferred over an equally-scored new suit,
+// without locking AI in too hard when a competing suit becomes genuinely better.
 function getCommittedSuits(hand: Card[], topN = 2): Set<string> {
   const bySuit = groupBySuit(hand)
   const scores: [string, number][] = []
   for (const [suit, cards] of bySuit) {
     const window = findBestRunWindow(cards)
-    const progressBonus = window.cards.length * 200
+    const progressBonus = window.cards.length * 50
     scores.push([suit, scoreSuitForRun(cards) + progressBonus])
   }
   scores.sort((a, b) => b[1] - a[1])
