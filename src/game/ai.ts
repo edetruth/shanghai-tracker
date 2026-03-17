@@ -70,12 +70,16 @@ function scoreSuitForRun(suitCards: Card[]): number {
   return maxSeq * 10 + suitCards.length * 4 + density * 15
 }
 
-// Get the top committed suits (best run-building opportunities)
+// Get the top committed suits (best run-building opportunities).
+// Adds a sticky progress bonus (window.cards.length * 200) so a near-complete run
+// is never de-committed when a new competing suit appears mid-round.
 function getCommittedSuits(hand: Card[], topN = 2): Set<string> {
   const bySuit = groupBySuit(hand)
   const scores: [string, number][] = []
   for (const [suit, cards] of bySuit) {
-    scores.push([suit, scoreSuitForRun(cards)])
+    const window = findBestRunWindow(cards)
+    const progressBonus = window.cards.length * 200
+    scores.push([suit, scoreSuitForRun(cards) + progressBonus])
   }
   scores.sort((a, b) => b[1] - a[1])
   return new Set(scores.slice(0, topN).map(s => s[0]))
@@ -148,6 +152,21 @@ function getRunContribution(sameSuitCards: Card[], rank: number): 'gap-fill' | '
   // Handles cases like [5♥, 9♥] where the window picks [5♥] but 10♥ is useful near 9♥.
   if (sameSuitCards.some(c => Math.abs(c.rank - rank) <= 2)) return 'near'
   return null
+}
+
+/**
+ * How many more natural cards are needed to complete a minimum-length run (3 cards)
+ * in a suit, given the current hand cards and available jokers.
+ * Returns 0 if already complete (≥3 consecutive with jokers filling gaps).
+ */
+function cardsToCompleteRun(suitCards: Card[], jokerCount: number): number {
+  if (suitCards.length === 0) return Math.max(0, 3 - jokerCount)
+  const window = findBestRunWindow(suitCards)
+  // Cards in window + jokers cover: window.cards.length + jokerCount cards toward a run
+  // Gaps within the window still need to be filled; jokers can fill them
+  const filledByJokers = Math.min(jokerCount, window.gaps.length)
+  const effectiveLength = window.cards.length + filledByJokers
+  return Math.max(0, 3 - effectiveLength)
 }
 
 // Try to find meld groups satisfying the round requirement.
@@ -316,7 +335,9 @@ function aiChooseDiscardForRuns(hand: Card[], runsNeeded: number): Card {
     return unprotected.reduce((max, c) => cardPoints(c.rank) > cardPoints(max.rank) ? c : max)
   }
 
-  // 3. All cards are in run windows — discard lowest-utility card from the windows
+  // 3. All cards are in run windows — discard lowest-utility card from the windows.
+  //    Desperate bonus: suits that are 1-2 cards from completing a run get extra protection.
+  const jokerCount = hand.filter(c => isJoker(c)).length
   function runUtility(card: Card): number {
     if (isJoker(card)) return 10000
     const sameSuit = nonJokers.filter(c => c.suit === card.suit && c.id !== card.id)
@@ -325,7 +346,10 @@ function aiChooseDiscardForRuns(hand: Card[], runsNeeded: number): Card {
       : contribution === 'extension' ? 60
       : contribution === 'near' ? 40
       : 0
-    return baseUtility - cardPoints(card.rank)
+    // Desperate bonus: protect cards from suits that are nearly complete
+    const ctr = cardsToCompleteRun(sameSuit, jokerCount)
+    const desperateBonus = ctr <= 1 ? 60 : ctr <= 2 ? 30 : 0
+    return baseUtility + desperateBonus - cardPoints(card.rank)
   }
 
   return hand.reduce((worst, card) => runUtility(card) < runUtility(worst) ? card : worst)
