@@ -90,7 +90,7 @@ export default function PlayerSetup({ onGameCreated, onJoinGame, onBack }: Props
   return (
     <div className="flex flex-col gap-4 p-4">
       {/* Header */}
-      <div className="pt-6 pb-1">
+      <div className="pb-1 safe-top">
         {onBack && (
           <button onClick={onBack} className="text-[#8b6914] p-1 -ml-1 mb-3 flex items-center gap-2">
             <ArrowLeft size={22} />

@@ -32,7 +32,7 @@ export default function GameOver({ players, onPlayAgain, onBack }: Props) {
   return (
     <div className="min-h-screen bg-[#f8f6f1] flex flex-col">
       {/* Header */}
-      <div className="bg-white border-b border-[#e2ddd2] px-4 py-5 text-center">
+      <div className="bg-white border-b border-[#e2ddd2] px-4 pb-5 text-center safe-top">
         <h1 className="text-2xl font-bold text-[#2c1810]">Game Over! 🏆</h1>
         <p className="text-sm text-[#8b7355] mt-1">Lowest score wins</p>
 

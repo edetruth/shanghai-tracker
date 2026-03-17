@@ -105,7 +105,7 @@ export default function ScoreEntry({ game, players, onComplete, onBack }: Props)
   return (
     <div className="flex flex-col min-h-[100dvh]">
       {/* Header */}
-      <div className="p-4 pt-6">
+      <div className="p-4 safe-top">
         <div className="flex items-center justify-between mb-4">
           <button onClick={onBack} className="text-[#a08c6e] p-1" aria-label="Exit game">
             <ChevronLeft size={24} />

@@ -88,7 +88,7 @@ export default function GameSummary({ game, players, onDone, onPlayerClick }: Pr
   return (
     <div className="flex flex-col min-h-[100dvh]">
       {/* Header */}
-      <div className="p-4 pt-8 text-center">
+      <div className="p-4 text-center safe-top">
         <div className="text-[#a08c6e] text-xs uppercase tracking-wider mb-1">Game Complete</div>
         <h1 className="font-display text-2xl font-bold text-[#8b6914]">Game Night Recap</h1>
       </div>

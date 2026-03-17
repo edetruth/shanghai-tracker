@@ -185,7 +185,7 @@ export default function StatsLeaderboard({ onPlayerClick, onNavigateHome }: Prop
 
   return (
     <div className="flex flex-col min-h-[100dvh]">
-      <div className="p-4 pt-6">
+      <div className="p-4 safe-top">
         <div className="flex items-center gap-3 mb-1">
           {onNavigateHome && (
             <button onClick={onNavigateHome} className="text-[#8b6914] p-1 -ml-1">

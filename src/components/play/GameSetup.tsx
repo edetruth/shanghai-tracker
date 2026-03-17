@@ -63,7 +63,7 @@ export default function GameSetup({ onStart, onBack }: Props) {
   return (
     <div className="min-h-screen bg-[#f8f6f1] flex flex-col">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 pt-4 pb-3 border-b border-[#e2ddd2] bg-white">
+      <div className="flex items-center gap-3 px-4 pb-3 border-b border-[#e2ddd2] bg-white safe-top">
         <button
           onClick={onBack}
           className="w-8 h-8 flex items-center justify-center rounded-lg text-[#8b7355] active:bg-[#efe9dd]"

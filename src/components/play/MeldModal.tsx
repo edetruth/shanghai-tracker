@@ -461,18 +461,14 @@ export default function MeldModal({ hand, requirement, onConfirm, onClose, mustL
             Your hand ({hand.filter(c => !usedIds.has(c.id)).length} available)
           </p>
           <div className="flex gap-1.5 overflow-x-auto pb-2" style={{ WebkitOverflowScrolling: 'touch' }}>
-            {hand.map(card => {
-              const locked = usedIds.has(card.id)
-              return (
-                <CardComponent
-                  key={card.id}
-                  card={card}
-                  selected={selectedIds.has(card.id)}
-                  onClick={locked ? undefined : () => toggleCard(card.id)}
-                  disabled={locked}
-                />
-              )
-            })}
+            {hand.filter(c => !usedIds.has(c.id)).map(card => (
+              <CardComponent
+                key={card.id}
+                card={card}
+                selected={selectedIds.has(card.id)}
+                onClick={() => toggleCard(card.id)}
+              />
+            ))}
           </div>
         </div>
       </div>

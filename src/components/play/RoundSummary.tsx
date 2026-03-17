@@ -75,7 +75,7 @@ export default function RoundSummary({ players, roundResults, roundNum, onNext, 
       )}
 
       {/* Header */}
-      <div className="bg-white border-b border-[#e2ddd2] px-4 py-5 text-center">
+      <div className="bg-white border-b border-[#e2ddd2] px-4 pb-5 text-center safe-top">
         <div className="w-12 h-12 rounded-full bg-[#e2b858] flex items-center justify-center mx-auto mb-2">
           <span className="text-lg font-bold text-[#2c1810]">{roundNum}</span>
         </div>
