@@ -1,5 +1,5 @@
 import type { Card, Meld, RoundRequirement } from './types'
-import { isValidRun, canLayOff, findSwappableJoker } from './meld-validator'
+import { isValidRun, canLayOff, simulateLayOff, findSwappableJoker } from './meld-validator'
 import { cardPoints, MIN_SET_SIZE, MIN_RUN_SIZE } from './rules'
 
 function isJoker(c: Card): boolean { return c.suit === 'joker' }
@@ -302,8 +302,13 @@ export function aiFindLayOff(hand: Card[], tablesMelds: Meld[]): { card: Card; m
     for (const meld of tablesMelds) {
       if (canLayOff(card, meld)) {
         const remaining = hand.filter(c => c.id !== card.id)
-        if (remaining.length === 1 && !tablesMelds.some(m => canLayOff(remaining[0], m))) {
-          continue // would leave 1 unplayable card — skip
+        if (remaining.length === 1) {
+          // Check against the SIMULATED post-lay-off meld bounds — a chain lay-off
+          // (e.g. 4♥ onto 5-9 run) updates runMin/runMax, enabling the next card (3♥).
+          const updatedMelds = tablesMelds.map(m => m.id === meld.id ? simulateLayOff(card, meld) : m)
+          if (!updatedMelds.some(m => canLayOff(remaining[0], m))) {
+            continue // would leave 1 unplayable card — skip
+          }
         }
         return { card, meld }
       }

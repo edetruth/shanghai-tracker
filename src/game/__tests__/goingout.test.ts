@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { canLayOff } from '../meld-validator'
 import { aiFindLayOff } from '../ai'
-import { c, makeMeld } from './helpers'
+import { c, joker, makeMeld } from './helpers'
 
 describe('Going out rules', () => {
   it('player can go out by laying off last card', () => {
@@ -51,6 +51,21 @@ describe('aiFindLayOff — stuck-state prevention', () => {
     // Lay off hearts 9 on run (extends to 5-6-7-8-9), leaves spades 9 which can go on setMeld
     const result = aiFindLayOff(hand, [runMeld, setMeld])
     expect(result).not.toBeNull()
+  })
+
+  it('chain lay-off: [3♥, 4♥] on run 5♥-8♥-JKR(9♥) — 4♥ lay-off must NOT be blocked', () => {
+    // The key chain bug: lay off 4♥ makes run 4-9, then 3♥ fits at min-1=3.
+    // aiFindLayOff must simulate the updated run bounds before deciding to skip.
+    const jkr = joker('jkr-chain')
+    const meld = makeMeld(
+      [c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8), jkr],
+      'run'
+    )
+    const hand = [c('hearts', 3), c('hearts', 4)]
+    const result = aiFindLayOff(hand, [meld])
+    // Should allow 4♥ (laying off 4♥ makes run 4-9; then 3♥ fits at 3=4-1)
+    expect(result).not.toBeNull()
+    expect(result?.card.rank).toBe(4)
   })
 
   it('returns last-card lay-off (going out) — not blocked', () => {

@@ -89,4 +89,22 @@ describe('canLayOff — chain scenario', () => {
     const updatedMeld = { ...meld, runMax: 9 }
     expect(canLayOff(c('hearts', 10), updatedMeld)).toBe(true)
   })
+
+  it('chain lay-off into run with joker at high end — hand [3♥, 4♥] on run 5♥-8♥-JKR(9♥)', () => {
+    // Run: 5♥-6♥-7♥-8♥-JKR(9♥), runMin=5, runMax=9
+    const jkr = joker('jkr-chain')
+    const meld = makeMeld(
+      [c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8), jkr],
+      'run'
+    )
+    // Step 1: 4♥ can lay off at low end (min=5, 4=min-1)
+    expect(canLayOff(c('hearts', 4), meld)).toBe(true)
+
+    // Step 2: After laying off 4♥, simulate updated run (runMin=4)
+    const afterFirst = { ...meld, runMin: 4 }
+    // 3♥ must now be valid (3=min-1=4-1=3)
+    expect(canLayOff(c('hearts', 3), afterFirst)).toBe(true)
+
+    // Both steps succeed → player can go out by chaining [4♥, 3♥]
+  })
 })

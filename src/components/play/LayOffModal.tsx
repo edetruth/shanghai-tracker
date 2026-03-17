@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
 import type { Card as CardType, Meld, RoundRequirement } from '../../game/types'
-import { canLayOff, findSwappableJoker } from '../../game/meld-validator'
+import { canLayOff, simulateLayOff, findSwappableJoker } from '../../game/meld-validator'
 import { aiFindBestMelds } from '../../game/ai'
 import CardComponent from './Card'
 import TableMelds from './TableMelds'
@@ -95,22 +95,9 @@ export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, 
         if (handAfter.length === 1) {
           const remaining = handAfter[0]
           // Check against SIMULATED updated melds (after the lay-off extends the target meld)
-          const simulatedMelds = tablesMelds.map(m => {
-            if (m.id !== selectedMeld.id || m.type !== 'run') return m
-            let runMin = m.runMin, runMax = m.runMax, runAceHigh = m.runAceHigh
-            if (selectedCard.suit === 'joker') {
-              runMax = (runMax ?? 0) + 1
-            } else {
-              let r = selectedCard.rank
-              if (selectedCard.rank === 1 && runMax === 13) { runMax = 14; runAceHigh = true }
-              else {
-                if (m.runAceHigh && selectedCard.rank === 1) r = 14
-                if (r < (runMin ?? 999)) runMin = r
-                else if (r > (runMax ?? 0)) runMax = r
-              }
-            }
-            return { ...m, runMin, runMax, runAceHigh }
-          })
+          const simulatedMelds = tablesMelds.map(m =>
+            m.id === selectedMeld.id ? simulateLayOff(selectedCard, m) : m
+          )
           const canRemainPlay = simulatedMelds.some(m => canLayOff(remaining, m))
           if (!canRemainPlay) {
             isValid = false

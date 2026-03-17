@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildMeld, getRunBounds, getNextJokerOptions } from '../meld-validator'
+import { buildMeld, canLayOff, getRunBounds, getNextJokerOptions, simulateLayOff } from '../meld-validator'
 import { c, joker } from './helpers'
 
 describe('buildMeld — sets', () => {
@@ -86,6 +86,70 @@ describe('getRunBounds', () => {
     expect(bounds.min).toBe(3)
     expect(bounds.max).toBe(6)
     expect(bounds.suit).toBe('hearts')
+  })
+})
+
+describe('simulateLayOff', () => {
+  it('updates runMin when card extends at low end', () => {
+    const meld = buildMeld(
+      [c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8)],
+      'run', 'p0', 'Test', 'meld-sl-1'
+    )
+    const updated = simulateLayOff(c('hearts', 4), meld)
+    expect(updated.runMin).toBe(4)
+    expect(updated.runMax).toBe(8)
+  })
+
+  it('updates runMax when card extends at high end', () => {
+    const meld = buildMeld(
+      [c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8)],
+      'run', 'p0', 'Test', 'meld-sl-2'
+    )
+    const updated = simulateLayOff(c('hearts', 9), meld)
+    expect(updated.runMin).toBe(5)
+    expect(updated.runMax).toBe(9)
+  })
+
+  it('updates runMax when joker extends at high end', () => {
+    const meld = buildMeld(
+      [c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8)],
+      'run', 'p0', 'Test', 'meld-sl-3'
+    )
+    const updated = simulateLayOff(joker(), meld)
+    expect(updated.runMax).toBe(9)
+  })
+
+  it('sets runAceHigh=true when ace extends K-high run to 14', () => {
+    const meld = buildMeld(
+      [c('hearts', 10), c('hearts', 11), c('hearts', 12), c('hearts', 13)],
+      'run', 'p0', 'Test', 'meld-sl-4'
+    )
+    const updated = simulateLayOff(c('hearts', 1), meld)
+    expect(updated.runMax).toBe(14)
+    expect(updated.runAceHigh).toBe(true)
+  })
+
+  it('does not change bounds for set melds', () => {
+    const meld = buildMeld(
+      [c('hearts', 7), c('diamonds', 7), c('clubs', 7)],
+      'set', 'p0', 'Test', 'meld-sl-5'
+    )
+    const updated = simulateLayOff(c('spades', 7), meld)
+    expect(updated.runMin).toBeUndefined()
+    expect(updated.runMax).toBeUndefined()
+  })
+
+  it('chain scenario: 4♥ onto 5-9 run → 3♥ valid on result', () => {
+    const jkr = joker('jkr-chain-sim')
+    const meld = buildMeld(
+      [c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8), jkr],
+      'run', 'p0', 'Test', 'meld-sl-6'
+    )
+    // After simulating 4♥ lay-off: runMin should be 4
+    const after4 = simulateLayOff(c('hearts', 4), meld)
+    expect(after4.runMin).toBe(4)
+    // canLayOff(3♥, after4) = 3 === 4-1 ✓
+    expect(canLayOff(c('hearts', 3), after4)).toBe(true)
   })
 })
 

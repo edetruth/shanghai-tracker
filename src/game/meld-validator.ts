@@ -297,6 +297,25 @@ export function getRunBounds(meld: Meld): { min: number; max: number; suit: stri
   }
 }
 
+// Return what a meld looks like AFTER a card is laid off on it (bounds only, no card array).
+// Used by stuck-state checkers to validate chained lay-offs.
+export function simulateLayOff(card: Card, meld: Meld): Meld {
+  if (meld.type !== 'run') return meld // sets don't change bounds
+  let runMin = meld.runMin, runMax = meld.runMax, runAceHigh = meld.runAceHigh
+  if (card.suit === 'joker') {
+    runMax = (runMax ?? 0) + 1
+  } else {
+    let r = card.rank
+    if (card.rank === 1 && runMax === 13) { runMax = 14; runAceHigh = true }
+    else {
+      if (meld.runAceHigh && card.rank === 1) r = 14
+      if (r < (runMin ?? 999)) runMin = r
+      else if (r > (runMax ?? 0)) runMax = r
+    }
+  }
+  return { ...meld, runMin, runMax, runAceHigh }
+}
+
 // Can a card be laid off on an existing meld?
 export function canLayOff(card: Card, meld: Meld): boolean {
   if (meld.type === 'set') {
