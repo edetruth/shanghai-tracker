@@ -144,30 +144,43 @@ function getRunContribution(sameSuitCards: Card[], rank: number): 'gap-fill' | '
   if (window.gaps.includes(rank)) return 'gap-fill'
   if (rank === window.minRank - 1 || rank === window.maxRank + 1) return 'extension'
   if (rank >= window.minRank - 2 && rank <= window.maxRank + 2) return 'near'
+  // Fallback: card is outside the best window but still within ±2 of an isolated suit fragment.
+  // Handles cases like [5♥, 9♥] where the window picks [5♥] but 10♥ is useful near 9♥.
+  if (sameSuitCards.some(c => Math.abs(c.rank - rank) <= 2)) return 'near'
   return null
 }
 
-// Try to find meld groups satisfying the round requirement
+// Try to find meld groups satisfying the round requirement.
+// For mixed rounds (sets + runs), tries sets-first then runs-first and returns whichever works.
+// This matters when the only joker can satisfy either the set OR the run but not both —
+// the greedy ordering determines which gets it.
 export function aiFindBestMelds(hand: Card[], requirement: RoundRequirement): Card[][] | null {
+  return tryMeldOrder(hand, requirement, 'sets-first')
+    ?? (requirement.sets > 0 && requirement.runs > 0
+        ? tryMeldOrder(hand, requirement, 'runs-first')
+        : null)
+}
+
+function tryMeldOrder(
+  hand: Card[],
+  requirement: RoundRequirement,
+  order: 'sets-first' | 'runs-first',
+): Card[][] | null {
   const jokers = hand.filter(isJoker)
   const naturals = hand.filter(c => !isJoker(c))
-
   const melds: Card[][] = []
   const usedIds = new Set<string>()
   let jokersUsed = 0
 
-  for (let s = 0; s < requirement.sets; s++) {
-    const remaining = naturals.filter(c => !usedIds.has(c.id))
-    const meld = tryFindSet(remaining, jokers, jokersUsed)
-    if (!meld) return null
-    meld.forEach(c => usedIds.add(c.id))
-    jokersUsed += meld.filter(isJoker).length
-    melds.push(meld)
-  }
+  const steps: Array<'set' | 'run'> = order === 'sets-first'
+    ? [...Array(requirement.sets).fill('set'), ...Array(requirement.runs).fill('run')]
+    : [...Array(requirement.runs).fill('run'), ...Array(requirement.sets).fill('set')]
 
-  for (let r = 0; r < requirement.runs; r++) {
+  for (const step of steps) {
     const remaining = naturals.filter(c => !usedIds.has(c.id))
-    const meld = tryFindRun(remaining, jokers, jokersUsed)
+    const meld = step === 'set'
+      ? tryFindSet(remaining, jokers, jokersUsed)
+      : tryFindRun(remaining, jokers, jokersUsed)
     if (!meld) return null
     meld.forEach(c => usedIds.add(c.id))
     jokersUsed += meld.filter(isJoker).length
