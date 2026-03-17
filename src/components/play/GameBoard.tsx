@@ -202,8 +202,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
   useEffect(() => { buyerStepRef.current = buyerStep }, [buyerStep])
   useEffect(() => { pendingBuyDiscardRef.current = pendingBuyDiscard }, [pendingBuyDiscard])
 
-  // Medium AI: max 1 lay-off per turn
-  const aiLayOffDoneRef = useRef(false)
+  // Medium AI: max 2 lay-offs per turn
+  const aiLayOffCountRef = useRef(0)
 
   // Auto-clear new card indicator after 3 seconds
   useEffect(() => {
@@ -788,7 +788,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
         }
       }
       // Easy: discard highest-value card
-      aiLayOffDoneRef.current = false
+      aiLayOffCountRef.current = 0
       const card = aiChooseDiscardEasy(player.hand)
       setAiMessage(`${player.name} discards`)
       setTimeout(() => setAiMessage(null), 800)
@@ -812,7 +812,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
     if (!player.hasLaidDown) {
       const melds = aiFindAllMelds(player.hand, requirement)
       if (melds && melds.length > 0) {
-        aiLayOffDoneRef.current = false
+        aiLayOffCountRef.current = 0
         noProgressTurnsRef.current = 0
         setAiMessage(`${player.name} lays down!`)
         setTimeout(() => setAiMessage(null), 1500)
@@ -834,10 +834,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
     }
 
     // Try to lay off (Medium: max 1 per turn, EXCEPT the final going-out lay-off; Hard: unlimited)
-    if (player.hasLaidDown && tablesMelds.length > 0 && (isHard || !aiLayOffDoneRef.current || player.hand.length === 1)) {
+    if (player.hasLaidDown && tablesMelds.length > 0 && (isHard || aiLayOffCountRef.current < 2 || player.hand.length === 1)) {
       const layOff = aiFindLayOff(player.hand, tablesMelds)
       if (layOff) {
-        aiLayOffDoneRef.current = true
+        aiLayOffCountRef.current++
         setAiMessage(`${player.name} lays off`)
         setTimeout(() => setAiMessage(null), 1000)
         handleLayOff(layOff.card, layOff.meld, layOff.jokerPosition)
@@ -847,7 +847,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
 
     // Discard
     if (player.hand.length > 0) {
-      aiLayOffDoneRef.current = false
+      aiLayOffCountRef.current = 0
       const card = isHard
         ? aiChooseDiscardHard(player.hand, tablesMelds)
         : aiChooseDiscard(player.hand, requirement, tablesMelds)

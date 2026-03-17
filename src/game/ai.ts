@@ -136,9 +136,20 @@ export function aiShouldTakeDiscard(
   const committedSuits = getCommittedSuits(hand, 2)
   if (committedSuits.has(discardCard.suit)) {
     const sameSuit = hand.filter(c => !isJoker(c) && c.suit === discardCard.suit)
-    if (sameSuit.length >= 2) {
-      for (const c of sameSuit) {
-        if (Math.abs(discardCard.rank - c.rank) === 1) return true
+    const isRunHeavy = requirement.runs > requirement.sets
+    if (isRunHeavy) {
+      // Run-heavy rounds: take within ±2 gap even with just 1 existing same-suit card
+      if (sameSuit.length >= 1) {
+        for (const c of sameSuit) {
+          if (Math.abs(discardCard.rank - c.rank) <= 2) return true
+        }
+      }
+    } else {
+      // Set-heavy rounds: only take if directly adjacent and already have 2 same-suit
+      if (sameSuit.length >= 2) {
+        for (const c of sameSuit) {
+          if (Math.abs(discardCard.rank - c.rank) === 1) return true
+        }
       }
     }
   }
