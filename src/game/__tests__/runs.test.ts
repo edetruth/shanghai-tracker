@@ -106,8 +106,7 @@ describe('isValidRun — ace handling', () => {
     ])).toBe(false)
   })
 
-  it('rejects A-K-Q-J (reverse order — not valid as-is, but valid sorted)', () => {
-    // isValidRun sorts internally, so this should be valid if it makes a run
+  it('accepts A-K-Q-J in any input order (isValidRun sorts internally)', () => {
     expect(isValidRun([
       c('spades', 1), c('spades', 13), c('spades', 12), c('spades', 11)
     ])).toBe(true)

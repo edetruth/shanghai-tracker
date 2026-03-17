@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { canLayOff } from '../meld-validator'
+import { canLayOff, simulateLayOff } from '../meld-validator'
 import { c, joker, makeMeld } from './helpers'
 
 describe('canLayOff — sets', () => {
@@ -71,22 +71,22 @@ describe('canLayOff — ace extension', () => {
 })
 
 describe('canLayOff — chain scenario', () => {
-  it('after laying off on a run, simulated run accepts next card', () => {
-    // 5-6-7-8 run; lay off 4 → run becomes 4-5-6-7-8; then 3 should be valid
+  it('after laying off on a run, simulateLayOff result accepts next card', () => {
+    // 5-6-7-8 run; lay off 4♥ → run becomes 4-5-6-7-8; then 3♥ should be valid
     const runCards = [c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8)]
     const meld = makeMeld(runCards, 'run')
 
-    // Simulate lay-off of 4♥ at low end
-    const updatedMeld = { ...meld, runMin: 4, cards: [c('hearts', 4), ...meld.cards] }
+    const updatedMeld = simulateLayOff(c('hearts', 4), meld)
+    expect(updatedMeld.runMin).toBe(4)
     expect(canLayOff(c('hearts', 3), updatedMeld)).toBe(true)
     expect(canLayOff(c('hearts', 9), updatedMeld)).toBe(true)
   })
 
-  it('laying off joker extends run max by 1', () => {
+  it('laying off joker (default high) extends runMax by 1 via simulateLayOff', () => {
     const runCards = [c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8)]
     const meld = makeMeld(runCards, 'run')
-    // After joker laid off: max = 9. Then 10 should be valid
-    const updatedMeld = { ...meld, runMax: 9 }
+    const updatedMeld = simulateLayOff(joker(), meld)
+    expect(updatedMeld.runMax).toBe(9)
     expect(canLayOff(c('hearts', 10), updatedMeld)).toBe(true)
   })
 
@@ -100,11 +100,10 @@ describe('canLayOff — chain scenario', () => {
     // Step 1: 4♥ can lay off at low end (min=5, 4=min-1)
     expect(canLayOff(c('hearts', 4), meld)).toBe(true)
 
-    // Step 2: After laying off 4♥, simulate updated run (runMin=4)
-    const afterFirst = { ...meld, runMin: 4 }
-    // 3♥ must now be valid (3=min-1=4-1=3)
+    // Step 2: use simulateLayOff to get updated bounds — runMin becomes 4
+    const afterFirst = simulateLayOff(c('hearts', 4), meld)
+    expect(afterFirst.runMin).toBe(4)
+    // 3♥ must now be valid (3 === 4-1)
     expect(canLayOff(c('hearts', 3), afterFirst)).toBe(true)
-
-    // Both steps succeed → player can go out by chaining [4♥, 3♥]
   })
 })

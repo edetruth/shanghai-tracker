@@ -124,7 +124,7 @@ GameSetup (PlayerConfig[] configured)
 - **Fan hand layout** — `HandDisplay` uses absolute positioning with overlap offset computed by hand size. All cards visible without scrolling. Selected cards lift via Card's `-translate-y-3`.
 - **Rule 9A** — After any non-going-out discard, game advances to next player for a free draw decision. If they draw from pile, `startBuyingWindowPostDraw()` opens buying for remaining players. `buyingIsPostDrawRef` tracks this mode; after buying resolves the drew-player goes to action phase directly.
 - **`nextPhaseForPlayer(player)`** — returns `'draw'` for AI (skips privacy screen), `'privacy'` for humans.
-- **`aiLayOffDoneRef`** — ref in `GameBoard`; Medium AI is capped at 1 lay-off per turn before being forced to discard. Hard AI has no cap.
+- **`aiLayOffDoneRef`** — ref in `GameBoard`; Medium AI is capped at 1 lay-off per turn before being forced to discard, **except** when `player.hand.length === 1` — the final going-out lay-off is always allowed. Hard AI has no cap.
 - **`aiActionTick`** — state counter bumped after Hard AI joker swaps (hand length unchanged, so this re-triggers the AI action effect).
 - **Extra melds rule** — `MeldModal` has a 3-phase flow: `required` → `bonus-prompt` → `bonus`. After the required melds are confirmed, `canFormAnyValidMeld` checks remaining cards; if a bonus meld is possible the player is prompted. AI uses `aiFindAllMelds` (finds required + all bonus melds greedily).
 - **Sort order in MeldModal** — `GameBoard` owns `handSort` state; passes it to `HandDisplay` (controlled) and passes `sortedCurrentHand` to `MeldModal` so both show cards in the same order.

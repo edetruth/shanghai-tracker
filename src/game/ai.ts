@@ -294,23 +294,34 @@ export function aiFindPreLayDownJokerSwap(
   return null
 }
 
+// For a joker being laid off on a run, choose the end that maximises future potential.
+// Prefers the end with more room (ranks available before hitting A-low or A-high).
+export function aiChooseJokerLayOffPosition(meld: Meld): 'low' | 'high' {
+  const roomBelow = (meld.runMin ?? 1) - 1       // ranks available below (runMin-1 down to 1)
+  const roomAbove = 14 - (meld.runMax ?? 13)      // ranks available above (runMax+1 up to 14)
+  return roomBelow >= roomAbove ? 'low' : 'high'
+}
+
 // Find a card in hand that can be laid off on any of the given melds.
 // Skips lay-offs that would leave exactly 1 card that can't itself be laid off
 // anywhere (which would strand the AI — can't discard last card, can't go out).
-export function aiFindLayOff(hand: Card[], tablesMelds: Meld[]): { card: Card; meld: Meld } | null {
+export function aiFindLayOff(hand: Card[], tablesMelds: Meld[]): { card: Card; meld: Meld; jokerPosition?: 'low' | 'high' } | null {
   for (const card of hand) {
     for (const meld of tablesMelds) {
       if (canLayOff(card, meld)) {
+        const jokerPosition = (card.suit === 'joker' && meld.type === 'run')
+          ? aiChooseJokerLayOffPosition(meld)
+          : undefined
         const remaining = hand.filter(c => c.id !== card.id)
         if (remaining.length === 1) {
           // Check against the SIMULATED post-lay-off meld bounds — a chain lay-off
           // (e.g. 4♥ onto 5-9 run) updates runMin/runMax, enabling the next card (3♥).
-          const updatedMelds = tablesMelds.map(m => m.id === meld.id ? simulateLayOff(card, meld) : m)
+          const updatedMelds = tablesMelds.map(m => m.id === meld.id ? simulateLayOff(card, meld, jokerPosition) : m)
           if (!updatedMelds.some(m => canLayOff(remaining[0], m))) {
             continue // would leave 1 unplayable card — skip
           }
         }
-        return { card, meld }
+        return { card, meld, jokerPosition }
       }
     }
   }

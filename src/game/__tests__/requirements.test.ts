@@ -58,6 +58,31 @@ describe('meetsRoundRequirement', () => {
     expect(meetsRoundRequirement([set3, set4], ROUND_REQUIREMENTS[3])).toBe(false)
   })
 
+  it('Round 5: 2 sets + 1 run — accepts exactly 2 sets + 1 run', () => {
+    expect(meetsRoundRequirement([set3, set4, run1], ROUND_REQUIREMENTS[4])).toBe(true)
+  })
+
+  it('Round 5: 2 sets + 1 run — rejects 3 sets (missing run)', () => {
+    expect(meetsRoundRequirement([set3, set4, set5], ROUND_REQUIREMENTS[4])).toBe(false)
+  })
+
+  it('Round 5: 2 sets + 1 run — rejects 1 set + 2 runs (wrong mix)', () => {
+    expect(meetsRoundRequirement([set3, run1, run2], ROUND_REQUIREMENTS[4])).toBe(false)
+  })
+
+  it('Round 6: 1 set + 2 runs — accepts exactly 1 set + 2 runs', () => {
+    expect(meetsRoundRequirement([set3, run1, run2], ROUND_REQUIREMENTS[5])).toBe(true)
+  })
+
+  it('Round 6: 1 set + 2 runs — rejects 2 sets + 1 run (wrong mix)', () => {
+    expect(meetsRoundRequirement([set3, set4, run1], ROUND_REQUIREMENTS[5])).toBe(false)
+  })
+
+  it('Round 6: 1 set + 2 runs — rejects 3 runs (missing set)', () => {
+    const run3 = [c('diamonds', 2), c('diamonds', 3), c('diamonds', 4), c('diamonds', 5)]
+    expect(meetsRoundRequirement([run1, run2, run3], ROUND_REQUIREMENTS[5])).toBe(false)
+  })
+
   it('Round 7: 3 runs — accepts exactly 3 runs', () => {
     const run3 = [c('diamonds', 2), c('diamonds', 3), c('diamonds', 4), c('diamonds', 5)]
     expect(meetsRoundRequirement([run1, run2, run3], ROUND_REQUIREMENTS[6])).toBe(true)

@@ -39,7 +39,11 @@ describe('isValidSet', () => {
     expect(isValidSet([c('hearts', 13), c('diamonds', 13), c('spades', 13)])).toBe(true)
   })
 
-  it('suit does not matter — same rank different suits is valid', () => {
+  it('different suits same rank is valid', () => {
+    expect(isValidSet([c('hearts', 10), c('diamonds', 10), c('clubs', 10)])).toBe(true)
+  })
+
+  it('duplicate suits in a set are allowed (no suit-uniqueness check)', () => {
     expect(isValidSet([c('hearts', 10), c('hearts', 10), c('clubs', 10)])).toBe(true)
   })
 

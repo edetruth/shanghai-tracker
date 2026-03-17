@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { canLayOff } from '../meld-validator'
-import { aiFindLayOff } from '../ai'
+import { canLayOff, simulateLayOff } from '../meld-validator'
+import { aiFindLayOff, aiChooseJokerLayOffPosition } from '../ai'
 import { c, joker, makeMeld } from './helpers'
 
 describe('Going out rules', () => {
@@ -75,5 +75,147 @@ describe('aiFindLayOff — stuck-state prevention', () => {
     // 1 card, valid lay-off — going out, should be allowed
     expect(result).not.toBeNull()
     expect(result?.card.rank).toBe(9)
+  })
+
+  it('joker lay-off includes jokerPosition in result', () => {
+    const jkr = joker('jkr-layoff')
+    const meld = makeMeld([c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8)], 'run')
+    const hand = [jkr]
+    const result = aiFindLayOff(hand, [meld])
+    expect(result).not.toBeNull()
+    expect(result?.jokerPosition).toBeDefined()
+    expect(['low', 'high']).toContain(result?.jokerPosition)
+  })
+})
+
+describe('aiChooseJokerLayOffPosition', () => {
+  it('prefers high end when run starts at 1 (more room above)', () => {
+    const meld = makeMeld([c('hearts', 1), c('hearts', 2), c('hearts', 3), c('hearts', 4)], 'run')
+    // runMin=1 → roomBelow=0; runMax=4 → roomAbove=10; prefer high
+    expect(aiChooseJokerLayOffPosition(meld)).toBe('high')
+  })
+
+  it('prefers low end when run ends at 14/K (more room below)', () => {
+    const meld = makeMeld([c('hearts', 10), c('hearts', 11), c('hearts', 12), c('hearts', 13)], 'run')
+    // runMin=10 → roomBelow=9; runMax=13 → roomAbove=1; prefer low
+    expect(aiChooseJokerLayOffPosition(meld)).toBe('low')
+  })
+
+  it('prefers low end when room is equal (tie goes to low)', () => {
+    // 6-7-8-9: runMin=6 → roomBelow=5; runMax=9 → roomAbove=5; equal → low (>= bias)
+    const meld = makeMeld([c('hearts', 6), c('hearts', 7), c('hearts', 8), c('hearts', 9)], 'run')
+    expect(aiChooseJokerLayOffPosition(meld)).toBe('low')
+  })
+})
+
+describe('aiFindLayOff — going-out sequences', () => {
+  // ── 3-step chain: [2♥, 3♥, 4♥] onto run 5♥-8♥ ──────────────────────────
+  it('3-step chain step 1: [2♥, 3♥, 4♥] → returns 4♥ (only valid first card)', () => {
+    const meld = makeMeld([c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8)], 'run')
+    const hand = [c('hearts', 2), c('hearts', 3), c('hearts', 4)]
+    // 4♥ is the only card that fits now (min-1=4); 2♥ and 3♥ cannot go yet
+    const result = aiFindLayOff(hand, [meld])
+    expect(result).not.toBeNull()
+    expect(result?.card.rank).toBe(4)
+  })
+
+  it('3-step chain step 2: [2♥, 3♥] on run 4♥-8♥ → returns 3♥', () => {
+    // After 4♥ was laid off, run is now 4-8
+    const meld = makeMeld([c('hearts', 4), c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8)], 'run')
+    const hand = [c('hearts', 2), c('hearts', 3)]
+    // 3♥ fits at min-1=3; laying it off leaves 2♥ which fits at new min-1=2
+    const result = aiFindLayOff(hand, [meld])
+    expect(result).not.toBeNull()
+    expect(result?.card.rank).toBe(3)
+  })
+
+  it('3-step chain step 3: [2♥] on run 3♥-8♥ → returns 2♥ (going out)', () => {
+    const meld = makeMeld([c('hearts', 3), c('hearts', 4), c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8)], 'run')
+    const hand = [c('hearts', 2)]
+    const result = aiFindLayOff(hand, [meld])
+    expect(result).not.toBeNull()
+    expect(result?.card.rank).toBe(2)
+  })
+
+  it('wrong start card blocked: [3♥] alone on run 5♥-8♥ → null (3 ≠ min-1=4)', () => {
+    const meld = makeMeld([c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8)], 'run')
+    const hand = [c('hearts', 3)]
+    expect(aiFindLayOff(hand, [meld])).toBeNull()
+  })
+
+  // ── Cross-meld go-out ─────────────────────────────────────────────────────
+  it('cross-meld: [4♥, J♠] — 4♥ on run, J♠ on set → both valid, returns 4♥', () => {
+    const runMeld = makeMeld([c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8)], 'run')
+    const setMeld = makeMeld([c('hearts', 11), c('diamonds', 11), c('clubs', 11)], 'set')
+    const hand = [c('hearts', 4), c('spades', 11)]
+    // Laying off 4♥ leaves J♠ which can go on setMeld → allowed
+    const result = aiFindLayOff(hand, [runMeld, setMeld])
+    expect(result).not.toBeNull()
+    expect(result?.card.rank).toBe(4)
+  })
+
+  it('cross-meld blocked: [4♥, K♠] — K♠ has no valid target → null', () => {
+    // After laying off 4♥, K♠ has nowhere to go → stuck-state → blocked
+    const runMeld = makeMeld([c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8)], 'run')
+    const hand = [c('hearts', 4), c('spades', 13)]
+    expect(aiFindLayOff(hand, [runMeld])).toBeNull()
+  })
+
+  // ── Going out onto a set ──────────────────────────────────────────────────
+  it('goes out by laying off last card onto a set', () => {
+    const setMeld = makeMeld([c('hearts', 11), c('diamonds', 11), c('clubs', 11)], 'set')
+    const hand = [c('spades', 11)]
+    const result = aiFindLayOff(hand, [setMeld])
+    expect(result).not.toBeNull()
+    expect(result?.card.rank).toBe(11)
+    expect(result?.card.suit).toBe('spades')
+  })
+
+  // ── Joker going out ───────────────────────────────────────────────────────
+  it('joker as last card goes out on a run (returns jokerPosition)', () => {
+    const runMeld = makeMeld([c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8)], 'run')
+    const hand = [joker('jkr-last')]
+    const result = aiFindLayOff(hand, [runMeld])
+    expect(result).not.toBeNull()
+    expect(result?.jokerPosition).toBeDefined()
+  })
+
+  // ── Stuck-state: neither card can start the chain ────────────────────────
+  it('neither card fits run — returns null (both stuck)', () => {
+    const meld = makeMeld([c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8)], 'run')
+    // 2♥ is 3 away from min; K♠ is wrong suit
+    const hand = [c('hearts', 2), c('spades', 13)]
+    expect(aiFindLayOff(hand, [meld])).toBeNull()
+  })
+})
+
+describe('simulateLayOff — jokerPosition param', () => {
+  it('extends runMin when jokerPosition=low', () => {
+    const meld = makeMeld(
+      [c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8)],
+      'run'
+    )
+    const updated = simulateLayOff(joker(), meld, 'low')
+    expect(updated.runMin).toBe(4)
+    expect(updated.runMax).toBe(8)
+  })
+
+  it('extends runMax when jokerPosition=high', () => {
+    const meld = makeMeld(
+      [c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8)],
+      'run'
+    )
+    const updated = simulateLayOff(joker(), meld, 'high')
+    expect(updated.runMin).toBe(5)
+    expect(updated.runMax).toBe(9)
+  })
+
+  it('defaults to high when jokerPosition omitted', () => {
+    const meld = makeMeld(
+      [c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8)],
+      'run'
+    )
+    const updated = simulateLayOff(joker(), meld)
+    expect(updated.runMax).toBe(9)
   })
 })

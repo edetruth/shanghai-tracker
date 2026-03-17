@@ -177,11 +177,13 @@ describe('aiChooseDiscard', () => {
   })
 
   it('discards from non-committed suits on run-heavy rounds', () => {
+    // 3 suits: hearts (4-card run, highest score) + spades (3-card run, second highest)
+    // are the top-2 committed suits; clubs (single ace) is genuinely non-committed.
     const hand = [
-      c('hearts', 5), c('hearts', 6), c('hearts', 7), // strong run suit
-      c('clubs', 1),                                    // isolated from non-committed suit
+      c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8), // committed suit 1
+      c('spades', 2), c('spades', 3), c('spades', 4),                  // committed suit 2
+      c('clubs', 1),                                                     // non-committed → discarded
     ]
-    // Hearts is committed, clubs is not → discard the ace
     const discard = aiChooseDiscard(hand, req3)
     expect(discard.suit).toBe('clubs')
   })

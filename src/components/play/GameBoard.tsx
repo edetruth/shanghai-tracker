@@ -451,7 +451,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
   }
 
   // ── Lay off ───────────────────────────────────────────────────────────────
-  function handleLayOff(card: CardType, meld: Meld) {
+  function handleLayOff(card: CardType, meld: Meld, jokerPosition?: 'low' | 'high') {
     const prev = gameState
     const playerIdx = prev.roundState.currentPlayerIndex
     const player = prev.players[playerIdx]
@@ -465,11 +465,18 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
 
     if (meld.type === 'run') {
       if (card.suit === 'joker') {
-        // Joker extends at high end
-        const newMax = (meld.runMax ?? 0) + 1
-        updatedRunMax = newMax
-        newJokerMappings.push({ cardId: card.id, representsRank: newMax, representsSuit: meld.runSuit! })
-        newMeldCards = [...meld.cards, card]
+        if (jokerPosition === 'low') {
+          const newMin = (meld.runMin ?? 1) - 1
+          updatedRunMin = newMin
+          newJokerMappings.push({ cardId: card.id, representsRank: newMin, representsSuit: meld.runSuit! })
+          newMeldCards = [card, ...meld.cards]
+        } else {
+          // Default: extend at high end
+          const newMax = (meld.runMax ?? 0) + 1
+          updatedRunMax = newMax
+          newJokerMappings.push({ cardId: card.id, representsRank: newMax, representsSuit: meld.runSuit! })
+          newMeldCards = [...meld.cards, card]
+        }
       } else {
         let r = card.rank
         const isAceHighExt = card.rank === 1 && meld.runMax === 13
@@ -819,14 +826,14 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
       }
     }
 
-    // Try to lay off (Medium: max 1 per turn; Hard: unlimited)
-    if (player.hasLaidDown && tablesMelds.length > 0 && (isHard || !aiLayOffDoneRef.current)) {
+    // Try to lay off (Medium: max 1 per turn, EXCEPT the final going-out lay-off; Hard: unlimited)
+    if (player.hasLaidDown && tablesMelds.length > 0 && (isHard || !aiLayOffDoneRef.current || player.hand.length === 1)) {
       const layOff = aiFindLayOff(player.hand, tablesMelds)
       if (layOff) {
         aiLayOffDoneRef.current = true
         setAiMessage(`${player.name} lays off`)
         setTimeout(() => setAiMessage(null), 1000)
-        handleLayOff(layOff.card, layOff.meld)
+        handleLayOff(layOff.card, layOff.meld, layOff.jokerPosition)
         return
       }
     }

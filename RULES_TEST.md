@@ -80,6 +80,8 @@ Run through these tests before deploying. Check each item manually in the app us
 
 - [ ] Can go out by laying off the last card in hand
 - [ ] CANNOT go out by discarding — discard button is disabled when hand has 1 card, shows error message
+- [ ] AI (Medium/Hard) can go out via a chain of sequential lay-offs (e.g. [4♥, 3♥] onto run 5♥-8♥: lay off 4♥, run becomes 4-8, lay off 3♥, gone)
+- [ ] Medium AI: after a normal lay-off reduces hand to 1 card, AI immediately attempts the final going-out lay-off (does NOT cycle back to draw)
 - [ ] After going out (by lay-off), round ends immediately and buying window opens
 - [ ] Player who goes out scores 0 for the round
 - [ ] Remaining players score the sum of their remaining hand cards
@@ -102,7 +104,7 @@ Run through these tests before deploying. Check each item manually in the app us
 ## 10. AI Behavior
 
 - [ ] Easy AI: never buys, takes discard rarely, lays down required melds only, discards highest card
-- [ ] Medium AI: buys when beneficial, lays down required + bonus melds, 1 lay-off max per turn
+- [ ] Medium AI: buys when beneficial, lays down required + bonus melds, 1 lay-off max per turn (exception: always lays off when 1 card remains to go out)
 - [ ] Hard AI: aggressive buying, lays down all possible melds, unlimited lay-offs, does joker swaps
 - [ ] AI messages ("Alice lays down!", "Bob discards", etc.) appear and clear after ~1 second
 - [ ] AI handles Round 3 (2 Runs) correctly — lays down 2 runs, not sets

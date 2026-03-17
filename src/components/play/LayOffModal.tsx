@@ -9,7 +9,7 @@ import TableMelds from './TableMelds'
 interface Props {
   hand: CardType[]
   tablesMelds: Meld[]
-  onLayOff: (card: CardType, meld: Meld) => void
+  onLayOff: (card: CardType, meld: Meld, jokerPosition?: 'low' | 'high') => void
   onSwapJoker: (naturalCard: CardType, meld: Meld) => void
   onClose: () => void
   errorMsg?: string | null
@@ -31,6 +31,7 @@ export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, 
   const [mode, setMode] = useState<Mode>(preLayDown ? 'swap' : 'layoff')
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
   const [selectedMeldId, setSelectedMeldId] = useState<string | null>(null)
+  const [jokerLayOffPos, setJokerLayOffPos] = useState<'low' | 'high' | null>(null)
 
   const selectedCard = hand.find(c => c.id === selectedCardId) ?? null
   const selectedMeld = tablesMelds.find(m => m.id === selectedMeldId) ?? null
@@ -41,16 +42,19 @@ export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, 
   function handleCardClick(cardId: string) {
     setSelectedCardId(prev => prev === cardId ? null : cardId)
     setSelectedMeldId(null)
+    setJokerLayOffPos(null)
   }
 
   function handleMeldClick(meld: Meld) {
     setSelectedMeldId(prev => prev === meld.id ? null : meld.id)
+    setJokerLayOffPos(null)
   }
 
   function handleModeChange(m: Mode) {
     setMode(m)
     setSelectedCardId(null)
     setSelectedMeldId(null)
+    setJokerLayOffPos(null)
   }
 
   // Smart meld sorting: when a card is selected, bubble valid targets to the top
@@ -78,6 +82,24 @@ export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, 
   // Joker swap targets: only runs (sets excluded per house rules)
   const swapRunMeldIds = new Set(tablesMelds.filter(m => m.type === 'run' && m.jokerMappings.length > 0).map(m => m.id))
 
+  // Joker placement ambiguity (lay-off mode only)
+  const isJokerLayOff = mode === 'layoff' && selectedCard?.suit === 'joker' && selectedMeld?.type === 'run'
+  const jokerCanLow = isJokerLayOff && (selectedMeld!.runMin ?? 1) > 1
+  const jokerCanHigh = isJokerLayOff && (selectedMeld!.runMax ?? 13) < 14
+  const needsJokerPicker = jokerCanLow && jokerCanHigh
+  // When only one end available, auto-resolve without requiring a picker choice
+  const effectiveJokerPos: 'low' | 'high' | undefined = isJokerLayOff
+    ? (needsJokerPicker ? jokerLayOffPos ?? undefined : (jokerCanLow ? 'low' : 'high'))
+    : undefined
+
+  // Rank display helpers for picker
+  function rankLabel(rank: number): string {
+    if (rank === 1 || rank === 14) return 'A'
+    if (rank === 11) return 'J'; if (rank === 12) return 'Q'; if (rank === 13) return 'K'
+    return String(rank)
+  }
+  const suitSymbol: Record<string, string> = { hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠' }
+
   // Validation
   let isValid = false
   let validationMessage = ''
@@ -89,6 +111,12 @@ export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, 
         ? 'Valid lay off ✓'
         : 'This card cannot be laid off on that meld'
 
+      // Joker picker: must choose position before confirming
+      if (isValid && needsJokerPicker && !jokerLayOffPos) {
+        isValid = false
+        validationMessage = ''  // picker is shown instead
+      }
+
       // Pre-validate: would this lay-off leave exactly 1 card that can't be played?
       if (isValid) {
         const handAfter = hand.filter(c => c.id !== selectedCard.id)
@@ -96,7 +124,7 @@ export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, 
           const remaining = handAfter[0]
           // Check against SIMULATED updated melds (after the lay-off extends the target meld)
           const simulatedMelds = tablesMelds.map(m =>
-            m.id === selectedMeld.id ? simulateLayOff(selectedCard, m) : m
+            m.id === selectedMeld.id ? simulateLayOff(selectedCard, m, effectiveJokerPos) : m
           )
           const canRemainPlay = simulatedMelds.some(m => canLayOff(remaining, m))
           if (!canRemainPlay) {
@@ -133,7 +161,7 @@ export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, 
   function handleConfirm() {
     if (!selectedCard || !selectedMeld || !isValid) return
     if (mode === 'layoff') {
-      onLayOff(selectedCard, selectedMeld)
+      onLayOff(selectedCard, selectedMeld, effectiveJokerPos)
     } else if (preLayDown && onPreLayDownSwap) {
       onPreLayDownSwap(selectedCard, selectedMeld)
       return // parent closes the modal
@@ -262,6 +290,35 @@ export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, 
                   layOffCard={mode === 'layoff' ? selectedCard : null}
                 />
               )}
+            </div>
+          )}
+
+          {/* Joker placement picker */}
+          {needsJokerPicker && selectedCard && selectedMeld && (
+            <div>
+              <p className="text-xs text-[#8b7355] mb-1.5 font-medium">Where does this joker go?</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setJokerLayOffPos('low')}
+                  className={`flex-1 py-2.5 px-3 rounded-xl text-sm font-semibold border-2 transition-all ${
+                    jokerLayOffPos === 'low'
+                      ? 'border-[#e2b858] bg-[#fdf8ec] text-[#8b6914]'
+                      : 'border-[#e2ddd2] bg-white text-[#8b7355]'
+                  }`}
+                >
+                  ← JKR, {rankLabel(selectedMeld.runMin!)}{suitSymbol[selectedMeld.runSuit!] ?? ''}, …
+                </button>
+                <button
+                  onClick={() => setJokerLayOffPos('high')}
+                  className={`flex-1 py-2.5 px-3 rounded-xl text-sm font-semibold border-2 transition-all ${
+                    jokerLayOffPos === 'high'
+                      ? 'border-[#e2b858] bg-[#fdf8ec] text-[#8b6914]'
+                      : 'border-[#e2ddd2] bg-white text-[#8b7355]'
+                  }`}
+                >
+                  …, {rankLabel(selectedMeld.runMax!)}{suitSymbol[selectedMeld.runSuit!] ?? ''}, JKR →
+                </button>
+              </div>
             </div>
           )}
 
