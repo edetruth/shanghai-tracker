@@ -1030,88 +1030,48 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
 
   // ── Main board: draw / action / buying ────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#1a3a2a] flex flex-col">
-      {/* Top bar */}
+    <div
+      className="bg-[#1a3a2a] flex flex-col overflow-hidden"
+      style={{ height: '100dvh' }}
+    >
+      {/* ── ZONE 1: Fixed Header — never moves ─────────────────────────── */}
       <div
-        className="bg-[#0f2218] border-b border-[#2d5a3c] px-4 py-2 flex items-center justify-between"
+        className="flex-shrink-0 bg-[#0f2218] border-b border-[#2d5a3c]"
         style={{ paddingTop: 'max(8px, env(safe-area-inset-top))' }}
       >
-        <div>
-          <p className="text-xs text-[#6aad7a]">Round {gameState.currentRound} of {TOTAL_ROUNDS} · {rs.requirement.description}</p>
-          <p className="text-sm font-bold text-white">
-            {uiPhase === 'buying' ? (
-              isHumanBuyerTurn
-                ? `${activeBuyer?.name} — Buy decision`
-                : `${activeBuyer?.name ?? '...'} deciding...`
-            ) : (
-              <>
-                {currentPlayer.name}'s turn
-                {currentPlayer.isAI && <span className="ml-1 text-xs font-normal text-[#6aad7a]">(AI)</span>}
-              </>
-            )}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-[#a8d0a8] bg-[#1e4a2e] px-2 py-1 rounded-full">
-            {currentPlayer.buysRemaining}/{MAX_BUYS} buys
-          </span>
-          <button
-            onClick={() => setShowPauseModal(true)}
-            aria-label="Pause game"
-            className="w-10 h-10 flex items-center justify-center rounded-xl bg-[#1e4a2e] text-[#a8d0a8] active:bg-[#2d5a3c]"
-          >
-            <Pause size={18} />
-          </button>
-        </div>
-      </div>
-
-      {/* Toast messages */}
-      {reshuffleMsg && (
-        <div className="bg-[#e2b858] px-4 py-2 text-center text-sm font-medium text-[#2c1810]">
-          Draw pile reshuffled from discards
-        </div>
-      )}
-      {aiMessage && (
-        <div className="bg-[#1e4a2e] px-4 py-2 text-center text-sm text-[#a8d0a8] animate-pulse">
-          {aiMessage}
-        </div>
-      )}
-
-      {/* Human buy banner (slim, pinned at top when human needs to decide) */}
-      {isHumanBuyerTurn && buyingDiscard && (
-        <div className="bg-[#fffbee] border-b-2 border-[#e2b858] px-4 py-3">
-          <div className="flex items-center gap-3">
-            <div className="flex-shrink-0 scale-90 origin-left">
-              <CardComponent card={buyingDiscard} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-[#2c1810]">{activeBuyer?.name} — Buy this card?</p>
-              <p className="text-[10px] text-[#8b7355]">+ 1 penalty card · {activeBuyer?.buysRemaining}/{MAX_BUYS} buys left</p>
-            </div>
-            <div className="flex gap-2 flex-shrink-0">
-              <button
-                onClick={() => handleBuyDecision(false)}
-                className="bg-[#efe9dd] text-[#8b7355] font-semibold rounded-lg px-3 py-2 text-sm active:opacity-80"
-              >
-                Pass
-              </button>
-              <button
-                onClick={() => handleBuyDecision(true)}
-                disabled={!activeBuyer || activeBuyer.buysRemaining <= 0}
-                className="bg-[#e2b858] text-[#2c1810] font-semibold rounded-lg px-3 py-2 text-sm active:opacity-80 disabled:opacity-40"
-              >
-                Buy
-              </button>
-            </div>
+        {/* Top bar: round info, turn indicator, buys, pause */}
+        <div className="px-4 py-2 flex items-center justify-between">
+          <div>
+            <p className="text-xs text-[#6aad7a]">Round {gameState.currentRound} of {TOTAL_ROUNDS} · {rs.requirement.description}</p>
+            <p className="text-sm font-bold text-white">
+              {uiPhase === 'buying' ? (
+                isHumanBuyerTurn
+                  ? `${activeBuyer?.name} — Buy decision`
+                  : `${activeBuyer?.name ?? '...'} deciding...`
+              ) : (
+                <>
+                  {currentPlayer.name}'s turn
+                  {currentPlayer.isAI && <span className="ml-1 text-xs font-normal text-[#6aad7a]">(AI)</span>}
+                </>
+              )}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[#a8d0a8] bg-[#1e4a2e] px-2 py-1 rounded-full">
+              {currentPlayer.buysRemaining}/{MAX_BUYS} buys
+            </span>
+            <button
+              onClick={() => setShowPauseModal(true)}
+              aria-label="Pause game"
+              className="w-10 h-10 flex items-center justify-center rounded-xl bg-[#1e4a2e] text-[#a8d0a8] active:bg-[#2d5a3c]"
+            >
+              <Pause size={18} />
+            </button>
           </div>
         </div>
-      )}
 
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4 pb-44">
-
-        {/* Player cards mini-bar with card counts */}
-        <div className="flex gap-1.5 overflow-x-auto pb-1">
+        {/* Player cards mini-bar */}
+        <div className="flex gap-1.5 overflow-x-auto pb-2 px-4">
           {gameState.players.map(p => {
             const total = p.roundScores.reduce((s, n) => s + n, 0)
             const isCurrent = p.id === currentPlayer.id
@@ -1153,10 +1113,26 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
           })}
         </div>
 
+        {/* Toast messages — live in Zone 1 so Zone 2 is unaffected */}
+        {reshuffleMsg && (
+          <div className="bg-[#e2b858] px-4 py-2 text-center text-sm font-medium text-[#2c1810]">
+            Draw pile reshuffled from discards
+          </div>
+        )}
+        {aiMessage && (
+          <div className="bg-[#1e4a2e] px-4 py-2 text-center text-sm text-[#a8d0a8] animate-pulse">
+            {aiMessage}
+          </div>
+        )}
+      </div>
+
+      {/* ── ZONE 2: Scrollable Middle — table content only ──────────────── */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-4">
+
         {/* Table melds */}
         <TableMelds melds={rs.tablesMelds} />
 
-        {/* Draw / discard area — visible for the current player's draw phase */}
+        {/* Draw / discard area */}
         {(uiPhase === 'draw' || uiPhase === 'action' || (uiPhase === 'buying' && !isHumanBuyerTurn)) && (
           <div>
             <p className="text-xs font-semibold text-[#6aad7a] uppercase tracking-wider mb-2">
@@ -1221,6 +1197,42 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
             </div>
           </div>
         )}
+      </div>
+
+      {/* ── ZONE 3: Fixed Hand + Actions — never moves ──────────────────── */}
+      <div
+        className="flex-shrink-0 bg-[#0f2218] border-t border-[#2d5a3c] px-4 pt-3"
+        style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}
+      >
+        {/* Human buy banner — pinned above hand when it's human's buy turn */}
+        {isHumanBuyerTurn && buyingDiscard && (
+          <div className="bg-[#fffbee] border border-[#e2b858] rounded-xl px-3 py-2 mb-3">
+            <div className="flex items-center gap-3">
+              <div className="flex-shrink-0 scale-90 origin-left">
+                <CardComponent card={buyingDiscard} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-[#2c1810]">{activeBuyer?.name} — Buy this card?</p>
+                <p className="text-[10px] text-[#8b7355]">+ 1 penalty card · {activeBuyer?.buysRemaining}/{MAX_BUYS} buys left</p>
+              </div>
+              <div className="flex gap-2 flex-shrink-0">
+                <button
+                  onClick={() => handleBuyDecision(false)}
+                  className="bg-[#efe9dd] text-[#8b7355] font-semibold rounded-lg px-3 py-2 text-sm active:opacity-80"
+                >
+                  Pass
+                </button>
+                <button
+                  onClick={() => handleBuyDecision(true)}
+                  disabled={!activeBuyer || activeBuyer.buysRemaining <= 0}
+                  className="bg-[#e2b858] text-[#2c1810] font-semibold rounded-lg px-3 py-2 text-sm active:opacity-80 disabled:opacity-40"
+                >
+                  Buy
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Player hand */}
         {!displayPlayer.isAI ? (
@@ -1249,10 +1261,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
             newCardIds={new Set()}
           />
         ) : null}
-      </div>
 
-      {/* Fixed action bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-[#0f2218] border-t border-[#2d5a3c] px-4 pt-3 pb-8 safe-bottom">
+        {/* Draw phase instructions */}
         {uiPhase === 'draw' && !currentPlayer.isAI && (
           <p className="text-center text-sm text-[#6aad7a] py-1">
             Tap the draw pile or discard card above
@@ -1261,7 +1271,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
 
         {/* Undo toast */}
         {pendingUndo && (
-          <div className="flex items-center justify-between bg-[#2c1810] text-white rounded-xl px-4 py-3">
+          <div className="flex items-center justify-between bg-[#2c1810] text-white rounded-xl px-4 py-3 mt-2">
             <span className="text-sm">Discarded {pendingUndo.card.rank === 0 ? 'Joker' : rankLabel(pendingUndo.card)}</span>
             <button
               onClick={handleUndoDiscard}
@@ -1273,7 +1283,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
         )}
 
         {uiPhase === 'action' && !currentPlayer.isAI && !pendingUndo && (
-          <div className="space-y-2">
+          <div className="space-y-2 mt-2">
             <div className="flex gap-2">
               {!currentPlayer.hasLaidDown && (
                 <button
@@ -1286,7 +1296,11 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
               {currentPlayer.hasLaidDown ? (
                 <button
                   onClick={() => { setNewCardIds(new Set()); setShowLayOffModal(true) }}
-                  className="bg-[#2d5a3c] text-[#a8d0a8] font-semibold border border-[#3d7a4c] rounded-xl flex-1 text-sm py-2.5 active:opacity-80"
+                  className={`font-semibold border rounded-xl flex-1 text-sm py-2.5 active:opacity-80 ${
+                    selectedCardIds.size > 0
+                      ? 'bg-[#3d7a4c] text-white border-[#4d9a5c]'
+                      : 'bg-[#2d5a3c] text-[#a8d0a8] border-[#3d7a4c]'
+                  }`}
                 >
                   Lay Off / Swap
                 </button>
@@ -1328,14 +1342,14 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
           </div>
         )}
 
-        {/* AI turn indicator in action bar */}
+        {/* AI turn indicator */}
         {(uiPhase === 'draw' || uiPhase === 'action') && currentPlayer.isAI && !aiMessage && (
           <p className="text-center text-sm text-[#6aad7a] py-1 animate-pulse">
             {currentPlayer.name} is playing...
           </p>
         )}
 
-        {/* Buying phase — AI deciding (non-banner) */}
+        {/* Buying phase — AI deciding */}
         {uiPhase === 'buying' && !isHumanBuyerTurn && activeBuyer?.isAI && !aiMessage && (
           <p className="text-center text-sm text-[#6aad7a] py-1 animate-pulse">
             {activeBuyer.name} deciding on buy...

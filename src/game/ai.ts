@@ -112,6 +112,8 @@ export function aiFindBestMelds(hand: Card[], requirement: RoundRequirement): Ca
 }
 
 // Should AI take the top discard card?
+// Conservative: only take if it directly enables melds, makes a set, or is adjacent to a committed run.
+// Expected ratio: ~60-70% draw from pile, 30-40% take discard — so the buy window opens regularly.
 export function aiShouldTakeDiscard(
   hand: Card[],
   discardCard: Card,
@@ -121,33 +123,24 @@ export function aiShouldTakeDiscard(
   if (isJoker(discardCard)) return true
   if (hasLaidDown) return false
 
-  // Taking it enables melds we couldn't make before
-  const withCard = aiFindBestMelds([...hand, discardCard], requirement)
-  if (withCard !== null && aiFindBestMelds(hand, requirement) === null) return true
+  // Taking it enables required melds we couldn't form without it
+  if (aiFindBestMelds([...hand, discardCard], requirement) !== null &&
+      aiFindBestMelds(hand, requirement) === null) return true
 
-  // Run-heavy round: be more aggressive about same-suit cards
-  const isRunHeavy = requirement.runs > requirement.sets
-  if (isRunHeavy) {
-    const sameSuit = hand.filter(c => !isJoker(c) && c.suit === discardCard.suit)
-    if (sameSuit.length >= 2) {
-      const allRanks = [...sameSuit.map(c => c.rank), discardCard.rank].sort((a, b) => a - b)
-      // Check if new card fills a gap or extends the sequence
-      for (let i = 1; i < allRanks.length; i++) {
-        if (allRanks[i] - allRanks[i - 1] <= 2) return true
-      }
-    }
-    return false
-  }
-
-  // Set-heavy round: pairs with 2+ same-rank cards → makes a set
+  // Card makes a set: hand already holds 2+ of same rank → adding this gives 3+
   const sameRank = hand.filter(c => !isJoker(c) && c.rank === discardCard.rank).length
   if (sameRank >= 2) return true
 
-  // Extends an existing suit sequence
-  const sameSuit = hand.filter(c => !isJoker(c) && c.suit === discardCard.suit)
-  if (sameSuit.length >= 2) {
-    const close = sameSuit.filter(c => Math.abs(c.rank - discardCard.rank) <= 2)
-    if (close.length >= 2) return true
+  // Card is directly adjacent (rank ±1) to a same-suit card in a committed run suit.
+  // Only check the top-2 committed suits to avoid greedily hoarding every suit.
+  const committedSuits = getCommittedSuits(hand, 2)
+  if (committedSuits.has(discardCard.suit)) {
+    const sameSuit = hand.filter(c => !isJoker(c) && c.suit === discardCard.suit)
+    if (sameSuit.length >= 2) {
+      for (const c of sameSuit) {
+        if (Math.abs(discardCard.rank - c.rank) === 1) return true
+      }
+    }
   }
 
   return false
