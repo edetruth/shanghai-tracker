@@ -131,21 +131,23 @@ export function aiShouldTakeDiscard(
   const sameRank = hand.filter(c => !isJoker(c) && c.rank === discardCard.rank).length
   if (sameRank >= 2) return true
 
-  // Card is directly adjacent (rank ±1) to a same-suit card in a committed run suit.
-  // Only check the top-2 committed suits to avoid greedily hoarding every suit.
-  const committedSuits = getCommittedSuits(hand, 2)
+  // For rounds with run requirements, commit to enough suits to cover ALL runs needed.
+  // Round 7 (3 runs) must consider 3+ suits, not just 2.
+  const hasRunReq = requirement.runs >= 1
+  const commitN = hasRunReq ? Math.min(requirement.runs + 1, 3) : 2
+  const committedSuits = getCommittedSuits(hand, commitN)
+
   if (committedSuits.has(discardCard.suit)) {
     const sameSuit = hand.filter(c => !isJoker(c) && c.suit === discardCard.suit)
-    const isRunHeavy = requirement.runs > requirement.sets
-    if (isRunHeavy) {
-      // Run-heavy rounds: take within ±2 gap even with just 1 existing same-suit card
+    if (hasRunReq) {
+      // Any round with a run requirement: take within ±2 gap with 1+ same-suit card
       if (sameSuit.length >= 1) {
         for (const c of sameSuit) {
           if (Math.abs(discardCard.rank - c.rank) <= 2) return true
         }
       }
     } else {
-      // Set-heavy rounds: only take if directly adjacent and already have 2 same-suit
+      // Pure set rounds: only take if directly adjacent and have 2+ same-suit
       if (sameSuit.length >= 2) {
         for (const c of sameSuit) {
           if (Math.abs(discardCard.rank - c.rank) === 1) return true
@@ -154,6 +156,22 @@ export function aiShouldTakeDiscard(
     }
   }
 
+  return false
+}
+
+// Easy AI: take discard when it completes a set or extends a strong run sequence.
+// Stricter than medium (weaker player), but not passive like the old aiFindBestMelds gate.
+export function aiShouldTakeDiscardEasy(hand: Card[], discardCard: Card, requirement: RoundRequirement): boolean {
+  if (isJoker(discardCard)) return true
+  const nonJokers = hand.filter(c => !isJoker(c))
+  // Take if it would complete a set: already hold 2 of same rank
+  const sameRank = nonJokers.filter(c => c.rank === discardCard.rank).length
+  if (sameRank >= 2) return true
+  // In run rounds: take if same-suit directly adjacent (±1) and already have 2+ of that suit
+  if (requirement.runs >= 1) {
+    const sameSuit = nonJokers.filter(c => c.suit === discardCard.suit)
+    if (sameSuit.length >= 2 && sameSuit.some(c => Math.abs(c.rank - discardCard.rank) <= 1)) return true
+  }
   return false
 }
 
@@ -172,10 +190,10 @@ export function aiChooseDiscard(hand: Card[], requirement?: RoundRequirement, ta
     ? (nonJokerHand.length > 0 ? nonJokerHand : hand)
     : hand
 
-  const isRunHeavy = requirement && requirement.runs > requirement.sets
+  const hasRunReq = requirement && requirement.runs >= 1
 
-  if (isRunHeavy) {
-    return aiChooseDiscardForRuns(candidateHand)
+  if (hasRunReq) {
+    return aiChooseDiscardForRuns(candidateHand, requirement.runs)
   }
 
   function utility(card: Card): number {
@@ -189,11 +207,12 @@ export function aiChooseDiscard(hand: Card[], requirement?: RoundRequirement, ta
   return candidateHand.reduce((worst, card) => utility(card) < utility(worst) ? card : worst)
 }
 
-// Discard strategy for run-heavy rounds: dump cards from non-committed suits
-function aiChooseDiscardForRuns(hand: Card[]): Card {
+// Discard strategy for rounds with run requirements: dump cards from non-committed suits.
+// runsNeeded: how many runs the round requires (determines how many suits to commit to).
+function aiChooseDiscardForRuns(hand: Card[], runsNeeded: number): Card {
   if (hand.length === 0) throw new Error('Empty hand')
 
-  const committedSuits = getCommittedSuits(hand, 2)
+  const committedSuits = getCommittedSuits(hand, Math.min(runsNeeded + 1, 3))
 
   // Find non-committed non-joker cards
   const nonCommitted = hand.filter(c => !isJoker(c) && !committedSuits.has(c.suit))
@@ -220,13 +239,13 @@ export function aiShouldBuy(hand: Card[], discardCard: Card, requirement: RoundR
   const without = aiFindBestMelds(hand, requirement)
   if (withCard !== null && without === null) return true
 
-  // For run rounds, also buy if the card fits a committed suit
-  const isRunHeavy = requirement.runs > requirement.sets
-  if (isRunHeavy) {
-    const committedSuits = getCommittedSuits(hand, 2)
+  // For rounds with run requirements, buy if card fits a committed run suit
+  if (requirement.runs >= 1) {
+    const commitN = Math.min(requirement.runs + 1, 3)
+    const committedSuits = getCommittedSuits(hand, commitN)
     if (committedSuits.has(discardCard.suit)) {
       const sameSuit = hand.filter(c => !isJoker(c) && c.suit === discardCard.suit)
-      if (sameSuit.length >= 2) {
+      if (sameSuit.length >= 1) {
         const close = sameSuit.filter(c => Math.abs(c.rank - discardCard.rank) <= 2)
         if (close.length >= 1) return true
       }
@@ -234,6 +253,20 @@ export function aiShouldBuy(hand: Card[], discardCard: Card, requirement: RoundR
   }
 
   return false
+}
+
+// Easy AI: buy if card would complete a set (2 already in hand) or enables required melds.
+// Still conservative: only buy if buysRemaining >= 3 (≤2 buys used so far).
+export function aiShouldBuyEasy(hand: Card[], discardCard: Card, requirement: RoundRequirement, buysRemaining: number): boolean {
+  if (buysRemaining < 3) return false
+  if (isJoker(discardCard)) return true
+  const nonJokers = hand.filter(c => !isJoker(c))
+  // Buy if it completes a set (already hold 2 of same rank)
+  const sameRank = nonJokers.filter(c => c.rank === discardCard.rank).length
+  if (sameRank >= 2) return true
+  // Fallback: buy if it directly unlocks the full required meld combination
+  return aiFindBestMelds([...hand, discardCard], requirement) !== null &&
+         aiFindBestMelds(hand, requirement) === null
 }
 
 // Check whether any valid meld (set or run) can be formed from the given cards
@@ -406,8 +439,10 @@ export function aiChooseDiscardHard(hand: Card[], tablesMelds: Meld[] = []): Car
   return candidateHand.reduce((worst, card) => utility(card) < utility(worst) ? card : worst)
 }
 
-// Hard mode: more aggressive buying — buy on any pair or run potential
-export function aiShouldBuyHard(hand: Card[], discardCard: Card, requirement: RoundRequirement): boolean {
+// Hard mode: smarter buying — buys on any pair or run potential, but self-limits to 3/round
+// buysRemaining counts down from MAX_BUYS (5); if ≤ 2, hard AI has already used 3 buys.
+export function aiShouldBuyHard(hand: Card[], discardCard: Card, requirement: RoundRequirement, buysRemaining: number): boolean {
+  if (buysRemaining <= 2) return false  // self-limit: max 3 buys per round
   if (isJoker(discardCard)) return true
   const withCard = aiFindBestMelds([...hand, discardCard], requirement)
   const without = aiFindBestMelds(hand, requirement)
@@ -422,17 +457,28 @@ export function aiShouldBuyHard(hand: Card[], discardCard: Card, requirement: Ro
   return false
 }
 
-// Easy mode: random/naive play — never buys, never takes discard, discards highest-value
+// Easy mode: discard a random isolated card (not clearly part of any meld), or highest-value if none.
+// This feels human-like and weaker than medium's strategic discard.
 export function aiChooseDiscardEasy(hand: Card[]): Card {
   if (hand.length === 0) throw new Error('Empty hand')
-  // Discard highest-value non-joker
   const nonJokers = hand.filter(c => !isJoker(c))
   if (nonJokers.length === 0) return hand[0]
+
+  // "Isolated" = no same-rank partner AND no adjacent same-suit card within ±1
+  const isolated = nonJokers.filter(card => {
+    const sameRank = nonJokers.filter(c => c.id !== card.id && c.rank === card.rank)
+    const adjacent = nonJokers.filter(c => c.id !== card.id && c.suit === card.suit && Math.abs(c.rank - card.rank) <= 1)
+    return sameRank.length === 0 && adjacent.length === 0
+  })
+
+  if (isolated.length > 0) {
+    return isolated[Math.floor(Math.random() * isolated.length)]
+  }
+  // All cards have some potential — discard highest value
   return nonJokers.reduce((max, c) => cardPoints(c.rank) > cardPoints(max.rank) ? c : max)
 }
 
-export function aiShouldTakeDiscardEasy(): boolean { return false }
-export function aiShouldBuyEasy(): boolean { return false }
+// (aiShouldTakeDiscardEasy and aiShouldBuyEasy are defined above)
 
 // Find a natural card in hand that can be swapped with a joker on the table
 export function aiFindJokerSwap(hand: Card[], tablesMelds: Meld[]): { card: Card; meld: Meld } | null {

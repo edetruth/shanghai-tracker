@@ -190,10 +190,27 @@ describe('aiChooseDiscard', () => {
 })
 
 describe('aiChooseDiscardEasy', () => {
-  it('discards the highest-value non-joker card', () => {
-    const hand = [c('hearts', 5), c('diamonds', 1), c('clubs', 3), joker()] // ace = 20 pts
+  it('discards a non-joker card (random from isolated cards)', () => {
+    const hand = [c('hearts', 5), c('diamonds', 1), c('clubs', 3), joker()]
     const discard = aiChooseDiscardEasy(hand)
-    expect(discard.rank).toBe(1) // ace
+    expect(discard.suit).not.toBe('joker')
+    expect([1, 3, 5]).toContain(discard.rank)
+  })
+
+  it('falls back to highest-value card when all cards are connected', () => {
+    // hearts 5,6,7 are all adjacent same-suit → not isolated; clubs 3 has no partner
+    // Actually: 5 is adjacent to 6, 6 adjacent to 5&7, 7 adjacent to 6 → all non-isolated
+    // clubs 3 has no adjacent same-suit → isolated
+    const hand = [c('hearts', 5), c('hearts', 6), c('hearts', 7), c('clubs', 3)]
+    const discard = aiChooseDiscardEasy(hand)
+    expect(discard.rank).toBe(3) // only isolated card
+  })
+
+  it('falls back to highest value when no isolated cards exist', () => {
+    // Two pairs: hearts 5&6 adjacent, spades 9&10 adjacent → nothing isolated
+    const hand = [c('hearts', 5), c('hearts', 6), c('spades', 9), c('spades', 10)]
+    const discard = aiChooseDiscardEasy(hand)
+    expect(discard.rank).toBe(10) // highest value fallback
   })
 })
 

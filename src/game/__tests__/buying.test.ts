@@ -7,8 +7,22 @@ const req1 = ROUND_REQUIREMENTS[0] // 2 sets
 const req3 = ROUND_REQUIREMENTS[2] // 2 runs
 
 describe('aiShouldBuyEasy', () => {
-  it('always returns false', () => {
-    expect(aiShouldBuyEasy()).toBe(false)
+  it('returns false when buys remaining < 3', () => {
+    const hand = [c('hearts', 7), c('diamonds', 7), c('clubs', 5)]
+    const discard = c('spades', 7)
+    expect(aiShouldBuyEasy(hand, discard, req1, 2)).toBe(false)
+  })
+
+  it('buys when card enables required meld and enough buys remain', () => {
+    const hand = [c('hearts', 7), c('diamonds', 7), c('clubs', 7), c('hearts', 9), c('diamonds', 9)]
+    const discard = c('spades', 9) // completes the 2nd set
+    expect(aiShouldBuyEasy(hand, discard, req1, 5)).toBe(true)
+  })
+
+  it('does not buy if hand can already form required melds', () => {
+    const hand = [c('hearts', 7), c('diamonds', 7), c('clubs', 7), c('hearts', 8), c('diamonds', 8), c('clubs', 8)]
+    const discard = c('spades', 2)
+    expect(aiShouldBuyEasy(hand, discard, req1, 5)).toBe(false)
   })
 })
 
@@ -41,20 +55,26 @@ describe('aiShouldBuy (medium)', () => {
 })
 
 describe('aiShouldBuyHard', () => {
-  it('always buys a joker', () => {
+  it('always buys a joker (if buys remain)', () => {
     const hand = [c('hearts', 5), c('diamonds', 5)]
-    expect(aiShouldBuyHard(hand, joker(), req1)).toBe(true)
+    expect(aiShouldBuyHard(hand, joker(), req1, 5)).toBe(true)
   })
 
   it('buys a card if it pairs with any existing card (more aggressive)', () => {
     const hand = [c('hearts', 9), c('clubs', 3), c('diamonds', 7)]
     const discard = c('spades', 9) // pairs with 9♥
-    expect(aiShouldBuyHard(hand, discard, req1)).toBe(true)
+    expect(aiShouldBuyHard(hand, discard, req1, 5)).toBe(true)
   })
 
   it('buys if discard is close to same-suit cards', () => {
     const hand = [c('hearts', 5), c('hearts', 6), c('hearts', 7), c('clubs', 3)]
     const discard = c('hearts', 8)
-    expect(aiShouldBuyHard(hand, discard, req3)).toBe(true)
+    expect(aiShouldBuyHard(hand, discard, req3, 5)).toBe(true)
+  })
+
+  it('does not buy when 3+ buys already used (buysRemaining <= 2)', () => {
+    const hand = [c('hearts', 9), c('clubs', 3), c('diamonds', 7)]
+    const discard = c('spades', 9)
+    expect(aiShouldBuyHard(hand, discard, req1, 2)).toBe(false)
   })
 })

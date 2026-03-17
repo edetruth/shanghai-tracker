@@ -11,9 +11,10 @@ import { buildMeld, isValidSet, findSwappableJoker, simulateLayOff, canGoOutViaC
 import { scoreRound, calculateHandScore } from '../game/scoring'
 import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, MAX_BUYS } from '../game/rules'
 import {
-  aiFindBestMelds, aiFindAllMelds, aiShouldTakeDiscard, aiChooseDiscard, aiChooseDiscardHard,
-  aiChooseDiscardEasy, aiShouldBuy, aiShouldBuyHard, aiFindLayOff, aiFindJokerSwap,
-  aiFindPreLayDownJokerSwap,
+  aiFindBestMelds, aiFindAllMelds, aiShouldTakeDiscard, aiShouldTakeDiscardEasy,
+  aiChooseDiscard, aiChooseDiscardHard, aiChooseDiscardEasy,
+  aiShouldBuy, aiShouldBuyEasy, aiShouldBuyHard,
+  aiFindLayOff, aiFindJokerSwap, aiFindPreLayDownJokerSwap,
 } from '../game/ai'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -354,9 +355,11 @@ function simProcessBuying(
     buyStats[buyer.id].offered++
 
     const shouldBuy =
-      difficulty === 'easy' ? false
-      : difficulty === 'hard' ? aiShouldBuyHard(buyer.hand, discardCard, current.roundState.requirement)
-      : aiShouldBuy(buyer.hand, discardCard, current.roundState.requirement)
+      difficulty === 'easy'
+        ? aiShouldBuyEasy(buyer.hand, discardCard, current.roundState.requirement, buyer.buysRemaining)
+        : difficulty === 'hard'
+          ? aiShouldBuyHard(buyer.hand, discardCard, current.roundState.requirement, buyer.buysRemaining)
+          : aiShouldBuy(buyer.hand, discardCard, current.roundState.requirement)
 
     if (shouldBuy) {
       buyStats[buyer.id].bought++
@@ -382,6 +385,7 @@ interface ActionResult {
   meldsCount?: number
   cardsLaidOff?: number
   swapped?: boolean
+  isJokerLayOff?: boolean
 }
 
 function simExecuteAIAction(
@@ -394,13 +398,25 @@ function simExecuteAIAction(
   const isHard = difficulty === 'hard'
   const isEasy = difficulty === 'easy'
 
-  // Easy AI: only required melds, discard highest value
+  // Easy AI: lay down when possible, 1 lay-off per turn, random-ish discard
   if (isEasy) {
     if (!player.hasLaidDown) {
       const melds = aiFindBestMelds(player.hand, requirement)
       if (melds && melds.length > 0) {
         const newState = simMeld(state, melds)
         return { state: newState, action: 'meld', meldsCount: melds.length }
+      }
+    }
+    // Easy: 1 lay-off per turn (jokers exempt from cap)
+    const hasJoker = player.hand.some(c => c.suit === 'joker')
+    if (player.hasLaidDown && tablesMelds.length > 0 && (!layOffDoneThisTurn || hasJoker)) {
+      const layOff = aiFindLayOff(player.hand, tablesMelds)
+      if (layOff) {
+        const newState = simLayOff(state, layOff.card, layOff.meld, layOff.jokerPosition)
+        if (newState) {
+          const isJokerLayOff = layOff.card.suit === 'joker'
+          return { state: newState, action: 'layoff', cardsLaidOff: 1, isJokerLayOff }
+        }
       }
     }
     const card = aiChooseDiscardEasy(player.hand)
@@ -444,18 +460,21 @@ function simExecuteAIAction(
     }
   }
 
-  // Try to lay off (Medium: max 1 per turn unless going out; Hard: unlimited)
-  if (player.hasLaidDown && tablesMelds.length > 0 && (isHard || !layOffDoneThisTurn || player.hand.length === 1)) {
+  // Try to lay off (Medium: max 2 per turn; Hard: unlimited; jokers always exempt from cap)
+  const hasJokerInHand = player.hand.some(c => c.suit === 'joker')
+  if (player.hasLaidDown && tablesMelds.length > 0 &&
+      (isHard || !layOffDoneThisTurn || player.hand.length === 1 || hasJokerInHand)) {
     const layOff = aiFindLayOff(player.hand, tablesMelds)
     if (layOff) {
       const newState = simLayOff(state, layOff.card, layOff.meld, layOff.jokerPosition)
       if (newState) {
+        const isJokerLayOff = layOff.card.suit === 'joker'
         if (isHard && !newState.roundState.goOutPlayerId) {
           // Hard AI: keep laying off until can't
           const next = simExecuteAIAction(newState, difficulty, true)
-          return { ...next, cardsLaidOff: (next.cardsLaidOff ?? 0) + 1 }
+          return { ...next, cardsLaidOff: (next.cardsLaidOff ?? 0) + 1, isJokerLayOff: isJokerLayOff || next.isJokerLayOff }
         }
-        return { state: newState, action: 'layoff', cardsLaidOff: 1 }
+        return { state: newState, action: 'layoff', cardsLaidOff: 1, isJokerLayOff }
       }
     }
   }
@@ -531,9 +550,11 @@ export function simulateRound(gameState: GameState, difficulty: AIDifficulty): {
 
     // ── DRAW PHASE ──────────────────────────────────────────────────────────
     const topDiscard = state.roundState.discardPile[state.roundState.discardPile.length - 1] ?? null
-    const shouldTake = topDiscard !== null &&
-      difficulty !== 'easy' &&
-      aiShouldTakeDiscard(player.hand, topDiscard, state.roundState.requirement, player.hasLaidDown)
+    const shouldTake = topDiscard !== null && (
+      difficulty === 'easy'
+        ? aiShouldTakeDiscardEasy(player.hand, topDiscard, state.roundState.requirement)
+        : aiShouldTakeDiscard(player.hand, topDiscard, state.roundState.requirement, player.hasLaidDown)
+    )
 
     if (shouldTake) {
       statsMap[pid].drewFromDiscard++
@@ -571,13 +592,15 @@ export function simulateRound(gameState: GameState, difficulty: AIDifficulty): {
     // ── ACTION PHASE: loop until player discards, goes out, or is stuck ─────
     // One call to simExecuteAIAction handles ONE step (meld, layoff, or discard).
     // After meld/layoff the player still needs to finish their turn with a discard.
-    let layOffCount = 0  // medium AI: capped at 2 lay-offs per turn
+    // Cap: easy=1 lay-off/turn, medium=2, hard=unlimited. Joker lay-offs never count toward cap.
+    const layOffCap = difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : Infinity
+    let layOffCount = 0
     let turnDone = false
     let actionSteps = 0
 
     while (!turnDone && !state.roundState.goOutPlayerId && actionSteps < 50) {
       actionSteps++
-      const actionResult = simExecuteAIAction(state, difficulty, layOffCount >= 2)
+      const actionResult = simExecuteAIAction(state, difficulty, layOffCount >= layOffCap)
       state = actionResult.state
 
       if (actionResult.swapped) statsMap[pid].jokerSwaps++
@@ -586,12 +609,12 @@ export function simulateRound(gameState: GameState, difficulty: AIDifficulty): {
         case 'meld':
           statsMap[pid].meldsLaidDown += actionResult.meldsCount ?? 0
           if (statsMap[pid].turnLaidDown === 0) statsMap[pid].turnLaidDown = turnCount
-          layOffCount = 0  // can still try lay-off after melding
+          layOffCount = 0  // reset after melding
           break
 
         case 'layoff':
           statsMap[pid].cardsLaidOff += actionResult.cardsLaidOff ?? 1
-          layOffCount++  // medium AI: capped at 2 lay-offs per turn
+          if (!actionResult.isJokerLayOff) layOffCount++  // jokers don't count toward cap
           break
 
         case 'discard':

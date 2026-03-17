@@ -6,8 +6,9 @@ import { createDecks, shuffle, dealHands } from '../../game/deck'
 import { buildMeld, isValidSet, canLayOff, findSwappableJoker, getNextJokerOptions } from '../../game/meld-validator'
 import { scoreRound } from '../../game/scoring'
 import {
-  aiFindBestMelds, aiFindAllMelds, aiShouldTakeDiscard, aiChooseDiscard, aiChooseDiscardHard, aiChooseDiscardEasy,
-  aiShouldBuy, aiShouldBuyHard,
+  aiFindBestMelds, aiFindAllMelds, aiShouldTakeDiscard, aiShouldTakeDiscardEasy,
+  aiChooseDiscard, aiChooseDiscardHard, aiChooseDiscardEasy,
+  aiShouldBuy, aiShouldBuyEasy, aiShouldBuyHard,
   aiFindLayOff, aiFindJokerSwap, aiFindPreLayDownJokerSwap
 } from '../../game/ai'
 import { SUIT_ORDER } from './HandDisplay'
@@ -776,18 +777,32 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
       return positions
     }
 
-    // Easy AI: only lay down required melds (no bonus), never lay off
+    // Easy AI: lay down required melds, 1 lay-off per turn (jokers exempt), then discard
     if (isEasy) {
       if (!player.hasLaidDown) {
         const melds = aiFindBestMelds(player.hand, requirement)
         if (melds && melds.length > 0) {
+          aiLayOffCountRef.current = 0
           setAiMessage(`${player.name} lays down`)
           setTimeout(() => setAiMessage(null), 1200)
           handleMeldConfirm(melds, aiJokerPositions(melds))
           return
         }
       }
-      // Easy: discard highest-value card
+      // Easy: up to 1 lay-off per turn (jokers always exempt)
+      const easyHasJoker = player.hand.some(c => c.suit === 'joker')
+      if (player.hasLaidDown && tablesMelds.length > 0 &&
+          (aiLayOffCountRef.current < 1 || player.hand.length === 1 || easyHasJoker)) {
+        const layOff = aiFindLayOff(player.hand, tablesMelds)
+        if (layOff) {
+          if (layOff.card.suit !== 'joker') aiLayOffCountRef.current++
+          setAiMessage(`${player.name} lays off`)
+          setTimeout(() => setAiMessage(null), 1000)
+          handleLayOff(layOff.card, layOff.meld, layOff.jokerPosition)
+          return
+        }
+      }
+      // Easy: discard a random isolated card
       aiLayOffCountRef.current = 0
       const card = aiChooseDiscardEasy(player.hand)
       setAiMessage(`${player.name} discards`)
@@ -833,11 +848,14 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
       }
     }
 
-    // Try to lay off (Medium: max 1 per turn, EXCEPT the final going-out lay-off; Hard: unlimited)
-    if (player.hasLaidDown && tablesMelds.length > 0 && (isHard || aiLayOffCountRef.current < 2 || player.hand.length === 1)) {
+    // Try to lay off (Easy: max 1/turn; Medium: max 2/turn; Hard: unlimited; jokers always exempt)
+    const layOffCap = isHard ? Infinity : isEasy ? 1 : 2
+    const hasJokerInHand = player.hand.some(c => c.suit === 'joker')
+    if (player.hasLaidDown && tablesMelds.length > 0 &&
+        (aiLayOffCountRef.current < layOffCap || player.hand.length === 1 || hasJokerInHand)) {
       const layOff = aiFindLayOff(player.hand, tablesMelds)
       if (layOff) {
-        aiLayOffCountRef.current++
+        if (layOff.card.suit !== 'joker') aiLayOffCountRef.current++  // jokers don't count toward cap
         setAiMessage(`${player.name} lays off`)
         setTimeout(() => setAiMessage(null), 1000)
         handleLayOff(layOff.card, layOff.meld, layOff.jokerPosition)
@@ -872,8 +890,11 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
         const top = state.roundState.discardPile[state.roundState.discardPile.length - 1] ?? null
 
         const isEasy = aiDifficulty === 'easy'
-        const shouldTake = !isEasy && top !== null &&
-          aiShouldTakeDiscard(player.hand, top, state.roundState.requirement, player.hasLaidDown)
+        const shouldTake = top !== null && (
+          isEasy
+            ? aiShouldTakeDiscardEasy(player.hand, top, state.roundState.requirement)
+            : aiShouldTakeDiscard(player.hand, top, state.roundState.requirement, player.hasLaidDown)
+        )
 
         setAiMessage(shouldTake
           ? `${player.name} takes the discard`
@@ -910,9 +931,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
       }
       const isEasy = aiDifficulty === 'easy'
       const shouldBuy = isEasy
-        ? false
+        ? aiShouldBuyEasy(currentBuyer.hand, disc, req, currentBuyer.buysRemaining)
         : aiDifficulty === 'hard'
-          ? aiShouldBuyHard(currentBuyer.hand, disc, req)
+          ? aiShouldBuyHard(currentBuyer.hand, disc, req, currentBuyer.buysRemaining)
           : aiShouldBuy(currentBuyer.hand, disc, req)
 
       if (shouldBuy) setAiMessage(`${currentBuyer.name} buys!`)
