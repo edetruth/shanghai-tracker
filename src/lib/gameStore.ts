@@ -259,6 +259,35 @@ export async function saveShanghaiEvents(
   await supabase.from('shanghai_events').insert(rows).then(() => {})
 }
 
+// Game telemetry
+export interface GameEvent {
+  round: number
+  turn: number
+  event: string
+  playerName: string
+  card?: string
+  detail?: string
+}
+
+export async function saveGameEvents(
+  gameId: string,
+  events: GameEvent[]
+): Promise<void> {
+  if (!events || events.length === 0) return
+  const rows = events.map(e => ({
+    game_id: gameId,
+    round_number: e.round,
+    turn_number: e.turn,
+    event_type: e.event,
+    player_name: e.playerName,
+    card: e.card ?? null,
+    detail: e.detail ? { detail: e.detail } : null,
+  }))
+  const { error } = await supabase.from('game_events').insert(rows)
+  if (error) console.error('saveGameEvents failed:', error)
+  // Silent fail — telemetry should never break the game
+}
+
 // Stats helpers
 export function computeWinner(scores: GameScore[]): GameScore | null {
   if (!scores.length) return null

@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { CheckCircle, AlertCircle, Loader } from 'lucide-react'
 import type { Player } from '../../game/types'
-import { savePlayedGame } from '../../lib/gameStore'
+import { savePlayedGame, saveGameEvents, type GameEvent } from '../../lib/gameStore'
 import { PLAYER_COLORS } from '../../lib/constants'
 
 interface Props {
   players: Player[]
   buyLimit: number
+  buyLog: GameEvent[]
   onPlayAgain: () => void
   onBack: () => void
 }
@@ -152,7 +153,7 @@ function Avatar({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function GameOver({ players, buyLimit, onPlayAgain, onBack }: Props) {
+export default function GameOver({ players, buyLimit, buyLog, onPlayAgain, onBack }: Props) {
   const [saveStatus, setSaveStatus] = useState<'saving' | 'saved' | 'error'>('saving')
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -162,7 +163,12 @@ export default function GameOver({ players, buyLimit, onPlayAgain, onBack }: Pro
     const playerData = players.map(p => ({ name: p.name, roundScores: p.roundScores }))
     const gameType = players.some(p => p.isAI) ? 'ai' : 'pass-and-play'
     savePlayedGame(playerData, date, gameType, buyLimit)
-      .then(() => setSaveStatus('saved'))
+      .then(async (gameId) => {
+        if (gameId && buyLog.length > 0) {
+          await saveGameEvents(gameId, buyLog)
+        }
+        setSaveStatus('saved')
+      })
       .catch(() => setSaveStatus('error'))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 

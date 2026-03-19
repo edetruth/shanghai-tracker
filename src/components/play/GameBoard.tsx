@@ -51,7 +51,7 @@ interface UndoState {
 interface BuyLogEntry {
   turn: number
   round: number
-  event: 'discard' | 'free_offer' | 'free_taken' | 'free_declined' | 'buy_window_open' | 'buy_offered' | 'bought' | 'passed' | 'window_closed'
+  event: 'discard' | 'free_offer' | 'free_taken' | 'free_declined' | 'buy_window_open' | 'buy_offered' | 'bought' | 'passed' | 'window_closed' | 'went_down' | 'went_out' | 'shanghaied' | 'joker_swap' | 'scenario_b' | 'scenario_c'
   playerName: string
   card: string
   detail?: string
@@ -522,6 +522,12 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     noProgressTurnsRef.current = 0
     drawPileDepletionsRef.current = 0
     const results = scoreRound(state.players, goOutId)
+    state.players.forEach(p => {
+      if (!p.hasLaidDown) {
+        const r = results.find(r => r.playerId === p.id)
+        addBuyLog({ round: state.currentRound, turn: turnCountRef.current, event: 'shanghaied', playerName: p.name, card: '', detail: `score: ${r?.score ?? 0}` })
+      }
+    })
     const players = state.players.map(p => {
       const result = results.find(r => r.playerId === p.id)
       return result ? { ...p, roundScores: [...p.roundScores, result.score] } : p
@@ -539,6 +545,12 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
       score: p.hand.reduce((sum, c) => sum + (c.rank === 0 ? 50 : c.rank === 1 ? 20 : c.rank >= 11 ? 10 : c.rank), 0),
       shanghaied: !p.hasLaidDown,
     }))
+    results.forEach(r => {
+      if (r.shanghaied) {
+        const p = state.players.find(p => p.id === r.playerId)
+        if (p) addBuyLog({ round: state.currentRound, turn: turnCountRef.current, event: 'shanghaied', playerName: p.name, card: '', detail: `score: ${r.score}` })
+      }
+    })
     const players = state.players.map(p => {
       const result = results.find(r => r.playerId === p.id)
       return result ? { ...p, roundScores: [...p.roundScores, result.score] } : p
@@ -583,6 +595,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
 
     // Reset progress counter when a meld happens
     noProgressTurnsRef.current = 0
+    addBuyLog({ round: prev.currentRound, turn: turnCountRef.current, event: 'went_down', playerName: player.name, card: '', detail: `melds: ${newMelds.length}` })
+    if (wentOut) addBuyLog({ round: prev.currentRound, turn: turnCountRef.current, event: 'went_out', playerName: player.name, card: '', detail: 'hand was empty' })
     setGameState(updated)
     setShowMeldModal(false)
     setPreLayDownSwap(false)
@@ -681,6 +695,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
         players: playersC,
         roundState: { ...prev.roundState, discardPile: newDiscardPile },
       }
+      addBuyLog({ round: prev.currentRound, turn: turnCountRef.current, event: 'scenario_c', playerName: player.name, card: '', detail: 'lay-off reversed' })
       setGameState(afterReversal)
       setSelectedCardIds(new Set())
       setLayOffError(null)
@@ -699,6 +714,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     setLayOffError(null)
 
     if (wentOut) {
+      addBuyLog({ round: prev.currentRound, turn: turnCountRef.current, event: 'went_out', playerName: player.name, card: '', detail: 'hand was empty' })
       setShowLayOffModal(false)
       const topCard = updated.roundState.discardPile[updated.roundState.discardPile.length - 1] ?? null
       startBuyingWindow(updated, playerIdx, topCard)
@@ -728,6 +744,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
 
   // ── Joker swap ────────────────────────────────────────────────────────────
   function handleJokerSwap(naturalCard: CardType, meld: Meld) {
+    const swapPlayer = gameState.players[gameState.roundState.currentPlayerIndex]
+    addBuyLog({ round: gameState.currentRound, turn: turnCountRef.current, event: 'joker_swap', playerName: swapPlayer.name, card: formatCard(naturalCard), detail: '' })
     setGameState(prev => computeJokerSwap(prev, naturalCard, meld) ?? prev)
     setSelectedCardIds(new Set())
   }
@@ -774,6 +792,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
           players: playersB,
           roundState: { ...rs, tablesMelds: newTablesMelds, discardPile: newDiscardPile },
         }
+        addBuyLog({ round: gameState.currentRound, turn: turnCountRef.current, event: 'scenario_b', playerName: player.name, card: '', detail: 'bonus meld reversed' })
         setGameState(afterRollback)
         setSelectedCardIds(new Set())
         haptic('heavy')
@@ -1275,6 +1294,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
       <GameOver
         players={gameState.players}
         buyLimit={gameState.buyLimit}
+        buyLog={buyLog}
         onPlayAgain={() => {
           setGameState(initGame(initialPlayers, buyLimit))
           setUiPhase('round-start')
