@@ -194,7 +194,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
   const [aiActionTick, setAiActionTick] = useState(0)
   const [gameSpeed, setGameSpeed] = useState<GameSpeed>('normal')
   const [buyLog, setBuyLog] = useState<BuyLogEntry[]>([])
-  const [buyLogOpen, setBuyLogOpen] = useState(false)
   // True after player taps "Pass" on the free discard offer — hides banner until next offer
   const [freeOfferDeclined, setFreeOfferDeclined] = useState(false)
   const turnCountRef = useRef(0)
@@ -1192,18 +1191,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     return () => clearTimeout(timerId)
   }, [uiPhase, buyerStep, buyerOrder]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Buy audit stats ───────────────────────────────────────────────────────
-  const buyStats = useMemo(() => {
-    const windowsOpened = buyLog.filter(e => e.event === 'buy_window_open').length
-    const boughtEntries = buyLog.filter(e => e.event === 'bought')
-    const passes = buyLog.filter(e => e.event === 'passed').length
-    const freeTaken = buyLog.filter(e => e.event === 'free_taken').length
-    const freeDeclined = buyLog.filter(e => e.event === 'free_declined').length
-    const byPlayer: Record<string, number> = {}
-    boughtEntries.forEach(e => { byPlayer[e.playerName] = (byPlayer[e.playerName] ?? 0) + 1 })
-    return { windowsOpened, totalBuys: boughtEntries.length, passes, freeTaken, freeDeclined, byPlayer }
-  }, [buyLog])
-
   // ── Determine display for buying phase ────────────────────────────────────
   const buyerIdx = buyerOrder[buyerStep]
   const activeBuyer = buyerIdx !== undefined ? gameState.players[buyerIdx] : null
@@ -1511,56 +1498,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
           currentPlayerId={currentPlayer.id}
         />
 
-        {/* ── BUY AUDIT LOG (dev tool — remove after playtesting) ─────── */}
-        <div style={{ marginTop: 14, borderTop: '1px solid #2d5a3a', paddingTop: 4 }}>
-          <button
-            onClick={() => setBuyLogOpen(o => !o)}
-            style={{
-              width: '100%', background: 'transparent', border: 'none',
-              color: '#4a7a5a', fontFamily: 'monospace', fontSize: 9,
-              textAlign: 'left', padding: '3px 0', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 4,
-            }}
-          >
-            <span>{buyLogOpen ? '▼' : '▶'}</span>
-            <span>
-              BUY LOG ({buyLog.length}) · wins:{buyStats.windowsOpened} buys:{buyStats.totalBuys} pass:{buyStats.passes} free↑:{buyStats.freeTaken} free↓:{buyStats.freeDeclined}
-            </span>
-          </button>
-          {buyLogOpen && (
-            <div style={{
-              background: '#06100a', borderRadius: 4, padding: '6px 8px',
-              maxHeight: 200, overflowY: 'auto',
-              fontSize: 9, fontFamily: 'monospace', color: '#4a7a5a',
-              marginBottom: 4,
-            }}>
-              {/* Stats summary */}
-              <div style={{ color: '#6aad7a', marginBottom: 4, paddingBottom: 4, borderBottom: '1px solid #1a3a2a' }}>
-                <div>windows: {buyStats.windowsOpened} · buys: {buyStats.totalBuys} · passes: {buyStats.passes}</div>
-                <div>free taken: {buyStats.freeTaken} · free declined: {buyStats.freeDeclined}</div>
-                {Object.keys(buyStats.byPlayer).length > 0 && (
-                  <div>by player: {Object.entries(buyStats.byPlayer).map(([n, c]) => `${n}:${c}`).join(', ')}</div>
-                )}
-              </div>
-              {/* Log entries */}
-              {buyLog.length === 0
-                ? <div style={{ color: '#2a5a3a' }}>No buy events yet.</div>
-                : buyLog.slice(-20).map((entry, i) => {
-                  const c: Record<string, string> = {
-                    discard: '#5a7a5a', free_offer: '#8ab88a', free_taken: '#6aef7a',
-                    free_declined: '#9a9a5a', buy_window_open: '#e2b858', buy_offered: '#a8d0a8',
-                    bought: '#4aef6a', passed: '#5a8a5a', window_closed: '#b8906a',
-                  }
-                  return (
-                    <div key={i} style={{ color: c[entry.event] ?? '#6aad7a', marginBottom: 1, lineHeight: 1.4 }}>
-                      R{entry.round}·T{entry.turn} [{entry.event}] {entry.playerName}: {entry.card}{entry.detail ? ` · ${entry.detail}` : ''}
-                    </div>
-                  )
-                })
-              }
-            </div>
-          )}
-        </div>
       </div>
 
       {/* ── ZONE 3: Fixed bottom — hand + action buttons ────────────────── */}
