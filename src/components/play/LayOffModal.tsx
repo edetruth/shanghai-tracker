@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import type { Card as CardType, Meld, Player } from '../../game/types'
-import { canLayOff } from '../../game/meld-validator'
+import { canLayOff, findSwappableJoker } from '../../game/meld-validator'
 import { haptic } from '../../lib/haptics'
 
 interface Props {
@@ -12,6 +12,7 @@ interface Props {
   onGoOut: () => void
   onDone: () => void
   players: Player[]
+  onJokerSwap?: (naturalCard: CardType, meld: Meld, jokerIndex: number) => void
 }
 
 // ── Suit colour helpers (spec §1.2) ──────────────────────────────────────────
@@ -174,7 +175,7 @@ function buildGroups(melds: Meld[], currentPlayerId: string, players: Player[]):
 // ── LayOffModal ───────────────────────────────────────────────────────────────
 
 export default function LayOffModal({
-  melds, currentPlayerId, currentPlayerName, hand, onLayOff, onGoOut, onDone, players,
+  melds, currentPlayerId, currentPlayerName, hand, onLayOff, onGoOut, onDone, players, onJokerSwap,
 }: Props) {
   const [selectedCards, setSelectedCards] = useState<CardType[]>([])
   const [layOffCount, setLayOffCount] = useState(0)
@@ -201,6 +202,13 @@ export default function LayOffModal({
   }, [selectedCards, melds])
 
   const hasValidMelds = validMeldIds !== null && validMeldIds.size > 0
+
+  // Joker-swap targets: only when exactly one non-joker card is selected
+  const swappableMelds = useMemo<Meld[]>(() => {
+    if (!onJokerSwap || selectedCards.length !== 1 || selectedCards[0].suit === 'joker') return []
+    const card = selectedCards[0]
+    return melds.filter(m => m.type === 'run' && findSwappableJoker(card, m) !== null)
+  }, [selectedCards, melds, onJokerSwap])
 
   // Auto-scroll to first valid meld when selection changes
   useEffect(() => {
@@ -238,9 +246,15 @@ export default function LayOffModal({
   let subtitle = 'Tap cards to select, then tap a meld'
   let subtitleColor = '#a8d0a8'
   if (selectedCards.length > 0) {
-    if (hasValidMelds) {
+    if (hasValidMelds && swappableMelds.length > 0) {
+      subtitle = `${validMeldIds!.size} lay-off · ${swappableMelds.length} joker swap`
+      subtitleColor = '#6aad7a'
+    } else if (hasValidMelds) {
       subtitle = `${validMeldIds!.size} valid meld${validMeldIds!.size !== 1 ? 's' : ''} — tap to lay off all`
       subtitleColor = '#6aad7a'
+    } else if (swappableMelds.length > 0) {
+      subtitle = `${swappableMelds.length} joker swap${swappableMelds.length !== 1 ? 's' : ''} available — see below`
+      subtitleColor = '#e2b858'
     } else {
       subtitle = selectedCards.length === 1
         ? "This card doesn't fit any meld"
@@ -267,13 +281,28 @@ export default function LayOffModal({
     setPostLayOffScrollMeldId(meld.id)
   }
 
+  function handleSwapTap(meld: Meld) {
+    if (selectedCards.length !== 1 || !onJokerSwap) return
+    const card = selectedCards[0]
+    const joker = findSwappableJoker(card, meld)
+    if (!joker) return
+    haptic('success')
+    const jokerIndex = meld.cards.findIndex(c => c.id === joker.id)
+    onJokerSwap(card, meld, jokerIndex)
+    setSelectedCards([])
+  }
+
   const groups = buildGroups(melds, currentPlayerId, players)
 
   // Selection bar status
   let selectionStatus = ''
   if (selectedCards.length > 0) {
-    if (hasValidMelds) {
+    if (hasValidMelds && swappableMelds.length > 0) {
+      selectionStatus = `${validMeldIds!.size} lay-off · ${swappableMelds.length} swap below`
+    } else if (hasValidMelds) {
       selectionStatus = `${validMeldIds!.size} meld${validMeldIds!.size !== 1 ? 's' : ''} accept all selected`
+    } else if (swappableMelds.length > 0) {
+      selectionStatus = `${swappableMelds.length} joker swap${swappableMelds.length !== 1 ? 's' : ''} available ↓`
     } else {
       selectionStatus = selectedCards.length === 1 ? 'No valid melds for this card' : 'No single meld accepts all'
     }
@@ -282,9 +311,15 @@ export default function LayOffModal({
   // Hint text for hand strip
   let hint = 'Tap a card to select it'
   if (selectedCards.length > 0) {
-    hint = hasValidMelds
-      ? 'Tap a glowing meld above to lay off all selected'
-      : 'No valid melds — tap another card or Done'
+    if (hasValidMelds && swappableMelds.length > 0) {
+      hint = 'Tap a glowing meld to lay off · tap a swap target below to swap the joker'
+    } else if (hasValidMelds) {
+      hint = 'Tap a glowing meld above to lay off all selected'
+    } else if (swappableMelds.length > 0) {
+      hint = 'Tap a glowing meld in the Swap section below to swap the joker'
+    } else {
+      hint = 'No valid melds — tap another card or Done'
+    }
   }
 
   return (
@@ -294,6 +329,10 @@ export default function LayOffModal({
         @keyframes lomPulse {
           0%, 100% { box-shadow: 0 0 6px rgba(106,173,122,0.4); }
           50%       { box-shadow: 0 0 18px rgba(106,173,122,0.9); }
+        }
+        @keyframes swapPulse {
+          0%, 100% { box-shadow: 0 0 6px rgba(226,184,88,0.4); }
+          50%       { box-shadow: 0 0 18px rgba(226,184,88,0.9); }
         }
       `}</style>
 
@@ -445,6 +484,72 @@ export default function LayOffModal({
                 </div>
               )
             })
+          )}
+
+          {/* ── Swap a Joker section ──────────────────────────────────────── */}
+          {swappableMelds.length > 0 && (
+            <>
+              <div style={{ height: 1, backgroundColor: '#2d5a3a', margin: '10px 0 8px' }} />
+
+              <p style={{
+                color: '#e2b858',
+                fontSize: 9,
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '1px',
+                margin: '0 0 4px',
+                lineHeight: 1,
+              }}>
+                🔄 Swap a Joker
+              </p>
+              <p style={{ color: '#a8d0a8', fontSize: 10, margin: '0 0 8px', lineHeight: 1.3 }}>
+                This card can replace a joker in a run. Tap to swap.
+              </p>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {swappableMelds.map(meld => {
+                  const joker = findSwappableJoker(selectedCards[0], meld)!
+                  return (
+                    <div
+                      key={meld.id}
+                      onClick={() => handleSwapTap(meld)}
+                      style={{
+                        backgroundColor: '#0f2218',
+                        border: '1.5px solid #e2b858',
+                        borderRadius: 8,
+                        padding: '6px 8px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 4,
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                        animation: 'swapPulse 1.4s ease-in-out infinite',
+                      }}
+                    >
+                      <p style={{ fontSize: 8, color: '#e2b858', margin: 0, lineHeight: 1 }}>
+                        run · {meld.ownerName.split(' ')[0]} — tap to swap joker
+                      </p>
+                      <div style={{ display: 'flex', gap: 2 }}>
+                        {meld.cards.map(card => (
+                          <div key={card.id} style={{ position: 'relative' }}>
+                            <ModalCard card={card} meld={meld} />
+                            {card.id === joker.id && (
+                              <div style={{
+                                position: 'absolute',
+                                inset: 0,
+                                borderRadius: 5,
+                                border: '2.5px solid #e2b858',
+                                pointerEvents: 'none',
+                              }} />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
           )}
         </div>
 

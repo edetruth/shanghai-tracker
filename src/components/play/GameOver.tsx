@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef } from 'react'
 import { CheckCircle, AlertCircle, Loader } from 'lucide-react'
 import type { Player } from '../../game/types'
-import { savePlayedGame, saveGameEvents, type GameEvent } from '../../lib/gameStore'
+import { completePlayedGame, saveGameEvents, type GameEvent } from '../../lib/gameStore'
 import { PLAYER_COLORS } from '../../lib/constants'
 
 interface Props {
   players: Player[]
   buyLimit: number
   buyLog: GameEvent[]
+  gameId: string | null
   onPlayAgain: () => void
   onBack: () => void
 }
@@ -153,20 +154,20 @@ function Avatar({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function GameOver({ players, buyLimit, buyLog, onPlayAgain, onBack }: Props) {
+export default function GameOver({ players, buyLimit, buyLog, gameId, onPlayAgain, onBack }: Props) {
   const [saveStatus, setSaveStatus] = useState<'saving' | 'saved' | 'error'>('saving')
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
-  // ── Auto-save (preserve existing behavior) ────────────────────────────────
+  // ── Auto-save via pre-created game record ─────────────────────────────────
   useEffect(() => {
-    const date = new Date().toISOString().split('T')[0]
+    if (!gameId) {
+      setSaveStatus('error')
+      return
+    }
     const playerData = players.map(p => ({ name: p.name, roundScores: p.roundScores }))
-    const gameType = players.some(p => p.isAI) ? 'ai' : 'pass-and-play'
-    savePlayedGame(playerData, date, gameType, buyLimit)
-      .then(async (gameId) => {
-        if (gameId && buyLog.length > 0) {
-          await saveGameEvents(gameId, buyLog)
-        }
+    completePlayedGame(gameId, playerData)
+      .then(async () => {
+        await saveGameEvents(gameId, buyLog)
         setSaveStatus('saved')
       })
       .catch(() => setSaveStatus('error'))

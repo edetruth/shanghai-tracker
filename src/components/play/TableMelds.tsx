@@ -2,9 +2,6 @@ import type { Card, Meld } from '../../game/types'
 import { canLayOff } from '../../game/meld-validator'
 
 // Props per UI/UX Spec Section 3
-// currentPlayerId/selectedCard/onLayOff are optional for backward compat with existing callers
-// Legacy props (onMeldClick, highlightMeldId, jokerMeldIds, validLayOffMeldIds, layOffCard)
-// are accepted but unused — kept so existing callers compile without changes.
 interface Props {
   melds: Meld[]
   currentPlayerId?: string
@@ -19,7 +16,7 @@ interface Props {
   layOffCard?: Card | null
 }
 
-// ── Suit helpers (matching spec Section 1.2) ─────────────────────────────────
+// ── Suit helpers ──────────────────────────────────────────────────────────────
 
 const SUIT_SORT: Record<string, number> = { hearts: 0, diamonds: 1, clubs: 2, spades: 3, joker: 4 }
 
@@ -63,7 +60,6 @@ function getJokerLabel(meld: Meld, cardId: string): string {
   return `${rankLabel(mapping.representsRank)}${suitSymbol(mapping.representsSuit)}`
 }
 
-// Sort set-meld cards by suit order (hearts → diamonds → clubs → spades → joker)
 function sortedSetCards(cards: Card[]): Card[] {
   return [...cards].sort((a, b) => {
     const sd = (SUIT_SORT[a.suit] ?? 5) - (SUIT_SORT[b.suit] ?? 5)
@@ -149,6 +145,7 @@ export default function TableMelds({
     return (
       <div
         style={{
+          width: '100%',
           backgroundColor: '#0f2218',
           borderRadius: 10,
           padding: 8,
@@ -169,7 +166,6 @@ export default function TableMelds({
 
   return (
     <>
-      {/* Keyframe for valid-target pulse */}
       <style>{`
         @keyframes tmPulse {
           0%, 100% { box-shadow: 0 0 4px rgba(106,173,122,0.4); }
@@ -177,17 +173,22 @@ export default function TableMelds({
         }
       `}</style>
 
-      <div style={{ backgroundColor: '#0f2218', borderRadius: 10, padding: 8 }}>
+      <div
+        style={{
+          width: '100%',
+          backgroundColor: '#0f2218',
+          borderRadius: 10,
+          padding: 8,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}
+      >
         {groups.map((group, gi) => {
           const isCurrentPlayer = group.ownerId === currentPlayerId
 
           return (
             <div key={group.ownerId}>
-              {/* Thin horizontal divider between player sections */}
-              {gi > 0 && (
-                <div style={{ height: 1, backgroundColor: '#2d5a3a', margin: '8px 0' }} />
-              )}
-
               {/* Player label */}
               <span
                 style={{
@@ -195,17 +196,24 @@ export default function TableMelds({
                   fontSize: 9,
                   fontWeight: 700,
                   textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
+                  letterSpacing: 1,
                   lineHeight: 1,
                   display: 'block',
-                  marginBottom: 5,
+                  marginBottom: 4,
                 }}
               >
                 {isCurrentPlayer ? 'You' : group.ownerName}
               </span>
 
-              {/* Melds — wrap to next line if needed */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {/* Melds row — wraps to next line as needed */}
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  gap: 6,
+                }}
+              >
                 {group.melds.map(meld => {
                   const isValid = isLayOffMode && canLayOff(selectedCard!, meld)
                   const isDimmed = isLayOffMode && !isValid
@@ -218,20 +226,15 @@ export default function TableMelds({
                       onClick={isValid && onLayOff ? () => onLayOff(selectedCard!, meld) : undefined}
                       style={{
                         backgroundColor: '#1e4a2e',
-                        border: isValid
-                          ? '2px solid #6aad7a'
-                          : isCurrentPlayer
-                            ? '1px solid #3b6d3a'
-                            : '1px solid #2d5a3a',
+                        border: isValid ? '1px solid #6aad7a' : '1px solid #2d5a3a',
                         borderRadius: 6,
                         padding: '4px 5px',
                         display: 'flex',
                         flexDirection: 'row',
-                        gap: 2,
+                        gap: 3,
                         alignItems: 'center',
-                        opacity: isDimmed ? 0.4 : 1,
+                        opacity: isDimmed ? 0.35 : 1,
                         cursor: isValid ? 'pointer' : 'default',
-                        flexShrink: 0,
                         transition: 'opacity 0.15s',
                         animation: isValid ? 'tmPulse 1.4s ease-in-out infinite' : 'none',
                       }}
@@ -243,6 +246,11 @@ export default function TableMelds({
                   )
                 })}
               </div>
+
+              {/* Thin divider after each player section except the last */}
+              {gi < groups.length - 1 && (
+                <div style={{ height: 1, backgroundColor: '#2d5a3a', marginTop: 4 }} />
+              )}
             </div>
           )
         })}

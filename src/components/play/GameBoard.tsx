@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
+import { createPlayedGame, saveGameEvents } from '../../lib/gameStore'
 import { Pause } from 'lucide-react'
 import type { GameState, Player, Card as CardType, Meld, PlayerConfig, AIDifficulty } from '../../game/types'
 import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, MAX_BUYS } from '../../game/rules'
@@ -194,9 +195,11 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
   const [aiActionTick, setAiActionTick] = useState(0)
   const [gameSpeed, setGameSpeed] = useState<GameSpeed>('normal')
   const [buyLog, setBuyLog] = useState<BuyLogEntry[]>([])
+  const [gameId, setGameId] = useState<string | null>(null)
   // True after player taps "Pass" on the free discard offer — hides banner until next offer
   const [freeOfferDeclined, setFreeOfferDeclined] = useState(false)
   const turnCountRef = useRef(0)
+  const pendingSaveRef = useRef<number>(0)
   const [discardError, setDiscardError] = useState<string | null>(null)
   const [layOffError, setLayOffError] = useState<string | null>(null)
   const [preLayDownSwap, setPreLayDownSwap] = useState(false)
@@ -234,6 +237,26 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
 
   function addBuyLog(entry: BuyLogEntry) {
     setBuyLog(prev => [...prev, entry])
+  }
+
+  // ── Create game record on mount ───────────────────────────────────────────
+  useEffect(() => {
+    const date = new Date().toISOString().split('T')[0]
+    const playerNames = initialPlayers.map(p => p.name)
+    const gameType = initialPlayers.some(p => p.isAI) ? 'ai' : 'pass-and-play'
+    const effectiveBuyLimit = buyLimit === -1 ? 999 : buyLimit
+    createPlayedGame(playerNames, date, gameType, effectiveBuyLimit)
+      .then(id => setGameId(id))
+      .catch(() => {}) // silent fail — telemetry must never break the game
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Flush telemetry events to Supabase ───────────────────────────────────
+  async function flushTelemetry(events: BuyLogEntry[]) {
+    if (!gameId || events.length === 0) return
+    const toSave = events.slice(pendingSaveRef.current)
+    if (toSave.length === 0) return
+    await saveGameEvents(gameId, toSave)
+    pendingSaveRef.current = events.length
   }
 
   // Reset declined flag whenever a new free offer arrives
@@ -534,6 +557,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     setGameState({ ...state, players })
     setRoundResults(results)
     setUiPhase('round-end')
+    flushTelemetry(buyLog) // fire-and-forget — telemetry must never block game flow
   }
 
   // ── Force end round (stalemate) ───────────────────────────────────────────
@@ -559,6 +583,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     setUiPhase('round-end')
     setAiMessage('Round ended — no one went out (stalemate)')
     setTimeout(() => setAiMessage(null), 4000)
+    flushTelemetry(buyLog) // fire-and-forget — telemetry must never block game flow
   }
 
   // ── Meld confirmation ─────────────────────────────────────────────────────
@@ -683,16 +708,16 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     const layOffEval = evaluateLayOffReversal(card, meld, player.hand, prev.roundState.tablesMelds, jokerPosition)
     if (layOffEval.outcome === 'reversed') {
       const { discardCard } = layOffEval
-      // Return the laid-off card to the player's hand; discard the unplayable remaining card
-      const finalHand = [card]
-      const newDiscardPile = [...prev.roundState.discardPile, discardCard!]
+      // Restore both cards: the laid-off card returns to hand AND the unplayable card stays.
+      // newHand = player.hand minus the tried lay-off card, so it already contains the unplayable card.
+      const finalHand = [...newHand, card]
       const playersC = prev.players.map((p, i) =>
         i === playerIdx ? { ...p, hand: finalHand } : p
       )
       const afterReversal: GameState = {
         ...prev,
         players: playersC,
-        roundState: { ...prev.roundState, discardPile: newDiscardPile },
+        roundState: { ...prev.roundState },
       }
       addBuyLog({ round: prev.currentRound, turn: turnCountRef.current, event: 'scenario_c', playerName: player.name, card: '', detail: 'lay-off reversed' })
       setGameState(afterReversal)
@@ -993,6 +1018,31 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     }
   }
 
+  // ── Reset for a brand-new game (play again) ──────────────────────────────
+  async function startNewGame() {
+    setGameState(initGame(initialPlayers, buyLimit))
+    setUiPhase('round-start')
+    setRoundResults(null)
+    setSelectedCardIds(new Set())
+    setPendingUndo(null)
+    setPendingBuyDiscard(null)
+    setBuyLog([])
+    setGameId(null)
+    pendingSaveRef.current = 0
+    noProgressTurnsRef.current = 0
+    drawPileDepletionsRef.current = 0
+    const date = new Date().toISOString().split('T')[0]
+    const playerNames = initialPlayers.map(p => p.name)
+    const gameType = initialPlayers.some(p => p.isAI) ? 'ai' : 'pass-and-play'
+    const effectiveBuyLimit = buyLimit === -1 ? 999 : buyLimit
+    try {
+      const id = await createPlayedGame(playerNames, date, gameType, effectiveBuyLimit)
+      setGameId(id)
+    } catch {
+      // silent fail — telemetry must never break the game
+    }
+  }
+
   // ── Next round / game over ────────────────────────────────────────────────
   function handleNextRound() {
     const nextRound = gameState.currentRound + 1
@@ -1282,16 +1332,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
         players={gameState.players}
         buyLimit={gameState.buyLimit}
         buyLog={buyLog}
-        onPlayAgain={() => {
-          setGameState(initGame(initialPlayers, buyLimit))
-          setUiPhase('round-start')
-          setRoundResults(null)
-          setSelectedCardIds(new Set())
-          setPendingUndo(null)
-          setPendingBuyDiscard(null)
-          noProgressTurnsRef.current = 0
-          drawPileDepletionsRef.current = 0
-        }}
+        gameId={gameId}
+        onPlayAgain={startNewGame}
         onBack={onExit}
       />
     )
@@ -1304,16 +1346,21 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     !rs.tablesMelds.some(m => canLayOff(currentPlayer.hand[0], m))
   const discardDisabled = selectedCardIds.size !== 1 || lastCardStuck
   const buyLimitStr = gameState.buyLimit >= 999 ? '∞' : String(gameState.buyLimit)
+  const isHumanDraw = uiPhase === 'draw' && !currentPlayer.isAI
 
   return (
     <div
-      className="bg-[#1a3a2a] flex flex-col overflow-hidden"
-      style={{ height: '100dvh' }}
+      className="bg-[#1a3a2a]"
+      style={{ minHeight: '100dvh', overflowY: 'auto' }}
     >
-      {/* ── ZONE 1: Fixed top — top bar + opponent strip + toasts ───────── */}
+      <style>{`
+        @keyframes gbPulseGold{0%,100%{box-shadow:0 0 0 0 rgba(226,184,88,0)}50%{box-shadow:0 0 12px 4px rgba(226,184,88,0.5)}}
+        @keyframes gbPulseGreen{0%,100%{box-shadow:0 0 0 0 rgba(106,173,122,0)}50%{box-shadow:0 0 12px 4px rgba(106,173,122,0.5)}}
+      `}</style>
+      {/* ── ZONE 1: Sticky top — top bar + opponent strip + toasts ─────── */}
       <div
-        className="flex-shrink-0 bg-[#0f2218]"
-        style={{ paddingTop: 'max(8px, env(safe-area-inset-top))' }}
+        className="bg-[#0f2218]"
+        style={{ position: 'sticky', top: 0, zIndex: 10, paddingTop: 'max(8px, env(safe-area-inset-top))' }}
       >
         {/* Top bar: round badge | requirement badge | pause (spec §2.1) */}
         <div
@@ -1434,8 +1481,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
         )}
       </div>
 
-      {/* ── ZONE 2: Scrollable middle — piles + table melds ─────────────── */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3">
+      {/* ── ZONE 2: Auto-height middle — piles + table melds ────────────── */}
+      <div className="px-3 py-3">
 
         {/* Draw pile + Discard pile: centered side by side (spec §2.3) */}
         {(uiPhase === 'draw' || uiPhase === 'action' || uiPhase === 'buying') && (
@@ -1444,14 +1491,16 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
             {/* Draw pile */}
             <div className="flex flex-col items-center gap-1">
               <p style={{ color: '#6aad7a', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Draw
+                {isHumanDraw ? 'TAP TO DRAW' : 'Draw'}
               </p>
               {rs.drawPile.length > 0 ? (
-                <CardComponent
-                  card={rs.drawPile[0]}
-                  faceDown
-                  onClick={uiPhase === 'draw' && !currentPlayer.isAI ? handleDrawFromPile : undefined}
-                />
+                <div style={{ borderRadius: 8, animation: isHumanDraw ? 'gbPulseGreen 1.2s ease-in-out 0.3s infinite' : 'none' }}>
+                  <CardComponent
+                    card={rs.drawPile[0]}
+                    faceDown
+                    onClick={isHumanDraw ? handleDrawFromPile : undefined}
+                  />
+                </div>
               ) : (
                 <div
                   className="rounded-lg border-2 border-dashed border-[#2d5a3a] flex items-center justify-center"
@@ -1465,17 +1514,17 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
 
             {/* Discard pile */}
             <div className="flex flex-col items-center gap-1">
-              <p style={{ color: '#6aad7a', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Discard
+              <p style={{ color: isHumanDraw ? '#e2b858' : '#6aad7a', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                {isHumanDraw ? 'TAP TO TAKE' : 'Discard'}
               </p>
               {(isHumanBuyerTurn ? buyingDiscard : topDiscard) ? (
-                <CardComponent
-                  card={(isHumanBuyerTurn && buyingDiscard ? buyingDiscard : topDiscard)!}
-                  onClick={uiPhase === 'draw' && !currentPlayer.isAI ? handleTakeDiscard : undefined}
-                  style={uiPhase === 'draw' && !currentPlayer.isAI
-                    ? { border: '2px solid #e2b858' }
-                    : undefined}
-                />
+                <div style={{ borderRadius: 8, animation: isHumanDraw ? 'gbPulseGold 1.2s ease-in-out infinite' : 'none' }}>
+                  <CardComponent
+                    card={(isHumanBuyerTurn && buyingDiscard ? buyingDiscard : topDiscard)!}
+                    onClick={isHumanDraw ? handleTakeDiscard : undefined}
+                    style={isHumanDraw ? { border: '2px solid #e2b858' } : undefined}
+                  />
+                </div>
               ) : (
                 <div
                   className="rounded-lg border-2 border-dashed border-[#2d5a3a]"
@@ -1500,10 +1549,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
 
       </div>
 
-      {/* ── ZONE 3: Fixed bottom — hand + action buttons ────────────────── */}
+      {/* ── ZONE 3: Sticky bottom — hand + action buttons ───────────────── */}
       <div
-        className="flex-shrink-0 bg-[#0f2218] border-t border-[#2d5a3a] px-3 pt-3"
-        style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}
+        className="bg-[#0f2218] border-t border-[#2d5a3a] px-3 pt-3"
+        style={{ position: 'sticky', bottom: 0, paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}
       >
         {/* Free-take banner — shown when next player can take discard for free (Rule 9A) */}
         {pendingBuyDiscard && uiPhase === 'draw' && !currentPlayer.isAI && !freeOfferDeclined && (
@@ -1869,6 +1918,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
           onLayOff={handleLayOff}
           onGoOut={() => setShowLayOffModal(false)}
           onDone={() => setShowLayOffModal(false)}
+          onJokerSwap={handleJokerSwap}
         />
       )}
 

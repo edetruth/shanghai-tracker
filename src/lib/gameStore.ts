@@ -223,6 +223,60 @@ export async function savePlayedGame(
   return game.id
 }
 
+export async function createPlayedGame(
+  playerNames: string[],
+  date: string,
+  gameType: string,
+  buyLimit: number = 5,
+): Promise<string> {
+  const playerIds = await Promise.all(
+    playerNames.map(name => upsertPlayer(name).then(p => p.id))
+  )
+  const { data: game, error } = await supabase
+    .from('games')
+    .insert({
+      date,
+      game_type: gameType,
+      buy_limit: buyLimit,
+      is_complete: false,
+      room_code: generateRoomCode(),
+    })
+    .select()
+    .single()
+  if (error || !game) throw error
+  await supabase.from('game_scores').insert(
+    playerIds.map(playerId => ({
+      game_id: game.id,
+      player_id: playerId,
+      round_scores: [],
+    }))
+  )
+  return game.id
+}
+
+export async function completePlayedGame(
+  gameId: string,
+  players: { name: string; roundScores: number[] }[]
+): Promise<void> {
+  for (const player of players) {
+    const { data: p } = await supabase
+      .from('players')
+      .select('id')
+      .eq('name', player.name)
+      .single()
+    if (!p) continue
+    await supabase
+      .from('game_scores')
+      .update({ round_scores: player.roundScores })
+      .eq('game_id', gameId)
+      .eq('player_id', p.id)
+  }
+  await supabase
+    .from('games')
+    .update({ is_complete: true })
+    .eq('id', gameId)
+}
+
 export async function updateGame(
   gameId: string,
   updates: { date?: string; notes?: string }
