@@ -31,6 +31,7 @@ function initGameDirect(numPlayers: number): GameState {
     currentRound: 1,
     deckCount,
     gameOver: false,
+    buyLimit: 5,
     roundState: {
       roundNumber: 1,
       requirement: ROUND_REQUIREMENTS[0],

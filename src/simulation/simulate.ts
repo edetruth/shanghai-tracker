@@ -7,7 +7,7 @@
 
 import type { Card, Meld, Player, GameState, PlayerConfig, AIDifficulty } from '../game/types'
 import { createDecks, shuffle, dealHands } from '../game/deck'
-import { buildMeld, isValidSet, findSwappableJoker, simulateLayOff, canGoOutViaChainLayOff } from '../game/meld-validator'
+import { buildMeld, isValidSet, findSwappableJoker, simulateLayOff, canGoOutViaChainLayOff, isLegalDiscard } from '../game/meld-validator'
 import { scoreRound, calculateHandScore } from '../game/scoring'
 import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, MAX_BUYS } from '../game/rules'
 import {
@@ -90,6 +90,7 @@ function initGame(configs: PlayerConfig[]): GameState {
     currentRound: 1,
     deckCount,
     gameOver: false,
+    buyLimit: 5,
     roundState: {
       roundNumber: 1,
       requirement: ROUND_REQUIREMENTS[0],
@@ -208,14 +209,14 @@ function simTakeDiscard(state: GameState): GameState {
   return { ...state, players, roundState: { ...state.roundState, discardPile } }
 }
 
-/** Discard a card. Returns null if the discard would empty the hand (going out via discard = illegal). */
+/** Discard a card. Returns null if the discard would empty the hand (GDD 6.3: going out via discard is illegal). */
 function simDiscard(state: GameState, cardId: string): { state: GameState; card: Card } | null {
   const playerIdx = state.roundState.currentPlayerIndex
   const player = state.players[playerIdx]
   const card = player.hand.find(c => c.id === cardId)
   if (!card) return null
+  if (!isLegalDiscard(player.hand, cardId)) return null  // GDD 6.3: cannot discard last card
   const newHand = player.hand.filter(c => c.id !== cardId)
-  if (newHand.length === 0) return null  // can't go out by discarding
   const discardPile = [...state.roundState.discardPile, card]
   const players = state.players.map((p, i) =>
     i === playerIdx ? { ...p, hand: newHand } : p

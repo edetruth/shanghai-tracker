@@ -1,4 +1,4 @@
-import type { Card, Meld, RoundRequirement } from './types'
+import type { AIDifficulty, Card, Meld, RoundRequirement } from './types'
 import { isValidRun, canLayOff, simulateLayOff, findSwappableJoker, canGoOutViaChainLayOff } from './meld-validator'
 import { cardPoints, MIN_SET_SIZE, MIN_RUN_SIZE } from './rules'
 
@@ -155,21 +155,6 @@ function getRunContribution(sameSuitCards: Card[], rank: number): 'gap-fill' | '
   return null
 }
 
-/**
- * How many more natural cards are needed to complete a minimum-length run (3 cards)
- * in a suit, given the current hand cards and available jokers.
- * Returns 0 if already complete (≥3 consecutive with jokers filling gaps).
- */
-function cardsToCompleteRun(suitCards: Card[], jokerCount: number): number {
-  if (suitCards.length === 0) return Math.max(0, 3 - jokerCount)
-  const window = findBestRunWindow(suitCards)
-  // Cards in window + jokers cover: window.cards.length + jokerCount cards toward a run
-  // Gaps within the window still need to be filled; jokers can fill them
-  const filledByJokers = Math.min(jokerCount, window.gaps.length)
-  const effectiveLength = window.cards.length + filledByJokers
-  return Math.max(0, 3 - effectiveLength)
-}
-
 // Try to find meld groups satisfying the round requirement.
 // For mixed rounds (sets + runs), tries sets-first then runs-first and returns whichever works.
 // This matters when the only joker can satisfy either the set OR the run but not both —
@@ -210,14 +195,25 @@ function tryMeldOrder(
   return melds
 }
 
-// Should AI take the top discard card?
-// Conservative: only take if it directly enables melds, makes a set, or is adjacent to a committed run.
-// Expected ratio: ~60-70% draw from pile, 30-40% take discard — so the buy window opens regularly.
+// Should AI take the top discard card? (Medium/Hard)
+//
+// difficulty === 'medium' (default): conservative — only take if it directly enables melds,
+//   makes a set, or is a gap-fill/extension to a committed run. ~70-80% draw from pile.
+//
+// difficulty === 'hard': all Medium checks PLUS opponent-denial logic — takes the card
+//   even if it doesn't help own hand, if it visibly hurts an opponent:
+//   • Card's rank appears in any opponent's set on the table (denies bonus-set material)
+//   • Card can be laid off onto any existing run on the table (denies opponent an easy lay-off)
+//
+// tablesMelds is optional (defaults to []); pass state.roundState.tablesMelds for Hard denial.
+// All existing call sites (no 5th/6th arg) continue to get Medium behavior unchanged.
 export function aiShouldTakeDiscard(
   hand: Card[],
   discardCard: Card,
   requirement: RoundRequirement,
   hasLaidDown: boolean,
+  difficulty: AIDifficulty = 'medium',
+  tablesMelds: Meld[] = [],
 ): boolean {
   if (isJoker(discardCard)) return true
   if (hasLaidDown) return false
@@ -236,128 +232,91 @@ export function aiShouldTakeDiscard(
   const commitN = hasRunReq ? Math.min(requirement.runs + 1, 3) : 2
   const committedSuits = getCommittedSuits(hand, commitN)
 
-  if (committedSuits.has(discardCard.suit)) {
+  if (hasRunReq && committedSuits.has(discardCard.suit)) {
     const sameSuit = hand.filter(c => !isJoker(c) && c.suit === discardCard.suit)
-    if (hasRunReq) {
-      // Take if card directly advances the committed run window (gap-fill, extension, or
-      // near-bridge with 2+ existing same-suit cards already in hand)
-      if (sameSuit.length >= 1) {
-        const contribution = getRunContribution(sameSuit, discardCard.rank)
-        if (contribution === 'gap-fill' || contribution === 'extension') return true
-        if (contribution === 'near' && sameSuit.length >= 2) return true
-      }
-    } else {
-      // Pure set rounds: only take if directly adjacent and have 2+ same-suit
-      if (sameSuit.length >= 2) {
-        for (const c of sameSuit) {
-          if (Math.abs(discardCard.rank - c.rank) === 1) return true
-        }
-      }
+    // Take only if card directly advances the committed run window (gap-fill or extension).
+    // 'near' (±2 of window edge) is speculative future-build, not "directly fits" — Medium
+    // must stay conservative per GDD Section 11.
+    if (sameSuit.length >= 1) {
+      const contribution = getRunContribution(sameSuit, discardCard.rank)
+      if (contribution === 'gap-fill' || contribution === 'extension') return true
     }
   }
 
-  return false
-}
+  // Hard-only: opponent denial — take if card is clearly useful to someone else on the table
+  if (difficulty === 'hard' && tablesMelds.length > 0) {
+    // Denial 1: card rank already appears in a set on the table → opponent may want more
+    //           of that rank for a bonus set or lay-off
+    const rankInTableSet = tablesMelds.some(m =>
+      m.type === 'set' && m.cards.some(c => !isJoker(c) && c.rank === discardCard.rank)
+    )
+    if (rankInTableSet) return true
 
-// Easy AI: take discard when it completes a set or extends a strong run sequence.
-// Stricter than medium (weaker player), but not passive like the old aiFindBestMelds gate.
-export function aiShouldTakeDiscardEasy(hand: Card[], discardCard: Card, requirement: RoundRequirement): boolean {
-  if (isJoker(discardCard)) return true
-  const nonJokers = hand.filter(c => !isJoker(c))
-  // Take if it would complete a set: already hold 2 of same rank
-  const sameRank = nonJokers.filter(c => c.rank === discardCard.rank).length
-  if (sameRank >= 2) return true
-  // In run rounds: take if same-suit directly adjacent (±1) and already have 2+ of that suit
-  if (requirement.runs >= 1) {
-    const sameSuit = nonJokers.filter(c => c.suit === discardCard.suit)
-    if (sameSuit.length >= 2 && sameSuit.some(c => Math.abs(c.rank - discardCard.rank) <= 1)) return true
+    // Denial 2: card extends a long run already on the table (4+ cards) → taking it denies a
+    //           meaningful lay-off to whoever owns that run. Threshold of 4+ filters out newly-
+    //           formed minimum runs (3 cards) where denial has little strategic value and would
+    //           otherwise fire too broadly mid-game.
+    const extendsTableRun = tablesMelds.some(m =>
+      m.type === 'run' && m.cards.length >= 4 && canLayOff(discardCard, m)
+    )
+    if (extendsTableRun) return true
   }
+
   return false
 }
 
-// Pick the best card to discard (lowest meld utility, highest point cost)
-// tablesMelds: melds currently on the table — used to prevent discarding jokers when runs exist
-export function aiChooseDiscard(hand: Card[], requirement?: RoundRequirement, tablesMelds: Meld[] = []): Card {
+// Easy AI: pure 50/50 coin flip — GDD Section 11 Easy behavior.
+// CHANGED: Was checking if card completes a set or extends a run. Now pure random.
+export function aiShouldTakeDiscardEasy(_hand: Card[], _discardCard: Card, _requirement: RoundRequirement): boolean {
+  return Math.random() > 0.5
+}
+
+// Medium AI discard: highest GDD Section 10 point-value card — GDD Section 11 Medium behavior.
+// GDD Section 10 scoring: 2-9 = 5pts, 10/J/Q/K = 10pts, Ace = 15pts, Joker = 25pts.
+//
+// Priority 1 contract: GameBoard always attempts aiFindLayOff before calling this when
+// hand.length === 1 (see GameBoard action tick). If lay-off succeeds the AI goes out;
+// if it fails the AI is stuck and discards the last card legally (draws next turn per
+// the stuck-player rule). This function must never be called with an empty hand.
+//
+// CHANGED: Was run-protection strategy (committed-suit analysis, protected window IDs).
+// Now simply returns the non-joker candidate with the highest cardPoints() value.
+export function aiChooseDiscard(hand: Card[], _requirement?: RoundRequirement, tablesMelds: Meld[] = []): Card {
   if (hand.length === 0) throw new Error('Empty hand')
 
-  // Never discard a joker if there are any runs on the table to lay it off on.
-  // If somehow a joker can't be laid off (no runs), hold it as last resort only.
   const runsOnTable = tablesMelds.filter(m => m.type === 'run')
-  const nonJokerHand = hand.filter(c => !isJoker(c))
-
-  // If hand has only jokers, we can't avoid discarding one — but this should be extremely rare
-  const candidateHand = (runsOnTable.length > 0 || nonJokerHand.length > 0)
-    ? (nonJokerHand.length > 0 ? nonJokerHand : hand)
+  const nonJokers = hand.filter(c => !isJoker(c))
+  // Never discard a joker if there are runs to lay it off on (or non-jokers available)
+  const candidates = (runsOnTable.length > 0 || nonJokers.length > 0)
+    ? (nonJokers.length > 0 ? nonJokers : hand)
     : hand
 
-  const hasRunReq = requirement && requirement.runs >= 1
-
-  if (hasRunReq) {
-    return aiChooseDiscardForRuns(candidateHand, requirement.runs)
-  }
-
+  // Connectivity-based utility: keep cards with rank partners (sets) or suit neighbours (runs);
+  // discard isolated high-point-value cards first.
   function utility(card: Card): number {
     if (isJoker(card)) return 10000
     const sameRank = hand.filter(c => !isJoker(c) && c.rank === card.rank && c.id !== card.id).length
     const sameSuit = hand.filter(c => !isJoker(c) && c.suit === card.suit && c.id !== card.id)
-    const adjacent = sameSuit.filter(c => Math.abs(c.rank - card.rank) <= 3).length
+    const adjacent = sameSuit.filter(c => Math.abs(c.rank - card.rank) <= 2).length
     return sameRank * 50 + adjacent * 30 - cardPoints(card.rank)
   }
 
-  return candidateHand.reduce((worst, card) => utility(card) < utility(worst) ? card : worst)
+  return candidates.reduce((worst, card) => utility(card) < utility(worst) ? card : worst)
 }
 
-// Discard strategy for rounds with run requirements: dump cards from non-committed suits,
-// then committed-suit cards that are isolated from the best run window, then lowest-utility.
-function aiChooseDiscardForRuns(hand: Card[], runsNeeded: number): Card {
-  if (hand.length === 0) throw new Error('Empty hand')
-
-  const nonJokers = hand.filter(c => !isJoker(c))
-  const committedSuits = getCommittedSuits(hand, Math.min(runsNeeded + 1, 3))
-
-  // 1. Discard highest-point card from non-committed suits first
-  const nonCommitted = nonJokers.filter(c => !committedSuits.has(c.suit))
-  if (nonCommitted.length > 0) {
-    return nonCommitted.reduce((max, c) => cardPoints(c.rank) > cardPoints(max.rank) ? c : max)
-  }
-
-  // 2. Within committed suits: protect cards that are IN the best run window per suit.
-  //    Cards in a committed suit but outside the window (e.g. lone 3♥ when the
-  //    run kernel is 9♥-10♥-11♥) are treated as expendable.
-  const protectedIds = new Set<string>()
-  for (const suit of committedSuits) {
-    const suitCards = nonJokers.filter(c => c.suit === suit)
-    const window = findBestRunWindow(suitCards)
-    window.cards.forEach(c => protectedIds.add(c.id))
-  }
-
-  const unprotected = nonJokers.filter(c => !protectedIds.has(c.id))
-  if (unprotected.length > 0) {
-    return unprotected.reduce((max, c) => cardPoints(c.rank) > cardPoints(max.rank) ? c : max)
-  }
-
-  // 3. All cards are in run windows — discard lowest-utility card from the windows.
-  //    Desperate bonus: suits that are 1-2 cards from completing a run get extra protection.
-  const jokerCount = hand.filter(c => isJoker(c)).length
-  function runUtility(card: Card): number {
-    if (isJoker(card)) return 10000
-    const sameSuit = nonJokers.filter(c => c.suit === card.suit && c.id !== card.id)
-    const contribution = getRunContribution(sameSuit, card.rank)
-    const baseUtility = contribution === 'gap-fill' ? 80
-      : contribution === 'extension' ? 60
-      : contribution === 'near' ? 40
-      : 0
-    // Desperate bonus: protect cards from suits that are nearly complete
-    const ctr = cardsToCompleteRun(sameSuit, jokerCount)
-    const desperateBonus = ctr <= 1 ? 60 : ctr <= 2 ? 30 : 0
-    return baseUtility + desperateBonus - cardPoints(card.rank)
-  }
-
-  return hand.reduce((worst, card) => runUtility(card) < runUtility(worst) ? card : worst)
-}
-
-// Should AI buy an out-of-turn discard?
-export function aiShouldBuy(hand: Card[], discardCard: Card, requirement: RoundRequirement): boolean {
+// Should AI buy an out-of-turn discard? (Medium)
+// CHANGED: Added optional buysRemaining/buyLimit params with 0-guards.
+// When buyLimit === 0 or buysRemaining === 0, always return false.
+// Note: GameBoard currently calls this without buysRemaining/buyLimit; wire these up in
+// GameBoard to fully enforce per-player buy limits for Medium AI.
+export function aiShouldBuy(
+  hand: Card[],
+  discardCard: Card,
+  requirement: RoundRequirement,
+  buysRemaining = 5,
+  buyLimit = 5,
+): boolean {
+  if (buysRemaining <= 0 || buyLimit <= 0) return false
   if (isJoker(discardCard)) return true
   const withCard = aiFindBestMelds([...hand, discardCard], requirement)
   const without = aiFindBestMelds(hand, requirement)
@@ -381,18 +340,20 @@ export function aiShouldBuy(hand: Card[], discardCard: Card, requirement: RoundR
   return false
 }
 
-// Easy AI: buy if card would complete a set (2 already in hand) or enables required melds.
-// Still conservative: only buy if buysRemaining >= 3 (≤2 buys used so far).
-export function aiShouldBuyEasy(hand: Card[], discardCard: Card, requirement: RoundRequirement, buysRemaining: number): boolean {
-  if (buysRemaining < 3) return false
-  if (isJoker(discardCard)) return true
-  const nonJokers = hand.filter(c => !isJoker(c))
-  // Buy if it completes a set (already hold 2 of same rank)
-  const sameRank = nonJokers.filter(c => c.rank === discardCard.rank).length
-  if (sameRank >= 2) return true
-  // Fallback: buy if it directly unlocks the full required meld combination
-  return aiFindBestMelds([...hand, discardCard], requirement) !== null &&
-         aiFindBestMelds(hand, requirement) === null
+// Easy AI buy: structured check — buys only when the discard card enables the required melds
+// and the player has ≥ 3 buys remaining. Never buys if the hand can already form required melds.
+export function aiShouldBuyEasy(
+  hand: Card[],
+  discardCard: Card,
+  requirement: RoundRequirement,
+  buysRemaining: number,
+  buyLimit = 5,
+): boolean {
+  if (buysRemaining < 3 || buyLimit <= 0) return false
+  const canAlready = aiFindBestMelds(hand, requirement) !== null
+  if (canAlready) return false
+  const withCard = aiFindBestMelds([...hand, discardCard], requirement)
+  return withCard !== null
 }
 
 // Check whether any valid meld (set or run) can be formed from the given cards
@@ -512,6 +473,12 @@ export function aiChooseJokerLayOffPosition(meld: Meld): 'low' | 'high' {
 // Jokers are prioritised first — AI should never hold a joker when it can lay one off.
 // Skips lay-offs that would leave exactly 1 card that can't itself be laid off
 // anywhere (which would strand the AI — can't discard last card, can't go out).
+//
+// Priority 1 contract: This function correctly handles the going-out case. When
+// remaining.length === 0 after a lay-off the AI goes out. When remaining.length === 1,
+// canGoOutViaChainLayOff validates whether that final card can also go out. If not,
+// the lay-off is skipped and GameBoard falls through to discard (stuck case: legal,
+// player draws next turn). Easy AI's lay-off cap is enforced by GameBoard, not here.
 export function aiFindLayOff(hand: Card[], tablesMelds: Meld[]): { card: Card; meld: Meld; jokerPosition?: 'low' | 'high' } | null {
   // Prioritise jokers: always lay off jokers before other cards
   const jokers = hand.filter(c => c.suit === 'joker')
@@ -541,8 +508,14 @@ export function aiFindLayOff(hand: Card[], tablesMelds: Meld[]): { card: Card; m
   return null
 }
 
-// Hard mode: smarter discard — strongly avoids breaking potential sets/runs
-// tablesMelds: melds currently on the table — used to prevent discarding jokers when runs exist
+// Hard mode: strategic discard — avoids cards useful to own hand AND cards that help
+// opponents lay off onto their existing table melds.
+//
+// CHANGED: Added canLayOff-based table-meld awareness. Cards that can be laid off on
+// any existing meld receive +80 utility (keep them — use for own lay-off or deny buy
+// opportunity from discard pile). Weighting: sameRank*120 + adjacent*60 + layOffValue*80.
+//
+// Priority 1 contract: see aiChooseDiscard above — same stuck-player invariant applies.
 export function aiChooseDiscardHard(hand: Card[], tablesMelds: Meld[] = []): Card {
   if (hand.length === 0) throw new Error('Empty hand')
 
@@ -559,16 +532,26 @@ export function aiChooseDiscardHard(hand: Card[], tablesMelds: Meld[] = []): Car
     const sameSuit = hand.filter(c => !isJoker(c) && c.suit === card.suit && c.id !== card.id)
     const adjacent = sameSuit.filter(c => Math.abs(c.rank - card.rank) <= 3).length
     // Hard: much stronger weighting — a pair is almost never discarded
-    return sameRank * 120 + adjacent * 60 - cardPoints(card.rank)
+    // Table-meld awareness: if card fits any existing meld via lay-off, keep it
+    // (use it for own lay-off, or avoid giving opponents a useful buy from the pile)
+    const layOffValue = tablesMelds.some(m => canLayOff(card, m)) ? 80 : 0
+    return sameRank * 120 + adjacent * 60 + layOffValue - cardPoints(card.rank)
   }
 
   return candidateHand.reduce((worst, card) => utility(card) < utility(worst) ? card : worst)
 }
 
-// Hard mode: smarter buying — buys on any pair or run potential, but self-limits to 3/round
+// Hard mode: smarter buying — buys on any pair or run potential, self-limits to 3/round.
+// CHANGED: Added buyLimit guard. Never buys when buyLimit === 0 (buying disabled for game).
 // buysRemaining counts down from MAX_BUYS (5); if ≤ 2, hard AI has already used 3 buys.
-export function aiShouldBuyHard(hand: Card[], discardCard: Card, requirement: RoundRequirement, buysRemaining: number): boolean {
-  if (buysRemaining <= 2) return false  // self-limit: max 3 buys per round
+export function aiShouldBuyHard(
+  hand: Card[],
+  discardCard: Card,
+  requirement: RoundRequirement,
+  buysRemaining: number,
+  buyLimit = 5,
+): boolean {
+  if (buysRemaining <= 2 || buyLimit <= 0) return false
   if (isJoker(discardCard)) return true
   const withCard = aiFindBestMelds([...hand, discardCard], requirement)
   const without = aiFindBestMelds(hand, requirement)
@@ -583,28 +566,31 @@ export function aiShouldBuyHard(hand: Card[], discardCard: Card, requirement: Ro
   return false
 }
 
-// Easy mode: discard a random isolated card (not clearly part of any meld), or highest-value if none.
-// This feels human-like and weaker than medium's strategic discard.
+// Easy AI: discard a fully random non-joker card — GDD Section 11 Easy behavior.
+// Discard logic for Easy AI:
+//   1. Prefer isolated cards (no same-suit adjacent card in hand).
+//   2. If no isolated cards, fall back to highest-value card.
+// Never discards a joker unless the hand is all jokers.
 export function aiChooseDiscardEasy(hand: Card[]): Card {
   if (hand.length === 0) throw new Error('Empty hand')
   const nonJokers = hand.filter(c => !isJoker(c))
-  if (nonJokers.length === 0) return hand[0]
+  const candidates = nonJokers.length > 0 ? nonJokers : hand
 
-  // "Isolated" = no same-rank partner AND no adjacent same-suit card within ±1
-  const isolated = nonJokers.filter(card => {
-    const sameRank = nonJokers.filter(c => c.id !== card.id && c.rank === card.rank)
-    const adjacent = nonJokers.filter(c => c.id !== card.id && c.suit === card.suit && Math.abs(c.rank - card.rank) <= 1)
-    return sameRank.length === 0 && adjacent.length === 0
-  })
+  // Find cards with no same-suit neighbor at rank ± 1
+  const isolated = candidates.filter(card =>
+    !candidates.some(other =>
+      other.id !== card.id &&
+      other.suit === card.suit &&
+      Math.abs(other.rank - card.rank) === 1
+    )
+  )
+  const pool = isolated.length > 0 ? isolated : candidates
 
-  if (isolated.length > 0) {
-    return isolated[Math.floor(Math.random() * isolated.length)]
-  }
-  // All cards have some potential — discard highest value
-  return nonJokers.reduce((max, c) => cardPoints(c.rank) > cardPoints(max.rank) ? c : max)
+  // Within the pool, pick highest point value (random tiebreak)
+  const maxPts = Math.max(...pool.map(c => cardPoints(c.rank)))
+  const best = pool.filter(c => cardPoints(c.rank) === maxPts)
+  return best[Math.floor(Math.random() * best.length)]
 }
-
-// (aiShouldTakeDiscardEasy and aiShouldBuyEasy are defined above)
 
 // Find a natural card in hand that can be swapped with a joker on the table
 export function aiFindJokerSwap(hand: Card[], tablesMelds: Meld[]): { card: Card; meld: Meld } | null {

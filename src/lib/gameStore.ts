@@ -45,6 +45,7 @@ export async function createGame(
   playerIds: string[],
   date: string,
   gameType: string = 'manual',
+  buyLimit: number = 5,
 ): Promise<Game> {
   const roomCode = generateRoomCode()
   const { data: game, error: gameError } = await supabase
@@ -54,6 +55,7 @@ export async function createGame(
       room_code: roomCode,
       is_complete: false,
       game_type: gameType,
+      buy_limit: buyLimit,
     })
     .select()
     .single()
@@ -200,12 +202,13 @@ export async function savePlayedGame(
   players: Array<{ name: string; roundScores: number[] }>,
   date: string,
   gameType: string = 'pass-and-play',
+  buyLimit: number = 5,
 ): Promise<string> {
   const playerRecords = await Promise.all(players.map(p => upsertPlayer(p.name)))
   const roomCode = generateRoomCode()
   const { data: game, error: gameError } = await supabase
     .from('games')
-    .insert({ date, room_code: roomCode, is_complete: true, game_type: gameType })
+    .insert({ date, room_code: roomCode, is_complete: true, game_type: gameType, buy_limit: buyLimit })
     .select()
     .single()
   if (gameError) throw gameError

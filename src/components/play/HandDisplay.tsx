@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useMemo } from 'react'
 import type { Card as CardType } from '../../game/types'
 import CardComponent from './Card'
 
@@ -8,16 +8,16 @@ interface Props {
   cards: CardType[]
   selectedIds: Set<string>
   onToggle: (cardId: string) => void
+  sortMode: SortMode
+  onSortChange: (mode: SortMode) => void
   label?: string
   disabled?: boolean
-  sort?: SortMode
-  onSortChange?: (sort: SortMode) => void
-  newCardIds?: Set<string>
+  newCardId?: string
 }
 
 export const SUIT_ORDER: Record<string, number> = { hearts: 0, diamonds: 1, clubs: 2, spades: 3, joker: 4 }
 
-// Compute horizontal offset per card based on hand size
+// Horizontal overlap offset per card based on hand size
 function cardOffset(count: number): number {
   if (count <= 5) return 56
   if (count <= 7) return 48
@@ -26,57 +26,79 @@ function cardOffset(count: number): number {
   return 24
 }
 
-export default function HandDisplay({ cards, selectedIds, onToggle, label, disabled, sort: sortProp, onSortChange, newCardIds }: Props) {
-  const [sortInternal, setSortInternal] = useState<SortMode>('rank')
-  const sort = sortProp ?? sortInternal
-
-  function setSort(mode: SortMode) {
-    if (onSortChange) onSortChange(mode)
-    else setSortInternal(mode)
-  }
-
+export default function HandDisplay({
+  cards,
+  selectedIds,
+  onToggle,
+  sortMode,
+  onSortChange,
+  label,
+  disabled,
+  newCardId,
+}: Props) {
   const sorted = useMemo(() => {
     return [...cards].sort((a, b) => {
-      if (sort === 'suit') {
+      if (sortMode === 'suit') {
+        // Group by suit (hearts, diamonds, clubs, spades, jokers last), rank ascending within suit
         const s = (SUIT_ORDER[a.suit] ?? 4) - (SUIT_ORDER[b.suit] ?? 4)
         if (s !== 0) return s
         return a.rank - b.rank
       }
-      // rank sort: jokers last, then by rank
+      // Rank sort: jokers last, then rank ascending, tie-break by suit order
+      if (a.suit === 'joker' && b.suit === 'joker') return 0
       if (a.suit === 'joker') return 1
       if (b.suit === 'joker') return -1
-      return a.rank - b.rank
+      if (a.rank !== b.rank) return a.rank - b.rank
+      return (SUIT_ORDER[a.suit] ?? 4) - (SUIT_ORDER[b.suit] ?? 4)
     })
-  }, [cards, sort])
+  }, [cards, sortMode])
 
   const offset = cardOffset(sorted.length)
   const containerWidth = sorted.length > 0 ? (sorted.length - 1) * offset + 48 : 48
-  // Card height = 72px, selected lift = 12px (translate-y-3), new badge = 8px above
+  // 72px card height + 12px selected lift + 4px new badge headroom
   const containerHeight = 88
 
   return (
     <div>
+      {/* Sort toggle + label row */}
       <div className="flex items-center justify-between mb-2">
         {label && (
-          <p className="text-xs text-[#a8d0a8]">
-            {label}
-          </p>
+          <p className="text-xs text-[#a8d0a8]">{label}</p>
         )}
-        <div className="bg-[#1e4a2e] rounded-lg p-0.5 flex gap-0.5 ml-auto">
-          {(['rank', 'suit'] as SortMode[]).map(mode => (
+
+        {/* Toggle pill — spec §2.5 */}
+        <div
+          className="flex ml-auto"
+          style={{
+            background: '#0f2218',
+            border: '1px solid #2d5a3a',
+            borderRadius: '6px',
+            overflow: 'hidden',
+          }}
+        >
+          {(['rank', 'suit'] as SortMode[]).map((mode) => (
             <button
               key={mode}
-              onClick={() => setSort(mode)}
-              className={`px-2 py-0.5 text-[10px] font-semibold rounded transition-all ${
-                sort === mode ? 'bg-[#e2b858] text-[#2c1810] shadow-sm' : 'text-[#8bc48b]'
-              }`}
+              onClick={() => onSortChange(mode)}
+              style={{
+                background: sortMode === mode ? '#1e4a2e' : 'transparent',
+                color: sortMode === mode ? '#e2b858' : '#6aad7a',
+                padding: '4px 10px',
+                fontSize: '11px',
+                fontWeight: 600,
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'background 120ms, color 120ms',
+                minHeight: '28px',
+              }}
             >
-              {mode.charAt(0).toUpperCase() + mode.slice(1)}
+              {mode === 'rank' ? 'Rank' : 'Suit'}
             </button>
           ))}
         </div>
       </div>
 
+      {/* Hand area */}
       {cards.length === 0 ? (
         <p className="text-sm text-[#8bc48b] italic py-2">No cards</p>
       ) : (
@@ -90,21 +112,20 @@ export default function HandDisplay({ cards, selectedIds, onToggle, label, disab
           >
             {sorted.map((card, index) => {
               const isSelected = selectedIds.has(card.id)
-              const isNewCard = newCardIds?.has(card.id) ?? false
               return (
                 <div
                   key={card.id}
                   className="absolute bottom-0"
                   style={{
                     left: `${index * offset}px`,
-                    zIndex: isSelected ? sorted.length + 10 : index + 1,
+                    zIndex: isSelected ? sorted.length + 10 : card.id === newCardId ? sorted.length + 5 : index + 1,
                     transition: 'left 150ms ease',
                   }}
                 >
                   <CardComponent
                     card={card}
                     selected={isSelected}
-                    isNew={isNewCard}
+                    isNew={card.id === newCardId}
                     onClick={disabled ? undefined : () => onToggle(card.id)}
                     disabled={disabled}
                   />

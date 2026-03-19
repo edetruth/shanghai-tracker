@@ -1,354 +1,580 @@
-import { useState } from 'react'
-import { X } from 'lucide-react'
-import type { Card as CardType, Meld, RoundRequirement } from '../../game/types'
-import { canLayOff, simulateLayOff, findSwappableJoker } from '../../game/meld-validator'
-import { aiFindBestMelds } from '../../game/ai'
-import CardComponent from './Card'
-import TableMelds from './TableMelds'
+import { useState, useRef, useEffect, useMemo } from 'react'
+import type { Card as CardType, Meld, Player } from '../../game/types'
+import { canLayOff } from '../../game/meld-validator'
+import { haptic } from '../../lib/haptics'
 
 interface Props {
+  melds: Meld[]
+  currentPlayerId: string
+  currentPlayerName: string
   hand: CardType[]
-  tablesMelds: Meld[]
   onLayOff: (card: CardType, meld: Meld, jokerPosition?: 'low' | 'high') => void
-  onSwapJoker: (naturalCard: CardType, meld: Meld) => void
-  onClose: () => void
-  errorMsg?: string | null
-  // Pre-lay-down swap mode: player hasn't laid down yet, must lay down after swap
-  preLayDown?: boolean
-  requirement?: RoundRequirement
-  onPreLayDownSwap?: (card: CardType, meld: Meld) => void
+  onGoOut: () => void
+  onDone: () => void
+  players: Player[]
 }
 
-function cardName(card: CardType): string {
-  const ranks: Record<number, string> = { 0: 'Joker', 1: 'A', 11: 'J', 12: 'Q', 13: 'K' }
-  const suits: Record<string, string> = { hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠' }
-  return `${ranks[card.rank] ?? String(card.rank)}${suits[card.suit] ?? ''}`
+// ── Suit colour helpers (spec §1.2) ──────────────────────────────────────────
+
+function suitBg(suit: string): string {
+  if (suit === 'joker') return '#fff8e0'
+  if (suit === 'hearts') return '#fff0f0'
+  if (suit === 'diamonds') return '#f0f5ff'
+  if (suit === 'clubs') return '#e0f7e8'
+  return '#eeecff'
 }
 
-type Mode = 'layoff' | 'swap'
+function suitColor(suit: string): string {
+  if (suit === 'joker') return '#8b6914'
+  if (suit === 'hearts') return '#c0393b'
+  if (suit === 'diamonds') return '#2158b8'
+  if (suit === 'clubs') return '#1a6b3a'
+  return '#3d2b8e'
+}
 
-export default function LayOffModal({ hand, tablesMelds, onLayOff, onSwapJoker, onClose, errorMsg, preLayDown, requirement, onPreLayDownSwap }: Props) {
-  const [mode, setMode] = useState<Mode>(preLayDown ? 'swap' : 'layoff')
-  const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
-  const [selectedMeldId, setSelectedMeldId] = useState<string | null>(null)
-  const [jokerLayOffPos, setJokerLayOffPos] = useState<'low' | 'high' | null>(null)
+function rankLabel(rank: number): string {
+  if (rank === 0) return 'JKR'
+  if (rank === 1 || rank === 14) return 'A'
+  if (rank === 11) return 'J'
+  if (rank === 12) return 'Q'
+  if (rank === 13) return 'K'
+  return String(rank)
+}
 
-  const selectedCard = hand.find(c => c.id === selectedCardId) ?? null
-  const selectedMeld = tablesMelds.find(m => m.id === selectedMeldId) ?? null
+function suitSymbol(suit: string): string {
+  if (suit === 'hearts') return '♥'
+  if (suit === 'diamonds') return '♦'
+  if (suit === 'clubs') return '♣'
+  if (suit === 'spades') return '♠'
+  return ''
+}
 
-  // Natural cards only for swap mode
-  const swapableHand = mode === 'swap' ? hand.filter(c => c.suit !== 'joker') : hand
+function getJokerLabel(meld: Meld, cardId: string): string {
+  if (meld.type !== 'run') return 'JKR'
+  const m = meld.jokerMappings.find(j => j.cardId === cardId)
+  if (!m) return 'JKR'
+  return `${rankLabel(m.representsRank)}${suitSymbol(m.representsSuit)}`
+}
 
-  function handleCardClick(cardId: string) {
-    setSelectedCardId(prev => prev === cardId ? null : cardId)
-    setSelectedMeldId(null)
-    setJokerLayOffPos(null)
-  }
+// ── 36×50px card used throughout this modal ──────────────────────────────────
 
-  function handleMeldClick(meld: Meld) {
-    setSelectedMeldId(prev => prev === meld.id ? null : meld.id)
-    setJokerLayOffPos(null)
-  }
+function ModalCard({
+  card, meld, selected, selectionIndex, onClick,
+}: {
+  card: CardType
+  meld?: Meld
+  selected?: boolean
+  selectionIndex?: number
+  onClick?: () => void
+}) {
+  const isJoker = card.suit === 'joker'
+  const label = isJoker && meld
+    ? getJokerLabel(meld, card.id)
+    : isJoker ? 'JKR' : `${rankLabel(card.rank)}${suitSymbol(card.suit)}`
+  const interactive = !!onClick
 
-  function handleModeChange(m: Mode) {
-    setMode(m)
-    setSelectedCardId(null)
-    setSelectedMeldId(null)
-    setJokerLayOffPos(null)
-  }
+  return (
+    <div style={{ position: 'relative', flexShrink: 0 }}>
+      <div
+        onClick={onClick}
+        style={{
+          width: 36,
+          height: 50,
+          backgroundColor: suitBg(card.suit),
+          border: selected ? '2px solid #e2b858' : '1.5px solid rgba(0,0,0,0.14)',
+          borderRadius: 5,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: suitColor(card.suit),
+          lineHeight: 1.1,
+          overflow: 'hidden',
+          userSelect: 'none',
+          cursor: interactive ? 'pointer' : 'default',
+          transform: selected ? 'translateY(-8px)' : undefined,
+          boxShadow: selected ? '0 4px 12px rgba(0,0,0,0.35)' : undefined,
+          transition: 'transform 100ms, box-shadow 100ms',
+          minWidth: interactive ? 44 : undefined,
+          minHeight: interactive ? 44 : undefined,
+        }}
+      >
+        {isJoker ? (
+          <>
+            <span style={{ fontSize: label.length > 3 ? 7 : 9, fontWeight: 700 }}>{label}</span>
+            <span style={{ fontSize: 11 }}>🃏</span>
+          </>
+        ) : (
+          <>
+            <span style={{ fontSize: 11, fontWeight: 800 }}>{rankLabel(card.rank)}</span>
+            <span style={{ fontSize: 14 }}>{suitSymbol(card.suit)}</span>
+          </>
+        )}
+      </div>
+      {selectionIndex !== undefined && (
+        <div style={{
+          position: 'absolute',
+          top: -4,
+          right: -4,
+          width: 14,
+          height: 14,
+          borderRadius: 7,
+          background: '#e2b858',
+          color: '#2c1810',
+          fontSize: 7,
+          fontWeight: 700,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          pointerEvents: 'none',
+          zIndex: 1,
+        }}>
+          {selectionIndex + 1}
+        </div>
+      )}
+    </div>
+  )
+}
 
-  // Smart meld sorting: when a card is selected, bubble valid targets to the top
-  const validLayOffMeldIds: Set<string> | undefined = (() => {
-    if (!selectedCard || mode !== 'layoff') return undefined
-    return new Set(tablesMelds.filter(m => canLayOff(selectedCard, m)).map(m => m.id))
-  })()
+// ── Player group helpers ──────────────────────────────────────────────────────
 
-  const displayMelds = (() => {
-    if (!selectedCard) return tablesMelds
-    if (mode === 'layoff') {
-      const valid = tablesMelds.filter(m => validLayOffMeldIds!.has(m.id))
-      const invalid = tablesMelds.filter(m => !validLayOffMeldIds!.has(m.id))
-      return [...valid, ...invalid]
+interface PlayerGroup {
+  playerId: string
+  playerName: string
+  melds: Meld[]
+}
+
+function buildGroups(melds: Meld[], currentPlayerId: string, players: Player[]): PlayerGroup[] {
+  const map = new Map<string, PlayerGroup>()
+
+  // Current player first
+  const me = players.find(p => p.id === currentPlayerId)
+  if (me) map.set(currentPlayerId, { playerId: currentPlayerId, playerName: me.name, melds: [] })
+
+  // Others in player order
+  for (const player of players) {
+    if (!map.has(player.id)) {
+      map.set(player.id, { playerId: player.id, playerName: player.name, melds: [] })
     }
-    if (mode === 'swap') {
-      // Runs with jokers swappable for this card go first
-      const validSwap = tablesMelds.filter(m => m.type === 'run' && findSwappableJoker(selectedCard, m))
-      const rest = tablesMelds.filter(m => !(m.type === 'run' && findSwappableJoker(selectedCard, m)))
-      return [...validSwap, ...rest]
-    }
-    return tablesMelds
-  })()
-
-  // Joker swap targets: only runs (sets excluded per house rules)
-  const swapRunMeldIds = new Set(tablesMelds.filter(m => m.type === 'run' && m.jokerMappings.length > 0).map(m => m.id))
-
-  // Joker placement ambiguity (lay-off mode only)
-  const isJokerLayOff = mode === 'layoff' && selectedCard?.suit === 'joker' && selectedMeld?.type === 'run'
-  const jokerCanLow = isJokerLayOff && (selectedMeld!.runMin ?? 1) > 1
-  const jokerCanHigh = isJokerLayOff && (selectedMeld!.runMax ?? 13) < 14
-  const needsJokerPicker = jokerCanLow && jokerCanHigh
-  // When only one end available, auto-resolve without requiring a picker choice
-  const effectiveJokerPos: 'low' | 'high' | undefined = isJokerLayOff
-    ? (needsJokerPicker ? jokerLayOffPos ?? undefined : (jokerCanLow ? 'low' : 'high'))
-    : undefined
-
-  // Rank display helpers for picker
-  function rankLabel(rank: number): string {
-    if (rank === 1 || rank === 14) return 'A'
-    if (rank === 11) return 'J'; if (rank === 12) return 'Q'; if (rank === 13) return 'K'
-    return String(rank)
   }
-  const suitSymbol: Record<string, string> = { hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠' }
 
-  // Validation
-  let isValid = false
-  let validationMessage = ''
+  // Distribute melds to groups
+  for (const meld of melds) {
+    let group = map.get(meld.ownerId)
+    if (!group) {
+      group = { playerId: meld.ownerId, playerName: meld.ownerName, melds: [] }
+      map.set(meld.ownerId, group)
+    }
+    group.melds.push(meld)
+  }
 
-  if (selectedCard && selectedMeld) {
-    if (mode === 'layoff') {
-      isValid = canLayOff(selectedCard, selectedMeld)
-      validationMessage = isValid
-        ? 'Valid lay off ✓'
-        : 'This card cannot be laid off on that meld'
+  return [...map.values()].filter(g => g.melds.length > 0)
+}
 
-      // Joker picker: must choose position before confirming
-      if (isValid && needsJokerPicker && !jokerLayOffPos) {
-        isValid = false
-        validationMessage = ''  // picker is shown instead
-      }
+// ── LayOffModal ───────────────────────────────────────────────────────────────
 
-      // Pre-validate: would this lay-off leave exactly 1 card that can't be played?
-      if (isValid) {
-        const handAfter = hand.filter(c => c.id !== selectedCard.id)
-        if (handAfter.length === 1) {
-          const remaining = handAfter[0]
-          // Check against SIMULATED updated melds (after the lay-off extends the target meld)
-          const simulatedMelds = tablesMelds.map(m =>
-            m.id === selectedMeld.id ? simulateLayOff(selectedCard, m, effectiveJokerPos) : m
-          )
-          const canRemainPlay = simulatedMelds.some(m => canLayOff(remaining, m))
-          if (!canRemainPlay) {
-            isValid = false
-            validationMessage = `Can't lay off — your remaining ${cardName(remaining)} can't be played anywhere, and you can't go out by discarding. Keep both cards and discard one instead.`
-          } else {
-            validationMessage = `Valid lay off ✓ — you can go out by laying off ${cardName(remaining)} next!`
-          }
+export default function LayOffModal({
+  melds, currentPlayerId, currentPlayerName, hand, onLayOff, onGoOut, onDone, players,
+}: Props) {
+  const [selectedCards, setSelectedCards] = useState<CardType[]>([])
+  const [layOffCount, setLayOffCount] = useState(0)
+  const [pendingQueue, setPendingQueue] = useState<{ cards: CardType[], meldId: string } | null>(null)
+  const [postLayOffScrollMeldId, setPostLayOffScrollMeldId] = useState<string | null>(null)
+
+  const meldRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+
+  // Intersection-based validMeldIds: a meld glows only if ALL selected cards fit it
+  const validMeldIds = useMemo<Set<string> | null>(() => {
+    if (selectedCards.length === 0) return null
+    let intersection: Set<string> | null = null
+    for (const card of selectedCards) {
+      const validForCard = new Set(melds.filter(m => canLayOff(card, m)).map(m => m.id))
+      if (intersection === null) {
+        intersection = validForCard
+      } else {
+        for (const id of [...intersection]) {
+          if (!validForCard.has(id)) intersection.delete(id)
         }
       }
-    } else {
-      const joker = findSwappableJoker(selectedCard, selectedMeld)
-      isValid = joker !== null
-      if (isValid && joker) {
-        if (preLayDown && requirement) {
-          // Pre-lay-down swap: verify the player can lay down after getting this joker
-          const simulatedHand = [...hand.filter(c => c.id !== selectedCard.id), joker]
-          const canLayDown = aiFindBestMelds(simulatedHand, requirement) !== null
-          if (!canLayDown) {
-            isValid = false
-            validationMessage = "You can't lay down even with this joker. Swap not allowed."
-          } else {
-            validationMessage = 'Valid swap ✓ — you\'ll take the joker and must lay down'
-          }
-        } else {
-          validationMessage = 'Valid swap ✓ — you\'ll take the joker'
-        }
-      } else if (!isValid) {
-        validationMessage = 'No joker in that meld represents this card'
+    }
+    return intersection ?? new Set()
+  }, [selectedCards, melds])
+
+  const hasValidMelds = validMeldIds !== null && validMeldIds.size > 0
+
+  // Auto-scroll to first valid meld when selection changes
+  useEffect(() => {
+    if (!hasValidMelds || !validMeldIds) return
+    for (const [id, el] of meldRefs.current) {
+      if (validMeldIds.has(id)) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+        break
       }
+    }
+  }, [selectedCards]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Scroll to tapped meld after lay-off
+  useEffect(() => {
+    if (!postLayOffScrollMeldId) return
+    const el = meldRefs.current.get(postLayOffScrollMeldId)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    setPostLayOffScrollMeldId(null)
+  }, [postLayOffScrollMeldId])
+
+  // pendingQueue effect: process one card per render cycle so each onLayOff
+  // sees the updated meld state from the parent before the next card is placed
+  useEffect(() => {
+    if (!pendingQueue || pendingQueue.cards.length === 0) return
+    const [firstCard, ...rest] = pendingQueue.cards
+    const currentMeld = melds.find(m => m.id === pendingQueue.meldId)
+    if (!currentMeld) { setPendingQueue(null); return }
+    const willGoOut = rest.length === 0 && hand.length === 1
+    onLayOff(firstCard, currentMeld)
+    if (willGoOut) onGoOut()
+    setPendingQueue(rest.length > 0 ? { cards: rest, meldId: pendingQueue.meldId } : null)
+  }, [pendingQueue, melds]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Dynamic subtitle
+  let subtitle = 'Tap cards to select, then tap a meld'
+  let subtitleColor = '#a8d0a8'
+  if (selectedCards.length > 0) {
+    if (hasValidMelds) {
+      subtitle = `${validMeldIds!.size} valid meld${validMeldIds!.size !== 1 ? 's' : ''} — tap to lay off all`
+      subtitleColor = '#6aad7a'
+    } else {
+      subtitle = selectedCards.length === 1
+        ? "This card doesn't fit any meld"
+        : 'No single meld accepts all selected cards — try a different combination'
+      subtitleColor = '#c08040'
     }
   }
 
-  function handleConfirm() {
-    if (!selectedCard || !selectedMeld || !isValid) return
-    if (mode === 'layoff') {
-      onLayOff(selectedCard, selectedMeld, effectiveJokerPos)
-    } else if (preLayDown && onPreLayDownSwap) {
-      onPreLayDownSwap(selectedCard, selectedMeld)
-      return // parent closes the modal
+  function handleCardSelect(card: CardType) {
+    haptic('tap')
+    setSelectedCards(prev => {
+      const idx = prev.findIndex(c => c.id === card.id)
+      if (idx >= 0) return prev.filter(c => c.id !== card.id)
+      return [...prev, card]
+    })
+  }
+
+  function handleMeldTap(meld: Meld) {
+    if (selectedCards.length === 0 || !validMeldIds?.has(meld.id)) return
+    haptic('tap')
+    setLayOffCount(c => c + selectedCards.length)
+    setPendingQueue({ cards: selectedCards, meldId: meld.id })
+    setSelectedCards([])
+    setPostLayOffScrollMeldId(meld.id)
+  }
+
+  const groups = buildGroups(melds, currentPlayerId, players)
+
+  // Selection bar status
+  let selectionStatus = ''
+  if (selectedCards.length > 0) {
+    if (hasValidMelds) {
+      selectionStatus = `${validMeldIds!.size} meld${validMeldIds!.size !== 1 ? 's' : ''} accept all selected`
     } else {
-      onSwapJoker(selectedCard, selectedMeld)
+      selectionStatus = selectedCards.length === 1 ? 'No valid melds for this card' : 'No single meld accepts all'
     }
-    // Reset selections so player can do another action
-    setSelectedCardId(null)
-    setSelectedMeldId(null)
+  }
+
+  // Hint text for hand strip
+  let hint = 'Tap a card to select it'
+  if (selectedCards.length > 0) {
+    hint = hasValidMelds
+      ? 'Tap a glowing meld above to lay off all selected'
+      : 'No valid melds — tap another card or Done'
   }
 
   return (
     <>
-      {/* Overlay */}
-      <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
+      {/* Pulsing glow keyframe for valid melds */}
+      <style>{`
+        @keyframes lomPulse {
+          0%, 100% { box-shadow: 0 0 6px rgba(106,173,122,0.4); }
+          50%       { box-shadow: 0 0 18px rgba(106,173,122,0.9); }
+        }
+      `}</style>
 
-      {/* Bottom sheet */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl max-h-[85vh] flex flex-col">
-        {/* Handle */}
-        <div className="flex justify-center pt-2 pb-1">
-          <div className="w-10 h-1 bg-[#e2ddd2] rounded-full" />
-        </div>
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 pb-3 border-b border-[#e2ddd2]">
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 50,
+          backgroundColor: '#1e4a2e',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
+      >
+        {/* ── Header (fixed) ─────────────────────────────────────────────── */}
+        <div
+          style={{
+            flexShrink: 0,
+            backgroundColor: '#0f2218',
+            padding: '12px 14px',
+            paddingTop: 'max(12px, env(safe-area-inset-top))',
+            borderBottom: '1px solid #2d5a3a',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
           <div>
-            <h2 className="font-bold text-[#2c1810] text-base">
-              {preLayDown ? 'Swap Joker' : 'Lay Off / Swap'}
-            </h2>
-            {preLayDown && (
-              <p className="text-xs text-[#e2b858] font-semibold mt-0.5">You must lay down after this swap</p>
-            )}
-            {!preLayDown && mode === 'layoff' && hand.length > 1 && (
-              <p className="text-xs text-[#8b7355] mt-0.5">
-                Lay off one card at a time — keep going until you're ready to discard
-              </p>
-            )}
-            {!preLayDown && mode === 'layoff' && hand.length === 1 && (
-              <p className="text-xs text-[#2d7a3a] font-semibold mt-0.5">
-                Last card — lay it off to go out!
-              </p>
-            )}
-          </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-[#a08c6e] active:bg-[#efe9dd]">
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-          {/* Empty melds message */}
-          {tablesMelds.length === 0 && (
-            <div className="text-center py-4">
-              <p className="text-sm text-[#a08c6e] italic">No melds on the table yet.</p>
-              <p className="text-xs text-[#a08c6e] mt-1">Lay off once other players have laid down melds.</p>
-            </div>
-          )}
-
-          {/* Mode tabs — hidden in pre-lay-down mode (swap only) */}
-          {!preLayDown && (
-            <div className="bg-[#efe9dd] rounded-xl p-1 flex gap-1">
-              <button
-                onClick={() => handleModeChange('layoff')}
-                className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
-                  mode === 'layoff' ? 'bg-white text-[#8b6914] shadow-sm' : 'text-[#8b7355]'
-                }`}
-              >
-                Lay Off
-              </button>
-              <button
-                onClick={() => handleModeChange('swap')}
-                className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
-                  mode === 'swap' ? 'bg-white text-[#8b6914] shadow-sm' : 'text-[#8b7355]'
-                }`}
-              >
-                Swap Joker
-              </button>
-            </div>
-          )}
-
-          {/* Swap mode hint when no RUNS have jokers */}
-          {mode === 'swap' && swapRunMeldIds.size === 0 && tablesMelds.length > 0 && (
-            <p className="text-sm text-[#a08c6e] italic text-center py-2">
-              No runs with jokers on the table (jokers in sets cannot be swapped)
+            <p style={{ color: '#a8d0a8', fontSize: 13, fontWeight: 500, margin: 0 }}>
+              Lay Off Cards
             </p>
-          )}
-
-          {/* Step 1: pick card */}
-          <div>
-            <p className="text-xs text-[#8b7355] mb-1.5">
-              Step 1: Pick a card from your hand
-              {mode === 'swap' && ' (natural cards only)'}
-            </p>
-            <div className="flex gap-1.5 overflow-x-auto pb-2" style={{ WebkitOverflowScrolling: 'touch' }}>
-              {swapableHand.map(card => (
-                <CardComponent
-                  key={card.id}
-                  card={card}
-                  selected={selectedCardId === card.id}
-                  onClick={() => handleCardClick(card.id)}
-                />
-              ))}
-              {swapableHand.length === 0 && (
-                <p className="text-sm text-[#a08c6e] italic">No eligible cards</p>
-              )}
-            </div>
-          </div>
-
-          {/* Step 2: pick meld */}
-          {selectedCardId && (
-            <div>
-              <p className="text-xs text-[#8b7355] mb-1.5">
-                Step 2: Pick a meld on the table
-                {mode === 'layoff' && validLayOffMeldIds!.size === 0 && (
-                  <span className="text-[#b83232] ml-1">— this card can't be laid off on any meld</span>
-                )}
-              </p>
-              {tablesMelds.length === 0 ? (
-                <p className="text-sm text-[#a08c6e] italic">No melds on the table yet</p>
-              ) : (
-                <TableMelds
-                  melds={displayMelds}
-                  onMeldClick={handleMeldClick}
-                  highlightMeldId={selectedMeldId ?? undefined}
-                  jokerMeldIds={mode === 'swap' ? swapRunMeldIds : undefined}
-                  validLayOffMeldIds={mode === 'layoff' ? validLayOffMeldIds : undefined}
-                  layOffCard={mode === 'layoff' ? selectedCard : null}
-                />
-              )}
-            </div>
-          )}
-
-          {/* Joker placement picker */}
-          {needsJokerPicker && selectedCard && selectedMeld && (
-            <div>
-              <p className="text-xs text-[#8b7355] mb-1.5 font-medium">Where does this joker go?</p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setJokerLayOffPos('low')}
-                  className={`flex-1 py-2.5 px-3 rounded-xl text-sm font-semibold border-2 transition-all ${
-                    jokerLayOffPos === 'low'
-                      ? 'border-[#e2b858] bg-[#fdf8ec] text-[#8b6914]'
-                      : 'border-[#e2ddd2] bg-white text-[#8b7355]'
-                  }`}
-                >
-                  ← JKR, {rankLabel(selectedMeld.runMin!)}{suitSymbol[selectedMeld.runSuit!] ?? ''}, …
-                </button>
-                <button
-                  onClick={() => setJokerLayOffPos('high')}
-                  className={`flex-1 py-2.5 px-3 rounded-xl text-sm font-semibold border-2 transition-all ${
-                    jokerLayOffPos === 'high'
-                      ? 'border-[#e2b858] bg-[#fdf8ec] text-[#8b6914]'
-                      : 'border-[#e2ddd2] bg-white text-[#8b7355]'
-                  }`}
-                >
-                  …, {rankLabel(selectedMeld.runMax!)}{suitSymbol[selectedMeld.runSuit!] ?? ''}, JKR →
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Validation message */}
-          {selectedCard && selectedMeld && validationMessage && (
-            <p className={`text-xs font-medium ${isValid ? 'text-[#2d7a3a]' : 'text-[#b83232]'}`}>
-              {validationMessage}
-            </p>
-          )}
-        </div>
-
-        {/* External error (safety-net undo message) */}
-        {errorMsg && (
-          <div className="px-4 pb-2">
-            <p className="text-xs text-[#b83232] bg-[#fff0f0] border border-[#f0c0c0] rounded-lg px-3 py-2">
-              {errorMsg}
+            <p style={{ color: subtitleColor, fontSize: 11, margin: '2px 0 0', transition: 'color 0.2s' }}>
+              {subtitle}
             </p>
           </div>
-        )}
 
-        {/* Action buttons */}
-        <div className="px-4 pb-8 pt-3 border-t border-[#e2ddd2] flex gap-3">
-          <button onClick={onClose} className="btn-secondary flex-1">Cancel</button>
           <button
-            onClick={handleConfirm}
-            disabled={!isValid}
-            className="btn-primary flex-1"
+            onClick={onDone}
+            style={{
+              background: '#e2b858',
+              color: '#2c1810',
+              border: 'none',
+              borderRadius: 8,
+              padding: '6px 14px',
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: 'pointer',
+              minHeight: 44,
+              minWidth: 44,
+            }}
           >
-            {preLayDown ? 'Swap & Lay Down' : 'Confirm'}
+            Done ✓
           </button>
+        </div>
+
+        {/* ── Meld body (scrollable) ──────────────────────────────────────── */}
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: 12,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
+          }}
+        >
+          {melds.length === 0 ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, minHeight: 80 }}>
+              <p style={{ color: '#3a5a3a', fontSize: 12, fontStyle: 'italic', margin: 0 }}>
+                No melds on the table yet
+              </p>
+            </div>
+          ) : (
+            groups.map((group, gi) => {
+              const isMe = group.playerId === currentPlayerId
+              return (
+                <div key={group.playerId}>
+                  {/* Divider between player groups */}
+                  {gi > 0 && (
+                    <div style={{ height: 1, backgroundColor: '#2d5a3a', marginBottom: 10 }} />
+                  )}
+
+                  {/* Player section label */}
+                  <p style={{
+                    color: isMe ? '#e2b858' : '#6aad7a',
+                    fontSize: 9,
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    letterSpacing: '1px',
+                    margin: '0 0 6px 0',
+                    lineHeight: 1,
+                  }}>
+                    {isMe ? 'Your melds' : group.playerName}
+                  </p>
+
+                  {/* Melds row — wraps if many */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {group.melds.map(meld => {
+                      const isValid = validMeldIds?.has(meld.id) ?? false
+                      const isDimmed = selectedCards.length > 0 && !isValid
+
+                      return (
+                        <div
+                          key={meld.id}
+                          ref={el => {
+                            if (el) meldRefs.current.set(meld.id, el)
+                            else meldRefs.current.delete(meld.id)
+                          }}
+                          onClick={() => handleMeldTap(meld)}
+                          style={{
+                            backgroundColor: '#0f2218',
+                            border: isValid
+                              ? '1.5px solid #6aad7a'
+                              : isMe
+                                ? '1.5px solid #3b6d3a'
+                                : '1.5px solid #2d5a3a',
+                            borderRadius: 8,
+                            padding: '6px 8px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 4,
+                            opacity: isDimmed ? 0.35 : 1,
+                            cursor: isValid ? 'pointer' : 'default',
+                            flexShrink: 0,
+                            transition: 'opacity 0.15s',
+                            animation: isValid ? 'lomPulse 1.4s ease-in-out infinite' : 'none',
+                          }}
+                        >
+                          {/* Owner label above cards */}
+                          <p style={{
+                            fontSize: 8,
+                            color: isValid ? '#6aad7a' : '#3a5a3a',
+                            margin: 0,
+                            lineHeight: 1,
+                          }}>
+                            {meld.type === 'run' ? 'run' : 'set'} · {isMe ? currentPlayerName.split(' ')[0] : meld.ownerName.split(' ')[0]}
+                          </p>
+
+                          {/* Full-size 36×50 cards */}
+                          <div style={{ display: 'flex', gap: 2 }}>
+                            {meld.cards.map(card => (
+                              <ModalCard key={card.id} card={card} meld={meld} />
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+
+        {/* ── Hand strip (fixed bottom) ───────────────────────────────────── */}
+        <div
+          style={{
+            flexShrink: 0,
+            backgroundColor: '#0f2218',
+            borderTop: '1px solid #2d5a3a',
+            padding: '10px 12px',
+            paddingBottom: 'max(10px, env(safe-area-inset-bottom))',
+          }}
+        >
+          {/* Label row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <p style={{ color: '#6aad7a', fontSize: 9, fontWeight: 600, margin: 0 }}>
+                Your hand ({hand.length} card{hand.length !== 1 ? 's' : ''})
+              </p>
+              {selectedCards.length > 0 && (
+                <div style={{
+                  background: '#e2b858',
+                  color: '#2c1810',
+                  fontSize: 8,
+                  fontWeight: 700,
+                  borderRadius: 8,
+                  padding: '1px 6px',
+                }}>
+                  {selectedCards.length} selected
+                </div>
+              )}
+            </div>
+            {layOffCount > 0 && (
+              <p style={{ color: '#e2b858', fontSize: 9, fontWeight: 600, margin: 0 }}>
+                {layOffCount} laid off this turn
+              </p>
+            )}
+          </div>
+
+          {/* Selection bar */}
+          <div style={{
+            border: selectedCards.length > 0 ? '1.5px solid #e2b858' : '1.5px solid #2d5a3a',
+            borderRadius: 6,
+            padding: '6px 10px',
+            marginBottom: 6,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            opacity: selectedCards.length > 0 ? 1 : 0.5,
+            background: '#0f2218',
+            minHeight: 32,
+          }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {selectedCards.length === 0 ? (
+                <p style={{ color: '#6aad7a', fontSize: 9, margin: 0, fontStyle: 'italic' }}>
+                  No cards selected
+                </p>
+              ) : (
+                <>
+                  <p style={{
+                    color: '#e2b858', fontSize: 10, margin: '0 0 1px', fontWeight: 600,
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  }}>
+                    {selectedCards.map(c =>
+                      c.suit === 'joker' ? 'JKR' : `${rankLabel(c.rank)}${suitSymbol(c.suit)}`
+                    ).join(', ')}
+                  </p>
+                  <p style={{ color: hasValidMelds ? '#6aad7a' : '#c08040', fontSize: 9, margin: 0 }}>
+                    {selectionStatus}
+                  </p>
+                </>
+              )}
+            </div>
+            {selectedCards.length > 0 && (
+              <button
+                onClick={() => setSelectedCards([])}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid #3a5a3a',
+                  borderRadius: 4,
+                  color: '#6aad7a',
+                  fontSize: 9,
+                  fontWeight: 600,
+                  padding: '3px 8px',
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                  marginLeft: 8,
+                  minHeight: 24,
+                }}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          {/* Hint */}
+          <p style={{ color: '#e2b858', fontSize: 9, margin: '0 0 8px', lineHeight: 1.3 }}>
+            {hint}
+          </p>
+
+          {/* Cards — horizontal scroll */}
+          {hand.length === 0 ? (
+            <p style={{ color: '#6aad7a', fontSize: 11, fontStyle: 'italic', margin: 0 }}>
+              Hand is empty — going out!
+            </p>
+          ) : (
+            <div
+              style={{
+                display: 'flex',
+                gap: 4,
+                overflowX: 'auto',
+                paddingBottom: 4,
+                scrollbarWidth: 'none',
+              }}
+              className="[&::-webkit-scrollbar]:hidden"
+            >
+              {hand.map(card => {
+                const selIdx = selectedCards.findIndex(c => c.id === card.id)
+                return (
+                  <ModalCard
+                    key={card.id}
+                    card={card}
+                    selected={selIdx >= 0}
+                    selectionIndex={selIdx >= 0 ? selIdx : undefined}
+                    onClick={() => handleCardSelect(card)}
+                  />
+                )
+              })}
+            </div>
+          )}
         </div>
       </div>
     </>

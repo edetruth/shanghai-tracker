@@ -1,11 +1,11 @@
 import type { Card, Meld, JokerMapping, RoundRequirement } from './types'
 import { MIN_SET_SIZE, MIN_RUN_SIZE } from './rules'
 
-// Returns true if cards form a valid set (3+ same rank, >=1 natural)
+// Returns true if cards form a valid set (3+ same rank; all-joker sets are valid per GDD 3.1)
 export function isValidSet(cards: Card[]): boolean {
   if (cards.length < MIN_SET_SIZE) return false
   const naturals = cards.filter(c => c.suit !== 'joker')
-  if (naturals.length === 0) return false
+  if (naturals.length === 0) return true  // all-joker set is valid (GDD Section 3.1)
   const rank = naturals[0].rank
   return naturals.every(c => c.rank === rank)
 }
@@ -20,12 +20,12 @@ function canFormRun(sortedRanks: number[], jokerCount: number): boolean {
   return jokerCount >= gaps
 }
 
-// Returns true if cards form a valid run (4+ same suit in sequence, >=1 natural, ace can be high or low, no wrap)
+// Returns true if cards form a valid run (4+ same suit in sequence; all-joker runs are valid per GDD 3.2; ace can be high or low, no wrap)
 export function isValidRun(cards: Card[]): boolean {
   if (cards.length < MIN_RUN_SIZE) return false
   const naturals = cards.filter(c => c.suit !== 'joker')
   const jokers = cards.filter(c => c.suit === 'joker')
-  if (naturals.length === 0) return false
+  if (naturals.length === 0) return true  // all-joker run is valid (GDD Section 3.2)
 
   const suit = naturals[0].suit
   if (suit === 'joker') return false
@@ -50,7 +50,11 @@ export function isValidRun(cards: Card[]): boolean {
   return false
 }
 
-// Returns true if the proposed melds satisfy the round requirement
+// Returns true if the proposed melds satisfy the round requirement.
+// Bonus meld type restriction (GDD Section 3.4): extra melds must match the round type.
+//   Sets-only round (runs===0): only sets allowed — no runs, even as bonus.
+//   Runs-only round (sets===0): only runs allowed — no sets, even as bonus.
+//   Mixed round (both>0): any valid meld type is allowed.
 export function meetsRoundRequirement(meldCards: Card[][], requirement: RoundRequirement): boolean {
   let setCount = 0
   let runCount = 0
@@ -59,6 +63,8 @@ export function meetsRoundRequirement(meldCards: Card[][], requirement: RoundReq
     else if (isValidRun(cards)) runCount++
     else return false
   }
+  if (requirement.runs === 0 && runCount > 0) return false  // sets-only round: no runs allowed
+  if (requirement.sets === 0 && setCount > 0) return false  // runs-only round: no sets allowed
   return setCount >= requirement.sets && runCount >= requirement.runs
 }
 
@@ -319,6 +325,85 @@ export function simulateLayOff(card: Card, meld: Meld, jokerPosition?: 'low' | '
     }
   }
   return { ...meld, runMin, runMax, runAceHigh }
+}
+
+// ── GDD 6.3 Scenario C: Lay-off reversal ─────────────────────────────────────
+
+/**
+ * Result of evaluating a human player's lay-off action against GDD Section 6.3 Scenario C.
+ *
+ *   'allowed'  — proceed: hand will have ≠ 1 card, or the remaining card is playable.
+ *   'reversed' — reverse the lay-off; player must discard `discardCard` (the unplayable
+ *                card that was left behind). The laid-off card returns to their hand.
+ */
+export interface ScenarioCResult {
+  outcome: 'allowed' | 'reversed'
+  /** Present when outcome === 'reversed': the unplayable card the player must discard. */
+  discardCard?: Card
+}
+
+/**
+ * GDD Section 6.3 Scenario C — evaluate a human player's lay-off action.
+ *
+ * After the lay-off, if exactly 1 card would remain in the player's hand AND that card
+ * cannot be played anywhere on the table (checked against post-lay-off meld bounds), the
+ * lay-off must automatically reverse:
+ *   - The laid-off card returns to the player's hand.
+ *   - The player discards `discardCard` (the unplayable remaining card) instead.
+ *
+ * Returning 'allowed' covers three safe cases:
+ *   1. More than 1 card remains — player can always discard later.
+ *   2. Hand is now empty — player went out by laying off their last card.
+ *   3. The single remaining card can be laid off somewhere — player goes out next action.
+ *
+ * @param card          The card the player is attempting to lay off.
+ * @param meld          The target meld.
+ * @param playerHand    Player's full hand before the lay-off.
+ * @param allTableMelds All melds currently on the table (before the lay-off).
+ * @param jokerPosition For joker lay-offs onto runs: 'low' extends runMin, 'high' extends runMax.
+ */
+export function evaluateLayOffReversal(
+  card: Card,
+  meld: Meld,
+  playerHand: Card[],
+  allTableMelds: Meld[],
+  jokerPosition?: 'low' | 'high'
+): ScenarioCResult {
+  const newHand = playerHand.filter(c => c.id !== card.id)
+
+  // Safe: hand has ≠ 1 card after the lay-off (player can still discard, or just went out)
+  if (newHand.length !== 1) return { outcome: 'allowed' }
+
+  // Build post-lay-off meld state so the remaining card is checked against updated bounds
+  const updatedMeld = simulateLayOff(card, meld, jokerPosition)
+  const updatedMelds = allTableMelds.map(m => m.id === meld.id ? updatedMeld : m)
+
+  const remainingCard = newHand[0]
+  const canPlay = updatedMelds.some(m => canLayOff(remainingCard, m))
+
+  // Safe: remaining card is playable — player can go out on their next action
+  if (canPlay) return { outcome: 'allowed' }
+
+  // Scenario C: lay-off reversal — the player must discard the unplayable card instead
+  return { outcome: 'reversed', discardCard: remainingCard }
+}
+
+// ── GDD 6.3: Going-out guard ──────────────────────────────────────────────────
+
+/**
+ * Returns true if discarding cardId is a legal action for this player.
+ *
+ * GDD Section 6.3: A player can NEVER go out by discarding their last card.
+ * This rule is UNIVERSAL — it applies regardless of whether the player has
+ * already laid down melds. Going out requires laying off or melding the last
+ * card; discarding is never the winning move.
+ *
+ * Any discard that would leave hand.length === 0 is illegal and must be
+ * rejected before mutating game state.
+ */
+export function isLegalDiscard(hand: Card[], cardId: string): boolean {
+  const remaining = hand.filter(c => c.id !== cardId)
+  return remaining.length > 0
 }
 
 // Can a card be laid off on an existing meld?

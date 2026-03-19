@@ -35,8 +35,11 @@ describe('isValidRun — basic', () => {
     ])).toBe(false)
   })
 
-  it('rejects all-joker run', () => {
-    expect(isValidRun([joker(), joker(), joker(), joker()])).toBe(false)
+  // GDD Section 3.2: Run of all jokers (4) = valid
+  // BUG: implementation rejects all-joker runs (requires naturals.length > 0)
+  // Engine file: src/game/meld-validator.ts isValidRun() line 27
+  it('run of all jokers (4) = valid (GDD 3.2) [BUG: implementation returns false]', () => {
+    expect(isValidRun([joker(), joker(), joker(), joker()])).toBe(true)
   })
 })
 
@@ -104,6 +107,20 @@ describe('isValidRun — ace handling', () => {
     expect(isValidRun([
       c('hearts', 12), c('hearts', 13), c('hearts', 1), c('hearts', 2)
     ])).toBe(false)
+  })
+
+  // GDD Section 3.2: K-A-2 = INVALID (no wrapping)
+  it('rejects K-A-2-3 wrap-around (GDD 3.2 — no wrapping)', () => {
+    expect(isValidRun([
+      c('spades', 13), c('spades', 1), c('spades', 2), c('spades', 3)
+    ])).toBe(false)
+  })
+
+  // GDD Section 3.2: Q-K-A same suit = valid (ace high) via joker extension
+  it('Q-K-A + joker = valid ace-high run (GDD 3.2)', () => {
+    expect(isValidRun([
+      c('hearts', 12), c('hearts', 13), c('hearts', 1), joker()
+    ])).toBe(true)
   })
 
   it('accepts A-K-Q-J in any input order (isValidRun sorts internally)', () => {

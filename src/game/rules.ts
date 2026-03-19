@@ -16,10 +16,10 @@ export const TOTAL_ROUNDS = 7
 export const MAX_BUYS = 5
 
 export function cardPoints(rank: number): number {
-  if (rank === 0) return 50        // Joker
-  if (rank === 1) return 20        // Ace
-  if (rank >= 11) return 10        // J, Q, K
-  return rank                      // 2-10 face value
+  if (rank === 0) return 25        // Joker
+  if (rank === 1) return 15        // Ace
+  if (rank >= 10) return 10        // 10, J, Q, K
+  return 5                         // 2-9 (all low cards equal value)
 }
 
 export const MIN_SET_SIZE = 3

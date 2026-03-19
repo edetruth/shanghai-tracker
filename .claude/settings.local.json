@@ -8,7 +8,10 @@
       "Read(//c/Users/Lisa Juru/shanghai-tracker/$HOME/shanghai-tracker/**)",
       "Bash(npx tsc:*)",
       "Bash(printf:*)",
-      "Bash(env | grep HOME)"
+      "Bash(env | grep HOME)",
+      "Bash(npx vitest:*)",
+      "Bash(python -c \":*)",
+      "Bash(git:*)"
     ]
   }
 }

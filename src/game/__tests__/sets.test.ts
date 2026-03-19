@@ -27,8 +27,11 @@ describe('isValidSet', () => {
     expect(isValidSet([c('hearts', 9), joker(), joker()])).toBe(true)
   })
 
-  it('rejects all-joker set (no naturals)', () => {
-    expect(isValidSet([joker(), joker(), joker()])).toBe(false)
+  // GDD Section 3.1: 3 jokers = valid set
+  // BUG: implementation rejects all-joker sets (requires naturals.length > 0)
+  // Engine file: src/game/meld-validator.ts isValidSet() line 8
+  it('3 jokers = valid set (GDD 3.1) [BUG: implementation returns false]', () => {
+    expect(isValidSet([joker(), joker(), joker()])).toBe(true)
   })
 
   it('accepts set of aces', () => {
@@ -58,6 +61,14 @@ describe('isValidSet', () => {
   it('5-card set is valid', () => {
     expect(isValidSet([
       c('hearts', 3), c('diamonds', 3), c('clubs', 3), c('spades', 3), joker()
+    ])).toBe(true)
+  })
+
+  // GDD Section 3.1: 6 same-rank cards = valid set
+  it('6 same-rank cards = valid set (GDD 3.1)', () => {
+    expect(isValidSet([
+      c('hearts', 6), c('diamonds', 6), c('clubs', 6),
+      c('spades', 6), c('hearts', 6), c('diamonds', 6),
     ])).toBe(true)
   })
 })

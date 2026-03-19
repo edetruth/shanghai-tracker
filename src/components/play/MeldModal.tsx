@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { X } from 'lucide-react'
 import type { Card as CardType, RoundRequirement } from '../../game/types'
 import { isValidSet, isValidRun, getNextJokerOptions } from '../../game/meld-validator'
@@ -10,15 +10,19 @@ interface Props {
   requirement: RoundRequirement
   onConfirm: (meldGroups: CardType[][], jokerPositions: Map<string, number>) => void
   onClose: () => void
-  mustLayDown?: boolean  // true when player swapped a joker pre-lay-down and MUST lay down now
+  mustLayDown?: boolean     // true when player swapped a joker pre-lay-down and MUST lay down now
+  sortMode?: 'rank' | 'suit'
+  onSortChange?: (mode: 'rank' | 'suit') => void
 }
 
-type ModalPhase = 'required' | 'bonus-prompt' | 'bonus' | 'joker-placement'
+type ModalPhase = 'slots' | 'bonus-prompt' | 'bonus' | 'joker-placement'
 type AllowedMeldType = 'set' | 'run' | 'both'
 
-function getAllowedBonusTypes(requirement: RoundRequirement): AllowedMeldType {
-  if (requirement.sets > 0 && requirement.runs > 0) return 'both'
-  if (requirement.sets > 0) return 'set'
+// ── Unchanged helpers ────────────────────────────────────────────────────────
+
+function getAllowedBonusTypes(req: RoundRequirement): AllowedMeldType {
+  if (req.sets > 0 && req.runs > 0) return 'both'
+  if (req.sets > 0) return 'set'
   return 'run'
 }
 
@@ -28,50 +32,24 @@ function bonusTypeLabel(t: AllowedMeldType): string {
   return 'Sets or Runs'
 }
 
-function getMeldTypeHint(requirement: RoundRequirement, step: number): string {
-  const meldTypes: string[] = []
-  for (let i = 0; i < requirement.sets; i++) meldTypes.push('Set (3+ cards of the same rank)')
-  for (let i = 0; i < requirement.runs; i++) meldTypes.push('Run (4+ cards, same suit in sequence)')
-  return meldTypes[step] ?? 'Meld'
+function totalRequired(req: RoundRequirement): number {
+  return req.sets + req.runs
 }
 
-function totalRequired(requirement: RoundRequirement): number {
-  return requirement.sets + requirement.runs
+function validateSlot(cards: CardType[], slotIdx: number, req: RoundRequirement): boolean {
+  if (cards.length === 0) return false
+  return slotIdx < req.sets ? isValidSet(cards) : isValidRun(cards)
 }
 
-function validateRequired(cards: CardType[], requirement: RoundRequirement, step: number): { valid: boolean; message: string } {
-  if (cards.length === 0) return { valid: false, message: '' }
-  const isSetStep = step < requirement.sets
-  if (isSetStep) {
-    if (isValidSet(cards)) return { valid: true, message: 'Valid set ✓' }
-    if (cards.length < 3) return { valid: false, message: `Need at least 3 cards for a set (have ${cards.length})` }
-    return { valid: false, message: 'Not a valid set — cards must share the same rank' }
-  } else {
-    if (isValidRun(cards)) return { valid: true, message: 'Valid run ✓' }
-    if (cards.length < 4) return { valid: false, message: `Need at least 4 cards for a run (have ${cards.length})` }
-    return { valid: false, message: 'Not a valid run — cards must be same suit in sequence' }
-  }
+function slotLabel(slotIdx: number, req: RoundRequirement): string {
+  return slotIdx < req.sets ? 'Set of 3+' : 'Run of 4+'
 }
 
-function validateBonus(cards: CardType[], allowedTypes: AllowedMeldType): { valid: boolean; message: string } {
-  if (cards.length === 0) return { valid: false, message: '' }
-  const canBeSet = allowedTypes !== 'run' && isValidSet(cards)
-  const canBeRun = allowedTypes !== 'set' && isValidRun(cards)
-  if (canBeSet) return { valid: true, message: 'Valid set ✓' }
-  if (canBeRun) return { valid: true, message: 'Valid run ✓' }
-
-  if (allowedTypes === 'set') {
-    if (isValidRun(cards)) return { valid: false, message: 'This round only allows extra Sets, not Runs' }
-    if (cards.length < 3) return { valid: false, message: `Need at least 3 cards for a set (have ${cards.length})` }
-    return { valid: false, message: 'Not a valid set — cards must share the same rank' }
-  }
-  if (allowedTypes === 'run') {
-    if (isValidSet(cards)) return { valid: false, message: 'This round only allows extra Runs, not Sets' }
-    if (cards.length < 4) return { valid: false, message: `Need at least 4 cards for a run (have ${cards.length})` }
-    return { valid: false, message: 'Not a valid run — cards must be same suit in sequence' }
-  }
-  if (cards.length < 3) return { valid: false, message: 'Need at least 3 cards for a set, or 4 for a run' }
-  return { valid: false, message: 'Not a valid set or run' }
+function validateBonus(cards: CardType[], allowed: AllowedMeldType): boolean {
+  if (cards.length === 0) return false
+  if (allowed !== 'run' && isValidSet(cards)) return true
+  if (allowed !== 'set' && isValidRun(cards)) return true
+  return false
 }
 
 function rankLabel(rank: number): string {
@@ -91,155 +69,406 @@ function suitSymbol(suit: string): string {
   return ''
 }
 
-// ─── Shared shell ─────────────────────────────────────────────────────────────
+const SUIT_ORDER: Record<string, number> = { hearts: 0, diamonds: 1, clubs: 2, spades: 3, joker: 4 }
 
-function ModalShell({ children, onClose, locked }: { children: React.ReactNode; onClose: () => void; locked?: boolean }) {
+// ── Centered modal panel (spec §4.1) — does NOT cover the hand at bottom ──────
+
+function ModalPanel({
+  children,
+  onClose,
+  locked,
+}: {
+  children: React.ReactNode
+  onClose: () => void
+  locked?: boolean
+}) {
   return (
     <>
-      <div className="fixed inset-0 bg-black/40 z-40" onClick={locked ? undefined : onClose} />
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl max-h-[85vh] flex flex-col">
-        <div className="flex justify-center pt-2 pb-1">
-          <div className="w-10 h-1 bg-[#e2ddd2] rounded-full" />
-        </div>
+      {/* Backdrop covers only above Zone 3 */}
+      <div
+        style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 195,
+          background: 'rgba(0,0,0,0.55)', zIndex: 49,
+        }}
+        onClick={locked ? undefined : onClose}
+      />
+      {/* Panel */}
+      <div
+        style={{
+          position: 'fixed',
+          top: 'max(56px, calc(env(safe-area-inset-top) + 56px))',
+          bottom: 200,
+          left: 8,
+          right: 8,
+          background: '#0f2218',
+          borderRadius: 10,
+          zIndex: 50,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
+      >
         {children}
       </div>
     </>
   )
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
+// ── Shared header bar ─────────────────────────────────────────────────────────
 
-export default function MeldModal({ hand, requirement, onConfirm, onClose, mustLayDown }: Props) {
+function Header({
+  title,
+  subtitle,
+  onClose,
+  locked,
+}: {
+  title: string
+  subtitle?: string
+  onClose: () => void
+  locked?: boolean
+}) {
+  return (
+    <div
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '10px 12px 8px', borderBottom: '1px solid #1e4a2e', flexShrink: 0,
+      }}
+    >
+      <div>
+        <p style={{ fontSize: 13, fontWeight: 700, color: '#e2b858', margin: 0 }}>{title}</p>
+        {subtitle && (
+          <p style={{ fontSize: 10, color: '#6aad7a', margin: '2px 0 0' }}>{subtitle}</p>
+        )}
+      </div>
+      {!locked && (
+        <button
+          onClick={onClose}
+          style={{
+            background: 'transparent', border: 'none', color: '#6aad7a',
+            cursor: 'pointer', padding: 4, display: 'flex', alignItems: 'center',
+            justifyContent: 'center', minWidth: 32, minHeight: 32,
+          }}
+        >
+          <X size={16} />
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ── Must-lay-down banner ──────────────────────────────────────────────────────
+
+function MustLayDownBanner() {
+  return (
+    <div
+      style={{
+        margin: '8px 12px 0', background: '#181000',
+        border: '1px solid #8b6914', borderRadius: 8, padding: '6px 10px', flexShrink: 0,
+      }}
+    >
+      <p style={{ fontSize: 11, fontWeight: 600, color: '#e2b858', margin: 0 }}>
+        You swapped a joker — you must lay down your hand this turn!
+      </p>
+    </div>
+  )
+}
+
+// ── Sort toggle (spec §4.3) ───────────────────────────────────────────────────
+
+function SortToggle({
+  sortMode,
+  onSortChange,
+}: {
+  sortMode: 'rank' | 'suit'
+  onSortChange?: (m: 'rank' | 'suit') => void
+}) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <div
+        style={{
+          display: 'flex', background: '#1e4a2e',
+          border: '1px solid #2d5a3a', borderRadius: 6, overflow: 'hidden',
+        }}
+      >
+        {(['rank', 'suit'] as const).map(mode => (
+          <button
+            key={mode}
+            onClick={() => onSortChange?.(mode)}
+            style={{
+              background: sortMode === mode ? '#2d5a3a' : 'transparent',
+              color: sortMode === mode ? '#e2b858' : '#6aad7a',
+              padding: '4px 10px', fontSize: 11, fontWeight: 600,
+              border: 'none', cursor: 'pointer', minHeight: 28,
+            }}
+          >
+            {mode === 'rank' ? 'Rank' : 'Suit'}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Secondary button style ────────────────────────────────────────────────────
+
+const secondaryBtn: React.CSSProperties = {
+  flex: 1, minHeight: 44, background: '#1e4a2e', color: '#a8d0a8',
+  border: '1px solid #2d5a3a', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+}
+
+function primaryBtn(enabled: boolean): React.CSSProperties {
+  return {
+    flex: 1, minHeight: 44, borderRadius: 8, border: 'none',
+    fontSize: 13, fontWeight: 600, cursor: enabled ? 'pointer' : 'default',
+    background: enabled ? '#e2b858' : '#1e4a2e',
+    color: enabled ? '#2c1810' : '#3a5a3a',
+  }
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
+export default function MeldModal({
+  hand,
+  requirement,
+  onConfirm,
+  onClose,
+  mustLayDown,
+  sortMode = 'rank',
+  onSortChange,
+}: Props) {
   const total = totalRequired(requirement)
   const allowedBonusTypes = getAllowedBonusTypes(requirement)
-  const [phase, setPhase] = useState<ModalPhase>('required')
-  const [step, setStep] = useState(0)
-  const [groups, setGroups] = useState<CardType[][]>([])
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
-  // Joker placement state
+  const [phase, setPhase] = useState<ModalPhase>('slots')
+  // Cards placed in each required slot (indices 0..total-1)
+  const [slotCards, setSlotCards] = useState<CardType[][]>(() =>
+    Array.from({ length: total }, () => [])
+  )
+  // Cards placed in the current bonus slot
+  const [bonusCards, setBonusCards] = useState<CardType[]>([])
+  // Cards selected from hand, waiting to be dropped into a slot
+  const [selectedHandCards, setSelectedHandCards] = useState<CardType[]>([])
+  // Groups that have been fully confirmed (required + past bonus melds)
+  const [confirmedGroups, setConfirmedGroups] = useState<CardType[][]>([])
+
+  // ── Joker placement state ────────────────────────────────────────────────
   const [jokerPositions, setJokerPositions] = useState<Map<string, number>>(new Map())
+  const [pendingGroups, setPendingGroups] = useState<CardType[][]>([])
+  const [pendingJokerGroupIdx, setPendingJokerGroupIdx] = useState(0)
   const [pendingGroup, setPendingGroup] = useState<CardType[] | null>(null)
-  const [pendingPhaseAfterJoker, setPendingPhaseAfterJoker] = useState<'required' | 'bonus' | null>(null)
+  const [pendingPhaseAfterJoker, setPendingPhaseAfterJoker] = useState<'slots' | 'bonus' | null>(null)
 
-  const usedIds = new Set(groups.flatMap(g => g.map(c => c.id)))
-  const selectedCards = hand.filter(c => selectedIds.has(c.id))
+  // ── Derived state ────────────────────────────────────────────────────────
+  const usedIds = useMemo(() => {
+    const ids = new Set<string>()
+    slotCards.forEach(s => s.forEach(c => ids.add(c.id)))
+    bonusCards.forEach(c => ids.add(c.id))
+    confirmedGroups.forEach(g => g.forEach(c => ids.add(c.id)))
+    return ids
+  }, [slotCards, bonusCards, confirmedGroups])
 
-  function toggleCard(cardId: string) {
-    if (usedIds.has(cardId)) return
-    setSelectedIds(prev => {
-      const next = new Set(prev)
-      if (next.has(cardId)) next.delete(cardId)
-      else next.add(cardId)
-      return next
+  const sortedHand = useMemo(() => {
+    const available = hand.filter(c => !usedIds.has(c.id))
+    return available.sort((a, b) => {
+      if (sortMode === 'suit') {
+        const s = (SUIT_ORDER[a.suit] ?? 4) - (SUIT_ORDER[b.suit] ?? 4)
+        if (s !== 0) return s
+        return a.rank - b.rank
+      }
+      if (a.suit === 'joker' && b.suit === 'joker') return 0
+      if (a.suit === 'joker') return 1
+      if (b.suit === 'joker') return -1
+      if (a.rank !== b.rank) return a.rank - b.rank
+      return (SUIT_ORDER[a.suit] ?? 4) - (SUIT_ORDER[b.suit] ?? 4)
+    })
+  }, [hand, usedIds, sortMode])
+
+  const allSlotsValid = slotCards.every((cards, i) => validateSlot(cards, i, requirement))
+  const bonusSlotValid = validateBonus(bonusCards, allowedBonusTypes)
+  const isBonus = phase === 'bonus'
+
+  // ── Card selection ───────────────────────────────────────────────────────
+  function handleHandCardTap(card: CardType) {
+    setSelectedHandCards(prev => {
+      const idx = prev.findIndex(c => c.id === card.id)
+      if (idx >= 0) return prev.filter(c => c.id !== card.id)
+      return [...prev, card]
     })
   }
 
-  // ── Finalize a group (after joker placement if needed) ───────────────────
-  function finalizeGroup(group: CardType[], positions: Map<string, number>, sourcePhase: 'required' | 'bonus') {
-    const newGroups = [...groups, group]
-    setGroups(newGroups)
-    setSelectedIds(new Set())
-    setPendingGroup(null)
-    setPendingPhaseAfterJoker(null)
-
-    if (sourcePhase === 'required') {
-      if (step + 1 < total) {
-        setStep(step + 1)
-        setPhase('required')
-        return
+  function handleSlotTap(slotIdx: number) {
+    if (selectedHandCards.length === 0) return
+    setSlotCards(prev => {
+      const next = prev.map(s => [...s])
+      for (const card of selectedHandCards) {
+        next[slotIdx] = [...next[slotIdx], card]
       }
-      const usedIdsNow = new Set(newGroups.flatMap(g => g.map(c => c.id)))
-      const remaining = hand.filter(c => !usedIdsNow.has(c.id))
-      if (remaining.length > 0 && canFormAnyValidMeld(remaining, allowedBonusTypes)) {
+      return next
+    })
+    setSelectedHandCards([])
+  }
+
+  function handleBonusSlotTap() {
+    if (selectedHandCards.length === 0) return
+    setBonusCards(prev => [...prev, ...selectedHandCards])
+    setSelectedHandCards([])
+  }
+
+  function removeFromSlot(card: CardType, slotIdx: number, e: React.MouseEvent) {
+    e.stopPropagation()
+    setSlotCards(prev => {
+      const next = prev.map(s => [...s])
+      next[slotIdx] = next[slotIdx].filter(c => c.id !== card.id)
+      return next
+    })
+    setSelectedHandCards([])
+  }
+
+  function removeFromBonus(card: CardType, e: React.MouseEvent) {
+    e.stopPropagation()
+    setBonusCards(prev => prev.filter(c => c.id !== card.id))
+    setSelectedHandCards([])
+  }
+
+  function handleClearAllSlots() {
+    setSlotCards(Array.from({ length: total }, () => []))
+    setBonusCards([])
+    setSelectedHandCards([])
+  }
+
+  // ── Slot border style (spec §4.2) ────────────────────────────────────────
+  function slotStyle(slotIdx: number): React.CSSProperties {
+    const cards = isBonus ? bonusCards : slotCards[slotIdx]
+    const valid = isBonus ? bonusSlotValid : validateSlot(cards, slotIdx, requirement)
+    if (valid) return { border: '2px solid #6aad7a', background: '#1a3a2a', borderRadius: 8 }
+    if (selectedHandCards.length > 0) return { border: '2px solid #e2b858', background: '#1a3a2a', borderRadius: 8 }
+    return { border: '2px dashed #2d5a3a', background: '#1a3a2a', borderRadius: 8 }
+  }
+
+  // Badge: "X / Y" when incomplete, "✓ Valid" when complete
+  function slotBadge(slotIdx: number): { text: string; valid: boolean } | null {
+    const cards = isBonus ? bonusCards : slotCards[slotIdx]
+    if (cards.length === 0) return null
+    const valid = isBonus ? bonusSlotValid : validateSlot(cards, slotIdx, requirement)
+    if (valid) return { text: '✓ Valid', valid: true }
+    const isSetSlot = !isBonus && slotIdx < requirement.sets
+    return { text: `${cards.length} / ${isSetSlot ? '3' : '4'}+`, valid: false }
+  }
+
+  // ── Joker processing ─────────────────────────────────────────────────────
+  function startJokerProcessing(
+    groups: CardType[][],
+    sourcePhase: 'slots' | 'bonus',
+    positions: Map<string, number>,
+    startIdx: number
+  ) {
+    for (let i = startIdx; i < groups.length; i++) {
+      const group = groups[i]
+      if (isValidRun(group) && !isValidSet(group) && group.some(c => c.suit === 'joker')) {
+        const placement = getNextJokerOptions(group, positions)
+        if (placement) {
+          setPendingGroups(groups)
+          setPendingJokerGroupIdx(i)
+          setPendingGroup(group)
+          setPendingPhaseAfterJoker(sourcePhase)
+          setJokerPositions(positions)
+          setPhase('joker-placement')
+          return
+        }
+      }
+    }
+    resolveGroups(groups, sourcePhase, positions)
+  }
+
+  function resolveGroups(
+    groups: CardType[][],
+    sourcePhase: 'slots' | 'bonus',
+    positions: Map<string, number>
+  ) {
+    setJokerPositions(positions)
+    const usedIdsNow = new Set(groups.flatMap(g => g.map(c => c.id)))
+    const remaining = hand.filter(c => !usedIdsNow.has(c.id))
+    const canBonus = remaining.length > 0 && canFormAnyValidMeld(remaining, allowedBonusTypes)
+
+    if (sourcePhase === 'slots') {
+      if (canBonus) {
+        setConfirmedGroups(groups)
         setPhase('bonus-prompt')
       } else {
-        onConfirm(newGroups, positions)
+        onConfirm(groups, positions)
       }
     } else {
-      const usedIdsNow = new Set(newGroups.flatMap(g => g.map(c => c.id)))
-      const remaining = hand.filter(c => !usedIdsNow.has(c.id))
-      if (remaining.length === 0 || !canFormAnyValidMeld(remaining, allowedBonusTypes)) {
-        onConfirm(newGroups, positions)
-      } else {
+      if (canBonus) {
+        setConfirmedGroups(groups)
+        setBonusCards([])
+        setSelectedHandCards([])
         setPhase('bonus')
+      } else {
+        onConfirm(groups, positions)
       }
     }
   }
 
-  // ── Confirm a meld — check for joker placement before finalizing ─────────
-  function handleConfirmMeld() {
-    const isRun = isValidRun(selectedCards) && !isValidSet(selectedCards)
-    const hasJoker = selectedCards.some(c => c.suit === 'joker')
-
-    if (isRun && hasJoker) {
-      const placement = getNextJokerOptions(selectedCards, new Map())
-      if (placement) {
-        // Enter joker placement mode
-        setPendingGroup(selectedCards)
-        setPendingPhaseAfterJoker(phase === 'required' ? 'required' : 'bonus')
-        setJokerPositions(new Map())
-        setPhase('joker-placement')
-        setSelectedIds(new Set())
-        return
-      }
-    }
-
-    // No ambiguous jokers — finalize immediately
-    finalizeGroup(selectedCards, jokerPositions, phase === 'required' ? 'required' : 'bonus')
+  function handleLayDown() {
+    if (!allSlotsValid) return
+    startJokerProcessing([...slotCards], 'slots', new Map(), 0)
   }
 
-  // ── Player picks a joker position ────────────────────────────────────────
+  function handleAddBonus() {
+    if (!bonusSlotValid) return
+    const allGroups = [...confirmedGroups, bonusCards]
+    startJokerProcessing(allGroups, 'bonus', jokerPositions, confirmedGroups.length)
+  }
+
+  // ── Joker pick ───────────────────────────────────────────────────────────
   function handleJokerPick(jokerCardId: string, rank: number) {
     if (!pendingGroup) return
     const newPositions = new Map(jokerPositions)
     newPositions.set(jokerCardId, rank)
-    setJokerPositions(newPositions)
 
-    // Check if there are more ambiguous jokers
-    const next = getNextJokerOptions(pendingGroup, newPositions)
-    if (next) {
-      // Re-render with updated positions (state update triggers this)
+    // More ambiguous jokers in this same group?
+    if (getNextJokerOptions(pendingGroup, newPositions)) {
+      setJokerPositions(newPositions)
       return
     }
 
-    // All jokers placed — finalize
-    finalizeGroup(pendingGroup, newPositions, pendingPhaseAfterJoker ?? 'required')
+    // Advance to next group that needs joker placement
+    for (let i = pendingJokerGroupIdx + 1; i < pendingGroups.length; i++) {
+      const group = pendingGroups[i]
+      if (isValidRun(group) && !isValidSet(group) && group.some(c => c.suit === 'joker')) {
+        const placement = getNextJokerOptions(group, newPositions)
+        if (placement) {
+          setPendingJokerGroupIdx(i)
+          setPendingGroup(group)
+          setJokerPositions(newPositions)
+          return
+        }
+      }
+    }
+
+    // All jokers placed
+    resolveGroups(pendingGroups, pendingPhaseAfterJoker ?? 'slots', newPositions)
   }
 
-  // ── Back navigation ──────────────────────────────────────────────────────
-  function handleBack() {
-    if (phase === 'joker-placement' && pendingGroup) {
-      // Restore selection so player can adjust their card picks
-      setSelectedIds(new Set(pendingGroup.map(c => c.id)))
-      setPendingGroup(null)
-      setJokerPositions(new Map())
-      setPhase(pendingPhaseAfterJoker ?? 'required')
-      setPendingPhaseAfterJoker(null)
-    } else if (phase === 'bonus') {
-      setPhase('bonus-prompt')
-      setSelectedIds(new Set())
-    } else if (phase === 'bonus-prompt') {
-      setGroups(groups.slice(0, total - 1))
-      setStep(total - 1)
-      setPhase('required')
-      setSelectedIds(new Set())
-    } else if (step === 0) {
-      onClose()
+  function handleJokerBack() {
+    setPendingGroup(null)
+    setJokerPositions(new Map())
+    if (pendingPhaseAfterJoker === 'bonus') {
+      setBonusCards(pendingGroups[pendingGroups.length - 1] ?? [])
+      setSelectedHandCards([])
+      setPhase('bonus')
     } else {
-      setGroups(groups.slice(0, -1))
-      setStep(step - 1)
-      setSelectedIds(new Set())
+      setSlotCards(pendingGroups.slice(0, total))
+      setSelectedHandCards([])
+      setPhase('slots')
     }
   }
 
   // ─── Joker placement screen ───────────────────────────────────────────────
   if (phase === 'joker-placement' && pendingGroup) {
     const placement = getNextJokerOptions(pendingGroup, jokerPositions)
-
-    // Shouldn't happen, but if all placed, finalize
     if (!placement) {
-      finalizeGroup(pendingGroup, jokerPositions, pendingPhaseAfterJoker ?? 'required')
+      resolveGroups(pendingGroups, pendingPhaseAfterJoker ?? 'slots', jokerPositions)
       return null
     }
 
@@ -249,62 +478,48 @@ export default function MeldModal({ hand, requirement, onConfirm, onClose, mustL
       let count = 0
       const temp = new Map<string, number>()
       let p = getNextJokerOptions(pendingGroup, temp)
-      while (p) {
-        count++
-        temp.set(p.joker.id, p.options[0].rank) // dummy pick to count
-        p = getNextJokerOptions(pendingGroup, temp)
-      }
+      while (p) { count++; temp.set(p.joker.id, p.options[0].rank); p = getNextJokerOptions(pendingGroup, temp) }
       return count
     })()
 
     return (
-      <ModalShell onClose={onClose} locked={mustLayDown}>
-        {mustLayDown && (
-          <div className="mx-4 mt-1 mb-0 bg-[#fffbee] border border-[#e2b858] rounded-xl px-3 py-2">
-            <p className="text-xs font-semibold text-[#8b6914]">You swapped a joker — you must lay down your hand this turn!</p>
-          </div>
-        )}
-        <div className="flex items-center justify-between px-4 pb-3 border-b border-[#e2ddd2]">
-          <div>
-            <h2 className="font-bold text-[#2c1810] text-base">Place Your Joker</h2>
-            <p className="text-xs text-[#8b7355] mt-0.5">
-              {totalAmbiguous > 1 ? `Joker ${placedCount + 1} of ${totalAmbiguous} — ` : ''}
-              Choose where it goes in your run
-            </p>
-          </div>
-          {!mustLayDown && (
-            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-[#a08c6e] active:bg-[#efe9dd]">
-              <X size={18} />
-            </button>
-          )}
-        </div>
+      <ModalPanel onClose={onClose} locked={mustLayDown}>
+        {mustLayDown && <MustLayDownBanner />}
+        <Header
+          title="Place Your Joker"
+          subtitle={`${totalAmbiguous > 1 ? `Joker ${placedCount + 1} of ${totalAmbiguous} — ` : ''}Choose where it goes in your run`}
+          onClose={onClose}
+          locked={mustLayDown}
+        />
 
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-          <p className="text-xs text-[#a08c6e]">
-            Tap the position you want. Choosing a lower position lets you extend the run further later.
+        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <p style={{ fontSize: 10, color: '#6aad7a', margin: 0 }}>
+            Tap the position. Choosing low lets you extend the run further later.
           </p>
 
           {placement.options.map(option => (
             <button
               key={option.rank}
               onClick={() => handleJokerPick(placement.joker.id, option.rank)}
-              className="w-full text-left rounded-xl border-2 border-[#e2ddd2] p-3 active:border-[#e2b858] active:bg-[#fffbee] transition-colors"
+              style={{
+                width: '100%', textAlign: 'left', background: '#1e4a2e',
+                border: '1.5px solid #2d5a3a', borderRadius: 8, padding: '8px 10px', cursor: 'pointer',
+              }}
             >
-              {/* Option label */}
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-[10px] font-bold bg-[#e2b858] text-[#2c1810] px-2 py-0.5 rounded-full">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <span style={{
+                  fontSize: 10, fontWeight: 700, background: '#e2b858',
+                  color: '#2c1810', borderRadius: 10, padding: '1px 8px',
+                }}>
                   Joker = {rankLabel(option.displayRank)}{sym}
                 </span>
-                <span className="text-[10px] text-[#a08c6e]">
+                <span style={{ fontSize: 10, color: '#6aad7a' }}>
                   {option.rank === placement.options[0].rank ? '← extend low' : 'extend high →'}
                 </span>
               </div>
-
-              {/* Run preview */}
-              <div className="flex gap-1 overflow-x-auto pb-1">
+              <div style={{ display: 'flex', gap: 3, overflowX: 'auto' }}>
                 {option.sequence.map(pos => {
                   if (pos.isNatural) {
-                    // Find the actual card from pendingGroup
                     const card = pendingGroup.find(c => {
                       if (c.suit === 'joker') return false
                       const r = placement.aceHigh && c.rank === 1 ? 14 : c.rank
@@ -312,19 +527,20 @@ export default function MeldModal({ hand, requirement, onConfirm, onClose, mustL
                     })
                     if (card) return <CardComponent key={pos.rank} card={card} compact />
                   }
-                  // Joker position — show as chip
                   const isChosen = pos.rank === option.rank
                   return (
                     <div
                       key={pos.rank}
-                      className={`rounded-lg border flex flex-col items-center justify-center w-10 h-16 flex-shrink-0 ${
-                        isChosen
-                          ? 'bg-[#fffbee] border-[#e2b858] shadow-sm'
-                          : 'bg-[#f8f6f1] border-[#e2ddd2] opacity-60'
-                      }`}
+                      style={{
+                        width: 40, height: 64, borderRadius: 6, flexShrink: 0,
+                        background: isChosen ? '#fff8e0' : '#1a3a2a',
+                        border: `1.5px solid ${isChosen ? '#e2b858' : '#2d5a3a'}`,
+                        opacity: isChosen ? 1 : 0.6,
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                      }}
                     >
-                      <span className="text-[8px] font-bold text-[#8b6914] leading-tight">JKR</span>
-                      <span className="text-[8px] text-[#8b6914] leading-tight">{rankLabel(pos.displayRank)}{sym}</span>
+                      <span style={{ fontSize: 8, fontWeight: 700, color: '#8b6914' }}>JKR</span>
+                      <span style={{ fontSize: 8, color: '#8b6914' }}>{rankLabel(pos.displayRank)}{sym}</span>
                     </div>
                   )
                 })}
@@ -333,166 +549,307 @@ export default function MeldModal({ hand, requirement, onConfirm, onClose, mustL
           ))}
         </div>
 
-        <div className="px-4 pb-8 pt-3 border-t border-[#e2ddd2]">
-          <button onClick={handleBack} className="btn-secondary w-full">Back</button>
+        <div style={{ padding: '8px 12px 12px', borderTop: '1px solid #1e4a2e', flexShrink: 0 }}>
+          <button onClick={handleJokerBack} style={secondaryBtn}>Back</button>
         </div>
-      </ModalShell>
+      </ModalPanel>
     )
   }
 
   // ─── Bonus prompt screen ──────────────────────────────────────────────────
   if (phase === 'bonus-prompt') {
     return (
-      <ModalShell onClose={onClose} locked={mustLayDown}>
-        <div className="flex items-center justify-between px-4 pb-3 border-b border-[#e2ddd2]">
-          <div>
-            <h2 className="font-bold text-[#2c1810] text-base">Lay Down More?</h2>
-            <p className="text-xs text-[#8b7355] mt-0.5">
-              Requirement met · {groups.length} meld{groups.length !== 1 ? 's' : ''} confirmed
-            </p>
-          </div>
-          {!mustLayDown && (
-            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-[#a08c6e] active:bg-[#efe9dd]">
-              <X size={18} />
-            </button>
-          )}
-        </div>
+      <ModalPanel onClose={onClose} locked={mustLayDown}>
+        <Header
+          title="Lay Down More?"
+          subtitle={`Requirement met · ${confirmedGroups.length} meld${confirmedGroups.length !== 1 ? 's' : ''} confirmed`}
+          onClose={onClose}
+          locked={mustLayDown}
+        />
 
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-          <div className="bg-[#f0fdf4] border border-[#a3e6b4] rounded-xl px-4 py-3">
-            <p className="text-sm font-semibold text-[#2d7a3a] mb-1">Requirement met! ✓</p>
-            <p className="text-sm text-[#8b7355]">
+        <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ background: '#1e4a2e', border: '1px solid #2d7a3a', borderRadius: 8, padding: '8px 10px' }}>
+            <p style={{ fontSize: 12, fontWeight: 600, color: '#6aad7a', margin: '0 0 2px' }}>Requirement met! ✓</p>
+            <p style={{ fontSize: 11, color: '#a8d0a8', margin: 0 }}>
               You can lay down additional melds ({bonusTypeLabel(allowedBonusTypes)}). Laying down more reduces your hand score.
             </p>
           </div>
 
-          {groups.map((group, i) => (
-            <div key={i} className="opacity-50">
-              <p className="text-xs text-[#8b7355] mb-1">Meld {i + 1} (confirmed)</p>
-              <div className="flex gap-1 overflow-x-auto pb-1">
-                {group.map(card => (
-                  <CardComponent key={card.id} card={card} compact />
-                ))}
+          {confirmedGroups.map((group, i) => (
+            <div key={i} style={{ opacity: 0.5 }}>
+              <p style={{ fontSize: 10, color: '#6aad7a', margin: '0 0 4px' }}>Meld {i + 1} (confirmed)</p>
+              <div style={{ display: 'flex', gap: 4, overflowX: 'auto' }}>
+                {group.map(card => <CardComponent key={card.id} card={card} compact />)}
               </div>
             </div>
           ))}
         </div>
 
-        <div className="px-4 pb-8 pt-3 border-t border-[#e2ddd2] flex gap-3">
-          <button onClick={() => onConfirm(groups, jokerPositions)} className="btn-secondary flex-1">
+        <div style={{ padding: '8px 12px 12px', borderTop: '1px solid #1e4a2e', flexShrink: 0, display: 'flex', gap: 8 }}>
+          <button onClick={() => onConfirm(confirmedGroups, jokerPositions)} style={secondaryBtn}>
             No, I'm done
           </button>
-          <button onClick={() => setPhase('bonus')} className="btn-primary flex-1">
+          <button
+            onClick={() => { setBonusCards([]); setSelectedHandCards([]); setPhase('bonus') }}
+            style={primaryBtn(true)}
+          >
             Yes, lay down more
           </button>
         </div>
-      </ModalShell>
+      </ModalPanel>
     )
   }
 
-  // ─── Required / bonus selection screen ───────────────────────────────────
-  const validation = phase === 'required'
-    ? validateRequired(selectedCards, requirement, step)
-    : validateBonus(selectedCards, allowedBonusTypes)
+  // ─── Slots screen (required & bonus) — spec §4.2 ─────────────────────────
+  const slotCount = isBonus ? 1 : total
 
-  const bonusMeldNumber = groups.length - total + 1
-  const bonusHint = phase === 'bonus' ? ` — ${bonusTypeLabel(allowedBonusTypes)}` : ''
+  // Determine if any slots have cards (for showing Clear All)
+  const hasAnySlotCards = isBonus
+    ? bonusCards.length > 0
+    : slotCards.some(s => s.length > 0)
 
   return (
-    <ModalShell onClose={onClose} locked={mustLayDown}>
-      {/* Must-lay-down banner */}
-      {mustLayDown && (
-        <div className="mx-4 mt-1 mb-0 bg-[#fffbee] border border-[#e2b858] rounded-xl px-3 py-2">
-          <p className="text-xs font-semibold text-[#8b6914]">You swapped a joker — you must lay down your hand this turn!</p>
-        </div>
-      )}
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 pb-3 border-b border-[#e2ddd2]">
-        <div>
-          <h2 className="font-bold text-[#2c1810] text-base">Lay Down Your Hand</h2>
-          <p className="text-xs text-[#8b7355] mt-0.5">
-            {phase === 'required'
-              ? `Meld ${step + 1} of ${total} — ${getMeldTypeHint(requirement, step)}`
-              : `Extra meld ${bonusMeldNumber}${bonusHint}`}
-          </p>
-        </div>
-        {!mustLayDown && (
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-[#a08c6e] active:bg-[#efe9dd]">
-            <X size={18} />
-          </button>
-        )}
-      </div>
+    <ModalPanel onClose={onClose} locked={mustLayDown}>
+      {mustLayDown && <MustLayDownBanner />}
+      <Header
+        title={isBonus ? 'Extra Meld' : 'Lay Down Your Hand'}
+        onClose={onClose}
+        locked={mustLayDown}
+      />
 
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-        {/* Previously confirmed groups */}
-        {groups.map((group, i) => (
-          <div key={i} className="opacity-40">
-            <p className="text-xs text-[#8b7355] mb-1">
-              {i < total ? `Meld ${i + 1}` : `Extra meld ${i - total + 1}`} (confirmed)
-            </p>
-            <div className="flex gap-1 overflow-x-auto pb-1">
-              {group.map(card => (
-                <CardComponent key={card.id} card={card} compact />
-              ))}
-            </div>
-          </div>
-        ))}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
 
-        {/* Selected cards preview */}
-        {selectedCards.length > 0 && (
-          <div>
-            <p className="text-xs text-[#8b7355] mb-1">Selected ({selectedCards.length})</p>
-            <div className="flex gap-1 overflow-x-auto pb-1">
-              {selectedCards.map(card => (
-                <CardComponent key={card.id} card={card} compact selected />
-              ))}
-            </div>
-            {validation.message && (
-              <p className={`text-xs mt-1.5 font-medium ${validation.valid ? 'text-[#2d7a3a]' : 'text-[#b83232]'}`}>
-                {validation.message}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Hand */}
-        <div>
-          <p className="text-xs text-[#8b7355] mb-1.5">
-            Your hand ({hand.filter(c => !usedIds.has(c.id)).length} available)
-          </p>
-          <div className="flex gap-1.5 overflow-x-auto pb-2" style={{ WebkitOverflowScrolling: 'touch' }}>
-            {hand.filter(c => !usedIds.has(c.id)).map(card => (
-              <CardComponent
-                key={card.id}
-                card={card}
-                selected={selectedIds.has(card.id)}
-                onClick={() => toggleCard(card.id)}
-              />
+        {/* Confirmed groups (bonus phase only — dimmed) */}
+        {isBonus && confirmedGroups.length > 0 && (
+          <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 2 }}>
+            {confirmedGroups.map((group, i) => (
+              <div key={i} style={{ opacity: 0.35, flexShrink: 0 }}>
+                <p style={{ fontSize: 9, color: '#6aad7a', margin: '0 0 3px', whiteSpace: 'nowrap' }}>
+                  {i < total ? `Meld ${i + 1}` : `Extra ${i - total + 1}`}
+                </p>
+                <div style={{ display: 'flex', gap: 2 }}>
+                  {group.map(card => <CardComponent key={card.id} card={card} compact />)}
+                </div>
+              </div>
             ))}
           </div>
+        )}
+
+        {/* ── Meld slots — side by side (spec §4.2 Option 3) ────────────── */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+          {Array.from({ length: slotCount }).map((_, slotIdx) => {
+            const cards = isBonus ? bonusCards : slotCards[slotIdx]
+            const label = isBonus
+              ? `Extra (${bonusTypeLabel(allowedBonusTypes)})`
+              : slotLabel(slotIdx, requirement)
+            const badge = slotBadge(slotIdx)
+
+            return (
+              <div
+                key={slotIdx}
+                style={{ flex: 1, minWidth: 0 }}
+                onClick={() => isBonus ? handleBonusSlotTap() : handleSlotTap(slotIdx)}
+              >
+                {/* Slot label */}
+                <p style={{
+                  fontSize: 9, color: '#6aad7a', fontWeight: 600, margin: '0 0 4px',
+                  textTransform: 'uppercase', letterSpacing: '0.04em',
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>
+                  {label}
+                </p>
+
+                {/* Slot box */}
+                <div
+                  style={{
+                    ...slotStyle(slotIdx),
+                    minHeight: 60,
+                    padding: '6px 6px 4px',
+                    cursor: selectedHandCards.length > 0 ? 'pointer' : 'default',
+                    transition: 'border-color 0.12s',
+                    position: 'relative',
+                  }}
+                >
+                  {/* Badge */}
+                  {badge && (
+                    <div style={{
+                      position: 'absolute', top: 4, right: 4,
+                      background: badge.valid ? '#6aad7a' : '#1e4a2e',
+                      color: badge.valid ? '#0f2218' : '#3a5a3a',
+                      fontSize: 8, fontWeight: 700, borderRadius: 4, padding: '1px 5px',
+                    }}>
+                      {badge.text}
+                    </div>
+                  )}
+
+                  {cards.length === 0 ? (
+                    <p style={{
+                      fontSize: 10, margin: '10px 4px',
+                      color: selectedHandCards.length > 0 ? '#e2b858' : '#2d5a3a',
+                      textAlign: 'center', fontStyle: 'italic',
+                    }}>
+                      {selectedHandCards.length > 0 ? 'Tap to place' : 'Empty'}
+                    </p>
+                  ) : (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                      {cards.map(card => (
+                        <div
+                          key={card.id}
+                          onClick={(e) => isBonus ? removeFromBonus(card, e) : removeFromSlot(card, slotIdx, e)}
+                        >
+                          <CardComponent card={card} compact />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Instruction */}
+        <p style={{ fontSize: 10, color: '#6aad7a', margin: 0 }}>
+          {selectedHandCards.length > 0
+            ? 'Tap a slot to place selected cards'
+            : 'Tap cards below to select, then tap a slot. Tap a placed card to remove it.'}
+        </p>
+
+        {/* Sort toggle (spec §4.3) */}
+        <SortToggle sortMode={sortMode} onSortChange={onSortChange} />
+
+        {/* Selection bar */}
+        <div style={{
+          border: selectedHandCards.length > 0 ? '1.5px solid #e2b858' : '1.5px solid #2d5a3a',
+          borderRadius: 6,
+          padding: '6px 10px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          opacity: selectedHandCards.length > 0 ? 1 : 0.5,
+          background: '#0f2218',
+          minHeight: 32,
+        }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {selectedHandCards.length === 0 ? (
+              <p style={{ color: '#6aad7a', fontSize: 9, margin: 0, fontStyle: 'italic' }}>
+                No cards selected
+              </p>
+            ) : (
+              <>
+                <p style={{
+                  color: '#e2b858', fontSize: 10, margin: '0 0 1px', fontWeight: 600,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>
+                  {selectedHandCards.map(c =>
+                    c.suit === 'joker' ? 'JKR' : `${rankLabel(c.rank)}${suitSymbol(c.suit)}`
+                  ).join(', ')}
+                </p>
+                <p style={{ color: '#a8d0a8', fontSize: 9, margin: 0 }}>
+                  {selectedHandCards.length} card{selectedHandCards.length !== 1 ? 's' : ''} — tap a slot to place
+                </p>
+              </>
+            )}
+          </div>
+          {selectedHandCards.length > 0 && (
+            <button
+              onClick={() => setSelectedHandCards([])}
+              style={{
+                background: 'transparent',
+                border: '1px solid #3a5a3a',
+                borderRadius: 4,
+                color: '#6aad7a',
+                fontSize: 9,
+                fontWeight: 600,
+                padding: '3px 8px',
+                cursor: 'pointer',
+                flexShrink: 0,
+                marginLeft: 8,
+                minHeight: 24,
+              }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+
+        {/* Hand cards */}
+        <div style={{ display: 'flex', gap: 4, overflowX: 'auto', paddingBottom: 4 }}>
+          {sortedHand.map(card => {
+            const selIdx = selectedHandCards.findIndex(c => c.id === card.id)
+            return (
+              <div
+                key={card.id}
+                onClick={() => handleHandCardTap(card)}
+                style={{ flexShrink: 0, position: 'relative' }}
+              >
+                <CardComponent
+                  card={card}
+                  compact
+                  selected={selIdx >= 0}
+                />
+                {selIdx >= 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: -4,
+                    right: -4,
+                    width: 14,
+                    height: 14,
+                    borderRadius: 7,
+                    background: '#e2b858',
+                    color: '#2c1810',
+                    fontSize: 7,
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    pointerEvents: 'none',
+                    zIndex: 1,
+                  }}>
+                    {selIdx + 1}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+          {sortedHand.length === 0 && (
+            <p style={{ fontSize: 11, color: '#2d5a3a', fontStyle: 'italic' }}>All cards placed</p>
+          )}
         </div>
       </div>
 
-      {/* Action buttons */}
-      <div className="px-4 pb-8 pt-3 border-t border-[#e2ddd2] flex gap-3">
-        {!(mustLayDown && phase === 'required' && step === 0) && (
-          <button onClick={handleBack} className="btn-secondary flex-1">
-            {phase === 'required' && step === 0 ? 'Cancel' : 'Back'}
-          </button>
+      {/* ── Action buttons ────────────────────────────────────────────────── */}
+      <div style={{ padding: '8px 12px 12px', borderTop: '1px solid #1e4a2e', flexShrink: 0, display: 'flex', gap: 8 }}>
+        {isBonus ? (
+          <>
+            <button onClick={() => onConfirm(confirmedGroups, jokerPositions)} style={secondaryBtn}>
+              Done
+            </button>
+            {hasAnySlotCards && (
+              <button onClick={handleClearAllSlots} style={secondaryBtn}>
+                Clear
+              </button>
+            )}
+            <button onClick={handleAddBonus} disabled={!bonusSlotValid} style={primaryBtn(bonusSlotValid)}>
+              Add Meld
+            </button>
+          </>
+        ) : (
+          <>
+            {!mustLayDown && (
+              <button onClick={onClose} style={secondaryBtn}>Cancel</button>
+            )}
+            {hasAnySlotCards && (
+              <button onClick={handleClearAllSlots} style={secondaryBtn}>
+                Clear
+              </button>
+            )}
+            <button onClick={handleLayDown} disabled={!allSlotsValid} style={primaryBtn(allSlotsValid)}>
+              Lay Down
+            </button>
+          </>
         )}
-        {phase === 'bonus' && (
-          <button onClick={() => onConfirm(groups, jokerPositions)} className="btn-secondary flex-1">
-            Done
-          </button>
-        )}
-        <button
-          onClick={handleConfirmMeld}
-          disabled={!validation.valid}
-          className="btn-primary flex-1"
-        >
-          {phase === 'required' && step + 1 >= total ? 'Lay Down All' : 'Confirm Meld'}
-        </button>
       </div>
-    </ModalShell>
+    </ModalPanel>
   )
 }

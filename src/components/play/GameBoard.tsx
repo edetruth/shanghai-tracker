@@ -3,7 +3,7 @@ import { Pause } from 'lucide-react'
 import type { GameState, Player, Card as CardType, Meld, PlayerConfig, AIDifficulty } from '../../game/types'
 import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, MAX_BUYS } from '../../game/rules'
 import { createDecks, shuffle, dealHands } from '../../game/deck'
-import { buildMeld, isValidSet, canLayOff, findSwappableJoker, getNextJokerOptions } from '../../game/meld-validator'
+import { buildMeld, isValidSet, canLayOff, findSwappableJoker, getNextJokerOptions, isLegalDiscard, evaluateLayOffReversal } from '../../game/meld-validator'
 import { scoreRound } from '../../game/scoring'
 import {
   aiFindBestMelds, aiFindAllMelds, aiShouldTakeDiscard, aiShouldTakeDiscardEasy,
@@ -21,10 +21,12 @@ import GameOver from './GameOver'
 import HandDisplay from './HandDisplay'
 import TableMelds from './TableMelds'
 import CardComponent from './Card'
+import BuyPrompt from './BuyPrompt'
 
 interface Props {
   initialPlayers: PlayerConfig[]
   aiDifficulty?: AIDifficulty
+  buyLimit?: number
   onExit: () => void
 }
 
@@ -46,17 +48,28 @@ interface UndoState {
   timerId: ReturnType<typeof setTimeout>
 }
 
+interface BuyLogEntry {
+  turn: number
+  round: number
+  event: 'discard' | 'free_offer' | 'free_taken' | 'free_declined' | 'buy_window_open' | 'buy_offered' | 'bought' | 'passed' | 'window_closed'
+  playerName: string
+  card: string
+  detail?: string
+}
+
 // ── Pure helpers ──────────────────────────────────────────────────────────────
 
-function initGame(configs: PlayerConfig[]): GameState {
+function initGame(configs: PlayerConfig[], buyLimit = 5): GameState {
   const deckCount = configs.length <= 4 ? 2 : 3
+  // -1 = unlimited; store as 999 so the game engine's numeric guards work correctly
+  const effectiveBuyLimit = buyLimit === -1 ? 999 : buyLimit
   const players: Player[] = configs.map((cfg, i) => ({
     id: `p${i}`,
     name: cfg.name,
     hand: [],
     melds: [],
     hasLaidDown: false,
-    buysRemaining: MAX_BUYS,
+    buysRemaining: effectiveBuyLimit,
     roundScores: [],
     isAI: cfg.isAI,
   }))
@@ -71,6 +84,7 @@ function initGame(configs: PlayerConfig[]): GameState {
     players,
     currentRound: 1,
     deckCount,
+    buyLimit: effectiveBuyLimit,
     gameOver: false,
     roundState: {
       roundNumber: 1,
@@ -99,13 +113,14 @@ function setupRound(state: GameState, roundNum: number): GameState {
   const nextDealer = (dealerIndex + 1) % state.players.length
   const firstPlayer = (nextDealer + 1) % state.players.length
 
-  // Reset buys to MAX_BUYS for each new round
+  // Reset buys to buyLimit (or MAX_BUYS as fallback) for each new round
+  const perRoundBuys = state.buyLimit ?? MAX_BUYS
   const players = state.players.map((p, i) => ({
     ...p,
     hand: hands[i],
     melds: [],
     hasLaidDown: false,
-    buysRemaining: MAX_BUYS,
+    buysRemaining: perRoundBuys,
   }))
 
   return {
@@ -159,8 +174,8 @@ function getAIDelay(speed: GameSpeed): number {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onExit }: Props) {
-  const [gameState, setGameState] = useState<GameState>(() => initGame(initialPlayers))
+export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buyLimit = 5, onExit }: Props) {
+  const [gameState, setGameState] = useState<GameState>(() => initGame(initialPlayers, buyLimit))
   const [uiPhase, setUiPhase] = useState<UIPhase>('round-start')
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set())
   const [handSort, setHandSort] = useState<'rank' | 'suit'>('rank')
@@ -178,10 +193,18 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
   const [newCardIds, setNewCardIds] = useState<Set<string>>(new Set())
   const [aiActionTick, setAiActionTick] = useState(0)
   const [gameSpeed, setGameSpeed] = useState<GameSpeed>('normal')
+  const [buyLog, setBuyLog] = useState<BuyLogEntry[]>([])
+  const [buyLogOpen, setBuyLogOpen] = useState(false)
+  // True after player taps "Pass" on the free discard offer — hides banner until next offer
+  const [freeOfferDeclined, setFreeOfferDeclined] = useState(false)
+  const turnCountRef = useRef(0)
   const [discardError, setDiscardError] = useState<string | null>(null)
   const [layOffError, setLayOffError] = useState<string | null>(null)
   const [preLayDownSwap, setPreLayDownSwap] = useState(false)
   const [showPreLayDownSwapModal, setShowPreLayDownSwapModal] = useState(false)
+  // Selection state for the inline pre-lay-down swap modal
+  const [preSwapCardId, setPreSwapCardId] = useState<string | null>(null)
+  const [preSwapMeldId, setPreSwapMeldId] = useState<string | null>(null)
   // Snapshot of game state BEFORE any pre-lay-down joker swaps — used to undo if player can't lay down after all swaps
   const preLayDownSwapBaseStateRef = useRef<GameState | null>(null)
   // Stalemate tracking (turns without any meld)
@@ -197,11 +220,58 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
   const buyerOrderRef = useRef(buyerOrder)
   const buyerStepRef = useRef(buyerStep)
   const pendingBuyDiscardRef = useRef(pendingBuyDiscard)
+  // Ref mirror of freeOfferDeclined — needed so handleDrawFromPile can read it
+  // without relying on the state value (which may not have synced via useEffect yet)
+  const freeOfferDeclinedRef = useRef(false)
+  // Stores the pending card at decline time so handleDrawFromPile can open the
+  // buying window even if pendingBuyDiscardRef.current has been cleared
+  const declinedPendingCardRef = useRef<CardType | null>(null)
   useEffect(() => { gameStateRef.current = gameState }, [gameState])
   useEffect(() => { uiPhaseRef.current = uiPhase }, [uiPhase])
   useEffect(() => { buyerOrderRef.current = buyerOrder }, [buyerOrder])
   useEffect(() => { buyerStepRef.current = buyerStep }, [buyerStep])
   useEffect(() => { pendingBuyDiscardRef.current = pendingBuyDiscard }, [pendingBuyDiscard])
+  useEffect(() => { freeOfferDeclinedRef.current = freeOfferDeclined }, [freeOfferDeclined])
+
+  function addBuyLog(entry: BuyLogEntry) {
+    setBuyLog(prev => [...prev, entry])
+  }
+
+  // Reset declined flag whenever a new free offer arrives
+  useEffect(() => {
+    if (pendingBuyDiscard !== null) setFreeOfferDeclined(false)
+  }, [pendingBuyDiscard])
+
+  // Log free_offer whenever pendingBuyDiscard becomes non-null
+  useEffect(() => {
+    if (pendingBuyDiscard === null) return
+    const state = gameStateRef.current
+    const nextPlayer = getCurrentPlayer(state)
+    setBuyLog(prev => [...prev, {
+      turn: turnCountRef.current,
+      round: state.currentRound,
+      event: 'free_offer' as const,
+      playerName: nextPlayer.name,
+      card: formatCard(pendingBuyDiscard),
+    }])
+  }, [pendingBuyDiscard]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Log buy_offered whenever it's a new player's turn in the buying window
+  useEffect(() => {
+    if (uiPhase !== 'buying') return
+    const buyerIdx = buyerOrder[buyerStep]
+    if (buyerIdx === undefined) return
+    const buyer = gameState.players[buyerIdx]
+    if (!buyer || !buyingDiscard) return
+    setBuyLog(prev => [...prev, {
+      turn: turnCountRef.current,
+      round: gameState.currentRound,
+      event: 'buy_offered' as const,
+      playerName: buyer.name,
+      card: formatCard(buyingDiscard),
+      detail: `buys: ${buyer.buysRemaining}/${gameState.buyLimit >= 999 ? '∞' : gameState.buyLimit}`,
+    }])
+  }, [uiPhase, buyerStep]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Medium AI: max 2 lay-offs per turn
   const aiLayOffCountRef = useRef(0)
@@ -242,11 +312,39 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
     })
   }
 
+  // ── Decline free discard offer — clears banner without drawing ───────────
+  function handleDeclineFreeOffer() {
+    // Use pendingBuyDiscard (React state, always current in this closure) as the
+    // authoritative source. The ref may not be synced yet if useEffect hasn't fired.
+    const pendingCard = pendingBuyDiscard ?? pendingBuyDiscardRef.current
+    declinedPendingCardRef.current = pendingCard   // save for handleDrawFromPile
+    setFreeOfferDeclined(true)
+    if (pendingCard) {
+      addBuyLog({
+        turn: turnCountRef.current,
+        round: gameStateRef.current.currentRound,
+        event: 'free_declined',
+        playerName: getCurrentPlayer(gameStateRef.current).name,
+        card: formatCard(pendingCard),
+      })
+    }
+  }
+
   // ── Draw from pile (with reshuffle if empty) ──────────────────────────────
   function handleDrawFromPile() {
-    // Use ref to avoid stale closure in AI setTimeout callbacks
-    const hasPendingBuy = pendingBuyDiscardRef.current !== null
-    const pendingCard = pendingBuyDiscardRef.current
+    // Use BOTH the ref and the React state value for wasExplicitlyDeclined.
+    // freeOfferDeclinedRef.current covers the AI stale-closure case.
+    // freeOfferDeclined (state) covers the human case where the ref may not yet be
+    // synced via useEffect (React 18 async commit can cause a brief desync window).
+    const wasExplicitlyDeclined = freeOfferDeclinedRef.current || freeOfferDeclined
+    const savedDeclinedCard = declinedPendingCardRef.current  // saved by handleDeclineFreeOffer
+    setFreeOfferDeclined(false)
+    declinedPendingCardRef.current = null
+    // pendingBuyDiscard (React state) is checked first — always current for human
+    // clicks (fresh closure). pendingBuyDiscardRef.current covers the AI setTimeout
+    // path where the closure may be from an older render.
+    const hasPendingBuy = pendingBuyDiscard !== null || pendingBuyDiscardRef.current !== null || wasExplicitlyDeclined
+    const pendingCard = pendingBuyDiscard ?? pendingBuyDiscardRef.current ?? (wasExplicitlyDeclined ? savedDeclinedCard : null)
     const currentIdx = rs.currentPlayerIndex
     const needsReshuffle = gameState.roundState.drawPile.length === 0
 
@@ -295,6 +393,17 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
 
     if (hasPendingBuy && pendingCard && updatedState) {
       setPendingBuyDiscard(null)
+      // Only log free_declined here when the decline wasn't logged already by
+      // handleDeclineFreeOffer (i.e. the AI or a silent path that skips the banner)
+      if (!wasExplicitlyDeclined) {
+        addBuyLog({
+          turn: turnCountRef.current,
+          round: gameStateRef.current.currentRound,
+          event: 'free_declined',
+          playerName: getCurrentPlayer(gameStateRef.current).name,
+          card: formatCard(pendingCard),
+        })
+      }
       // Player passed on the discard — open buying window for players AFTER current
       startBuyingWindowPostDraw(updatedState, currentIdx, pendingCard)
     } else {
@@ -306,6 +415,17 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
   function handleTakeDiscard() {
     const card = gameState.roundState.discardPile[gameState.roundState.discardPile.length - 1]
     if (!card) return
+
+    if (pendingBuyDiscardRef.current !== null) {
+      const state = gameStateRef.current
+      addBuyLog({
+        turn: turnCountRef.current,
+        round: state.currentRound,
+        event: 'free_taken',
+        playerName: getCurrentPlayer(state).name,
+        card: formatCard(card),
+      })
+    }
 
     setPendingBuyDiscard(null) // clear pending buy — card is taken
     setNewCardIds(new Set([card.id]))
@@ -341,6 +461,16 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
         setUiPhase(nextPhaseForPlayer(nextPlayer))
       }
     } else {
+      if (discardCard) {
+        addBuyLog({
+          turn: turnCountRef.current,
+          round: state.currentRound,
+          event: 'buy_window_open',
+          playerName: state.players[discarder]?.name ?? '?',
+          card: formatCard(discardCard),
+          detail: `${order.length} buyer(s)`,
+        })
+      }
       setUiPhase('buying')
     }
   }
@@ -373,6 +503,14 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
         setUiPhase('action')
       }
     } else {
+      addBuyLog({
+        turn: turnCountRef.current,
+        round: state.currentRound,
+        event: 'buy_window_open',
+        playerName: drewPlayer.name,
+        card: formatCard(discardCard),
+        detail: `post-draw, ${order.length} buyer(s)`,
+      })
       setUiPhase('buying')
     }
   }
@@ -528,12 +666,30 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
     const goOutPlayerId = wentOut ? player.id : prev.roundState.goOutPlayerId
     const players = prev.players.map((p, i) => i === playerIdx ? { ...p, hand: newHand } : p)
 
-    // Safety net: if lay-off would leave exactly 1 card that can't be played anywhere,
-    // block it before committing — player would be stuck (can't discard last card, can't go out)
-    if (newHand.length === 1 && !tablesMelds.some(m => canLayOff(newHand[0], m))) {
-      setLayOffError('Lay-off blocked — your remaining card can\'t be played anywhere, and you can\'t go out by discarding. Keep at least 2 cards so you can discard.')
-      haptic('error')
-      setTimeout(() => setLayOffError(null), 4000)
+    // GDD Section 6.3 Scenario C: if the lay-off would leave 1 unplayable card, reverse it
+    const layOffEval = evaluateLayOffReversal(card, meld, player.hand, prev.roundState.tablesMelds, jokerPosition)
+    if (layOffEval.outcome === 'reversed') {
+      const { discardCard } = layOffEval
+      // Return the laid-off card to the player's hand; discard the unplayable remaining card
+      const finalHand = [card]
+      const newDiscardPile = [...prev.roundState.discardPile, discardCard!]
+      const playersC = prev.players.map((p, i) =>
+        i === playerIdx ? { ...p, hand: finalHand } : p
+      )
+      const afterReversal: GameState = {
+        ...prev,
+        players: playersC,
+        roundState: { ...prev.roundState, discardPile: newDiscardPile },
+      }
+      setGameState(afterReversal)
+      setSelectedCardIds(new Set())
+      setLayOffError(null)
+      haptic('heavy')
+      const advanced = advancePlayer(afterReversal)
+      const nextPlayer = advanced.players[advanced.roundState.currentPlayerIndex]
+      setPendingBuyDiscard(discardCard!)
+      setGameState(advanced)
+      setUiPhase(nextPhaseForPlayer(nextPlayer))
       return
     }
 
@@ -588,17 +744,66 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
 
     const newHand = player.hand.filter(c => c.id !== cardId)
 
-    // Rule: you cannot go out by discarding — only applies before laying down.
-    // If the player has already laid down but has 1 stuck card with no valid lay-off,
-    // they ARE allowed to discard it; they just don't go out — they draw next turn.
-    if (newHand.length === 0 && !player.hasLaidDown && !player.isAI) {
+    // Scenario B: player went down with bonus melds and their last card can't be laid off.
+    // Roll back only the bonus melds (required melds stay on the table), then auto-discard
+    // the least useful card from the reconstituted hand.
+    if (!isLegalDiscard(player.hand, cardId) && player.hasLaidDown) {
+      const req = rs.requirement
+      let setCount = 0
+      let runCount = 0
+      const bonusMelds: Meld[] = []
+      for (const meld of player.melds) {
+        if (meld.type === 'set' && setCount < req.sets) { setCount++ }
+        else if (meld.type === 'run' && runCount < req.runs) { runCount++ }
+        else { bonusMelds.push(meld) }
+      }
+      if (bonusMelds.length > 0) {
+        const bonusMeldIds = new Set(bonusMelds.map(m => m.id))
+        const bonusCards = bonusMelds.flatMap(m => m.cards)
+        const newTablesMelds = rs.tablesMelds.filter(m => !bonusMeldIds.has(m.id))
+        const newPlayerMelds = player.melds.filter(m => !bonusMeldIds.has(m.id))
+        const reconstitutedHand = [...player.hand, ...bonusCards]
+        const discardCard = aiChooseDiscard(reconstitutedHand, rs.requirement, newTablesMelds)
+        const finalHand = reconstitutedHand.filter(c => c.id !== discardCard.id)
+        const newDiscardPile = [...rs.discardPile, discardCard]
+        const playersB = gameState.players.map((p, i) =>
+          i === playerIdx ? { ...p, hand: finalHand, melds: newPlayerMelds } : p
+        )
+        const afterRollback: GameState = {
+          ...gameState,
+          players: playersB,
+          roundState: { ...rs, tablesMelds: newTablesMelds, discardPile: newDiscardPile },
+        }
+        setGameState(afterRollback)
+        setSelectedCardIds(new Set())
+        haptic('heavy')
+        const advanced = advancePlayer(afterRollback)
+        const nextPlayer = advanced.players[advanced.roundState.currentPlayerIndex]
+        turnCountRef.current += 1
+        addBuyLog({
+          turn: turnCountRef.current,
+          round: gameState.currentRound,
+          event: 'discard',
+          playerName: player.name,
+          card: formatCard(discardCard),
+          detail: 'auto (bonus meld rollback)',
+        })
+        setPendingBuyDiscard(discardCard)
+        setGameState(advanced)
+        setUiPhase(nextPhaseForPlayer(nextPlayer))
+        return
+      }
+    }
+
+    // Rule: cannot go out by discarding — universal (applies whether or not the player has laid down)
+    if (!isLegalDiscard(player.hand, cardId) && !player.isAI) {
       setDiscardError('You cannot go out by discarding. You must lay off your last card to go out.')
       haptic('error')
       setTimeout(() => setDiscardError(null), 3500)
       return
     }
-    // AI with 1 card that hasn't laid down: skip discard, increment stalemate counter, advance turn
-    if (newHand.length === 0 && !player.hasLaidDown && player.isAI) {
+    // AI with 1 card that can't go out by discarding: skip discard, increment stalemate counter, advance turn
+    if (!isLegalDiscard(player.hand, cardId) && player.isAI) {
       noProgressTurnsRef.current += 1
       const advanced = advancePlayer(gameState)
       const nextPlayer = advanced.players[advanced.roundState.currentPlayerIndex]
@@ -622,6 +827,15 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
     setGameState(afterDiscard)
     setSelectedCardIds(new Set())
     haptic('heavy')
+
+    turnCountRef.current += 1
+    addBuyLog({
+      turn: turnCountRef.current,
+      round: gameState.currentRound,
+      event: 'discard',
+      playerName: player.name,
+      card: formatCard(card),
+    })
 
     // Increment no-progress counter
     if (!player.hasLaidDown) noProgressTurnsRef.current += 1
@@ -688,6 +902,15 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
       if (penaltyCard) buyNewIds.add(penaltyCard.id)
       if (buyNewIds.size > 0) setNewCardIds(buyNewIds)
 
+      addBuyLog({
+        turn: turnCountRef.current,
+        round: gameState.currentRound,
+        event: 'bought',
+        playerName: buyer.name,
+        card: buyingDiscard ? formatCard(buyingDiscard) : '?',
+        detail: `buys after: ${buyer.buysRemaining - 1}/${gameState.buyLimit >= 999 ? '∞' : gameState.buyLimit}`,
+      })
+
       if (isPostDraw) {
         // Post-draw buy: current player (who drew from pile) still acts after this
         buyingIsPostDrawRef.current = false
@@ -711,10 +934,26 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
       }
     } else {
       const nextStep = buyerStep + 1
+      const passerName = buyerOrder[buyerStep] !== undefined ? gameState.players[buyerOrder[buyerStep]]?.name ?? '?' : '?'
+      addBuyLog({
+        turn: turnCountRef.current,
+        round: gameState.currentRound,
+        event: 'passed',
+        playerName: passerName,
+        card: buyingDiscard ? formatCard(buyingDiscard) : '?',
+      })
       if (nextStep < buyerOrder.length) {
         setBuyerStep(nextStep)
       } else {
         // All buyers passed
+        addBuyLog({
+          turn: turnCountRef.current,
+          round: gameState.currentRound,
+          event: 'window_closed',
+          playerName: '-',
+          card: buyingDiscard ? formatCard(buyingDiscard) : '?',
+          detail: 'no buyer',
+        })
         if (isPostDraw) {
           buyingIsPostDrawRef.current = false
           if (gameState.roundState.goOutPlayerId !== null) {
@@ -791,20 +1030,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
           return
         }
       }
-      // Easy: up to 1 lay-off per turn (jokers always exempt)
-      const easyHasJoker = player.hand.some(c => c.suit === 'joker')
-      if (player.hasLaidDown && tablesMelds.length > 0 &&
-          (aiLayOffCountRef.current < 1 || player.hand.length === 1 || easyHasJoker)) {
-        const layOff = aiFindLayOff(player.hand, tablesMelds)
-        if (layOff) {
-          if (layOff.card.suit !== 'joker') aiLayOffCountRef.current++
-          setAiMessage(`${player.name} lays off`)
-          setTimeout(() => setAiMessage(null), 1000)
-          handleLayOff(layOff.card, layOff.meld, layOff.jokerPosition)
-          return
-        }
-      }
-      // Easy: discard a random isolated card
+      // Easy: never lays off (GDD Section 11) — discard a random isolated card
       aiLayOffCountRef.current = 0
       const card = aiChooseDiscardEasy(player.hand)
       setAiMessage(`${player.name} discards`)
@@ -895,7 +1121,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
         const shouldTake = top !== null && (
           isEasy
             ? aiShouldTakeDiscardEasy(player.hand, top, state.roundState.requirement)
-            : aiShouldTakeDiscard(player.hand, top, state.roundState.requirement, player.hasLaidDown)
+            : aiShouldTakeDiscard(player.hand, top, state.roundState.requirement, player.hasLaidDown, aiDifficulty, state.roundState.tablesMelds)
         )
 
         setAiMessage(shouldTake
@@ -936,7 +1162,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
         ? aiShouldBuyEasy(currentBuyer.hand, disc, req, currentBuyer.buysRemaining)
         : aiDifficulty === 'hard'
           ? aiShouldBuyHard(currentBuyer.hand, disc, req, currentBuyer.buysRemaining)
-          : aiShouldBuy(currentBuyer.hand, disc, req)
+          : aiShouldBuy(currentBuyer.hand, disc, req, currentBuyer.buysRemaining, state.buyLimit)
 
       if (shouldBuy) setAiMessage(`${currentBuyer.name} buys!`)
       else setAiMessage(`${currentBuyer.name} passes`)
@@ -946,6 +1172,18 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
 
     return () => clearTimeout(timerId)
   }, [uiPhase, buyerStep, buyerOrder]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Buy audit stats ───────────────────────────────────────────────────────
+  const buyStats = useMemo(() => {
+    const windowsOpened = buyLog.filter(e => e.event === 'buy_window_open').length
+    const boughtEntries = buyLog.filter(e => e.event === 'bought')
+    const passes = buyLog.filter(e => e.event === 'passed').length
+    const freeTaken = buyLog.filter(e => e.event === 'free_taken').length
+    const freeDeclined = buyLog.filter(e => e.event === 'free_declined').length
+    const byPlayer: Record<string, number> = {}
+    boughtEntries.forEach(e => { byPlayer[e.playerName] = (byPlayer[e.playerName] ?? 0) + 1 })
+    return { windowsOpened, totalBuys: boughtEntries.length, passes, freeTaken, freeDeclined, byPlayer }
+  }, [buyLog])
 
   // ── Determine display for buying phase ────────────────────────────────────
   const buyerIdx = buyerOrder[buyerStep]
@@ -1036,8 +1274,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
     return (
       <GameOver
         players={gameState.players}
+        buyLimit={gameState.buyLimit}
         onPlayAgain={() => {
-          setGameState(initGame(initialPlayers))
+          setGameState(initGame(initialPlayers, buyLimit))
           setUiPhase('round-start')
           setRoundResults(null)
           setSelectedCardIds(new Set())
@@ -1052,91 +1291,130 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
   }
 
   // ── Main board: draw / action / buying ────────────────────────────────────
+  // Display-only derivations (no state mutations)
+  const lastCardStuck = uiPhase === 'action' && !currentPlayer.isAI &&
+    currentPlayer.hand.length === 1 &&
+    !rs.tablesMelds.some(m => canLayOff(currentPlayer.hand[0], m))
+  const discardDisabled = selectedCardIds.size !== 1 || lastCardStuck
+  const buyLimitStr = gameState.buyLimit >= 999 ? '∞' : String(gameState.buyLimit)
+
   return (
     <div
       className="bg-[#1a3a2a] flex flex-col overflow-hidden"
       style={{ height: '100dvh' }}
     >
-      {/* ── ZONE 1: Fixed Header — never moves ─────────────────────────── */}
+      {/* ── ZONE 1: Fixed top — top bar + opponent strip + toasts ───────── */}
       <div
-        className="flex-shrink-0 bg-[#0f2218] border-b border-[#2d5a3c]"
+        className="flex-shrink-0 bg-[#0f2218]"
         style={{ paddingTop: 'max(8px, env(safe-area-inset-top))' }}
       >
-        {/* Top bar: round info, turn indicator, buys, pause */}
-        <div className="px-4 py-2 flex items-center justify-between">
-          <div>
-            <p className="text-xs text-[#6aad7a]">Round {gameState.currentRound} of {TOTAL_ROUNDS} · {rs.requirement.description}</p>
-            <p className="text-sm font-bold text-white">
-              {uiPhase === 'buying' ? (
-                isHumanBuyerTurn
-                  ? `${activeBuyer?.name} — Buy decision`
-                  : `${activeBuyer?.name ?? '...'} deciding...`
-              ) : (
-                <>
-                  {currentPlayer.name}'s turn
-                  {currentPlayer.isAI && <span className="ml-1 text-xs font-normal text-[#6aad7a]">(AI)</span>}
-                </>
-              )}
-            </p>
+        {/* Top bar: round badge | requirement badge | pause (spec §2.1) */}
+        <div
+          className="flex items-center justify-between px-3 pb-2"
+          style={{ borderBottom: '1px solid #2d5a3a', minHeight: 36 }}
+        >
+          {/* Round badge */}
+          <div style={{
+            background: '#0f2218', color: '#a8d0a8',
+            border: '1px solid #2d5a3a', borderRadius: 20,
+            padding: '3px 10px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
+          }}>
+            Round {gameState.currentRound}/{TOTAL_ROUNDS}
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-[#a8d0a8] bg-[#1e4a2e] px-2 py-1 rounded-full">
-              {currentPlayer.buysRemaining}/{MAX_BUYS} buys
-            </span>
-            <button
-              onClick={() => setShowPauseModal(true)}
-              aria-label="Pause game"
-              className="w-10 h-10 flex items-center justify-center rounded-xl bg-[#1e4a2e] text-[#a8d0a8] active:bg-[#2d5a3c]"
-            >
-              <Pause size={18} />
-            </button>
+
+          {/* Requirement badge */}
+          <div style={{
+            background: '#0f2218', color: '#e2b858',
+            border: '1px solid #8b6914', borderRadius: 20,
+            padding: '3px 10px', fontSize: 11, fontWeight: 600,
+            textAlign: 'center', flex: '0 1 auto', margin: '0 8px',
+          }}>
+            {rs.requirement.description}
           </div>
+
+          {/* Pause button — 44px minimum touch target */}
+          <button
+            onClick={() => setShowPauseModal(true)}
+            aria-label="Pause game"
+            style={{
+              background: '#0f2218', border: '1px solid #2d5a3a', borderRadius: 8,
+              color: '#a8d0a8', minWidth: 44, minHeight: 44,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', flexShrink: 0,
+            }}
+          >
+            <Pause size={18} />
+          </button>
         </div>
 
-        {/* Player cards mini-bar */}
-        <div className="flex gap-1.5 overflow-x-auto pb-2 px-4">
-          {gameState.players.map(p => {
-            const total = p.roundScores.reduce((s, n) => s + n, 0)
-            const isCurrent = p.id === currentPlayer.id
-            const isBuyer = uiPhase === 'buying' && activeBuyer?.id === p.id
-            const isLow = p.hand.length <= 3 && p.hand.length > 0
-            return (
-              <div
-                key={p.id}
-                className={`flex-shrink-0 rounded-lg px-2 py-1.5 text-center min-w-[52px] ${
-                  isBuyer ? 'bg-[#e2b858]' :
-                  isCurrent ? 'bg-[#2d5a3c]' : 'bg-[#1e4a2e]'
-                }`}
-              >
-                <p className={`text-[10px] font-medium truncate max-w-[48px] ${
-                  isBuyer || isCurrent ? 'text-[#2c1810]' : 'text-[#a8d0a8]'
-                }`}>
-                  {p.name.split(' ')[0]}
-                  {p.isAI && ' 🤖'}
-                </p>
-                <p className={`font-mono text-xs font-bold ${
-                  isBuyer || isCurrent ? 'text-[#2c1810]' : 'text-[#6aad7a]'
-                }`}>
-                  {total}
-                </p>
-                <p className={`text-[9px] font-semibold ${
-                  isLow ? 'text-[#f87171]' :
-                  isBuyer || isCurrent ? 'text-[#2c1810]' : 'text-[#6aad7a]'
-                }`}>
-                  {p.hand.length}🃏
-                </p>
-                <p className={`text-[9px] ${
-                  p.buysRemaining === 0 ? 'text-[#f87171]' :
-                  isBuyer || isCurrent ? 'text-[#2c1810]' : 'text-[#6aad7a]'
-                }`}>
-                  {p.buysRemaining}🛒
-                </p>
-              </div>
-            )
-          })}
+        {/* Opponent strip — horizontal scroll, no wrap, hidden scrollbar (spec §2.2) */}
+        <div
+          className="flex gap-2 px-3 py-2"
+          style={{ overflowX: 'auto', overflowY: 'hidden', flexWrap: 'nowrap', scrollbarWidth: 'none' }}
+        >
+          {gameState.players
+            .map(p => {
+              const total = p.roundScores.reduce((s, n) => s + n, 0)
+              const isBuyingNow = uiPhase === 'buying' && activeBuyer?.id === p.id
+              const isMe = p.id === displayPlayer.id
+              const isActiveTurn = p.id === currentPlayer.id
+              const buysColor = p.buysRemaining === 0
+                ? '#b83232'
+                : p.buysRemaining <= 2
+                  ? '#c08040'
+                  : '#6aad7a'
+              const borderColor = isMe
+                ? '#e2b858'
+                : isBuyingNow
+                  ? '#e2b858'
+                  : isActiveTurn
+                    ? '#4a7a5a'
+                    : '#2d5a3a'
+              return (
+                <div
+                  key={p.id}
+                  className={isBuyingNow && !isMe ? 'animate-pulse' : ''}
+                  style={{
+                    flexShrink: 0,
+                    background: isMe ? '#1e3010' : '#0f2218',
+                    border: `1px solid ${borderColor}`,
+                    borderRadius: 8,
+                    padding: '5px 7px',
+                  }}
+                >
+                  {/* Name row with meld dot */}
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <div style={{
+                      width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                      background: p.hasLaidDown ? '#6aad7a' : '#2d5a3a',
+                    }} />
+                    <p style={{
+                      color: isMe ? '#e2b858' : '#a8d0a8', fontSize: 9, fontWeight: 600,
+                      maxWidth: 52, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {isMe ? 'You' : `${p.name.split(' ')[0]}${p.isAI ? ' 🤖' : ''}`}
+                    </p>
+                  </div>
+                  {/* Active turn dot */}
+                  {isActiveTurn && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginBottom: 2 }}>
+                      <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#e2b858', flexShrink: 0 }} />
+                      <p style={{ color: '#e2b858', fontSize: 7, fontWeight: 700, margin: 0 }}>their turn</p>
+                    </div>
+                  )}
+                  <p style={{ color: '#6aad7a', fontSize: 8, fontFamily: 'monospace', fontWeight: 700 }}>
+                    {total} pts
+                  </p>
+                  <p style={{ color: '#a8d0a8', fontSize: 9 }}>🃏 {p.hand.length}</p>
+                  <p style={{ color: buysColor, fontSize: 8, fontWeight: 600 }}>
+                    {p.buysRemaining}/{buyLimitStr} buys
+                  </p>
+                </div>
+              )
+            })}
         </div>
 
-        {/* Toast messages — live in Zone 1 so Zone 2 is unaffected */}
+        {/* Toast messages */}
         {reshuffleMsg && (
           <div className="bg-[#e2b858] px-4 py-2 text-center text-sm font-medium text-[#2c1810]">
             Draw pile reshuffled from discards
@@ -1149,128 +1427,164 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
         )}
       </div>
 
-      {/* ── ZONE 2: Scrollable Middle — table content only ──────────────── */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-4">
+      {/* ── ZONE 2: Scrollable middle — piles + table melds ─────────────── */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-3 py-3">
+
+        {/* Draw pile + Discard pile: centered side by side (spec §2.3) */}
+        {(uiPhase === 'draw' || uiPhase === 'action' || uiPhase === 'buying') && (
+          <div className="flex justify-center items-end gap-8 mb-4">
+
+            {/* Draw pile */}
+            <div className="flex flex-col items-center gap-1">
+              <p style={{ color: '#6aad7a', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Draw
+              </p>
+              {rs.drawPile.length > 0 ? (
+                <CardComponent
+                  card={rs.drawPile[0]}
+                  faceDown
+                  onClick={uiPhase === 'draw' && !currentPlayer.isAI ? handleDrawFromPile : undefined}
+                />
+              ) : (
+                <div
+                  className="rounded-lg border-2 border-dashed border-[#2d5a3a] flex items-center justify-center"
+                  style={{ width: 48, height: 72, color: '#2d5a3a', fontSize: 9, textAlign: 'center' }}
+                >
+                  Empty
+                </div>
+              )}
+              <p style={{ color: '#6aad7a', fontSize: 9 }}>{rs.drawPile.length} cards</p>
+            </div>
+
+            {/* Discard pile */}
+            <div className="flex flex-col items-center gap-1">
+              <p style={{ color: '#6aad7a', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Discard
+              </p>
+              {(isHumanBuyerTurn ? buyingDiscard : topDiscard) ? (
+                <CardComponent
+                  card={(isHumanBuyerTurn && buyingDiscard ? buyingDiscard : topDiscard)!}
+                  onClick={uiPhase === 'draw' && !currentPlayer.isAI ? handleTakeDiscard : undefined}
+                  style={uiPhase === 'draw' && !currentPlayer.isAI
+                    ? { border: '2px solid #e2b858' }
+                    : undefined}
+                />
+              ) : (
+                <div
+                  className="rounded-lg border-2 border-dashed border-[#2d5a3a]"
+                  style={{ width: 48, height: 72 }}
+                />
+              )}
+              {isHumanBuyerTurn && (
+                <p style={{ color: '#e2b858', fontSize: 9, fontWeight: 600 }}>For sale</p>
+              )}
+              {pendingBuyDiscard && uiPhase === 'draw' && !currentPlayer.isAI && (
+                <p style={{ color: '#e2b858', fontSize: 9, fontWeight: 600 }}>Buyable</p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Table melds */}
-        <TableMelds melds={rs.tablesMelds} />
+        <TableMelds
+          melds={rs.tablesMelds}
+          currentPlayerId={currentPlayer.id}
+        />
 
-        {/* Draw / discard area */}
-        {(uiPhase === 'draw' || uiPhase === 'action' || (uiPhase === 'buying' && !isHumanBuyerTurn)) && (
-          <div>
-            <p className="text-xs font-semibold text-[#6aad7a] uppercase tracking-wider mb-2">
-              {uiPhase === 'draw' && !currentPlayer.isAI ? 'Draw a card' : 'Discard pile'}
-            </p>
-            <div className="flex gap-4 items-end">
-              {uiPhase === 'draw' && !currentPlayer.isAI && (
-                <div className="flex flex-col items-center gap-1">
-                  <div
-                    onClick={handleDrawFromPile}
-                    className="w-12 h-[4.5rem] rounded-lg bg-[#2d5a3c] border-2 border-[#e2b858] flex items-center justify-center cursor-pointer active:opacity-70 select-none"
-                  >
-                    <span className="text-xl">🂠</span>
-                  </div>
-                  <p className="text-[10px] text-[#8bc48b]">Draw pile</p>
-                  <p className="text-[10px] text-[#6aad7a]">{rs.drawPile.length} cards</p>
-                </div>
-              )}
-
-              {topDiscard && (
-                <div className="flex flex-col items-center gap-1">
-                  <CardComponent
-                    card={topDiscard}
-                    onClick={uiPhase === 'draw' && !currentPlayer.isAI ? handleTakeDiscard : undefined}
-                  />
-                  <p className="text-[10px] text-[#8bc48b]">
-                    {uiPhase === 'draw' && !currentPlayer.isAI ? 'Take discard' : 'Last discard'}
-                  </p>
-                  {pendingBuyDiscard && uiPhase === 'draw' && !currentPlayer.isAI && (
-                    <p className="text-[9px] text-[#e2b858] font-semibold">← buyable</p>
-                  )}
-                </div>
-              )}
-
-              {uiPhase !== 'draw' && (
-                <p className="text-xs text-[#6aad7a] self-center">
-                  Draw pile: {rs.drawPile.length} cards
-                </p>
-              )}
-
-              {uiPhase === 'draw' && currentPlayer.isAI && (
-                <p className="text-xs text-[#6aad7a] self-center animate-pulse">
-                  {currentPlayer.name} is thinking…
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Show buying discard during human buy decision */}
-        {isHumanBuyerTurn && topDiscard && (
-          <div>
-            <p className="text-xs font-semibold text-[#6aad7a] uppercase tracking-wider mb-2">Discard pile</p>
-            <div className="flex gap-4 items-end">
-              <div className="flex flex-col items-center gap-1">
-                <CardComponent card={buyingDiscard ?? topDiscard} />
-                <p className="text-[10px] text-[#8bc48b]">Card up for sale</p>
+        {/* ── BUY AUDIT LOG (dev tool — remove after playtesting) ─────── */}
+        <div style={{ marginTop: 14, borderTop: '1px solid #2d5a3a', paddingTop: 4 }}>
+          <button
+            onClick={() => setBuyLogOpen(o => !o)}
+            style={{
+              width: '100%', background: 'transparent', border: 'none',
+              color: '#4a7a5a', fontFamily: 'monospace', fontSize: 9,
+              textAlign: 'left', padding: '3px 0', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 4,
+            }}
+          >
+            <span>{buyLogOpen ? '▼' : '▶'}</span>
+            <span>
+              BUY LOG ({buyLog.length}) · wins:{buyStats.windowsOpened} buys:{buyStats.totalBuys} pass:{buyStats.passes} free↑:{buyStats.freeTaken} free↓:{buyStats.freeDeclined}
+            </span>
+          </button>
+          {buyLogOpen && (
+            <div style={{
+              background: '#06100a', borderRadius: 4, padding: '6px 8px',
+              maxHeight: 200, overflowY: 'auto',
+              fontSize: 9, fontFamily: 'monospace', color: '#4a7a5a',
+              marginBottom: 4,
+            }}>
+              {/* Stats summary */}
+              <div style={{ color: '#6aad7a', marginBottom: 4, paddingBottom: 4, borderBottom: '1px solid #1a3a2a' }}>
+                <div>windows: {buyStats.windowsOpened} · buys: {buyStats.totalBuys} · passes: {buyStats.passes}</div>
+                <div>free taken: {buyStats.freeTaken} · free declined: {buyStats.freeDeclined}</div>
+                {Object.keys(buyStats.byPlayer).length > 0 && (
+                  <div>by player: {Object.entries(buyStats.byPlayer).map(([n, c]) => `${n}:${c}`).join(', ')}</div>
+                )}
               </div>
-              <p className="text-xs text-[#6aad7a] self-center">
-                Draw pile: {rs.drawPile.length} cards
-              </p>
+              {/* Log entries */}
+              {buyLog.length === 0
+                ? <div style={{ color: '#2a5a3a' }}>No buy events yet.</div>
+                : buyLog.slice(-20).map((entry, i) => {
+                  const c: Record<string, string> = {
+                    discard: '#5a7a5a', free_offer: '#8ab88a', free_taken: '#6aef7a',
+                    free_declined: '#9a9a5a', buy_window_open: '#e2b858', buy_offered: '#a8d0a8',
+                    bought: '#4aef6a', passed: '#5a8a5a', window_closed: '#b8906a',
+                  }
+                  return (
+                    <div key={i} style={{ color: c[entry.event] ?? '#6aad7a', marginBottom: 1, lineHeight: 1.4 }}>
+                      R{entry.round}·T{entry.turn} [{entry.event}] {entry.playerName}: {entry.card}{entry.detail ? ` · ${entry.detail}` : ''}
+                    </div>
+                  )
+                })
+              }
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      {/* ── ZONE 3: Fixed Hand + Actions — never moves ──────────────────── */}
+      {/* ── ZONE 3: Fixed bottom — hand + action buttons ────────────────── */}
       <div
-        className="flex-shrink-0 bg-[#0f2218] border-t border-[#2d5a3c] px-4 pt-3"
+        className="flex-shrink-0 bg-[#0f2218] border-t border-[#2d5a3a] px-3 pt-3"
         style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}
       >
-        {/* Human buy banner — pinned above hand when it's human's buy turn */}
-        {isHumanBuyerTurn && buyingDiscard && (
-          <div className="bg-[#fffbee] border border-[#e2b858] rounded-xl px-3 py-2 mb-3">
-            <div className="flex items-center gap-3">
-              <div className="flex-shrink-0 scale-90 origin-left">
-                <CardComponent card={buyingDiscard} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-[#2c1810]">{activeBuyer?.name} — Buy this card?</p>
-                <p className="text-[10px] text-[#8b7355]">+ 1 penalty card · {activeBuyer?.buysRemaining}/{MAX_BUYS} buys left</p>
-              </div>
-              <div className="flex gap-2 flex-shrink-0">
-                <button
-                  onClick={() => handleBuyDecision(false)}
-                  className="bg-[#efe9dd] text-[#8b7355] font-semibold rounded-lg px-3 py-2 text-sm active:opacity-80"
-                >
-                  Pass
-                </button>
-                <button
-                  onClick={() => handleBuyDecision(true)}
-                  disabled={!activeBuyer || activeBuyer.buysRemaining <= 0}
-                  className="bg-[#e2b858] text-[#2c1810] font-semibold rounded-lg px-3 py-2 text-sm active:opacity-80 disabled:opacity-40"
-                >
-                  Buy
-                </button>
-              </div>
-            </div>
-          </div>
+        {/* Free-take banner — shown when next player can take discard for free (Rule 9A) */}
+        {pendingBuyDiscard && uiPhase === 'draw' && !currentPlayer.isAI && !freeOfferDeclined && (
+          <BuyPrompt
+            card={pendingBuyDiscard}
+            isFree={true}
+            playerName={currentPlayer.name}
+            buysRemaining={currentPlayer.buysRemaining}
+            buyLimit={gameState.buyLimit}
+            onAccept={handleTakeDiscard}
+            onDecline={handleDeclineFreeOffer}
+          />
         )}
 
-        {/* Player hand */}
+        {/* Paid buy banner — shown when it's a human player's turn in the buying window */}
+        {isHumanBuyerTurn && buyingDiscard && activeBuyer && (
+          <BuyPrompt
+            card={buyingDiscard}
+            isFree={false}
+            playerName={activeBuyer.name}
+            buysRemaining={activeBuyer.buysRemaining}
+            buyLimit={gameState.buyLimit}
+            onAccept={() => handleBuyDecision(true)}
+            onDecline={() => handleBuyDecision(false)}
+          />
+        )}
+
+        {/* Player hand — sort toggle + fan layout (spec §2.5) */}
         {!displayPlayer.isAI ? (
           <HandDisplay
             cards={displayPlayer.hand}
             selectedIds={selectedCardIds}
             onToggle={toggleCard}
             label={`${isHumanBuyerTurn ? displayPlayer.name + "'s " : 'Your '}hand (${displayPlayer.hand.length} cards)`}
-            disabled={
-              (uiPhase !== 'action' && !isHumanBuyerTurn) ||
-              pendingUndo !== null
-            }
-            sort={handSort}
+            disabled={false}
+            sortMode={handSort}
             onSortChange={setHandSort}
-            newCardIds={newCardIds}
+            newCardId={[...newCardIds][0]}
           />
         ) : aiTurnHumanViewer ? (
           <HandDisplay
@@ -1278,10 +1592,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
             selectedIds={new Set()}
             onToggle={() => {}}
             label={`${aiTurnHumanViewer.name}'s hand (${aiTurnHumanViewer.hand.length} cards) — planning`}
-            disabled={true}
-            sort={handSort}
+            disabled={false}
+            sortMode={handSort}
             onSortChange={setHandSort}
-            newCardIds={new Set()}
           />
         ) : null}
 
@@ -1296,41 +1609,54 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
         {pendingUndo && (
           <div className="flex items-center justify-between bg-[#2c1810] text-white rounded-xl px-4 py-3 mt-2">
             <span className="text-sm">Discarded {pendingUndo.card.rank === 0 ? 'Joker' : rankLabel(pendingUndo.card)}</span>
-            <button
-              onClick={handleUndoDiscard}
-              className="text-[#e2b858] text-sm font-bold active:opacity-70"
-            >
+            <button onClick={handleUndoDiscard} className="text-[#e2b858] text-sm font-bold active:opacity-70">
               Undo
             </button>
           </div>
         )}
 
+        {/* Action buttons — Lay Down | Lay Off | Discard (spec §2.6) */}
         {uiPhase === 'action' && !currentPlayer.isAI && !pendingUndo && (
           <div className="space-y-2 mt-2">
             <div className="flex gap-2">
-              {!currentPlayer.hasLaidDown && (
-                <button
-                  onClick={() => setShowMeldModal(true)}
-                  className="bg-[#e2b858] text-[#2c1810] font-bold rounded-xl flex-1 text-sm py-2.5 active:opacity-80"
-                >
-                  Lay Down Hand
-                </button>
-              )}
+
+              {/* Lay Down button */}
+              <button
+                onClick={!currentPlayer.hasLaidDown ? () => setShowMeldModal(true) : undefined}
+                disabled={currentPlayer.hasLaidDown}
+                style={{
+                  flex: 1, minHeight: 44, borderRadius: 12, border: 'none',
+                  background: currentPlayer.hasLaidDown ? '#1e4a2e' : '#e2b858',
+                  color: currentPlayer.hasLaidDown ? '#3a5a3a' : '#2c1810',
+                  fontSize: 14, fontWeight: 700,
+                  cursor: currentPlayer.hasLaidDown ? 'not-allowed' : 'pointer',
+                }}
+              >
+                Lay Down
+              </button>
+
+              {/* Lay Off / Swap Joker button */}
               {currentPlayer.hasLaidDown ? (
                 <button
                   onClick={() => { setNewCardIds(new Set()); setShowLayOffModal(true) }}
-                  className={`font-semibold border rounded-xl flex-1 text-sm py-2.5 active:opacity-80 ${
-                    selectedCardIds.size > 0
-                      ? 'bg-[#3d7a4c] text-white border-[#4d9a5c]'
-                      : 'bg-[#2d5a3c] text-[#a8d0a8] border-[#3d7a4c]'
-                  }`}
+                  style={{
+                    flex: 1, minHeight: 44, borderRadius: 12,
+                    border: '1px solid #2d5a3a',
+                    background: selectedCardIds.size > 0 ? '#3d7a4c' : '#1e4a2e',
+                    color: '#a8d0a8', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                  }}
                 >
-                  Lay Off / Swap
+                  Lay Off
                 </button>
               ) : hasSwappableJokersBeforeLayDown ? (
                 <button
                   onClick={() => { setNewCardIds(new Set()); setShowPreLayDownSwapModal(true) }}
-                  className="bg-[#2d5a3c] text-[#a8d0a8] font-semibold border border-[#3d7a4c] rounded-xl flex-1 text-sm py-2.5 active:opacity-80"
+                  style={{
+                    flex: 1, minHeight: 44, borderRadius: 12,
+                    border: '1px solid #2d5a3a',
+                    background: '#1e4a2e', color: '#a8d0a8',
+                    fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                  }}
                 >
                   Swap Joker
                 </button>
@@ -1338,35 +1664,46 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
                 <button
                   disabled
                   title="Lay down your hand first"
-                  className="bg-[#1e4a2e] text-[#4a7a5a] font-semibold border border-[#2d5a3c] rounded-xl flex-1 text-sm py-2.5 opacity-50 cursor-not-allowed"
+                  style={{
+                    flex: 1, minHeight: 44, borderRadius: 12,
+                    border: '1px solid #2d5a3a',
+                    background: '#1e4a2e', color: '#3a5a3a',
+                    fontSize: 14, fontWeight: 600, cursor: 'not-allowed', opacity: 0.5,
+                  }}
                 >
-                  Lay Off / Swap
+                  Lay Off
                 </button>
               )}
             </div>
+
+            {/* Discard error */}
             {discardError && (
-              <p className="text-center text-xs text-[#e87070] bg-[#2c1810]/60 rounded-lg px-3 py-2 border border-[#e87070]/30">
+              <p
+                className="text-center text-xs rounded-lg px-3 py-2 border"
+                style={{ color: '#e87070', background: 'rgba(44,24,16,0.6)', borderColor: 'rgba(232,112,112,0.3)' }}
+              >
                 {discardError}
               </p>
             )}
+
+            {/* Discard button — disabled when no selection or last card can't go anywhere */}
             <button
-              onClick={() => { setNewCardIds(new Set()); handleDiscard() }}
-              disabled={selectedCardIds.size !== 1}
-              className={`w-full rounded-xl py-2.5 text-sm font-semibold transition-all ${
-                selectedCardIds.size === 1
-                  ? 'bg-white text-[#2c1810] active:opacity-80'
-                  : 'bg-[#1e4a2e] text-[#4a7a5a]'
-              }`}
+              onClick={!discardDisabled ? () => { setNewCardIds(new Set()); handleDiscard() } : undefined}
+              disabled={discardDisabled}
+              title={lastCardStuck ? 'Play your last card onto a meld to go out' : undefined}
+              style={{
+                width: '100%', minHeight: 44, borderRadius: 12, border: 'none',
+                background: discardDisabled ? '#1e4a2e' : 'white',
+                color: discardDisabled ? '#3a5a3a' : '#2c1810',
+                fontSize: 14, fontWeight: 600,
+                cursor: discardDisabled ? 'not-allowed' : 'pointer',
+              }}
             >
-              {selectedCardIds.size === 1
-                ? (currentPlayer.hand.length === 1 && !currentPlayer.hasLaidDown
-                    ? 'Discard — lay off to go out instead'
-                    : currentPlayer.hand.length === 1 && currentPlayer.hasLaidDown && !rs.tablesMelds.some(m => canLayOff(currentPlayer.hand[0], m))
-                      ? 'Discard (continue next turn)'
-                      : currentPlayer.hand.length === 1 && currentPlayer.hasLaidDown
-                        ? 'Discard — lay off to go out instead'
-                        : 'Discard Selected Card')
-                : 'Tap a card to select, then discard'}
+              {lastCardStuck
+                ? 'Play your last card onto a meld to go out'
+                : selectedCardIds.size === 1
+                  ? 'Discard Selected Card'
+                  : 'Select a card to discard'}
             </button>
           </div>
         )}
@@ -1386,7 +1723,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
         )}
       </div>
 
-      {/* Modals */}
+      {/* Modals — logic unchanged */}
       {showMeldModal && (
         <MeldModal
           hand={sortedCurrentHand}
@@ -1397,82 +1734,182 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
         />
       )}
 
-      {showPreLayDownSwapModal && (
-        <LayOffModal
-          hand={currentPlayer.hand}
-          tablesMelds={rs.tablesMelds}
-          onLayOff={handleLayOff}
-          onSwapJoker={handleJokerSwap}
-          onClose={() => {
-            // If player closes without completing a required lay-down, undo any accumulated swaps
-            if (preLayDownSwapBaseStateRef.current) {
-              setGameState(preLayDownSwapBaseStateRef.current)
-              preLayDownSwapBaseStateRef.current = null
-            }
+      {/* ── Pre-lay-down Swap Joker modal (inline) ──────────────────────── */}
+      {showPreLayDownSwapModal && (() => {
+        const naturalHand = currentPlayer.hand.filter(c => c.suit !== 'joker')
+        const swapRuns = rs.tablesMelds.filter(m => m.type === 'run' && m.jokerMappings.length > 0)
+        const psCard = naturalHand.find(c => c.id === preSwapCardId) ?? null
+        const psMeld = swapRuns.find(m => m.id === preSwapMeldId) ?? null
+        const psValid = psCard !== null && psMeld !== null && findSwappableJoker(psCard, psMeld) !== null
+
+        function closeSwapModal() {
+          if (preLayDownSwapBaseStateRef.current) {
+            setGameState(preLayDownSwapBaseStateRef.current)
+            preLayDownSwapBaseStateRef.current = null
+          }
+          setPreSwapCardId(null)
+          setPreSwapMeldId(null)
+          setShowPreLayDownSwapModal(false)
+        }
+
+        function confirmSwap() {
+          if (!psCard || !psMeld) return
+          if (!preLayDownSwapBaseStateRef.current) {
+            preLayDownSwapBaseStateRef.current = gameState
+          }
+          const afterSwap = computeJokerSwap(gameState, psCard, psMeld)
+          if (!afterSwap) return
+          const playerIdx = afterSwap.roundState.currentPlayerIndex
+          const newHand = afterSwap.players[playerIdx].hand
+          const canLayDown = aiFindBestMelds(newHand, rs.requirement) !== null
+          if (canLayDown) {
+            setGameState(afterSwap)
+            setSelectedCardIds(new Set())
+            preLayDownSwapBaseStateRef.current = null
+            setPreSwapCardId(null)
+            setPreSwapMeldId(null)
             setShowPreLayDownSwapModal(false)
-          }}
-          preLayDown
-          requirement={rs.requirement}
-          onPreLayDownSwap={(card, meld) => {
-            // Save the original state (before any pre-lay-down swaps) for potential undo
-            if (!preLayDownSwapBaseStateRef.current) {
-              preLayDownSwapBaseStateRef.current = gameState
-            }
-
-            // Compute the swap result synchronously to check if lay-down is now possible
-            const afterSwap = computeJokerSwap(gameState, card, meld)
-            if (!afterSwap) return // joker not found — should not happen
-
-            const playerIdx = afterSwap.roundState.currentPlayerIndex
-            const newHand = afterSwap.players[playerIdx].hand
-            const canLayDown = aiFindBestMelds(newHand, rs.requirement) !== null
-
-            if (canLayDown) {
-              // Player can now lay down — apply the swap and open MeldModal
+            setPreLayDownSwap(true)
+            setShowMeldModal(true)
+          } else {
+            const newTablesMelds = afterSwap.roundState.tablesMelds
+            const moreSwapsPossible = newTablesMelds.some(m =>
+              m.type === 'run' && m.jokerMappings.length > 0 &&
+              newHand.some(c => c.suit !== 'joker' && findSwappableJoker(c, m) !== null)
+            )
+            if (moreSwapsPossible) {
               setGameState(afterSwap)
               setSelectedCardIds(new Set())
-              preLayDownSwapBaseStateRef.current = null
-              setShowPreLayDownSwapModal(false)
-              setPreLayDownSwap(true)
-              setShowMeldModal(true)
+              setPreSwapCardId(null)
+              setPreSwapMeldId(null)
             } else {
-              // Check if another swap is still possible from the new hand
-              const newTablesMelds = afterSwap.roundState.tablesMelds
-              const moreSwapsPossible = newTablesMelds.some(m =>
-                m.type === 'run' && m.jokerMappings.length > 0 &&
-                newHand.some(c => c.suit !== 'joker' && findSwappableJoker(c, m) !== null)
-              )
-
-              if (moreSwapsPossible) {
-                // Apply this swap and stay in the swap modal for the next swap
-                setGameState(afterSwap)
-                setSelectedCardIds(new Set())
-                // Modal stays open (showPreLayDownSwapModal remains true)
-              } else {
-                // No more swaps possible and still can't lay down — undo ALL swaps in this sequence
-                const baseState = preLayDownSwapBaseStateRef.current
-                setGameState(baseState ?? gameState)
-                preLayDownSwapBaseStateRef.current = null
-                setSelectedCardIds(new Set())
-                setShowPreLayDownSwapModal(false)
-                // Show error briefly — use layOffError as a reusable error channel
-                setLayOffError('You can only swap jokers if you can lay down afterwards.')
-                setTimeout(() => setLayOffError(null), 4000)
-              }
+              const baseState = preLayDownSwapBaseStateRef.current
+              setGameState(baseState ?? gameState)
+              preLayDownSwapBaseStateRef.current = null
+              setSelectedCardIds(new Set())
+              setPreSwapCardId(null)
+              setPreSwapMeldId(null)
+              setShowPreLayDownSwapModal(false)
+              setLayOffError('You can only swap jokers if you can lay down afterwards.')
+              setTimeout(() => setLayOffError(null), 4000)
             }
-          }}
-          errorMsg={layOffError}
-        />
-      )}
+          }
+        }
+
+        return (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 50, backgroundColor: '#1e4a2e', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            {/* Header */}
+            <div style={{ flexShrink: 0, backgroundColor: '#0f2218', padding: '12px 14px', paddingTop: 'max(12px, env(safe-area-inset-top))', borderBottom: '1px solid #2d5a3a', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div>
+                <p style={{ color: '#a8d0a8', fontSize: 13, fontWeight: 500, margin: 0 }}>Swap a Joker</p>
+                <p style={{ color: '#e2b858', fontSize: 11, margin: '2px 0 0' }}>You must lay down after this swap</p>
+              </div>
+              <button onClick={closeSwapModal} style={{ background: 'transparent', border: '1px solid #2d5a3a', borderRadius: 8, color: '#6aad7a', padding: '6px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', minHeight: 44, minWidth: 44 }}>
+                Cancel
+              </button>
+            </div>
+
+            {/* Error */}
+            {layOffError && (
+              <div style={{ padding: '8px 14px', backgroundColor: 'rgba(44,24,16,0.5)', borderBottom: '1px solid #3a1a0a' }}>
+                <p style={{ color: '#e87070', fontSize: 11, margin: 0 }}>{layOffError}</p>
+              </div>
+            )}
+
+            {/* Body */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Step 1: pick natural card */}
+              <div>
+                <p style={{ color: '#a8d0a8', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.8px', margin: '0 0 8px' }}>
+                  Step 1 — Pick a card from your hand
+                </p>
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                  {naturalHand.length === 0
+                    ? <p style={{ color: '#3a5a3a', fontSize: 11, fontStyle: 'italic' }}>No natural cards in hand</p>
+                    : naturalHand.map(card => {
+                      const sel = preSwapCardId === card.id
+                      return (
+                        <div
+                          key={card.id}
+                          onClick={() => { setPreSwapCardId(card.id); setPreSwapMeldId(null) }}
+                          style={{ width: 36, height: 50, minWidth: 44, minHeight: 44, backgroundColor: sel ? '#fff8dc' : ['hearts','diamonds'].includes(card.suit) ? (card.suit === 'hearts' ? '#fff0f0' : '#f0f5ff') : card.suit === 'clubs' ? '#e0f7e8' : '#eeecff', border: sel ? '2px solid #e2b858' : '1.5px solid rgba(0,0,0,0.14)', borderRadius: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transform: sel ? 'translateY(-6px)' : undefined, transition: 'transform 100ms', userSelect: 'none', color: card.suit === 'hearts' ? '#c0393b' : card.suit === 'diamonds' ? '#2158b8' : card.suit === 'clubs' ? '#1a6b3a' : '#3d2b8e' }}>
+                          <span style={{ fontSize: 11, fontWeight: 800 }}>{card.rank === 1 ? 'A' : card.rank === 11 ? 'J' : card.rank === 12 ? 'Q' : card.rank === 13 ? 'K' : String(card.rank)}</span>
+                          <span style={{ fontSize: 14 }}>{card.suit === 'hearts' ? '♥' : card.suit === 'diamonds' ? '♦' : card.suit === 'clubs' ? '♣' : '♠'}</span>
+                        </div>
+                      )
+                    })
+                  }
+                </div>
+              </div>
+
+              {/* Step 2: pick run meld (only shown once a card is selected) */}
+              {psCard && (
+                <div>
+                  <p style={{ color: '#a8d0a8', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.8px', margin: '0 0 8px' }}>
+                    Step 2 — Pick a run with a joker
+                  </p>
+                  {swapRuns.length === 0
+                    ? <p style={{ color: '#3a5a3a', fontSize: 11, fontStyle: 'italic' }}>No runs with jokers on the table</p>
+                    : (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {swapRuns.map(meld => {
+                          const isTarget = findSwappableJoker(psCard, meld) !== null
+                          const sel = preSwapMeldId === meld.id
+                          return (
+                            <div
+                              key={meld.id}
+                              onClick={() => isTarget && setPreSwapMeldId(meld.id)}
+                              style={{ backgroundColor: '#0f2218', border: sel ? '1.5px solid #e2b858' : isTarget ? '1.5px solid #6aad7a' : '1.5px solid #2d5a3a', borderRadius: 8, padding: '6px 8px', display: 'flex', flexDirection: 'column', gap: 4, opacity: isTarget ? 1 : 0.35, cursor: isTarget ? 'pointer' : 'default', flexShrink: 0, animation: isTarget && !sel ? 'lomPulse 1.4s ease-in-out infinite' : 'none' }}>
+                              <p style={{ fontSize: 8, color: isTarget ? '#6aad7a' : '#3a5a3a', margin: 0 }}>run · {meld.ownerName.split(' ')[0]}</p>
+                              <div style={{ display: 'flex', gap: 2 }}>
+                                {meld.cards.map(card => {
+                                  const isJkr = card.suit === 'joker'
+                                  const mapping = isJkr ? meld.jokerMappings.find(j => j.cardId === card.id) : null
+                                  const lbl = isJkr ? (mapping ? `${mapping.representsRank === 1 || mapping.representsRank === 14 ? 'A' : mapping.representsRank === 11 ? 'J' : mapping.representsRank === 12 ? 'Q' : mapping.representsRank === 13 ? 'K' : String(mapping.representsRank)}${mapping.representsSuit === 'hearts' ? '♥' : mapping.representsSuit === 'diamonds' ? '♦' : mapping.representsSuit === 'clubs' ? '♣' : '♠'}` : 'JKR') : `${card.rank === 1 ? 'A' : card.rank === 11 ? 'J' : card.rank === 12 ? 'Q' : card.rank === 13 ? 'K' : card.rank}${card.suit === 'hearts' ? '♥' : card.suit === 'diamonds' ? '♦' : card.suit === 'clubs' ? '♣' : '♠'}`
+                                  return (
+                                    <div key={card.id} style={{ width: 22, height: 30, backgroundColor: isJkr ? '#fff8e0' : card.suit === 'hearts' ? '#fff0f0' : card.suit === 'diamonds' ? '#f0f5ff' : card.suit === 'clubs' ? '#e0f7e8' : '#eeecff', border: '1px solid rgba(0,0,0,0.12)', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 7, fontWeight: 700, color: isJkr ? '#8b6914' : card.suit === 'hearts' ? '#c0393b' : card.suit === 'diamonds' ? '#2158b8' : card.suit === 'clubs' ? '#1a6b3a' : '#3d2b8e', flexShrink: 0 }}>
+                                      {lbl}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )
+                  }
+                </div>
+              )}
+            </div>
+
+            {/* Confirm button */}
+            <div style={{ flexShrink: 0, backgroundColor: '#0f2218', borderTop: '1px solid #2d5a3a', padding: '12px 14px', paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
+              <button
+                onClick={confirmSwap}
+                disabled={!psValid}
+                style={{ width: '100%', minHeight: 48, borderRadius: 12, border: 'none', background: psValid ? '#e2b858' : '#1e4a2e', color: psValid ? '#2c1810' : '#3a5a3a', fontSize: 14, fontWeight: 700, cursor: psValid ? 'pointer' : 'not-allowed' }}
+              >
+                Swap & Lay Down
+              </button>
+            </div>
+
+            {/* Reuse pulse keyframe from LayOffModal */}
+            <style>{`@keyframes lomPulse{0%,100%{box-shadow:0 0 6px rgba(106,173,122,0.4)}50%{box-shadow:0 0 18px rgba(106,173,122,0.9)}}`}</style>
+          </div>
+        )
+      })()}
 
       {showLayOffModal && (
         <LayOffModal
+          melds={rs.tablesMelds}
+          currentPlayerId={currentPlayer.id}
+          currentPlayerName={currentPlayer.name}
           hand={currentPlayer.hand}
-          tablesMelds={rs.tablesMelds}
+          players={gameState.players}
           onLayOff={handleLayOff}
-          onSwapJoker={handleJokerSwap}
-          onClose={() => { setShowLayOffModal(false); setLayOffError(null) }}
-          errorMsg={layOffError}
+          onGoOut={() => setShowLayOffModal(false)}
+          onDone={() => setShowLayOffModal(false)}
         />
       )}
 
@@ -1484,7 +1921,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
             <p className="text-sm text-[#6aad7a] text-center mb-4">
               Round {gameState.currentRound} of {TOTAL_ROUNDS} · {currentPlayer.name}'s turn
             </p>
-            {/* Game speed */}
             <p className="text-xs text-[#6aad7a] text-center mb-2">AI Speed</p>
             <div className="bg-[#1e4a2e] rounded-xl p-1 flex gap-1 mb-4">
               {(['fast', 'normal', 'slow'] as GameSpeed[]).map(s => (
@@ -1522,6 +1958,15 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', onE
       )}
     </div>
   )
+}
+
+// Helper for buy log card display
+function formatCard(card: CardType): string {
+  if (card.rank === 0) return 'Jkr'
+  const r = card.rank
+  const rank = r === 1 ? 'A' : r === 11 ? 'J' : r === 12 ? 'Q' : r === 13 ? 'K' : String(r)
+  const suit = card.suit === 'hearts' ? '♥' : card.suit === 'diamonds' ? '♦' : card.suit === 'clubs' ? '♣' : '♠'
+  return `${rank}${suit}`
 }
 
 // Helper for undo discard label

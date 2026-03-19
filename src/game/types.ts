@@ -35,7 +35,7 @@ export interface Player {
   hand: Card[]
   melds: Meld[]         // melds this player has laid down this round
   hasLaidDown: boolean
-  buysRemaining: number // 5 per round, resets each new round
+  buysRemaining: number // resets to GameState.buyLimit at the start of each round
   roundScores: number[] // score per round index 0-6
   isAI?: boolean
 }
@@ -72,4 +72,5 @@ export interface GameState {
   roundState: RoundState
   deckCount: number
   gameOver: boolean
+  buyLimit: number      // configured at setup; default 5; 0 = buying disabled; resets buysRemaining each round
 }
