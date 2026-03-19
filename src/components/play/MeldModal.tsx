@@ -84,11 +84,11 @@ function ModalPanel({
 }) {
   return (
     <>
-      {/* Backdrop covers only above Zone 3 */}
+      {/* Full-screen backdrop — hides main board hand behind the modal */}
       <div
         style={{
-          position: 'fixed', top: 0, left: 0, right: 0, bottom: 195,
-          background: 'rgba(0,0,0,0.55)', zIndex: 49,
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.75)', zIndex: 49,
         }}
         onClick={locked ? undefined : onClose}
       />

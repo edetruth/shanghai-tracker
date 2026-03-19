@@ -1,4 +1,3 @@
-import { useRef, useState, useEffect, useCallback } from 'react'
 import type { Card, Meld } from '../../game/types'
 import { canLayOff } from '../../game/meld-validator'
 
@@ -107,7 +106,7 @@ function MicroCard({ card, meld }: { card: Card; meld: Meld }) {
   )
 }
 
-// ── Player group grouping helpers ─────────────────────────────────────────────
+// ── Player group helpers ──────────────────────────────────────────────────────
 
 interface PlayerGroup {
   ownerId: string
@@ -143,30 +142,6 @@ export default function TableMelds({
   selectedCard = null,
   onLayOff,
 }: Props) {
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const [dots, setDots] = useState({ count: 1, active: 0 })
-
-  const recalcDots = useCallback(() => {
-    const el = scrollRef.current
-    if (!el) return
-    const total = el.scrollWidth
-    const visible = el.clientWidth
-    if (total <= visible + 2) {
-      setDots({ count: 1, active: 0 })
-      return
-    }
-    const count = Math.max(2, Math.ceil(total / visible))
-    const active = Math.round((el.scrollLeft / (total - visible)) * (count - 1))
-    setDots({ count, active })
-  }, [])
-
-  // Recalculate dots when melds change (new content width)
-  useEffect(() => {
-    // rAF ensures DOM is painted before measuring
-    const id = requestAnimationFrame(recalcDots)
-    return () => cancelAnimationFrame(id)
-  }, [melds, recalcDots])
-
   const isLayOffMode = selectedCard !== null
 
   // ── Empty state ──────────────────────────────────────────────────────────
@@ -193,135 +168,7 @@ export default function TableMelds({
   const groups = buildGroups(melds, currentPlayerId)
 
   return (
-    <div style={{ backgroundColor: '#0f2218', borderRadius: 10, padding: 8 }}>
-      {/* ── Horizontal scrollable strip ────────────────────────────────── */}
-      <div
-        ref={scrollRef}
-        onScroll={recalcDots}
-        style={{
-          display: 'flex',
-          flexDirection: 'row',
-          alignItems: 'flex-start',
-          overflowX: 'auto',
-          overflowY: 'hidden',
-          scrollbarWidth: 'none',           // Firefox
-          msOverflowStyle: 'none',          // IE/Edge legacy
-          WebkitOverflowScrolling: 'touch', // iOS momentum
-        } as React.CSSProperties}
-        // Hide webkit scrollbar via Tailwind arbitrary variant
-        className="[&::-webkit-scrollbar]:hidden"
-      >
-        {groups.map((group, gi) => {
-          const isCurrentPlayer = group.ownerId === currentPlayerId
-
-          return (
-            <div
-              key={group.ownerId}
-              style={{ display: 'flex', flexDirection: 'row', alignItems: 'stretch', flexShrink: 0 }}
-            >
-              {/* Thin vertical divider between player groups */}
-              {gi > 0 && (
-                <div
-                  style={{
-                    width: 1,
-                    backgroundColor: '#2d5a3a',
-                    alignSelf: 'stretch',
-                    marginLeft: 6,
-                    marginRight: 6,
-                    flexShrink: 0,
-                  }}
-                />
-              )}
-
-              {/* Player group column */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
-                {/* Player label */}
-                <span
-                  style={{
-                    color: '#6aad7a',
-                    fontSize: 8,
-                    fontWeight: 600,
-                    whiteSpace: 'nowrap',
-                    lineHeight: 1,
-                    paddingLeft: 2,
-                  }}
-                >
-                  {isCurrentPlayer ? 'You' : group.ownerName}
-                </span>
-
-                {/* Melds row */}
-                <div style={{ display: 'flex', flexDirection: 'row', gap: 4, alignItems: 'flex-start' }}>
-                  {group.melds.map(meld => {
-                    const isValid = isLayOffMode && canLayOff(selectedCard!, meld)
-                    const isDimmed = isLayOffMode && !isValid
-                    const displayCards =
-                      meld.type === 'set' ? sortedSetCards(meld.cards) : meld.cards
-
-                    return (
-                      <div
-                        key={meld.id}
-                        onClick={isValid && onLayOff ? () => onLayOff(selectedCard!, meld) : undefined}
-                        style={{
-                          backgroundColor: '#1e4a2e',
-                          border: isValid
-                            ? '2px solid #6aad7a'
-                            : isCurrentPlayer
-                              ? '1px solid #3b6d3a'
-                              : '1px solid #2d5a3a',
-                          borderRadius: 6,
-                          padding: '4px 5px',
-                          display: 'flex',
-                          flexDirection: 'row',
-                          gap: 2,
-                          alignItems: 'center',
-                          opacity: isDimmed ? 0.4 : 1,
-                          cursor: isValid ? 'pointer' : 'default',
-                          flexShrink: 0,
-                          transition: 'opacity 0.15s',
-                          // Pulsing green glow on valid targets
-                          animation: isValid ? 'tmPulse 1.4s ease-in-out infinite' : 'none',
-                        }}
-                      >
-                        {displayCards.map(card => (
-                          <MicroCard key={card.id} card={card} meld={meld} />
-                        ))}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* ── Scroll position dots ───────────────────────────────────────── */}
-      {dots.count > 1 && (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            gap: 4,
-            marginTop: 6,
-          }}
-        >
-          {Array.from({ length: dots.count }).map((_, i) => (
-            <div
-              key={i}
-              style={{
-                width: i === dots.active ? 12 : 4,
-                height: 4,
-                borderRadius: i === dots.active ? 2 : '50%',
-                backgroundColor: i === dots.active ? '#6aad7a' : '#2d5a3a',
-                transition: 'width 0.2s ease, border-radius 0.2s ease',
-                flexShrink: 0,
-              }}
-            />
-          ))}
-        </div>
-      )}
-
+    <>
       {/* Keyframe for valid-target pulse */}
       <style>{`
         @keyframes tmPulse {
@@ -329,6 +176,77 @@ export default function TableMelds({
           50%       { box-shadow: 0 0 12px rgba(106,173,122,0.85); }
         }
       `}</style>
-    </div>
+
+      <div style={{ backgroundColor: '#0f2218', borderRadius: 10, padding: 8 }}>
+        {groups.map((group, gi) => {
+          const isCurrentPlayer = group.ownerId === currentPlayerId
+
+          return (
+            <div key={group.ownerId}>
+              {/* Thin horizontal divider between player sections */}
+              {gi > 0 && (
+                <div style={{ height: 1, backgroundColor: '#2d5a3a', margin: '8px 0' }} />
+              )}
+
+              {/* Player label */}
+              <span
+                style={{
+                  color: isCurrentPlayer ? '#e2b858' : '#6aad7a',
+                  fontSize: 9,
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  lineHeight: 1,
+                  display: 'block',
+                  marginBottom: 5,
+                }}
+              >
+                {isCurrentPlayer ? 'You' : group.ownerName}
+              </span>
+
+              {/* Melds — wrap to next line if needed */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {group.melds.map(meld => {
+                  const isValid = isLayOffMode && canLayOff(selectedCard!, meld)
+                  const isDimmed = isLayOffMode && !isValid
+                  const displayCards =
+                    meld.type === 'set' ? sortedSetCards(meld.cards) : meld.cards
+
+                  return (
+                    <div
+                      key={meld.id}
+                      onClick={isValid && onLayOff ? () => onLayOff(selectedCard!, meld) : undefined}
+                      style={{
+                        backgroundColor: '#1e4a2e',
+                        border: isValid
+                          ? '2px solid #6aad7a'
+                          : isCurrentPlayer
+                            ? '1px solid #3b6d3a'
+                            : '1px solid #2d5a3a',
+                        borderRadius: 6,
+                        padding: '4px 5px',
+                        display: 'flex',
+                        flexDirection: 'row',
+                        gap: 2,
+                        alignItems: 'center',
+                        opacity: isDimmed ? 0.4 : 1,
+                        cursor: isValid ? 'pointer' : 'default',
+                        flexShrink: 0,
+                        transition: 'opacity 0.15s',
+                        animation: isValid ? 'tmPulse 1.4s ease-in-out infinite' : 'none',
+                      }}
+                    >
+                      {displayCards.map(card => (
+                        <MicroCard key={card.id} card={card} meld={meld} />
+                      ))}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </>
   )
 }

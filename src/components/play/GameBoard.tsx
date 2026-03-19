@@ -1731,6 +1731,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
           onConfirm={handleMeldConfirm}
           onClose={() => { if (!preLayDownSwap) setShowMeldModal(false) }}
           mustLayDown={preLayDownSwap}
+          sortMode={handSort}
+          onSortChange={setHandSort}
         />
       )}
 
