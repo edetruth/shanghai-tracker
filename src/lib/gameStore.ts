@@ -1,5 +1,7 @@
 import { supabase } from './supabase'
 import type { Game, GameScore, GameWithScores, Player } from './types'
+import type { AIDecision, PlayerRoundStats, PlayerGameStats, Player as GamePlayer } from '../game/types'
+import { cardPoints } from '../game/rules'
 
 // Players
 export async function getPlayers(): Promise<Player[]> {
@@ -340,6 +342,81 @@ export async function saveGameEvents(
   const { error } = await supabase.from('game_events').insert(rows)
   if (error) console.error('saveGameEvents failed:', error)
   // Silent fail — telemetry should never break the game
+}
+
+// ── Telemetry: AI decisions ──────────────────────────────────────────────────
+
+export async function saveAIDecisions(decisions: AIDecision[]): Promise<void> {
+  if (decisions.length === 0) return
+  try {
+    await supabase.from('ai_decisions').insert(decisions)
+  } catch {
+    // silent — telemetry never breaks gameplay
+  }
+}
+
+export async function backfillDecisionOutcomes(
+  gameId: string,
+  roundNumber: number,
+  players: GamePlayer[],
+): Promise<void> {
+  try {
+    const { data: decisions } = await supabase
+      .from('ai_decisions')
+      .select('id, player_name, card_suit, card_rank')
+      .eq('game_id', gameId)
+      .eq('round_number', roundNumber)
+      .in('decision_type', ['draw', 'buy', 'free_take'])
+      .in('decision_result', ['took_discard', 'bought', 'took'])
+
+    if (!decisions || decisions.length === 0) return
+
+    for (const d of decisions) {
+      const player = players.find(p => p.name === d.player_name)
+      if (!player) continue
+
+      const cardInMeld = player.melds.some(m =>
+        m.cards.some(c => c.suit === d.card_suit && c.rank === d.card_rank)
+      )
+      const cardInHand = player.hand.some(c =>
+        c.suit === d.card_suit && c.rank === d.card_rank
+      )
+      const points = cardInHand ? cardPoints(d.card_rank ?? 0) : 0
+
+      await supabase
+        .from('ai_decisions')
+        .update({
+          card_used_in_meld: cardInMeld,
+          card_still_in_hand_at_round_end: cardInHand,
+          points_contributed: points,
+        })
+        .eq('id', d.id)
+    }
+  } catch {
+    // silent
+  }
+}
+
+// ── Telemetry: round + game stats ───────────────────────────────────────────
+
+export async function savePlayerRoundStats(stats: PlayerRoundStats): Promise<void> {
+  try {
+    await supabase.from('player_round_stats').upsert(stats, {
+      onConflict: 'game_id,round_number,player_name',
+    })
+  } catch {
+    // silent
+  }
+}
+
+export async function savePlayerGameStats(stats: PlayerGameStats): Promise<void> {
+  try {
+    await supabase.from('player_game_stats').upsert(stats, {
+      onConflict: 'game_id,player_name',
+    })
+  } catch {
+    // silent
+  }
 }
 
 // Stats helpers

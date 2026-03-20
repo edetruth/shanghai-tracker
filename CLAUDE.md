@@ -90,7 +90,7 @@ npm run lint      # ESLint check
 
 ## Database (Supabase)
 
-Four tables — no row-level security (public anon key access):
+Seven tables — no row-level security (public anon key access):
 
 | Table | Key columns |
 |-------|-------------|
@@ -98,10 +98,15 @@ Four tables — no row-level security (public anon key access):
 | `games` | `id`, `date`, `room_code`, `notes`, `is_complete`, `game_type`, `created_at` |
 | `game_scores` | `id`, `game_id`, `player_id`, `round_scores` (number[]), `total_score` (generated) |
 | `shanghai_events` | `id`, `game_id`, `player_id`, `round_number`, `created_at` (optional) |
+| `ai_decisions` | `id`, `game_id`, `round_number`, `turn_number`, `player_name`, `decision_type`, `decision_result`, ... (telemetry) |
+| `player_round_stats` | `id`, `game_id`, `round_number`, `player_name`, `round_score`, `went_out`, `went_down`, ... (per-round summary) |
+| `player_game_stats` | `id`, `game_id`, `player_name`, `total_score`, `final_rank`, `won`, ... (per-game summary) |
 
 All DB access goes through `src/lib/gameStore.ts`. Never call Supabase directly from components.
 
 Key functions: `getPlayers`, `upsertPlayer`, `createGame(playerIds, date, gameType?)`, `getGame`, `getCompletedGames`, `updateRoundScore`, `saveAllRoundScores`, `completeGame`, `deleteGame`, `updateGame`, `importGame`, `savePlayedGame(players, date, gameType)`, `saveShanghaiEvents(gameId, roundNumber, playerIds)`, `computeWinner`, `generateRoomCode`.
+
+Telemetry functions (fire-and-forget, never break gameplay): `saveAIDecisions`, `backfillDecisionOutcomes`, `savePlayerRoundStats`, `savePlayerGameStats`.
 
 ## Play Mode
 

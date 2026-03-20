@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { createPlayedGame, saveGameEvents } from '../../lib/gameStore'
+import { createPlayedGame, saveGameEvents, saveAIDecisions, backfillDecisionOutcomes, savePlayerRoundStats, savePlayerGameStats } from '../../lib/gameStore'
+import type { AIDecision, PlayerRoundStats, PlayerGameStats } from '../../game/types'
 import { Pause } from 'lucide-react'
 import type { GameState, Player, Card as CardType, Meld, PlayerConfig, AIDifficulty, OpponentHistory } from '../../game/types'
 import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, MAX_BUYS, cardPoints } from '../../game/rules'
@@ -220,6 +221,79 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
   // Panic mode: total turns elapsed per AI player per round (resets each round)
   const aiTurnsElapsedRef = useRef<Map<string, number>>(new Map())
 
+  // ── Telemetry tracking refs ─────────────────────────────────────────────────
+  const pendingDecisionsRef = useRef<AIDecision[]>([])
+  const playerTurnCountsRef = useRef<Map<string, number>>(new Map())
+  const turnWentDownRef = useRef<Map<string, number>>(new Map())
+  const turnsHeldRef = useRef<Map<string, number>>(new Map())
+  // Per-player counters for round stats (reset each round)
+  const telemetryCountersRef = useRef<Map<string, {
+    freeTakes: number; freeDeclines: number; pileDraws: number
+    buysMade: number; buysPassed: number; buyOpportunities: number
+    discards: number; denialTakes: number; denialBuys: number
+    meldsLaidDown: number; bonusMelds: number; layOffs: number; jokerSwaps: number
+    handSizeWentDown: number | null; scenarioB: number; scenarioC: number
+  }>>(new Map())
+
+  function getTelemetryCounters(playerId: string) {
+    if (!telemetryCountersRef.current.has(playerId)) {
+      telemetryCountersRef.current.set(playerId, {
+        freeTakes: 0, freeDeclines: 0, pileDraws: 0,
+        buysMade: 0, buysPassed: 0, buyOpportunities: 0,
+        discards: 0, denialTakes: 0, denialBuys: 0,
+        meldsLaidDown: 0, bonusMelds: 0, layOffs: 0, jokerSwaps: 0,
+        handSizeWentDown: null, scenarioB: 0, scenarioC: 0,
+      })
+    }
+    return telemetryCountersRef.current.get(playerId)!
+  }
+
+  function recordDecision(
+    player: Player,
+    decisionType: string,
+    decisionResult: string,
+    card?: CardType | null,
+    reason?: string,
+  ) {
+    if (!gameId) return
+    const state = gameStateRef.current
+    const handPoints = player.hand.reduce((sum, c) => sum + cardPoints(c.rank), 0)
+    const turnNum = playerTurnCountsRef.current.get(player.id) ?? 0
+
+    pendingDecisionsRef.current.push({
+      game_id: gameId,
+      round_number: state.currentRound,
+      turn_number: turnNum,
+      player_name: player.name,
+      difficulty: player.isAI ? aiDifficulty : null,
+      is_human: !player.isAI,
+      decision_type: decisionType,
+      decision_result: decisionResult,
+      hand_size: player.hand.length,
+      hand_points: handPoints,
+      has_laid_down: player.hasLaidDown,
+      buys_remaining: player.buysRemaining,
+      card_suit: card?.suit,
+      card_rank: card?.rank,
+      reason,
+    })
+  }
+
+  function flushDecisions() {
+    if (pendingDecisionsRef.current.length === 0) return
+    const batch = [...pendingDecisionsRef.current]
+    pendingDecisionsRef.current = []
+    void saveAIDecisions(batch)
+  }
+
+  function resetRoundTelemetry() {
+    playerTurnCountsRef.current = new Map()
+    turnWentDownRef.current = new Map()
+    turnsHeldRef.current = new Map()
+    telemetryCountersRef.current = new Map()
+    pendingDecisionsRef.current = []
+  }
+
   // Post-draw buying: when true, after buying window resolves the CURRENT player acts (they already drew)
   const buyingIsPostDrawRef = useRef(false)
   // Track who discarded the current card — so they can't buy it back
@@ -357,13 +431,16 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     declinedPendingCardRef.current = pendingCard   // save for handleDrawFromPile
     setFreeOfferDeclined(true)
     if (pendingCard) {
+      const decliner = getCurrentPlayer(gameStateRef.current)
       addBuyLog({
         turn: turnCountRef.current,
         round: gameStateRef.current.currentRound,
         event: 'free_declined',
-        playerName: getCurrentPlayer(gameStateRef.current).name,
+        playerName: decliner.name,
         card: formatCard(pendingCard),
       })
+      recordDecision(decliner, 'free_take', 'declined', pendingCard)
+      getTelemetryCounters(decliner.id).freeDeclines++
     }
   }
 
@@ -422,6 +499,13 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
 
     if (drawnCard) setNewCardIds(new Set([drawnCard.id]))
 
+    // Telemetry: record pile draw
+    {
+      const drawer = gameState.players[gameState.roundState.currentPlayerIndex]
+      recordDecision(drawer, 'draw', 'drew_pile')
+      getTelemetryCounters(drawer.id).pileDraws++
+    }
+
     if (needsReshuffle) {
       setReshuffleMsg(true)
       setTimeout(() => setReshuffleMsg(false), 2500)
@@ -469,6 +553,15 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     // Record for opponent awareness (Hard AI)
     const taker = gameState.players[gameState.roundState.currentPlayerIndex]
     recordOpponentEvent(taker.id, 'picked', card)
+
+    // Telemetry: record free take or draw decision
+    if (pendingBuyDiscardRef.current !== null) {
+      recordDecision(taker, 'free_take', 'took', card, 'free take')
+      getTelemetryCounters(taker.id).freeTakes++
+    } else {
+      recordDecision(taker, 'draw', 'took_discard', card)
+      getTelemetryCounters(taker.id).freeTakes++
+    }
 
     setGameState(prev => {
       const discardPile = [...prev.roundState.discardPile]
@@ -579,6 +672,17 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     setRoundResults(results)
     setUiPhase('round-end')
     flushTelemetry(buyLog) // fire-and-forget — telemetry must never block game flow
+
+    // Telemetry: flush remaining decisions, backfill outcomes, save round stats
+    flushDecisions()
+    if (gameId) {
+      void backfillDecisionOutcomes(gameId, state.currentRound, players)
+      for (const p of players) {
+        const result = results.find(r => r.playerId === p.id)
+        void savePlayerRoundStats(computeRoundStats(gameId, state.currentRound, p, result ?? null))
+      }
+    }
+    resetRoundTelemetry()
   }
 
   // ── Force end round (stalemate) ───────────────────────────────────────────
@@ -607,6 +711,17 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     setAiMessage('Round ended — no one went out (stalemate)')
     setTimeout(() => setAiMessage(null), 4000)
     flushTelemetry(buyLog) // fire-and-forget — telemetry must never block game flow
+
+    // Telemetry: flush + save round stats for stalemate
+    flushDecisions()
+    if (gameId) {
+      void backfillDecisionOutcomes(gameId, state.currentRound, players)
+      for (const p of players) {
+        const result = results.find(r => r.playerId === p.id)
+        void savePlayerRoundStats(computeRoundStats(gameId, state.currentRound, p, result ?? null))
+      }
+    }
+    resetRoundTelemetry()
   }
 
   // ── Meld confirmation ─────────────────────────────────────────────────────
@@ -642,6 +757,16 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
 
     // Reset progress counter when a meld happens
     noProgressTurnsRef.current = 0
+
+    // Telemetry: record going down
+    recordDecision(player, 'go_down', 'went_down', null, `${newMelds.length} melds`)
+    const tc = getTelemetryCounters(player.id)
+    const reqCount = rs.requirement.sets + rs.requirement.runs
+    tc.meldsLaidDown += newMelds.length
+    tc.bonusMelds += Math.max(0, newMelds.length - reqCount)
+    tc.handSizeWentDown = player.hand.length
+    turnWentDownRef.current.set(player.id, playerTurnCountsRef.current.get(player.id) ?? 0)
+
     addBuyLog({ round: prev.currentRound, turn: turnCountRef.current, event: 'went_down', playerName: player.name, card: '', detail: `melds: ${newMelds.length}` })
     if (wentOut) addBuyLog({ round: prev.currentRound, turn: turnCountRef.current, event: 'went_out', playerName: player.name, card: '', detail: 'hand was empty' })
     setGameState(updated)
@@ -727,6 +852,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     const goOutPlayerId = wentOut ? player.id : prev.roundState.goOutPlayerId
     const players = prev.players.map((p, i) => i === playerIdx ? { ...p, hand: newHand } : p)
 
+    // Telemetry: record lay-off
+    recordDecision(player, 'lay_off', 'laid_off', card)
+    getTelemetryCounters(player.id).layOffs++
+
     // GDD Section 6.3 Scenario C: if the lay-off would leave 1 unplayable card, reverse it
     const layOffEval = evaluateLayOffReversal(card, meld, player.hand, prev.roundState.tablesMelds, jokerPosition)
     if (layOffEval.outcome === 'reversed') {
@@ -743,6 +872,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
         roundState: { ...prev.roundState },
       }
       addBuyLog({ round: prev.currentRound, turn: turnCountRef.current, event: 'scenario_c', playerName: player.name, card: '', detail: 'lay-off reversed' })
+      getTelemetryCounters(player.id).scenarioC++
       setGameState(afterReversal)
       setSelectedCardIds(new Set())
       setLayOffError(null)
@@ -794,6 +924,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
   function handleJokerSwap(naturalCard: CardType, meld: Meld) {
     const swapPlayer = gameState.players[gameState.roundState.currentPlayerIndex]
     addBuyLog({ round: gameState.currentRound, turn: turnCountRef.current, event: 'joker_swap', playerName: swapPlayer.name, card: formatCard(naturalCard), detail: '' })
+    recordDecision(swapPlayer, 'joker_swap', 'swapped', naturalCard)
+    getTelemetryCounters(swapPlayer.id).jokerSwaps++
     setGameState(prev => computeJokerSwap(prev, naturalCard, meld) ?? prev)
     setSelectedCardIds(new Set())
   }
@@ -844,6 +976,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
           roundState: { ...rs, tablesMelds: newTablesMelds, discardPile: newDiscardPile },
         }
         addBuyLog({ round: gameState.currentRound, turn: turnCountRef.current, event: 'scenario_b', playerName: player.name, card: '', detail: 'bonus meld reversed' })
+        getTelemetryCounters(player.id).scenarioB++
         setGameState(afterRollback)
         setSelectedCardIds(new Set())
         haptic('heavy')
@@ -899,6 +1032,13 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     haptic('heavy')
 
     turnCountRef.current += 1
+
+    // Telemetry: record discard, bump per-player turn count, flush batch
+    recordDecision(player, 'discard', 'discarded', card)
+    getTelemetryCounters(player.id).discards++
+    playerTurnCountsRef.current.set(player.id, (playerTurnCountsRef.current.get(player.id) ?? 0) + 1)
+    flushDecisions()
+
     addBuyLog({
       turn: turnCountRef.current,
       round: gameState.currentRound,
@@ -988,6 +1128,12 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
       // Record buy for opponent awareness (Hard AI)
       recordOpponentEvent(buyer.id, 'picked', buyingDiscard)
 
+      // Telemetry: record buy
+      recordDecision(buyer, 'buy', 'bought', buyingDiscard)
+      const btc = getTelemetryCounters(buyer.id)
+      btc.buysMade++
+      btc.buyOpportunities++
+
       // Highlight newly received buy cards
       const buyNewIds = new Set<string>()
       if (buyingDiscard) buyNewIds.add(buyingDiscard.id)
@@ -1026,7 +1172,18 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
       }
     } else {
       const nextStep = buyerStep + 1
-      const passerName = buyerOrder[buyerStep] !== undefined ? gameState.players[buyerOrder[buyerStep]]?.name ?? '?' : '?'
+      const passerIdx = buyerOrder[buyerStep]
+      const passer = passerIdx !== undefined ? gameState.players[passerIdx] : null
+      const passerName = passer?.name ?? '?'
+
+      // Telemetry: record buy pass
+      if (passer) {
+        recordDecision(passer, 'buy', 'passed', buyingDiscard)
+        const ptc = getTelemetryCounters(passer.id)
+        ptc.buysPassed++
+        ptc.buyOpportunities++
+      }
+
       addBuyLog({
         turn: turnCountRef.current,
         round: gameState.currentRound,
@@ -1080,6 +1237,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     pendingSaveRef.current = 0
     noProgressTurnsRef.current = 0
     drawPileDepletionsRef.current = 0
+    resetRoundTelemetry()
     const date = new Date().toISOString().split('T')[0]
     const playerNames = initialPlayers.map(p => p.name)
     const gameType = initialPlayers.some(p => p.isAI) ? 'ai' : 'pass-and-play'
@@ -1089,6 +1247,100 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
       setGameId(id)
     } catch {
       // silent fail — telemetry must never break the game
+    }
+  }
+
+  // ── Telemetry: compute round stats ──────────────────────────────────────
+  function computeRoundStats(
+    gId: string, roundNum: number, p: Player,
+    result: { playerId: string; score: number; shanghaied: boolean } | null,
+  ): PlayerRoundStats {
+    const tc = telemetryCountersRef.current.get(p.id)
+    const totalTurns = playerTurnCountsRef.current.get(p.id) ?? 0
+    const turnDown = turnWentDownRef.current.get(p.id) ?? null
+    const held = turnsHeldRef.current.get(p.id) ?? 0
+    const totalTakes = (tc?.freeTakes ?? 0) + (tc?.buysMade ?? 0)
+    const takeOpportunities = totalTakes + (tc?.freeDeclines ?? 0)
+    const buyOpp = tc?.buyOpportunities ?? 0
+    const handPoints = p.hand.reduce((sum, c) => sum + cardPoints(c.rank), 0)
+
+    return {
+      game_id: gId,
+      round_number: roundNum,
+      player_name: p.name,
+      is_human: !p.isAI,
+      difficulty: p.isAI ? aiDifficulty : null,
+      round_score: result?.score ?? handPoints,
+      went_out: result?.score === 0,
+      went_down: p.hasLaidDown,
+      shanghaied: result?.shanghaied ?? !p.hasLaidDown,
+      total_turns: totalTurns,
+      turn_went_down: turnDown,
+      turns_held_before_going_down: held,
+      free_takes: tc?.freeTakes ?? 0,
+      free_declines: tc?.freeDeclines ?? 0,
+      pile_draws: tc?.pileDraws ?? 0,
+      discard_take_rate: takeOpportunities > 0 ? (tc?.freeTakes ?? 0) / takeOpportunities : null,
+      cards_taken_used_in_meld: 0, // backfilled by backfillDecisionOutcomes
+      cards_taken_wasted: 0,
+      take_accuracy: null,
+      buys_made: tc?.buysMade ?? 0,
+      buys_passed: tc?.buysPassed ?? 0,
+      buy_opportunities: buyOpp,
+      cards_bought_used_in_meld: 0,
+      cards_bought_wasted: 0,
+      buy_accuracy: buyOpp > 0 ? (tc?.buysMade ?? 0) / buyOpp : null,
+      discards_total: tc?.discards ?? 0,
+      denial_takes: tc?.denialTakes ?? 0,
+      denial_buys: tc?.denialBuys ?? 0,
+      melds_laid_down: tc?.meldsLaidDown ?? 0,
+      bonus_melds: tc?.bonusMelds ?? 0,
+      lay_offs_made: tc?.layOffs ?? 0,
+      joker_swaps: tc?.jokerSwaps ?? 0,
+      hand_size_when_went_down: tc?.handSizeWentDown ?? null,
+      final_hand_size: p.hand.length,
+      final_hand_points: handPoints,
+      scenario_b_triggers: tc?.scenarioB ?? 0,
+      scenario_c_triggers: tc?.scenarioC ?? 0,
+    }
+  }
+
+  function computeAndSaveGameStats(gId: string, players: Player[]) {
+    const sorted = [...players].sort((a, b) => {
+      const aTotal = a.roundScores.reduce((s, v) => s + v, 0)
+      const bTotal = b.roundScores.reduce((s, v) => s + v, 0)
+      return aTotal - bTotal
+    })
+    const winnerTotal = sorted[0]?.roundScores.reduce((s, v) => s + v, 0) ?? 0
+
+    for (let rank = 0; rank < sorted.length; rank++) {
+      const p = sorted[rank]
+      const total = p.roundScores.reduce((s, v) => s + v, 0)
+      const stats: PlayerGameStats = {
+        game_id: gId,
+        player_name: p.name,
+        is_human: !p.isAI,
+        difficulty: p.isAI ? aiDifficulty : null,
+        total_score: total,
+        final_rank: rank + 1,
+        won: total === winnerTotal && rank === 0,
+        rounds_won: p.roundScores.filter(s => s === 0).length,
+        rounds_shanghaied: 0, // not tracked at game level
+        rounds_went_down: p.roundScores.length, // approximate
+        avg_score_per_round: p.roundScores.length > 0 ? total / p.roundScores.length : 0,
+        worst_round_score: Math.max(...p.roundScores, 0),
+        best_round_score: Math.min(...p.roundScores, 999),
+        overall_take_accuracy: null,
+        overall_buy_accuracy: null,
+        avg_turns_to_go_down: null,
+        total_buys_made: 0,
+        total_denial_actions: 0,
+        total_lay_offs: 0,
+        total_joker_swaps: 0,
+        avg_turn_went_down: null,
+        times_held_going_down: 0,
+      }
+      void savePlayerGameStats(stats)
     }
   }
 
@@ -1103,6 +1355,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     if (nextRound > TOTAL_ROUNDS) {
       setGameState(prev => ({ ...prev, gameOver: true }))
       setUiPhase('game-over')
+      // Telemetry: save game-level stats
+      if (gameId) computeAndSaveGameStats(gameId, gameState.players)
     } else {
       const next = setupRound(gameState, nextRound)
       setGameState(next)
@@ -1190,6 +1444,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
           )
           if (!shouldGoDown) {
             aiTurnsCouldGoDownRef.current.set(player.id, turnsWaited + 1)
+            turnsHeldRef.current.set(player.id, (turnsHeldRef.current.get(player.id) ?? 0) + 1)
+            recordDecision(player, 'go_down', 'held', null, 'strategic hold')
             setAiMessage(`${player.name} holds...`)
             setTimeout(() => setAiMessage(null), 1000)
             // Fall through to discard instead of melding
@@ -1590,12 +1846,23 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
         </div>
       </div>
 
-      {/* ── ZONE 2: Auto-height middle — piles + table melds ────────────── */}
+      {/* ── ZONE 2: Scrollable middle — table melds ─────────────────── */}
       <div className="px-3 py-3">
+        {/* Table melds */}
+        <TableMelds
+          melds={rs.tablesMelds}
+          currentPlayerId={currentPlayer.id}
+        />
+      </div>
 
-        {/* Draw pile + Discard pile: centered side by side (spec §2.3) */}
+      {/* ── ZONE 3: Sticky bottom — piles + hand + action buttons ─────── */}
+      <div
+        className="bg-[#0f2218] border-t border-[#2d5a3a] px-3 pt-2"
+        style={{ position: 'sticky', bottom: 0, zIndex: 10, paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}
+      >
+        {/* Draw pile + Discard pile: side by side above hand */}
         {(uiPhase === 'draw' || uiPhase === 'action' || uiPhase === 'buying') && (
-          <div className="flex justify-center items-end gap-6 mb-3">
+          <div className="flex justify-center items-end gap-6 mb-2">
 
             {/* Draw pile */}
             <div className="flex flex-col items-center gap-1">
@@ -1649,20 +1916,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
             </div>
           </div>
         )}
-
-        {/* Table melds */}
-        <TableMelds
-          melds={rs.tablesMelds}
-          currentPlayerId={currentPlayer.id}
-        />
-
-      </div>
-
-      {/* ── ZONE 3: Sticky bottom — hand + action buttons ───────────────── */}
-      <div
-        className="bg-[#0f2218] border-t border-[#2d5a3a] px-3 pt-3"
-        style={{ position: 'sticky', bottom: 0, paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}
-      >
         {/* Free-take banner — shown when next player can take discard for free (Rule 9A) */}
         {pendingBuyDiscard && uiPhase === 'draw' && !currentPlayer.isAI && !freeOfferDeclined && (
           <BuyPrompt
@@ -1717,7 +1970,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
         <div style={{ minHeight: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {uiPhase === 'draw' && !currentPlayer.isAI ? (
             <p className="text-center text-xs text-[#6aad7a] py-1">
-              Tap the draw pile or discard card above
+              Tap the draw pile or discard card
             </p>
           ) : (uiPhase === 'draw' || uiPhase === 'action') && currentPlayer.isAI && !aiMessage ? (
             <p className="text-center text-xs text-[#6aad7a] py-1 animate-pulse">

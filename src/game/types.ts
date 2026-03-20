@@ -79,3 +79,88 @@ export interface GameState {
   gameOver: boolean
   buyLimit: number      // configured at setup; default 5; 0 = buying disabled; resets buysRemaining each round
 }
+
+// ── Telemetry types ──────────────────────────────────────────────────────────
+
+export interface AIDecision {
+  game_id: string
+  round_number: number
+  turn_number: number
+  player_name: string
+  difficulty: string | null
+  is_human: boolean
+  decision_type: string
+  decision_result: string
+  hand_size: number
+  hand_points: number
+  has_laid_down: boolean
+  buys_remaining: number
+  card_suit?: string
+  card_rank?: number
+  reason?: string
+}
+
+export interface PlayerRoundStats {
+  game_id: string
+  round_number: number
+  player_name: string
+  is_human: boolean
+  difficulty: string | null
+  round_score: number
+  went_out: boolean
+  went_down: boolean
+  shanghaied: boolean
+  total_turns: number
+  turn_went_down: number | null
+  turns_held_before_going_down: number
+  free_takes: number
+  free_declines: number
+  pile_draws: number
+  discard_take_rate: number | null
+  cards_taken_used_in_meld: number
+  cards_taken_wasted: number
+  take_accuracy: number | null
+  buys_made: number
+  buys_passed: number
+  buy_opportunities: number
+  cards_bought_used_in_meld: number
+  cards_bought_wasted: number
+  buy_accuracy: number | null
+  discards_total: number
+  denial_takes: number
+  denial_buys: number
+  melds_laid_down: number
+  bonus_melds: number
+  lay_offs_made: number
+  joker_swaps: number
+  hand_size_when_went_down: number | null
+  final_hand_size: number
+  final_hand_points: number
+  scenario_b_triggers: number
+  scenario_c_triggers: number
+}
+
+export interface PlayerGameStats {
+  game_id: string
+  player_name: string
+  is_human: boolean
+  difficulty: string | null
+  total_score: number
+  final_rank: number
+  won: boolean
+  rounds_won: number
+  rounds_shanghaied: number
+  rounds_went_down: number
+  avg_score_per_round: number
+  worst_round_score: number
+  best_round_score: number
+  overall_take_accuracy: number | null
+  overall_buy_accuracy: number | null
+  avg_turns_to_go_down: number | null
+  total_buys_made: number
+  total_denial_actions: number
+  total_lay_offs: number
+  total_joker_swaps: number
+  avg_turn_went_down: number | null
+  times_held_going_down: number
+}
