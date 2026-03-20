@@ -60,10 +60,16 @@ describe('aiShouldBuyHard', () => {
     expect(aiShouldBuyHard(hand, joker(), req1, 5)).toBe(true)
   })
 
-  it('buys a card if it pairs with any existing card (more aggressive)', () => {
-    const hand = [c('hearts', 9), c('clubs', 3), c('diamonds', 7)]
-    const discard = c('spades', 9) // pairs with 9♥
+  it('buys a card that completes a set (2+ same rank in hand)', () => {
+    const hand = [c('hearts', 9), c('clubs', 9), c('diamonds', 7)]
+    const discard = c('spades', 9) // completes set of 9s
     expect(aiShouldBuyHard(hand, discard, req1, 5)).toBe(true)
+  })
+
+  it('does NOT buy on a single pair (sameRank === 1)', () => {
+    const hand = [c('hearts', 9), c('clubs', 3), c('diamonds', 7)]
+    const discard = c('spades', 9) // only pairs with one 9
+    expect(aiShouldBuyHard(hand, discard, req1, 5)).toBe(false)
   })
 
   it('buys if discard is close to same-suit cards', () => {

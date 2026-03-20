@@ -40,7 +40,7 @@ cardPoints(rank):
   rank >= 10  → 10   (10, J, Q, K)
   rank 2–9    → 5    (all low cards equal value)
 ```
-⚠ The current code is WRONG. It uses face value for 2–10 and Ace=20, Joker=50. Fix this.
+✅ Already correct in `rules.ts`. No changes needed.
 
 ### Round Requirements (GDD Section 2)
 ```
@@ -145,7 +145,7 @@ interface GameState {
   roundState: RoundState
   deckCount: number
   gameOver: boolean
-  buyLimit: number  // NEW — configured at setup
+  buyLimit: number  // configured at setup; default 5; 0 = buying disabled
 }
 ```
 

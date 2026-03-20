@@ -56,11 +56,11 @@ Always follow this order to avoid agents breaking each other's work:
 
 These are the confirmed discrepancies between the GDD and current code:
 
-### P0 — Critical Rule Violations
-1. **Scoring values wrong** — code uses face value for 2–10, Ace=20, Joker=50. GDD says: 2–9=5pts, 10/J/Q/K=10pts, Ace=15pts, Joker=25pts. Fix in `rules.ts` → `cardPoints()`.
-2. **Cannot go out by discarding** — AI currently discards its last card to end rounds. Must be fixed in AI and game engine.
-3. **Bonus meld reversal (Scenario B)** — when bonus meld leaves 1 unplayable card, only the bonus meld is taken back (required melds stay). Verify this is correctly implemented.
-4. **Joker swap before going down** — if player swaps joker without going down, swap must reverse. Verify implementation.
+### P0 — Critical Rule Violations (all fixed)
+1. ~~**Scoring values wrong**~~ — **FIXED.** `cardPoints()` in `rules.ts` now uses GDD values: 2–9=5pts, 10/J/Q/K=10pts, Ace=15pts, Joker=25pts.
+2. ~~**Cannot go out by discarding**~~ — **FIXED.** AI tries lay-off when hand.length === 1; stuck players draw next turn. `isLegalDiscard()` enforces this in the engine.
+3. ~~**Bonus meld reversal (Scenario B)**~~ — **FIXED.** Only bonus melds taken back; required melds stay on table.
+4. ~~**Joker swap before going down**~~ — **FIXED.** Swap reverses if player cannot go down same turn. `findSwappableJoker` enforces runs-only swaps.
 
 ### P1 — Missing Features
 5. **Configurable buy limit** — currently hardcoded at 5. Must become a game setup option (default 5, range 0–10+). Affects: GameSetup.tsx, types.ts, GameState, all buy logic.

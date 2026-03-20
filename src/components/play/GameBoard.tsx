@@ -1,16 +1,17 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { createPlayedGame, saveGameEvents } from '../../lib/gameStore'
 import { Pause } from 'lucide-react'
-import type { GameState, Player, Card as CardType, Meld, PlayerConfig, AIDifficulty } from '../../game/types'
+import type { GameState, Player, Card as CardType, Meld, PlayerConfig, AIDifficulty, OpponentHistory } from '../../game/types'
 import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, MAX_BUYS } from '../../game/rules'
 import { createDecks, shuffle, dealHands } from '../../game/deck'
 import { buildMeld, isValidSet, canLayOff, findSwappableJoker, getNextJokerOptions, isLegalDiscard, evaluateLayOffReversal } from '../../game/meld-validator'
 import { scoreRound } from '../../game/scoring'
 import {
-  aiFindBestMelds, aiFindAllMelds, aiShouldTakeDiscard, aiShouldTakeDiscardEasy,
+  aiFindBestMelds, aiFindAllMelds, aiShouldTakeDiscard, aiShouldTakeDiscardHard, aiShouldTakeDiscardEasy,
   aiChooseDiscard, aiChooseDiscardHard, aiChooseDiscardEasy,
   aiShouldBuy, aiShouldBuyEasy, aiShouldBuyHard,
-  aiFindLayOff, aiFindJokerSwap, aiFindPreLayDownJokerSwap
+  aiFindLayOff, aiFindJokerSwap, aiFindPreLayDownJokerSwap,
+  aiShouldGoDownHard
 } from '../../game/ai'
 import { SUIT_ORDER } from './HandDisplay'
 import { haptic } from '../../lib/haptics'
@@ -212,6 +213,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
   // Stalemate tracking (turns without any meld)
   const noProgressTurnsRef = useRef(0)
   const drawPileDepletionsRef = useRef(0)
+  // Opponent history: tracks picked/discarded cards per player per round (Hard AI awareness)
+  const opponentHistoryRef = useRef<Map<string, OpponentHistory>>(new Map())
+  // Hard AI going-down timing: how many turns this AI could have gone down but chose to wait
+  const aiTurnsCouldGoDownRef = useRef<Map<string, number>>(new Map())
 
   // Post-draw buying: when true, after buying window resolves the CURRENT player acts (they already drew)
   const buyingIsPostDrawRef = useRef(false)
@@ -237,6 +242,12 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
 
   function addBuyLog(entry: BuyLogEntry) {
     setBuyLog(prev => [...prev, entry])
+  }
+
+  function recordOpponentEvent(playerId: string, type: 'picked' | 'discarded', card: CardType) {
+    const map = opponentHistoryRef.current
+    if (!map.has(playerId)) map.set(playerId, { picked: [], discarded: [] })
+    map.get(playerId)![type].push(card)
   }
 
   // ── Create game record on mount ───────────────────────────────────────────
@@ -370,8 +381,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     const currentIdx = rs.currentPlayerIndex
     const needsReshuffle = gameState.roundState.drawPile.length === 0
 
-    // Determine the card that will be drawn BEFORE calling setGameState,
-    // so setNewCardIds is never dependent on a value captured inside the updater.
+    // Compute draw pile snapshots synchronously — used to build updatedState below
+    // and to identify the drawn card for setNewCardIds.
     let drawPileSnapshot = [...gameState.roundState.drawPile]
     let discardPileSnapshot = [...gameState.roundState.discardPile]
     if (drawPileSnapshot.length === 0) {
@@ -379,32 +390,31 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
       drawPileSnapshot = shuffle([...discardPileSnapshot])
       discardPileSnapshot = top ? [top] : []
     }
-    const drawnCard = drawPileSnapshot[0] ?? null
+    // Shift the drawn card from the snapshot (already includes any reshuffle applied above)
+    const drawnCard = drawPileSnapshot.shift() ?? null
 
+    // Track draw-pile depletions synchronously (needed for stalemate detection)
+    if (needsReshuffle) drawPileDepletionsRef.current += 1
+
+    // Build updatedState synchronously from the snapshots computed above.
+    // IMPORTANT: We cannot use the setGameState(prev => ...) updater pattern here because
+    // in React 18 concurrent mode (createRoot) the updater runs asynchronously during the
+    // render phase — updatedState would still be null when startBuyingWindowPostDraw is
+    // called below, causing the buying window to never open.
     let updatedState: GameState | null = null
-
-    setGameState(prev => {
-      let drawPile = [...prev.roundState.drawPile]
-      let discardPile = [...prev.roundState.discardPile]
-
-      if (drawPile.length === 0) {
-        const top = discardPile.pop()
-        drawPile = shuffle([...discardPile])
-        discardPile = top ? [top] : []
-        drawPileDepletionsRef.current += 1
-      }
-
-      const card = drawPile.shift()
-      if (!card) return prev
-
-      const players = prev.players.map((p, i) =>
-        i === prev.roundState.currentPlayerIndex
-          ? { ...p, hand: [...p.hand, card] }
+    if (drawnCard) {
+      const players = gameState.players.map((p, i) =>
+        i === gameState.roundState.currentPlayerIndex
+          ? { ...p, hand: [...p.hand, drawnCard] }
           : p
       )
-      updatedState = { ...prev, players, roundState: { ...prev.roundState, drawPile, discardPile } }
-      return updatedState
-    })
+      updatedState = {
+        ...gameState,
+        players,
+        roundState: { ...gameState.roundState, drawPile: drawPileSnapshot, discardPile: discardPileSnapshot },
+      }
+      setGameState(updatedState)
+    }
 
     if (drawnCard) setNewCardIds(new Set([drawnCard.id]))
 
@@ -451,6 +461,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
 
     setPendingBuyDiscard(null) // clear pending buy — card is taken
     setNewCardIds(new Set([card.id]))
+
+    // Record for opponent awareness (Hard AI)
+    const taker = gameState.players[gameState.roundState.currentPlayerIndex]
+    recordOpponentEvent(taker.id, 'picked', card)
 
     setGameState(prev => {
       const discardPile = [...prev.roundState.discardPile]
@@ -709,9 +723,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     // GDD Section 6.3 Scenario C: if the lay-off would leave 1 unplayable card, reverse it
     const layOffEval = evaluateLayOffReversal(card, meld, player.hand, prev.roundState.tablesMelds, jokerPosition)
     if (layOffEval.outcome === 'reversed') {
-      const { discardCard } = layOffEval
-      // Restore both cards: the laid-off card returns to hand AND the unplayable card stays.
-      // newHand = player.hand minus the tried lay-off card, so it already contains the unplayable card.
+      // GDD Section 6.3 Scenario C: restore BOTH cards to the hand and stay in action phase.
+      // newHand = player.hand minus the tried lay-off card (contains the unplayable card).
+      // Adding card back gives the player their full 2-card hand again.
       const finalHand = [...newHand, card]
       const playersC = prev.players.map((p, i) =>
         i === playerIdx ? { ...p, hand: finalHand } : p
@@ -726,11 +740,12 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
       setSelectedCardIds(new Set())
       setLayOffError(null)
       haptic('heavy')
-      const advanced = advancePlayer(afterReversal)
-      const nextPlayer = advanced.players[advanced.roundState.currentPlayerIndex]
-      setPendingBuyDiscard(discardCard!)
-      setGameState(advanced)
-      setUiPhase(nextPhaseForPlayer(nextPlayer))
+      // Close the LayOffModal and return player to action phase — do NOT advance turns
+      // or set pendingBuyDiscard (the unplayable card stays in hand, not offered as a buy).
+      setShowLayOffModal(false)
+      setUiPhase('action')
+      setDiscardError('Lay-off reversed — discard the unplayable card and keep the playable one for next turn.')
+      setTimeout(() => setDiscardError(null), 4000)
       return
     }
 
@@ -882,6 +897,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
       card: formatCard(card),
     })
 
+    // Record discard for opponent awareness (Hard AI)
+    recordOpponentEvent(player.id, 'discarded', card)
+
     // Increment no-progress counter
     if (!player.hasLaidDown) noProgressTurnsRef.current += 1
 
@@ -940,6 +958,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
         players,
         roundState: { ...gameState.roundState, drawPile, discardPile },
       }
+
+      // Record buy for opponent awareness (Hard AI)
+      recordOpponentEvent(buyer.id, 'picked', buyingDiscard)
 
       // Highlight newly received buy cards
       const buyNewIds = new Set<string>()
@@ -1049,6 +1070,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
   function handleNextRound() {
     noProgressTurnsRef.current = 0
     drawPileDepletionsRef.current = 0
+    opponentHistoryRef.current = new Map()
+    aiTurnsCouldGoDownRef.current = new Map()
     const nextRound = gameState.currentRound + 1
     if (nextRound > TOTAL_ROUNDS) {
       setGameState(prev => ({ ...prev, gameOver: true }))
@@ -1127,12 +1150,36 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     if (!player.hasLaidDown) {
       const melds = aiFindAllMelds(player.hand, requirement)
       if (melds && melds.length > 0) {
-        aiLayOffCountRef.current = 0
-        noProgressTurnsRef.current = 0
-        setAiMessage(`${player.name} lays down!`)
-        setTimeout(() => setAiMessage(null), 1500)
-        handleMeldConfirm(melds, aiJokerPositions(melds))
-        return
+        // Hard AI: evaluate whether to go down now or wait for a better hand
+        if (isHard) {
+          const turnsWaited = aiTurnsCouldGoDownRef.current.get(player.id) ?? 0
+          const shouldGoDown = aiShouldGoDownHard(
+            player.hand, melds, requirement, tablesMelds,
+            state.players, state.roundState.currentPlayerIndex, turnsWaited,
+          )
+          if (!shouldGoDown) {
+            aiTurnsCouldGoDownRef.current.set(player.id, turnsWaited + 1)
+            setAiMessage(`${player.name} holds...`)
+            setTimeout(() => setAiMessage(null), 1000)
+            // Fall through to discard instead of melding
+          } else {
+            aiTurnsCouldGoDownRef.current.delete(player.id)
+            aiLayOffCountRef.current = 0
+            noProgressTurnsRef.current = 0
+            setAiMessage(`${player.name} lays down!`)
+            setTimeout(() => setAiMessage(null), 1500)
+            handleMeldConfirm(melds, aiJokerPositions(melds))
+            return
+          }
+        } else {
+          // Medium: always go down immediately
+          aiLayOffCountRef.current = 0
+          noProgressTurnsRef.current = 0
+          setAiMessage(`${player.name} lays down!`)
+          setTimeout(() => setAiMessage(null), 1500)
+          handleMeldConfirm(melds, aiJokerPositions(melds))
+          return
+        }
       }
     }
 
@@ -1167,7 +1214,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     if (player.hand.length > 0) {
       aiLayOffCountRef.current = 0
       const card = isHard
-        ? aiChooseDiscardHard(player.hand, tablesMelds)
+        ? aiChooseDiscardHard(player.hand, tablesMelds, opponentHistoryRef.current,
+            state.players.filter(p => p.id !== player.id))
         : aiChooseDiscard(player.hand, requirement, tablesMelds)
       console.log(`[Buy] AI ${player.name} discarded [${card.rank === 0 ? 'Joker' : `${card.rank}${card.suit}`}]`)
       setAiMessage(`${player.name} discards`)
@@ -1190,10 +1238,14 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
         const top = state.roundState.discardPile[state.roundState.discardPile.length - 1] ?? null
 
         const isEasy = aiDifficulty === 'easy'
+        const isHard = aiDifficulty === 'hard'
         const shouldTake = top !== null && (
           isEasy
             ? aiShouldTakeDiscardEasy(player.hand, top, state.roundState.requirement)
-            : aiShouldTakeDiscard(player.hand, top, state.roundState.requirement, player.hasLaidDown, aiDifficulty, state.roundState.tablesMelds)
+            : isHard
+              ? aiShouldTakeDiscardHard(player.hand, top, state.roundState.requirement, player.hasLaidDown,
+                  state.roundState.tablesMelds, state.players.filter(p => p.id !== player.id))
+              : aiShouldTakeDiscard(player.hand, top, state.roundState.requirement, player.hasLaidDown, aiDifficulty, state.roundState.tablesMelds)
         )
 
         setAiMessage(shouldTake
@@ -1233,7 +1285,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
       const shouldBuy = isEasy
         ? aiShouldBuyEasy(currentBuyer.hand, disc, req, currentBuyer.buysRemaining)
         : aiDifficulty === 'hard'
-          ? aiShouldBuyHard(currentBuyer.hand, disc, req, currentBuyer.buysRemaining)
+          ? aiShouldBuyHard(currentBuyer.hand, disc, req, currentBuyer.buysRemaining,
+              state.roundState.tablesMelds, state.players.filter(p => p.id !== currentBuyer.id))
           : aiShouldBuy(currentBuyer.hand, disc, req, currentBuyer.buysRemaining, state.buyLimit)
 
       if (shouldBuy) setAiMessage(`${currentBuyer.name} buys!`)
@@ -1358,8 +1411,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
       style={{ minHeight: '100dvh', overflowY: 'auto' }}
     >
       <style>{`
-        @keyframes gbPulseGold{0%,100%{box-shadow:0 0 0 0 rgba(226,184,88,0)}50%{box-shadow:0 0 12px 4px rgba(226,184,88,0.5)}}
-        @keyframes gbPulseGreen{0%,100%{box-shadow:0 0 0 0 rgba(106,173,122,0)}50%{box-shadow:0 0 12px 4px rgba(106,173,122,0.5)}}
+        @keyframes gbPulseGold{0%,100%{box-shadow:0 0 0 0 rgba(226,184,88,0)}50%{box-shadow:0 0 22px 8px rgba(226,184,88,0.85)}}
+        @keyframes gbPulseGreen{0%,100%{box-shadow:0 0 0 0 rgba(106,173,122,0);transform:scale(1)}50%{box-shadow:0 0 22px 8px rgba(106,173,122,0.85);transform:scale(1.08)}}
       `}</style>
       {/* ── ZONE 1: Sticky top — top bar + opponent strip + toasts ─────── */}
       <div
@@ -1495,7 +1548,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
 
             {/* Draw pile */}
             <div className="flex flex-col items-center gap-1">
-              <p style={{ color: '#6aad7a', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <p style={{ color: isHumanDraw ? '#ffffff' : '#6aad7a', fontSize: isHumanDraw ? 11 : 9, fontWeight: isHumanDraw ? 700 : 400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 {isHumanDraw ? 'TAP TO DRAW' : 'Draw'}
               </p>
               {rs.drawPile.length > 0 ? (
@@ -1519,7 +1572,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
 
             {/* Discard pile */}
             <div className="flex flex-col items-center gap-1">
-              <p style={{ color: isHumanDraw ? '#e2b858' : '#6aad7a', fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <p style={{ color: isHumanDraw ? '#e2b858' : '#6aad7a', fontSize: isHumanDraw ? 11 : 9, fontWeight: isHumanDraw ? 700 : 400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 {isHumanDraw ? 'TAP TO TAKE' : 'Discard'}
               </p>
               {(isHumanBuyerTurn ? buyingDiscard : topDiscard) ? (

@@ -114,29 +114,100 @@ if (!player.hasLaidDown) {
 
 ## AI Function Contracts
 
-### Core Functions (keep these signatures stable — Frontend depends on them)
+### Core Functions
+Each difficulty has its own function rather than a single function with a difficulty parameter.
 
 ```typescript
-// Find the best combination of melds to satisfy the round requirement
-aiFindBestMelds(hand: Card[], requirement: RoundRequirement, difficulty: AIDifficulty): Meld[]
+// ── Meld finding (shared across difficulties) ────────────────────────────────
 
-// Find required melds + all possible bonus melds
-aiFindAllMelds(hand: Card[], requirement: RoundRequirement, difficulty: AIDifficulty): Meld[]
+// Find the minimum melds needed to satisfy the round requirement. Returns null if impossible.
+aiFindBestMelds(hand: Card[], requirement: RoundRequirement): Card[][] | null
 
-// Should AI take the top discard card?
-aiShouldTakeDiscard(card: Card, hand: Card[], requirement: RoundRequirement, hasLaidDown: boolean, difficulty: AIDifficulty): boolean
+// Find required melds PLUS all additional valid bonus melds greedily.
+// Extra melds match round type (sets-only round = extra sets only, etc.)
+aiFindAllMelds(hand: Card[], requirement: RoundRequirement): Card[][] | null
 
-// Which card should AI discard?
-aiChooseDiscard(hand: Card[], tableMetaids: Meld[], difficulty: AIDifficulty): Card
+// Check if any valid meld (set or run) can be formed from cards
+canFormAnyValidMeld(cards: Card[], allowedTypes?: 'set' | 'run' | 'both'): boolean
 
-// Should AI buy the current discard?
-aiShouldBuy(card: Card, hand: Card[], requirement: RoundRequirement, hasLaidDown: boolean, buysRemaining: number, buyLimit: number, difficulty: AIDifficulty): boolean
 
-// Find a card to lay off onto table melds
-aiFindLayOff(hand: Card[], tableMelds: Meld[], difficulty: AIDifficulty): { card: Card; meldId: string } | null
+// ── Take-discard decisions ────────────────────────────────────────────────────
 
-// Find a joker swap opportunity on the table
-aiFindJokerSwap(hand: Card[], tableMelds: Meld[], hasLaidDown: boolean, difficulty: AIDifficulty): { naturalCard: Card; meldId: string; jokerIndex: number } | null
+// Easy AI: pure 50/50 coin flip
+aiShouldTakeDiscardEasy(_hand: Card[], _discardCard: Card, _requirement: RoundRequirement): boolean
+
+// Medium AI: takes only if card enables required melds, completes a set (2+ same rank),
+// or is a gap-fill/extension to a committed run. 'near' condition intentionally excluded.
+aiShouldTakeDiscard(
+  hand: Card[], discardCard: Card, requirement: RoundRequirement,
+  hasLaidDown: boolean, difficulty?: AIDifficulty, tablesMelds?: Meld[]
+): boolean
+
+// Hard AI: same core checks but requires 3+ same-suit cards in window (vs Medium's 1+).
+// Also adds denial logic: takes if opponent about to go out can lay it off.
+// Target take rate ~20-25%.
+aiShouldTakeDiscardHard(
+  hand: Card[], discardCard: Card, requirement: RoundRequirement,
+  hasLaidDown: boolean, tablesMelds?: Meld[], opponents?: Player[]
+): boolean
+
+
+// ── Discard decisions ─────────────────────────────────────────────────────────
+
+// Easy AI: discards isolated high-value non-joker card; never discards jokers
+aiChooseDiscardEasy(hand: Card[]): Card
+
+// Medium AI: discards lowest-utility card (connectivity-based: rank partners + suit neighbours
+// vs point cost); never discards jokers when runs are on the table
+aiChooseDiscard(hand: Card[], _requirement?: RoundRequirement, tablesMelds?: Meld[]): Card
+
+// Hard AI: adds opponent-awareness — factors in danger score (opponent meld fit,
+// opponent collection patterns from history)
+aiChooseDiscardHard(
+  hand: Card[], tablesMelds?: Meld[],
+  opponentHistory?: Map<string, OpponentHistory>, opponents?: Player[]
+): Card
+
+
+// ── Buy decisions ─────────────────────────────────────────────────────────────
+
+// Easy AI: structured check — buys only when card enables required melds AND buysRemaining >= 3
+aiShouldBuyEasy(
+  hand: Card[], discardCard: Card, requirement: RoundRequirement,
+  buysRemaining: number, buyLimit?: number
+): boolean
+
+// Medium AI: buys if card enables required melds, completes a set, or is gap-fill/extension
+// in a committed run (also buys 'near' if 2+ same-suit cards already in hand)
+aiShouldBuy(
+  hand: Card[], discardCard: Card, requirement: RoundRequirement,
+  buysRemaining?: number, buyLimit?: number
+): boolean
+
+// Hard AI: same 3+ card threshold as Hard take-discard; adds denial buying when opponent
+// is about to go out (opp.hand.length <= 2); requires buysRemaining > 2
+aiShouldBuyHard(
+  hand: Card[], discardCard: Card, requirement: RoundRequirement,
+  buysRemaining: number, tablesMelds?: Meld[], opponents?: Player[]
+): boolean
+
+
+// ── Lay-off and joker swap ────────────────────────────────────────────────────
+
+// Find a card to lay off onto table melds. Prioritises jokers first.
+// Skips lay-offs that would leave 1 card that cannot itself go out.
+aiFindLayOff(hand: Card[], tablesMelds: Meld[]): { card: Card; meld: Meld; jokerPosition?: 'low' | 'high' } | null
+
+// Find a joker swap opportunity anywhere on the table (all difficulties)
+aiFindJokerSwap(hand: Card[], tablesMelds: Meld[]): { card: Card; meld: Meld } | null
+
+// Pre-lay-down joker swap: tries single then pair swaps to enable meeting the round requirement
+aiFindPreLayDownJokerSwap(
+  hand: Card[], tablesMelds: Meld[], requirement: RoundRequirement
+): { card: Card; meld: Meld } | null
+
+// For joker lay-off onto a run, choose the end (low/high) with more room
+aiChooseJokerLayOffPosition(meld: Meld): 'low' | 'high'
 ```
 
 ---
@@ -144,34 +215,26 @@ aiFindJokerSwap(hand: Card[], tableMelds: Meld[], hasLaidDown: boolean, difficul
 ## Difficulty Implementation Details
 
 ### Easy AI
-- `aiShouldTakeDiscard`: `Math.random() > 0.5` — pure coin flip
-- `aiShouldBuy`: `Math.random() > 0.7` — buys about 30% of the time randomly
-- `aiChooseDiscard`: random card from hand (not joker-aware)
-- `aiFindBestMelds`: finds minimum required melds only
-- `aiFindAllMelds`: returns required melds only (no bonus)
-- `aiFindLayOff`: always returns null (never lays off)
-- `aiFindJokerSwap`: random 50/50 whether to attempt a swap
-- Goes down only when it has no other choice (hand is depleted or requirement exactly met with nothing else possible)
+- **Take discard** (`aiShouldTakeDiscardEasy`): `Math.random() > 0.5` — pure coin flip, no hand evaluation
+- **Buy** (`aiShouldBuyEasy`): structured check — buys ONLY if the card enables required melds AND `buysRemaining >= 3`; never random
+- **Discard** (`aiChooseDiscardEasy`): picks isolated high-value non-joker cards (no same-suit adjacent card); falls back to highest point value; never discards jokers
+- **Meld finding**: uses shared `aiFindBestMelds` and `aiFindAllMelds` (required + bonus)
+- **Lay-offs**: GameBoard caps Easy AI at 0 lay-offs per turn (never lays off in practice)
+- **Joker swaps**: `aiFindJokerSwap` is available but GameBoard controls whether Easy AI uses it
 
 ### Medium AI
-- `aiShouldTakeDiscard`: takes if card directly completes or extends a meld in current hand
-- `aiShouldBuy`: buys if card completes a meld or is needed for the round requirement
-- `aiChooseDiscard`: discards the card with the highest point value (per GDD Section 10 scoring)
-- `aiFindBestMelds`: finds optimal combination for the round requirement
-- `aiFindAllMelds`: finds required + any additional valid melds
-- `aiFindLayOff`: lays off when a card fits any existing meld
-- `aiFindJokerSwap`: swaps if the joker is needed to complete a meld this turn
-- Goes down as soon as the round requirement is met
+- **Take discard** (`aiShouldTakeDiscard` with `difficulty='medium'`): takes if card enables required melds, completes a set (2+ same rank), or is a gap-fill/extension to a committed run window. The `'near'` condition (within ±2 of window edge) is deliberately excluded — Medium only takes direct fits.
+- **Buy** (`aiShouldBuy`): buys for gap-fill/extension (same as take-discard), plus buys 'near' cards when 2+ same-suit cards already in hand
+- **Discard** (`aiChooseDiscard`): connectivity-based utility — keeps cards with rank partners (set potential) or suit neighbours (run potential); discards least connected high-value cards. Not a simple highest-point-value discard.
+- **Lay-offs**: lays off when cards fit table melds; capped at 1 per turn by GameBoard (except when hand.length === 1)
+- **Joker swaps**: uses `aiFindJokerSwap`; `aiFindPreLayDownJokerSwap` for pre-lay-down swaps
 
 ### Hard AI
-- `aiShouldTakeDiscard`: full hand evaluation — takes if it improves expected score OR denies a key card from an opponent who needs it
-- `aiShouldBuy`: buys optimally — considers card value to own hand AND strategic denial of opponents
-- `aiChooseDiscard`: evaluates all players' visible melds and known needs; discards least dangerous card
-- `aiFindBestMelds`: finds optimal combination
-- `aiFindAllMelds`: greedily finds all possible melds to minimize hand
-- `aiFindLayOff`: maximizes lay-offs each turn — lay off multiple cards when possible
-- `aiFindJokerSwap`: proactively seeks joker swaps to improve hand; considers blocking opponents
-- Times going down based on: own hand strength, opponents' progress, round number
+- **Take discard** (`aiShouldTakeDiscardHard`): requires 3+ same-suit cards in window (vs Medium's 1+) for gap-fill/extension. No 'near' condition. Adds denial logic: takes card if an opponent with hand.length ≤ 3 can lay it off onto their melds. Target take rate ~20-25%.
+- **Buy** (`aiShouldBuyHard`): same 3+ card threshold for runs; adds denial buying when opponent has hand.length ≤ 2; requires `buysRemaining > 2`
+- **Discard** (`aiChooseDiscardHard`): same connectivity utility as Medium plus opponent-awareness — adds danger score for cards that feed opponent run/set patterns (from `opponentHistory` and current table melds)
+- **Lay-offs**: no cap (GameBoard allows unlimited lay-offs for Hard)
+- **Joker swaps**: uses all joker swap functions including `aiFindPreLayDownJokerSwap`
 
 ---
 

@@ -42,6 +42,11 @@ export interface Player {
 
 export type AIDifficulty = 'easy' | 'medium' | 'hard'
 
+export interface OpponentHistory {
+  picked: Card[]     // cards this player took from the discard pile (free take or buy)
+  discarded: Card[]  // cards this player discarded
+}
+
 export interface PlayerConfig {
   name: string
   isAI: boolean

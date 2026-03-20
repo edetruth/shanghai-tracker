@@ -72,6 +72,23 @@ The buying window must clearly show:
 - Current buys remaining for each player
 - If buyLimit === 0: no buying window opens at all
 
+### Buying Flow Implementation (Rule 9A)
+The exact flow in GameBoard.tsx:
+```
+1. Player discards → 3s undo timer starts
+2. After undo timer expires: next player in turn order is offered the discard FREE (no buy used)
+   → If taken: no buying window opens; that player advances to action phase
+   → If declined: freeOfferDeclined = true; player taps draw pile manually
+3. After next player draws from pile (handleDrawFromPile):
+   → Dual-check React state AND ref to detect declined state (React 18 timing safety):
+     const wasExplicitlyDeclined = freeOfferDeclinedRef.current || freeOfferDeclined
+   → If hasPendingBuy: call startBuyingWindowPostDraw() for remaining players
+4. buyingIsPostDrawRef tracks whether we're in post-draw buying mode
+5. After buying resolves: the player who drew from pile goes to action phase
+```
+
+**React 18 timing note:** `startBuyingWindowPostDraw` builds `updatedState` synchronously from pre-computed snapshots and calls `setGameState(updatedState)` directly — NOT inside a `setGameState(prev => ...)` updater (which would be async). This ensures `updatedState` is non-null when the buying window check fires.
+
 ### Discard Visibility (GDD Section 4.3)
 - Only the current discard is visible — one card face up
 - Previous discards are not shown

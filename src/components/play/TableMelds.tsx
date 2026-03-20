@@ -61,7 +61,7 @@ function sortedSetCards(cards: Card[]): Card[] {
   })
 }
 
-// ── Micro card (32×44px) ─────────────────────────────────────────────────────
+// ── Micro card (45×62px) ─────────────────────────────────────────────────────
 
 function MicroCard({ card, meld }: { card: Card; meld: Meld }) {
   const isJoker = card.suit === 'joker'
@@ -86,11 +86,11 @@ function MicroCard({ card, meld }: { card: Card; meld: Meld }) {
   return (
     <div
       style={{
-        width: 32,
-        height: 44,
+        width: 45,
+        height: 62,
         backgroundColor: suitBg(card.suit),
         border: '1px solid rgba(0,0,0,0.12)',
-        borderRadius: 4,
+        borderRadius: 5,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -102,8 +102,8 @@ function MicroCard({ card, meld }: { card: Card; meld: Meld }) {
         userSelect: 'none',
       }}
     >
-      <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.3px' }}>{rankPart}</span>
-      {suitPart && <span style={{ fontSize: 10 }}>{suitPart}</span>}
+      <span style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.3px' }}>{rankPart}</span>
+      {suitPart && <span style={{ fontSize: 14 }}>{suitPart}</span>}
     </div>
   )
 }
@@ -234,10 +234,10 @@ export default function TableMelds({
                         backgroundColor: '#1e4a2e',
                         border: isValid ? '1px solid #6aad7a' : '1px solid #2d5a3a',
                         borderRadius: 6,
-                        padding: '6px 8px',
+                        padding: '8px 10px',
                         display: 'flex',
                         flexDirection: 'row',
-                        gap: 3,
+                        gap: 4,
                         alignItems: 'center',
                         opacity: isDimmed ? 0.35 : 1,
                         cursor: isValid ? 'pointer' : 'default',
