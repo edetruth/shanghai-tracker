@@ -155,9 +155,7 @@ function advancePlayer(state: GameState): GameState {
   return { ...state, roundState: { ...state.roundState, currentPlayerIndex: next } }
 }
 
-function nextPhaseForPlayer(player: Player): UIPhase {
-  return player.isAI ? 'draw' : 'privacy'
-}
+// (nextPhaseForPlayer is defined inside GameBoard to account for solo-human games)
 
 function buildBuyerOrder(state: GameState, discarderIndex: number): number[] {
   const order: number[] = []
@@ -318,6 +316,27 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
   useEffect(() => { buyerStepRef.current = buyerStep }, [buyerStep])
   useEffect(() => { pendingBuyDiscardRef.current = pendingBuyDiscard }, [pendingBuyDiscard])
   useEffect(() => { freeOfferDeclinedRef.current = freeOfferDeclined }, [freeOfferDeclined])
+
+  // Solo human = only 1 human player (rest are AI). Skip privacy screen, show turn banner instead.
+  const soloHuman = useMemo(() => initialPlayers.filter(p => !p.isAI).length <= 1, [initialPlayers])
+  const [turnBanner, setTurnBanner] = useState<string | null>(null)
+
+  // Show "Your turn!" banner when solo human's draw phase starts
+  useEffect(() => {
+    const player = gameState.players[gameState.roundState.currentPlayerIndex]
+    if (soloHuman && uiPhase === 'draw' && player && !player.isAI) {
+      setTurnBanner(`Your turn, ${player.name}!`)
+      const timer = setTimeout(() => setTurnBanner(null), 1500)
+      return () => clearTimeout(timer)
+    }
+  }, [uiPhase, gameState.roundState.currentPlayerIndex]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Override: skip privacy screen for solo-human games
+  // eslint-disable-next-line no-inner-declarations
+  function nextPhaseForPlayer(player: Player): UIPhase {
+    if (player.isAI) return 'draw'
+    return soloHuman ? 'draw' : 'privacy'
+  }
 
   function addBuyLog(entry: BuyLogEntry) {
     setBuyLog(prev => [...prev, entry])
@@ -1741,7 +1760,36 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
       <style>{`
         @keyframes gbPulseGold{0%,100%{box-shadow:0 0 0 0 rgba(226,184,88,0)}50%{box-shadow:0 0 22px 8px rgba(226,184,88,0.85)}}
         @keyframes gbPulseGreen{0%,100%{box-shadow:0 0 0 0 rgba(106,173,122,0);transform:scale(1)}50%{box-shadow:0 0 22px 8px rgba(106,173,122,0.85);transform:scale(1.08)}}
+        @keyframes turnBannerIn{0%{opacity:0;transform:translateY(-20px)}100%{opacity:1;transform:translateY(0)}}
+        @keyframes turnBannerOut{0%{opacity:1}100%{opacity:0}}
       `}</style>
+
+      {/* Turn banner — non-blocking overlay for solo-human games */}
+      {turnBanner && (
+        <div style={{
+          position: 'absolute',
+          top: 'max(52px, calc(env(safe-area-inset-top) + 44px))',
+          left: 0, right: 0,
+          zIndex: 40,
+          display: 'flex',
+          justifyContent: 'center',
+          pointerEvents: 'none',
+          animation: 'turnBannerIn 0.3s ease-out',
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #e2b858, #d4a843)',
+            color: '#2c1810',
+            padding: '8px 24px',
+            borderRadius: 12,
+            fontSize: 14,
+            fontWeight: 700,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+          }}>
+            {turnBanner}
+          </div>
+        </div>
+      )}
+
       {/* ── ZONE 1: Fixed top — top bar + opponent strip + toasts ─────── */}
       <div
         className="bg-[#0f2218]"
