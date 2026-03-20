@@ -9,9 +9,10 @@ import StatsLeaderboard from './components/StatsLeaderboard'
 import JoinGame from './components/JoinGame'
 import PlayerProfileModal from './components/PlayerProfileModal'
 import PlayTab from './components/PlayTab'
+import AnalyticsPage from './components/AnalyticsPage'
 import type { Game, Player } from './lib/types'
 
-type Section = 'home' | 'play' | 'scoretracker' | 'stats'
+type Section = 'home' | 'play' | 'scoretracker' | 'stats' | 'analytics'
 type ScoreTrackerState = 'list' | 'setup' | 'playing' | 'summary' | 'joining'
 
 export default function App() {
@@ -109,6 +110,10 @@ export default function App() {
             onPlayerClick={handlePlayerClick}
             onNavigateHome={() => navigateTo('home')}
           />
+        )}
+
+        {section === 'analytics' && (
+          <AnalyticsPage onBack={() => navigateTo('home')} />
         )}
 
       </main>

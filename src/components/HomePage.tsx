@@ -1,6 +1,6 @@
-import { Gamepad2, ClipboardList, Trophy, HelpCircle } from 'lucide-react'
+import { Gamepad2, ClipboardList, Trophy, HelpCircle, BarChart3 } from 'lucide-react'
 
-type Section = 'play' | 'scoretracker' | 'stats'
+type Section = 'play' | 'scoretracker' | 'stats' | 'analytics'
 
 interface Props {
   onNavigate: (section: Section) => void
@@ -64,6 +64,19 @@ export default function HomePage({ onNavigate, onShowTutorial }: Props) {
           <div>
             <div className="text-[#2c1810] font-semibold text-lg">Stats & Records</div>
             <div className="text-[#8b7355] text-sm mt-0.5">Leaderboards & player stats</div>
+          </div>
+        </button>
+
+        <button
+          onClick={() => onNavigate('analytics')}
+          className="card p-5 text-left flex items-center gap-4 active:opacity-80 transition-opacity"
+        >
+          <div className="w-14 h-14 bg-[#efe9dd] rounded-2xl flex items-center justify-center flex-shrink-0">
+            <BarChart3 size={28} className="text-[#8b6914]" />
+          </div>
+          <div>
+            <div className="text-[#2c1810] font-semibold text-lg">Analytics</div>
+            <div className="text-[#8b7355] text-sm mt-0.5">AI performance & game insights</div>
           </div>
         </button>
       </div>

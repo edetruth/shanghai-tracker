@@ -401,9 +401,10 @@ export async function backfillDecisionOutcomes(
 
 export async function savePlayerRoundStats(stats: PlayerRoundStats): Promise<void> {
   try {
-    await supabase.from('player_round_stats').upsert(stats, {
+    const { error } = await supabase.from('player_round_stats').upsert(stats, {
       onConflict: 'game_id,round_number,player_name',
     })
+    if (error) console.error('savePlayerRoundStats failed:', error.message, error.details)
   } catch {
     // silent
   }
@@ -411,12 +412,39 @@ export async function savePlayerRoundStats(stats: PlayerRoundStats): Promise<voi
 
 export async function savePlayerGameStats(stats: PlayerGameStats): Promise<void> {
   try {
-    await supabase.from('player_game_stats').upsert(stats, {
+    const { error } = await supabase.from('player_game_stats').upsert(stats, {
       onConflict: 'game_id,player_name',
     })
+    if (error) console.error('savePlayerGameStats failed:', error.message, error.details)
   } catch {
     // silent
   }
+}
+
+// ── Telemetry: read queries ──────────────────────────────────────────────────
+
+export async function getPlayerRoundStats(limit = 500): Promise<PlayerRoundStats[]> {
+  try {
+    const { data } = await supabase.from('player_round_stats').select('*')
+      .order('created_at', { ascending: false }).limit(limit)
+    return data ?? []
+  } catch { return [] }
+}
+
+export async function getPlayerGameStats(limit = 100): Promise<PlayerGameStats[]> {
+  try {
+    const { data } = await supabase.from('player_game_stats').select('*')
+      .order('created_at', { ascending: false }).limit(limit)
+    return data ?? []
+  } catch { return [] }
+}
+
+export async function getAIDecisions(limit = 2000): Promise<AIDecision[]> {
+  try {
+    const { data } = await supabase.from('ai_decisions').select('*')
+      .order('created_at', { ascending: false }).limit(limit)
+    return data ?? []
+  } catch { return [] }
 }
 
 // Stats helpers

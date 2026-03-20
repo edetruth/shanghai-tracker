@@ -65,7 +65,6 @@ function sortedSetCards(cards: Card[]): Card[] {
 
 function MicroCard({ card, meld }: { card: Card; meld: Meld }) {
   const isJoker = card.suit === 'joker'
-  const layOffOwner = meld.cardOwners?.[card.id] ?? null
 
   let rankPart: string
   let suitPart: string
@@ -85,44 +84,26 @@ function MicroCard({ card, meld }: { card: Card; meld: Meld }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
-      <div
-        style={{
-          width: 38,
-          height: 53,
-          backgroundColor: suitBg(card.suit),
-          border: layOffOwner ? '1px solid #e2b858' : '1px solid rgba(0,0,0,0.12)',
-          borderRadius: 5,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-          color: suitColor(card.suit),
-          lineHeight: 1,
-          overflow: 'hidden',
-          userSelect: 'none',
-          position: 'relative',
-        }}
-      >
-        <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.3px' }}>{rankPart}</span>
-        {suitPart && <span style={{ fontSize: 12 }}>{suitPart}</span>}
-      </div>
-      {layOffOwner && (
-        <span style={{
-          fontSize: 7,
-          color: '#e2b858',
-          lineHeight: 1,
-          marginTop: 1,
-          maxWidth: 38,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          textAlign: 'center',
-        }}>
-          {layOffOwner}
-        </span>
-      )}
+    <div
+      style={{
+        width: 38,
+        height: 53,
+        backgroundColor: suitBg(card.suit),
+        border: '1px solid rgba(0,0,0,0.12)',
+        borderRadius: 5,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        color: suitColor(card.suit),
+        lineHeight: 1,
+        overflow: 'hidden',
+        userSelect: 'none',
+      }}
+    >
+      <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.3px' }}>{rankPart}</span>
+      {suitPart && <span style={{ fontSize: 12 }}>{suitPart}</span>}
     </div>
   )
 }

@@ -104,11 +104,11 @@ export default function HandDisplay({
       ) : (
         <div
           className="relative overflow-x-auto pb-2"
-          style={{ height: `${containerHeight}px` }}
+          style={{ height: `${containerHeight}px`, display: 'flex', justifyContent: sorted.length <= 3 ? 'center' : 'flex-start' }}
         >
           <div
             className="relative"
-            style={{ width: `${containerWidth}px`, height: `${containerHeight}px` }}
+            style={{ width: `${containerWidth}px`, height: `${containerHeight}px`, flexShrink: 0 }}
           >
             {sorted.map((card, index) => {
               const isSelected = selectedIds.has(card.id)

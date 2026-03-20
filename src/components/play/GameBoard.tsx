@@ -1705,16 +1705,16 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
   return (
     <div
       className="bg-[#1a3a2a]"
-      style={{ minHeight: '100dvh', overflowY: 'auto' }}
+      style={{ height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
     >
       <style>{`
         @keyframes gbPulseGold{0%,100%{box-shadow:0 0 0 0 rgba(226,184,88,0)}50%{box-shadow:0 0 22px 8px rgba(226,184,88,0.85)}}
         @keyframes gbPulseGreen{0%,100%{box-shadow:0 0 0 0 rgba(106,173,122,0);transform:scale(1)}50%{box-shadow:0 0 22px 8px rgba(106,173,122,0.85);transform:scale(1.08)}}
       `}</style>
-      {/* ── ZONE 1: Sticky top — top bar + opponent strip + toasts ─────── */}
+      {/* ── ZONE 1: Fixed top — top bar + opponent strip + toasts ─────── */}
       <div
         className="bg-[#0f2218]"
-        style={{ position: 'sticky', top: 0, zIndex: 10, paddingTop: 'max(8px, env(safe-area-inset-top))' }}
+        style={{ flexShrink: 0, paddingTop: 'max(8px, env(safe-area-inset-top))' }}
       >
         {/* Top bar: round badge | requirement badge | pause (spec §2.1) */}
         <div
@@ -1846,103 +1846,149 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
         </div>
       </div>
 
-      {/* ── ZONE 2: Scrollable middle — table melds ─────────────────── */}
-      <div className="px-3 py-3">
-        {/* Table melds */}
+      {/* ── ZONE 2: Scrollable middle — table melds ONLY ──────────────── */}
+      <div
+        className="px-3 py-3"
+        style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}
+      >
         <TableMelds
           melds={rs.tablesMelds}
           currentPlayerId={currentPlayer.id}
         />
       </div>
 
-      {/* ── ZONE 3: Sticky bottom — piles + hand + action buttons ─────── */}
-      <div
-        className="bg-[#0f2218] border-t border-[#2d5a3a] px-3 pt-2"
-        style={{ position: 'sticky', bottom: 0, zIndex: 10, paddingBottom: 'max(16px, env(safe-area-inset-bottom))' }}
-      >
-        {/* Draw pile + Discard pile: side by side above hand */}
-        {(uiPhase === 'draw' || uiPhase === 'action' || uiPhase === 'buying') && (
-          <div className="flex justify-center items-end gap-6 mb-2">
-
-            {/* Draw pile */}
-            <div className="flex flex-col items-center gap-1">
-              <p style={{ color: isHumanDraw ? '#ffffff' : '#6aad7a', fontSize: isHumanDraw ? 11 : 9, fontWeight: isHumanDraw ? 700 : 400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                {isHumanDraw ? 'TAP TO DRAW' : 'Draw'}
-              </p>
-              {rs.drawPile.length > 0 ? (
-                <div style={{ borderRadius: 8, animation: isHumanDraw ? 'gbPulseGreen 1.2s ease-in-out 0.3s infinite' : 'none' }}>
-                  <CardComponent
-                    card={rs.drawPile[0]}
-                    faceDown
-                    onClick={isHumanDraw ? handleDrawFromPile : undefined}
-                  />
-                </div>
-              ) : (
-                <div
-                  className="rounded-lg border-2 border-dashed border-[#2d5a3a] flex items-center justify-center"
-                  style={{ width: 41, height: 61, color: '#2d5a3a', fontSize: 9, textAlign: 'center' }}
-                >
-                  Empty
-                </div>
-              )}
-              <p style={{ color: '#6aad7a', fontSize: 9 }}>{rs.drawPile.length} cards</p>
-            </div>
-
-            {/* Discard pile */}
-            <div className="flex flex-col items-center gap-1">
-              <p style={{ color: isHumanDraw ? '#e2b858' : '#6aad7a', fontSize: isHumanDraw ? 11 : 9, fontWeight: isHumanDraw ? 700 : 400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                {isHumanDraw ? 'TAP TO TAKE' : 'Discard'}
-              </p>
-              {(isHumanBuyerTurn ? buyingDiscard : topDiscard) ? (
-                <div style={{ borderRadius: 8, animation: isHumanDraw ? 'gbPulseGold 1.2s ease-in-out infinite' : 'none' }}>
-                  <CardComponent
-                    card={(isHumanBuyerTurn && buyingDiscard ? buyingDiscard : topDiscard)!}
-                    onClick={isHumanDraw ? handleTakeDiscard : undefined}
-                    style={isHumanDraw ? { border: '2px solid #e2b858' } : undefined}
-                  />
-                </div>
-              ) : (
-                <div
-                  className="rounded-lg border-2 border-dashed border-[#2d5a3a]"
-                  style={{ width: 41, height: 61 }}
+      {/* ── ZONE 3: Fixed piles strip — always visible ────────────────── */}
+      {(uiPhase === 'draw' || uiPhase === 'action' || uiPhase === 'buying') && (
+        <div
+          style={{
+            flexShrink: 0,
+            background: '#162e22',
+            borderTop: '1px solid #2d5a3a',
+            borderBottom: '1px solid #2d5a3a',
+            padding: '6px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 32,
+          }}
+        >
+          {/* Draw pile */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+            <p style={{
+              color: isHumanDraw ? '#ffffff' : '#6aad7a',
+              fontSize: isHumanDraw ? 10 : 9,
+              fontWeight: isHumanDraw ? 700 : 400,
+              textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0,
+            }}>
+              {isHumanDraw ? 'TAP TO DRAW' : 'Draw'}
+            </p>
+            {rs.drawPile.length > 0 ? (
+              <div style={{
+                borderRadius: 6,
+                animation: isHumanDraw ? 'gbPulseGreen 1.2s ease-in-out 0.3s infinite' : 'none',
+                transform: 'scale(0.85)', transformOrigin: 'top center',
+              }}>
+                <CardComponent
+                  card={rs.drawPile[0]}
+                  faceDown
+                  onClick={isHumanDraw ? handleDrawFromPile : undefined}
                 />
-              )}
-              {isHumanBuyerTurn && (
-                <p style={{ color: '#e2b858', fontSize: 9, fontWeight: 600 }}>For sale</p>
-              )}
-              {pendingBuyDiscard && uiPhase === 'draw' && !currentPlayer.isAI && (
-                <p style={{ color: '#e2b858', fontSize: 9, fontWeight: 600 }}>Buyable</p>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div
+                style={{
+                  width: 35, height: 52, borderRadius: 6,
+                  border: '2px dashed #2d5a3a',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#2d5a3a', fontSize: 9, textAlign: 'center',
+                }}
+              >
+                Empty
+              </div>
+            )}
+            <p style={{ color: '#6aad7a', fontSize: 9, margin: 0 }}>{rs.drawPile.length} cards</p>
           </div>
-        )}
-        {/* Free-take banner — shown when next player can take discard for free (Rule 9A) */}
-        {pendingBuyDiscard && uiPhase === 'draw' && !currentPlayer.isAI && !freeOfferDeclined && (
-          <BuyPrompt
-            card={pendingBuyDiscard}
-            isFree={true}
-            playerName={currentPlayer.name}
-            buysRemaining={currentPlayer.buysRemaining}
-            buyLimit={gameState.buyLimit}
-            onAccept={handleTakeDiscard}
-            onDecline={handleDeclineFreeOffer}
-          />
-        )}
 
-        {/* Paid buy banner — shown when it's a human player's turn in the buying window */}
-        {isHumanBuyerTurn && buyingDiscard && activeBuyer && (
-          <BuyPrompt
-            card={buyingDiscard}
-            isFree={false}
-            playerName={activeBuyer.name}
-            buysRemaining={activeBuyer.buysRemaining}
-            buyLimit={gameState.buyLimit}
-            onAccept={() => handleBuyDecision(true)}
-            onDecline={() => handleBuyDecision(false)}
-          />
-        )}
+          {/* Discard pile */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+            <p style={{
+              color: isHumanDraw ? '#e2b858' : isHumanBuyerTurn ? '#e2b858' : '#6aad7a',
+              fontSize: isHumanDraw ? 10 : 9,
+              fontWeight: isHumanDraw || isHumanBuyerTurn ? 700 : 400,
+              textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0,
+            }}>
+              {isHumanDraw ? 'TAP TO TAKE' : isHumanBuyerTurn ? 'FOR SALE' : 'Discard'}
+            </p>
+            {(isHumanBuyerTurn ? buyingDiscard : topDiscard) ? (
+              <div style={{
+                borderRadius: 6,
+                animation: isHumanDraw ? 'gbPulseGold 1.2s ease-in-out infinite' : 'none',
+                transform: 'scale(0.85)', transformOrigin: 'top center',
+              }}>
+                <CardComponent
+                  card={(isHumanBuyerTurn && buyingDiscard ? buyingDiscard : topDiscard)!}
+                  onClick={isHumanDraw ? handleTakeDiscard : undefined}
+                  style={isHumanDraw ? { border: '2px solid #e2b858' } : undefined}
+                />
+              </div>
+            ) : (
+              <div
+                style={{
+                  width: 35, height: 52, borderRadius: 6,
+                  border: '2px dashed #2d5a3a',
+                }}
+              />
+            )}
+            <p style={{
+              color: pendingBuyDiscard && uiPhase === 'draw' && !currentPlayer.isAI ? '#e2b858' : '#6aad7a',
+              fontSize: 9, fontWeight: pendingBuyDiscard ? 600 : 400, margin: 0,
+            }}>
+              {pendingBuyDiscard && uiPhase === 'draw' && !currentPlayer.isAI ? 'Buyable' : '\u00A0'}
+            </p>
+          </div>
+        </div>
+      )}
 
-        {/* Player hand — sort toggle + fan layout (spec §2.5) */}
+      {/* ── ZONE 4: Fixed bottom — buy prompt + hand + actions ──────────── */}
+      <div
+        className="bg-[#0f2218] px-3 pt-2"
+        style={{ flexShrink: 0, paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
+      >
+        {/* Buy prompt area — reserved height, fade in/out, no layout shift */}
+        <div style={{
+          minHeight: (pendingBuyDiscard && uiPhase === 'draw' && !currentPlayer.isAI && !freeOfferDeclined) ||
+                     (isHumanBuyerTurn && buyingDiscard && activeBuyer) ? undefined : 0,
+          transition: 'opacity 200ms ease',
+          opacity: (pendingBuyDiscard && uiPhase === 'draw' && !currentPlayer.isAI && !freeOfferDeclined) ||
+                   (isHumanBuyerTurn && buyingDiscard && activeBuyer) ? 1 : 0,
+          pointerEvents: (pendingBuyDiscard && uiPhase === 'draw' && !currentPlayer.isAI && !freeOfferDeclined) ||
+                         (isHumanBuyerTurn && buyingDiscard && activeBuyer) ? 'auto' : 'none',
+        }}>
+          {pendingBuyDiscard && uiPhase === 'draw' && !currentPlayer.isAI && !freeOfferDeclined && (
+            <BuyPrompt
+              card={pendingBuyDiscard}
+              isFree={true}
+              playerName={currentPlayer.name}
+              buysRemaining={currentPlayer.buysRemaining}
+              buyLimit={gameState.buyLimit}
+              onAccept={handleTakeDiscard}
+              onDecline={handleDeclineFreeOffer}
+            />
+          )}
+          {isHumanBuyerTurn && buyingDiscard && activeBuyer && (
+            <BuyPrompt
+              card={buyingDiscard}
+              isFree={false}
+              playerName={activeBuyer.name}
+              buysRemaining={activeBuyer.buysRemaining}
+              buyLimit={gameState.buyLimit}
+              onAccept={() => handleBuyDecision(true)}
+              onDecline={() => handleBuyDecision(false)}
+            />
+          )}
+        </div>
+
+        {/* Player hand — sort toggle + fan layout */}
         {!displayPlayer.isAI ? (
           <HandDisplay
             cards={displayPlayer.hand}
@@ -1967,17 +2013,17 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
         ) : null}
 
         {/* Status slot — stable height, content fades */}
-        <div style={{ minHeight: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ minHeight: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {uiPhase === 'draw' && !currentPlayer.isAI ? (
-            <p className="text-center text-xs text-[#6aad7a] py-1">
+            <p className="text-center text-xs text-[#6aad7a]" style={{ margin: 0 }}>
               Tap the draw pile or discard card
             </p>
           ) : (uiPhase === 'draw' || uiPhase === 'action') && currentPlayer.isAI && !aiMessage ? (
-            <p className="text-center text-xs text-[#6aad7a] py-1 animate-pulse">
+            <p className="text-center text-xs text-[#6aad7a] animate-pulse" style={{ margin: 0 }}>
               {currentPlayer.name} is playing...
             </p>
           ) : uiPhase === 'buying' && !isHumanBuyerTurn && activeBuyer?.isAI && !aiMessage ? (
-            <p className="text-center text-xs text-[#6aad7a] py-1 animate-pulse">
+            <p className="text-center text-xs text-[#6aad7a] animate-pulse" style={{ margin: 0 }}>
               {activeBuyer.name} deciding on buy...
             </p>
           ) : (
@@ -1987,7 +2033,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
 
         {/* Undo toast */}
         {pendingUndo && (
-          <div className="flex items-center justify-between bg-[#2c1810] text-white rounded-xl px-4 py-3 mt-2">
+          <div className="flex items-center justify-between bg-[#2c1810] text-white rounded-xl px-4 py-2">
             <span className="text-sm">Discarded {pendingUndo.card.rank === 0 ? 'Joker' : rankLabel(pendingUndo.card)}</span>
             <button onClick={handleUndoDiscard} className="text-[#e2b858] text-sm font-bold active:opacity-70">
               Undo

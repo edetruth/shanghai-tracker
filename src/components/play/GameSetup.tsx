@@ -1,8 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { ChevronLeft } from 'lucide-react'
-import { getPlayers } from '../../lib/gameStore'
 import { PLAYER_COLORS } from '../../lib/constants'
-import type { Player as DBPlayer } from '../../lib/types'
 import type { PlayerConfig, AIDifficulty } from '../../game/types'
 
 interface Props {
@@ -129,12 +127,10 @@ function Step1({
 // ── Step 2 — Name players ───────────────────────────────────────────────────
 function Step2({
   players,
-  knownPlayers,
   onNameChange,
   onToggleAI,
 }: {
   players: PlayerConfig[]
-  knownPlayers: DBPlayer[]
   onNameChange: (i: number, v: string) => void
   onToggleAI: (i: number) => void
 }) {
@@ -167,8 +163,8 @@ function Step2({
                 {player.name.trim() ? player.name.trim()[0].toUpperCase() : i + 1}
               </div>
 
-              {/* Name input with Supabase autocomplete */}
-              <div style={{ flex: 1, position: 'relative' }}>
+              {/* Name input */}
+              <div style={{ flex: 1 }}>
                 <input
                   type="text"
                   value={player.name}
@@ -176,7 +172,7 @@ function Step2({
                   placeholder={player.isAI ? `AI ${i + 1}` : `Player ${i + 1}`}
                   maxLength={20}
                   disabled={player.isAI}
-                  list={`suggestions-${i}`}
+                  autoComplete="off"
                   style={{
                     width: '100%',
                     background: player.isAI ? '#0a1810' : '#0f2218',
@@ -189,13 +185,6 @@ function Step2({
                     boxSizing: 'border-box',
                   }}
                 />
-                {!player.isAI && knownPlayers.length > 0 && (
-                  <datalist id={`suggestions-${i}`}>
-                    {knownPlayers.map(p => (
-                      <option key={p.id} value={p.name} />
-                    ))}
-                  </datalist>
-                )}
               </div>
 
               {/* Human / AI toggle */}
@@ -424,13 +413,8 @@ export default function GameSetup({ onStart, onBack }: Props) {
     { name: '', isAI: false },
     { name: '', isAI: false },
   ])
-  const [knownPlayers, setKnownPlayers] = useState<DBPlayer[]>([])
   const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>('medium')
   const [buyLimit, setBuyLimit] = useState(5)
-
-  useEffect(() => {
-    getPlayers().then(setKnownPlayers).catch(console.error)
-  }, [])
 
   function handleCountSelect(count: number) {
     setPlayerCount(count)
@@ -501,7 +485,7 @@ export default function GameSetup({ onStart, onBack }: Props) {
       }}
     >
       {/* Top bar — back button + step label */}
-      <div style={{ display: 'flex', alignItems: 'center', padding: '12px 12px 0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '12px 12px 0', paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
         <button
           onClick={goBack}
           style={{
@@ -525,7 +509,6 @@ export default function GameSetup({ onStart, onBack }: Props) {
         {step === 2 && playerCount && (
           <Step2
             players={players}
-            knownPlayers={knownPlayers}
             onNameChange={handleNameChange}
             onToggleAI={handleToggleAI}
           />
