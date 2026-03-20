@@ -562,6 +562,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
 
   // ── Force end round (stalemate) ───────────────────────────────────────────
   function forceEndRound(state: GameState) {
+    noProgressTurnsRef.current = 0
+    drawPileDepletionsRef.current = 0
     // If nobody has gone out, score all remaining hands (nobody gets 0)
     const results = state.players.map(p => ({
       playerId: p.id,
@@ -1045,6 +1047,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
 
   // ── Next round / game over ────────────────────────────────────────────────
   function handleNextRound() {
+    noProgressTurnsRef.current = 0
+    drawPileDepletionsRef.current = 0
     const nextRound = gameState.currentRound + 1
     if (nextRound > TOTAL_ROUNDS) {
       setGameState(prev => ({ ...prev, gameOver: true }))
@@ -1371,7 +1375,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
           <div style={{
             background: '#0f2218', color: '#a8d0a8',
             border: '1px solid #2d5a3a', borderRadius: 20,
-            padding: '3px 10px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
+            padding: '5px 12px', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap',
           }}>
             Round {gameState.currentRound}/{TOTAL_ROUNDS}
           </div>
@@ -1380,24 +1384,24 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
           <div style={{
             background: '#0f2218', color: '#e2b858',
             border: '1px solid #8b6914', borderRadius: 20,
-            padding: '3px 10px', fontSize: 11, fontWeight: 600,
+            padding: '5px 12px', fontSize: 13, fontWeight: 600,
             textAlign: 'center', flex: '0 1 auto', margin: '0 8px',
           }}>
             {rs.requirement.description}
           </div>
 
-          {/* Pause button — 44px minimum touch target */}
+          {/* Pause button — 48px minimum touch target */}
           <button
             onClick={() => setShowPauseModal(true)}
             aria-label="Pause game"
             style={{
               background: '#0f2218', border: '1px solid #2d5a3a', borderRadius: 8,
-              color: '#a8d0a8', minWidth: 44, minHeight: 44,
+              color: '#a8d0a8', minWidth: 48, minHeight: 48,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', flexShrink: 0,
             }}
           >
-            <Pause size={18} />
+            <Pause size={22} />
           </button>
         </div>
 
@@ -1432,19 +1436,20 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
                     flexShrink: 0,
                     background: isMe ? '#1e3010' : '#0f2218',
                     border: `1px solid ${borderColor}`,
-                    borderRadius: 8,
-                    padding: '5px 7px',
+                    borderRadius: 10,
+                    padding: '8px 10px',
+                    minWidth: 80,
                   }}
                 >
                   {/* Name row with meld dot */}
                   <div className="flex items-center gap-1 mb-0.5">
                     <div style={{
-                      width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                      width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
                       background: p.hasLaidDown ? '#6aad7a' : '#2d5a3a',
                     }} />
                     <p style={{
-                      color: isMe ? '#e2b858' : '#a8d0a8', fontSize: 9, fontWeight: 600,
-                      maxWidth: 52, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      color: isMe ? '#e2b858' : '#a8d0a8', fontSize: 13, fontWeight: 500,
+                      maxWidth: 64, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>
                       {isMe ? 'You' : `${p.name.split(' ')[0]}${p.isAI ? ' 🤖' : ''}`}
                     </p>
@@ -1453,14 +1458,14 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
                   {isActiveTurn && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginBottom: 2 }}>
                       <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#e2b858', flexShrink: 0 }} />
-                      <p style={{ color: '#e2b858', fontSize: 7, fontWeight: 700, margin: 0 }}>their turn</p>
+                      <p style={{ color: '#e2b858', fontSize: 9, fontWeight: 700, margin: 0 }}>their turn</p>
                     </div>
                   )}
-                  <p style={{ color: '#6aad7a', fontSize: 8, fontFamily: 'monospace', fontWeight: 700 }}>
+                  <p style={{ color: '#6aad7a', fontSize: 12, fontFamily: 'monospace', fontWeight: 700 }}>
                     {total} pts
                   </p>
-                  <p style={{ color: '#a8d0a8', fontSize: 9 }}>🃏 {p.hand.length}</p>
-                  <p style={{ color: buysColor, fontSize: 8, fontWeight: 600 }}>
+                  <p style={{ color: '#a8d0a8', fontSize: 11 }}>🃏 {p.hand.length}</p>
+                  <p style={{ color: buysColor, fontSize: 11, fontWeight: 600 }}>
                     {p.buysRemaining}/{buyLimitStr} buys
                   </p>
                 </div>

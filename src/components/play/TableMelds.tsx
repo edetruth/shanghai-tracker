@@ -53,13 +53,6 @@ function suitSymbol(suit: string): string {
   return ''
 }
 
-function getJokerLabel(meld: Meld, cardId: string): string {
-  if (meld.type !== 'run') return 'JKR'
-  const mapping = meld.jokerMappings.find(m => m.cardId === cardId)
-  if (!mapping) return 'JKR'
-  return `${rankLabel(mapping.representsRank)}${suitSymbol(mapping.representsSuit)}`
-}
-
 function sortedSetCards(cards: Card[]): Card[] {
   return [...cards].sort((a, b) => {
     const sd = (SUIT_SORT[a.suit] ?? 5) - (SUIT_SORT[b.suit] ?? 5)
@@ -68,36 +61,49 @@ function sortedSetCards(cards: Card[]): Card[] {
   })
 }
 
-// ── Micro card (22×30px) ─────────────────────────────────────────────────────
+// ── Micro card (32×44px) ─────────────────────────────────────────────────────
 
 function MicroCard({ card, meld }: { card: Card; meld: Meld }) {
   const isJoker = card.suit === 'joker'
-  const label = isJoker
-    ? getJokerLabel(meld, card.id)
-    : `${rankLabel(card.rank)}${suitSymbol(card.suit)}`
+
+  let rankPart: string
+  let suitPart: string
+
+  if (isJoker) {
+    if (meld.type !== 'run') {
+      rankPart = 'JKR'
+      suitPart = ''
+    } else {
+      const mapping = meld.jokerMappings.find(m => m.cardId === card.id)
+      rankPart = mapping ? rankLabel(mapping.representsRank) : 'JKR'
+      suitPart = mapping ? suitSymbol(mapping.representsSuit) : ''
+    }
+  } else {
+    rankPart = rankLabel(card.rank)
+    suitPart = suitSymbol(card.suit)
+  }
 
   return (
     <div
       style={{
-        width: 22,
-        height: 30,
+        width: 32,
+        height: 44,
         backgroundColor: suitBg(card.suit),
         border: '1px solid rgba(0,0,0,0.12)',
-        borderRadius: 3,
+        borderRadius: 4,
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
         flexShrink: 0,
-        fontSize: 7,
-        fontWeight: 700,
         color: suitColor(card.suit),
         lineHeight: 1,
-        letterSpacing: '-0.3px',
         overflow: 'hidden',
         userSelect: 'none',
       }}
     >
-      {label}
+      <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: '-0.3px' }}>{rankPart}</span>
+      {suitPart && <span style={{ fontSize: 10 }}>{suitPart}</span>}
     </div>
   )
 }
@@ -228,7 +234,7 @@ export default function TableMelds({
                         backgroundColor: '#1e4a2e',
                         border: isValid ? '1px solid #6aad7a' : '1px solid #2d5a3a',
                         borderRadius: 6,
-                        padding: '4px 5px',
+                        padding: '6px 8px',
                         display: 'flex',
                         flexDirection: 'row',
                         gap: 3,
