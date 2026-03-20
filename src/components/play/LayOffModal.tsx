@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react'
 import type { Card as CardType, Meld, Player } from '../../game/types'
 import { canLayOff, findSwappableJoker } from '../../game/meld-validator'
 import { haptic } from '../../lib/haptics'
+import { SUIT_ORDER } from './HandDisplay'
 
 interface Props {
   melds: Meld[]
@@ -181,6 +182,9 @@ export default function LayOffModal({
   const [layOffCount, setLayOffCount] = useState(0)
   const [pendingQueue, setPendingQueue] = useState<{ cards: CardType[], meldId: string } | null>(null)
   const [postLayOffScrollMeldId, setPostLayOffScrollMeldId] = useState<string | null>(null)
+  const [handSort, setHandSort] = useState<'rank' | 'suit'>('rank')
+  // Joker position prompt: when laying off a joker on a run, ask low/high
+  const [jokerPrompt, setJokerPrompt] = useState<{ card: CardType, meld: Meld, remainingCards: CardType[] } | null>(null)
 
   const meldRefs = useRef<Map<string, HTMLDivElement>>(new Map())
 
@@ -202,6 +206,21 @@ export default function LayOffModal({
   }, [selectedCards, melds])
 
   const hasValidMelds = validMeldIds !== null && validMeldIds.size > 0
+
+  const sortedHand = useMemo(() => {
+    return [...hand].sort((a, b) => {
+      if (handSort === 'suit') {
+        const s = (SUIT_ORDER[a.suit] ?? 4) - (SUIT_ORDER[b.suit] ?? 4)
+        if (s !== 0) return s
+        return a.rank - b.rank
+      }
+      if (a.suit === 'joker' && b.suit === 'joker') return 0
+      if (a.suit === 'joker') return 1
+      if (b.suit === 'joker') return -1
+      if (a.rank !== b.rank) return a.rank - b.rank
+      return (SUIT_ORDER[a.suit] ?? 4) - (SUIT_ORDER[b.suit] ?? 4)
+    })
+  }, [hand, handSort])
 
   // Joker-swap targets: only when exactly one non-joker card is selected
   const swappableMelds = useMemo<Meld[]>(() => {
@@ -236,6 +255,24 @@ export default function LayOffModal({
     const [firstCard, ...rest] = pendingQueue.cards
     const currentMeld = melds.find(m => m.id === pendingQueue.meldId)
     if (!currentMeld) { setPendingQueue(null); return }
+
+    // If next card is a joker on a run, pause and prompt for position
+    if (firstCard.suit === 'joker' && currentMeld.type === 'run') {
+      const canLow = (currentMeld.runMin ?? 1) > 1
+      const canHigh = (currentMeld.runMax ?? 13) < 14
+      if (canLow && canHigh) {
+        setJokerPrompt({ card: firstCard, meld: currentMeld, remainingCards: rest })
+        setPendingQueue(null)
+        return
+      }
+      // Only one end valid — auto-place
+      const pos: 'low' | 'high' = canLow ? 'low' : 'high'
+      setLayOffCount(c => c + 1)
+      onLayOff(firstCard, currentMeld, pos)
+      setPendingQueue(rest.length > 0 ? { cards: rest, meldId: pendingQueue.meldId } : null)
+      return
+    }
+
     const willGoOut = rest.length === 0 && hand.length === 1
     onLayOff(firstCard, currentMeld)
     if (willGoOut) onGoOut()
@@ -275,10 +312,50 @@ export default function LayOffModal({
   function handleMeldTap(meld: Meld) {
     if (selectedCards.length === 0 || !validMeldIds?.has(meld.id)) return
     haptic('tap')
+
+    // Check if any selected card is a joker being laid off on a run — needs position prompt
+    if (meld.type === 'run') {
+      const jokerIdx = selectedCards.findIndex(c => c.suit === 'joker')
+      if (jokerIdx >= 0) {
+        const jokerCard = selectedCards[jokerIdx]
+        const remaining = selectedCards.filter((_, i) => i !== jokerIdx)
+        const canLow = (meld.runMin ?? 1) > 1
+        const canHigh = (meld.runMax ?? 13) < 14
+        if (canLow && canHigh) {
+          // Both ends valid — prompt user
+          setJokerPrompt({ card: jokerCard, meld, remainingCards: remaining })
+          setSelectedCards([])
+          return
+        }
+        // Only one end valid — auto-place
+        const pos: 'low' | 'high' = canLow ? 'low' : 'high'
+        setLayOffCount(c => c + 1)
+        onLayOff(jokerCard, meld, pos)
+        if (remaining.length > 0) {
+          setPendingQueue({ cards: remaining, meldId: meld.id })
+        }
+        setSelectedCards([])
+        setPostLayOffScrollMeldId(meld.id)
+        return
+      }
+    }
+
     setLayOffCount(c => c + selectedCards.length)
     setPendingQueue({ cards: selectedCards, meldId: meld.id })
     setSelectedCards([])
     setPostLayOffScrollMeldId(meld.id)
+  }
+
+  function handleJokerPositionChoice(position: 'low' | 'high') {
+    if (!jokerPrompt) return
+    haptic('tap')
+    setLayOffCount(c => c + 1)
+    onLayOff(jokerPrompt.card, jokerPrompt.meld, position)
+    if (jokerPrompt.remainingCards.length > 0) {
+      setPendingQueue({ cards: jokerPrompt.remainingCards, meldId: jokerPrompt.meld.id })
+    }
+    setPostLayOffScrollMeldId(jokerPrompt.meld.id)
+    setJokerPrompt(null)
   }
 
   function handleSwapTap(meld: Meld) {
@@ -553,6 +630,43 @@ export default function LayOffModal({
           )}
         </div>
 
+        {/* ── Joker position prompt ─────────────────────────────────────── */}
+        {jokerPrompt && (
+          <div
+            style={{
+              flexShrink: 0,
+              backgroundColor: '#2e1a0e',
+              borderTop: '1px solid #e2b858',
+              padding: '10px 14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+            }}
+          >
+            <p style={{ color: '#f0d480', fontSize: 12, fontWeight: 600, margin: 0, flex: 1 }}>
+              Place Joker at which end?
+            </p>
+            <button
+              onClick={() => handleJokerPositionChoice('low')}
+              style={{
+                background: '#6aad7a', color: '#0f2218', border: 'none', borderRadius: 8,
+                padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', minHeight: 36,
+              }}
+            >
+              Low ({rankLabel((jokerPrompt.meld.runMin ?? 1) - 1)}{suitSymbol(jokerPrompt.meld.runSuit ?? '')})
+            </button>
+            <button
+              onClick={() => handleJokerPositionChoice('high')}
+              style={{
+                background: '#e2b858', color: '#2c1810', border: 'none', borderRadius: 8,
+                padding: '6px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer', minHeight: 36,
+              }}
+            >
+              High ({rankLabel((jokerPrompt.meld.runMax ?? 13) + 1)}{suitSymbol(jokerPrompt.meld.runSuit ?? '')})
+            </button>
+          </div>
+        )}
+
         {/* ── Hand strip (fixed bottom) ───────────────────────────────────── */}
         <div
           style={{
@@ -582,11 +696,42 @@ export default function LayOffModal({
                 </div>
               )}
             </div>
-            {layOffCount > 0 && (
-              <p style={{ color: '#e2b858', fontSize: 9, fontWeight: 600, margin: 0 }}>
-                {layOffCount} laid off this turn
-              </p>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {layOffCount > 0 && (
+                <p style={{ color: '#e2b858', fontSize: 9, fontWeight: 600, margin: 0 }}>
+                  {layOffCount} laid off
+                </p>
+              )}
+              {/* Sort toggle */}
+              <div
+                style={{
+                  display: 'flex',
+                  background: '#0f2218',
+                  border: '1px solid #2d5a3a',
+                  borderRadius: 6,
+                  overflow: 'hidden',
+                }}
+              >
+                {(['rank', 'suit'] as const).map(mode => (
+                  <button
+                    key={mode}
+                    onClick={() => setHandSort(mode)}
+                    style={{
+                      background: handSort === mode ? '#1e4a2e' : 'transparent',
+                      color: handSort === mode ? '#e2b858' : '#6aad7a',
+                      padding: '3px 8px',
+                      fontSize: 9,
+                      fontWeight: 600,
+                      border: 'none',
+                      cursor: 'pointer',
+                      minHeight: 22,
+                    }}
+                  >
+                    {mode === 'rank' ? 'Rank' : 'Suit'}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Selection bar */}
@@ -650,7 +795,7 @@ export default function LayOffModal({
             {hint}
           </p>
 
-          {/* Cards — horizontal scroll */}
+          {/* Cards — horizontal scroll, sorted */}
           {hand.length === 0 ? (
             <p style={{ color: '#6aad7a', fontSize: 11, fontStyle: 'italic', margin: 0 }}>
               Hand is empty — going out!
@@ -666,7 +811,7 @@ export default function LayOffModal({
               }}
               className="[&::-webkit-scrollbar]:hidden"
             >
-              {hand.map(card => {
+              {sortedHand.map(card => {
                 const selIdx = selectedCards.findIndex(c => c.id === card.id)
                 return (
                   <ModalCard

@@ -222,6 +222,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
 
   // Post-draw buying: when true, after buying window resolves the CURRENT player acts (they already drew)
   const buyingIsPostDrawRef = useRef(false)
+  // Track who discarded the current card — so they can't buy it back
+  const lastDiscarderIdxRef = useRef<number>(-1)
 
   // Stable refs so AI callbacks always have current values
   const gameStateRef = useRef(gameState)
@@ -518,8 +520,11 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
   function startBuyingWindowPostDraw(state: GameState, drewPlayerIdx: number, discardCard: CardType) {
     const order: number[] = []
     const count = state.players.length
+    const originalDiscarder = lastDiscarderIdxRef.current
     for (let i = 1; i < count; i++) {
       const idx = (drewPlayerIdx + i) % count
+      // Exclude original discarder — can't buy back their own card
+      if (idx === originalDiscarder) continue
       if (state.players[idx].buysRemaining > 0) order.push(idx)
     }
 
@@ -803,6 +808,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     const card = player.hand.find(c => c.id === cardId)
     if (!card) return
 
+    // Track who discarded so they can't buy their own card back
+    lastDiscarderIdxRef.current = playerIdx
+
     const newHand = player.hand.filter(c => c.id !== cardId)
 
     // Scenario B: player went down with bonus melds and their last card can't be laid off.
@@ -936,6 +944,22 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     setGameState(pendingUndo.preDiscardState)
     setPendingUndo(null)
     // Stay in 'action' phase
+  }
+
+  // ── End turn without discarding (stuck with 1 unplayable card) ──────────
+  function handleEndTurnStuck() {
+    noProgressTurnsRef.current += 1
+    haptic('tap')
+    // Check stalemate before advancing
+    const totalPlayers = gameState.players.length
+    if (drawPileDepletionsRef.current >= 2 && noProgressTurnsRef.current > totalPlayers * 8) {
+      forceEndRound(gameState)
+      return
+    }
+    const advanced = advancePlayer(gameState)
+    const nextPlayer = advanced.players[advanced.roundState.currentPlayerIndex]
+    setGameState(advanced)
+    setUiPhase(nextPhaseForPlayer(nextPlayer))
   }
 
   // ── Buy decision ──────────────────────────────────────────────────────────
@@ -1415,10 +1439,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
 
   // ── Main board: draw / action / buying ────────────────────────────────────
   // Display-only derivations (no state mutations)
+  // Player has 1 card, has laid down, and can't lay it off anywhere — stuck
   const lastCardStuck = uiPhase === 'action' && !currentPlayer.isAI &&
-    currentPlayer.hand.length === 1 &&
+    currentPlayer.hand.length === 1 && currentPlayer.hasLaidDown &&
     !rs.tablesMelds.some(m => canLayOff(currentPlayer.hand[0], m))
-  const discardDisabled = selectedCardIds.size !== 1 || lastCardStuck
   const buyLimitStr = gameState.buyLimit >= 999 ? '∞' : String(gameState.buyLimit)
   const isHumanDraw = uiPhase === 'draw' && !currentPlayer.isAI
 
@@ -1767,25 +1791,33 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
               </p>
             )}
 
-            {/* Discard button — disabled when no selection or last card can't go anywhere */}
-            <button
-              onClick={!discardDisabled ? () => { setNewCardIds(new Set()); handleDiscard() } : undefined}
-              disabled={discardDisabled}
-              title={lastCardStuck ? 'Play your last card onto a meld to go out' : undefined}
-              style={{
-                width: '100%', minHeight: 38, borderRadius: 10, border: 'none',
-                background: discardDisabled ? '#1e4a2e' : 'white',
-                color: discardDisabled ? '#3a5a3a' : '#2c1810',
-                fontSize: 13, fontWeight: 600,
-                cursor: discardDisabled ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {lastCardStuck
-                ? 'Play your last card onto a meld to go out'
-                : selectedCardIds.size === 1
-                  ? 'Discard Selected Card'
-                  : 'Select a card to discard'}
-            </button>
+            {/* End Turn button — shown when stuck with 1 unplayable card after laying down */}
+            {lastCardStuck ? (
+              <button
+                onClick={handleEndTurnStuck}
+                style={{
+                  width: '100%', minHeight: 38, borderRadius: 10, border: 'none',
+                  background: '#e2b858', color: '#2c1810',
+                  fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                End Turn (draw next turn)
+              </button>
+            ) : (
+              <button
+                onClick={selectedCardIds.size === 1 ? () => { setNewCardIds(new Set()); handleDiscard() } : undefined}
+                disabled={selectedCardIds.size !== 1}
+                style={{
+                  width: '100%', minHeight: 38, borderRadius: 10, border: 'none',
+                  background: selectedCardIds.size !== 1 ? '#1e4a2e' : 'white',
+                  color: selectedCardIds.size !== 1 ? '#3a5a3a' : '#2c1810',
+                  fontSize: 13, fontWeight: 600,
+                  cursor: selectedCardIds.size !== 1 ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {selectedCardIds.size === 1 ? 'Discard Selected Card' : 'Select a card to discard'}
+              </button>
+            )}
           </div>
         )}
 
