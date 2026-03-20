@@ -1567,17 +1567,27 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
             })}
         </div>
 
-        {/* Toast messages */}
-        {reshuffleMsg && (
-          <div className="bg-[#e2b858] px-4 py-2 text-center text-sm font-medium text-[#2c1810]">
-            Draw pile reshuffled from discards
-          </div>
-        )}
-        {aiMessage && (
-          <div className="bg-[#1e4a2e] px-4 py-2 text-center text-sm text-[#a8d0a8] animate-pulse">
-            {aiMessage}
-          </div>
-        )}
+        {/* Toast slot — always reserves space, content fades in/out */}
+        <div
+          style={{
+            minHeight: 28,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'opacity 150ms ease',
+            opacity: reshuffleMsg || aiMessage ? 1 : 0,
+            background: reshuffleMsg ? '#e2b858' : '#1e4a2e',
+            padding: reshuffleMsg || aiMessage ? '4px 16px' : '4px 16px',
+          }}
+        >
+          {reshuffleMsg ? (
+            <span className="text-xs font-medium text-[#2c1810]">Draw pile reshuffled from discards</span>
+          ) : aiMessage ? (
+            <span className="text-xs text-[#a8d0a8] animate-pulse">{aiMessage}</span>
+          ) : (
+            <span className="text-xs">{'\u00A0'}</span>
+          )}
+        </div>
       </div>
 
       {/* ── ZONE 2: Auto-height middle — piles + table melds ────────────── */}
@@ -1703,12 +1713,24 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
           />
         ) : null}
 
-        {/* Draw phase instructions */}
-        {uiPhase === 'draw' && !currentPlayer.isAI && (
-          <p className="text-center text-sm text-[#6aad7a] py-1">
-            Tap the draw pile or discard card above
-          </p>
-        )}
+        {/* Status slot — stable height, content fades */}
+        <div style={{ minHeight: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {uiPhase === 'draw' && !currentPlayer.isAI ? (
+            <p className="text-center text-xs text-[#6aad7a] py-1">
+              Tap the draw pile or discard card above
+            </p>
+          ) : (uiPhase === 'draw' || uiPhase === 'action') && currentPlayer.isAI && !aiMessage ? (
+            <p className="text-center text-xs text-[#6aad7a] py-1 animate-pulse">
+              {currentPlayer.name} is playing...
+            </p>
+          ) : uiPhase === 'buying' && !isHumanBuyerTurn && activeBuyer?.isAI && !aiMessage ? (
+            <p className="text-center text-xs text-[#6aad7a] py-1 animate-pulse">
+              {activeBuyer.name} deciding on buy...
+            </p>
+          ) : (
+            <span>{'\u00A0'}</span>
+          )}
+        </div>
 
         {/* Undo toast */}
         {pendingUndo && (
@@ -1821,19 +1843,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
           </div>
         )}
 
-        {/* AI turn indicator */}
-        {(uiPhase === 'draw' || uiPhase === 'action') && currentPlayer.isAI && !aiMessage && (
-          <p className="text-center text-sm text-[#6aad7a] py-1 animate-pulse">
-            {currentPlayer.name} is playing...
-          </p>
-        )}
-
-        {/* Buying phase — AI deciding */}
-        {uiPhase === 'buying' && !isHumanBuyerTurn && activeBuyer?.isAI && !aiMessage && (
-          <p className="text-center text-sm text-[#6aad7a] py-1 animate-pulse">
-            {activeBuyer.name} deciding on buy...
-          </p>
-        )}
       </div>
 
       {/* Modals — logic unchanged */}
