@@ -1939,8 +1939,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
         />
       </div>
 
-      {/* ── ZONE 3: Fixed piles strip — always visible ────────────────── */}
-      {(uiPhase === 'draw' || uiPhase === 'action' || uiPhase === 'buying') && (
+      {/* ── ZONE 3: Piles strip — hidden during AI turns in solo-human games ── */}
+      {(uiPhase === 'draw' || uiPhase === 'action' || uiPhase === 'buying') &&
+       (!soloHuman || !currentPlayer.isAI || isHumanBuyerTurn) && (
         <div
           style={{
             flexShrink: 0,
