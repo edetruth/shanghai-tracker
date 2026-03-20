@@ -681,7 +681,7 @@ export function aiShouldBuyHard(
 export function aiShouldGoDownHard(
   hand: Card[],
   melds: Card[][],
-  requirement: RoundRequirement,
+  _requirement: RoundRequirement,
   tablesMelds: Meld[],
   players: Player[],
   currentPlayerIndex: number,

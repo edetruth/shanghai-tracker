@@ -154,7 +154,7 @@ function Avatar({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function GameOver({ players, buyLimit, buyLog, gameId, onPlayAgain, onBack }: Props) {
+export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId, onPlayAgain, onBack }: Props) {
   const [saveStatus, setSaveStatus] = useState<'saving' | 'saved' | 'error'>('saving')
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
