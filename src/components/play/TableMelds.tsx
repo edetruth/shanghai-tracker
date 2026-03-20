@@ -1,19 +1,13 @@
+import { useMemo } from 'react'
 import type { Card, Meld } from '../../game/types'
-import { canLayOff } from '../../game/meld-validator'
+import { canLayOff, findSwappableJoker } from '../../game/meld-validator'
 
-// Props per UI/UX Spec Section 3
 interface Props {
   melds: Meld[]
   currentPlayerId?: string
   selectedCard?: Card | null
   onLayOff?: (card: Card, meld: Meld) => void
-  jokerPosition?: number
-  // Legacy props — accepted but no-op in new design
-  onMeldClick?: (meld: Meld) => void
-  highlightMeldId?: string
-  jokerMeldIds?: Set<string>
-  validLayOffMeldIds?: Set<string>
-  layOffCard?: Card | null
+  onJokerSwap?: (naturalCard: Card, meld: Meld) => void
 }
 
 // ── Suit helpers ──────────────────────────────────────────────────────────────
@@ -63,7 +57,7 @@ function sortedSetCards(cards: Card[]): Card[] {
 
 // ── Micro card (45×62px) ─────────────────────────────────────────────────────
 
-function MicroCard({ card, meld }: { card: Card; meld: Meld }) {
+function MicroCard({ card, meld, highlight }: { card: Card; meld: Meld; highlight?: boolean }) {
   const isJoker = card.suit === 'joker'
 
   let rankPart: string
@@ -89,7 +83,7 @@ function MicroCard({ card, meld }: { card: Card; meld: Meld }) {
         width: 38,
         height: 53,
         backgroundColor: suitBg(card.suit),
-        border: '1px solid rgba(0,0,0,0.12)',
+        border: highlight ? '2px solid #e2b858' : '1px solid rgba(0,0,0,0.12)',
         borderRadius: 5,
         display: 'flex',
         flexDirection: 'column',
@@ -143,8 +137,22 @@ export default function TableMelds({
   currentPlayerId = '',
   selectedCard = null,
   onLayOff,
+  onJokerSwap,
 }: Props) {
   const isLayOffMode = selectedCard !== null
+
+  // Compute valid lay-off targets and joker swap targets
+  const validLayOffIds = useMemo<Set<string>>(() => {
+    if (!selectedCard) return new Set()
+    return new Set(melds.filter(m => canLayOff(selectedCard, m)).map(m => m.id))
+  }, [selectedCard, melds])
+
+  const swapMeldIds = useMemo<Set<string>>(() => {
+    if (!selectedCard || selectedCard.suit === 'joker' || !onJokerSwap) return new Set()
+    return new Set(
+      melds.filter(m => m.type === 'run' && findSwappableJoker(selectedCard, m) !== null).map(m => m.id)
+    )
+  }, [selectedCard, melds, onJokerSwap])
 
   // ── Empty state ──────────────────────────────────────────────────────────
   if (melds.length === 0) {
@@ -177,6 +185,10 @@ export default function TableMelds({
           0%, 100% { box-shadow: 0 0 4px rgba(106,173,122,0.4); }
           50%       { box-shadow: 0 0 12px rgba(106,173,122,0.85); }
         }
+        @keyframes tmSwapPulse {
+          0%, 100% { box-shadow: 0 0 4px rgba(226,184,88,0.4); }
+          50%       { box-shadow: 0 0 12px rgba(226,184,88,0.85); }
+        }
       `}</style>
 
       <div
@@ -192,6 +204,15 @@ export default function TableMelds({
       >
         {groups.map((group, gi) => {
           const isCurrentPlayer = group.ownerId === currentPlayerId
+
+          // Sort melds: valid lay-off targets first, then swap targets, then the rest
+          const sortedMelds = isLayOffMode
+            ? [...group.melds].sort((a, b) => {
+                const aPri = validLayOffIds.has(a.id) ? 0 : swapMeldIds.has(a.id) ? 1 : 2
+                const bPri = validLayOffIds.has(b.id) ? 0 : swapMeldIds.has(b.id) ? 1 : 2
+                return aPri - bPri
+              })
+            : group.melds
 
           return (
             <div key={group.ownerId}>
@@ -220,34 +241,76 @@ export default function TableMelds({
                   gap: 6,
                 }}
               >
-                {group.melds.map(meld => {
-                  const isValid = isLayOffMode && canLayOff(selectedCard!, meld)
-                  const isDimmed = isLayOffMode && !isValid
+                {sortedMelds.map(meld => {
+                  const isLayOffValid = isLayOffMode && validLayOffIds.has(meld.id)
+                  const isSwapValid = isLayOffMode && !isLayOffValid && swapMeldIds.has(meld.id)
+                  const isDimmed = isLayOffMode && !isLayOffValid && !isSwapValid
+                  const isInteractive = isLayOffValid || isSwapValid
                   const displayCards =
                     meld.type === 'set' ? sortedSetCards(meld.cards) : meld.cards
+
+                  // Find the joker that would be swapped (for highlighting)
+                  const swapJoker = isSwapValid && selectedCard
+                    ? findSwappableJoker(selectedCard, meld)
+                    : null
+
+                  function handleTap() {
+                    if (isLayOffValid && onLayOff && selectedCard) {
+                      onLayOff(selectedCard, meld)
+                    } else if (isSwapValid && onJokerSwap && selectedCard) {
+                      onJokerSwap(selectedCard, meld)
+                    }
+                  }
 
                   return (
                     <div
                       key={meld.id}
-                      onClick={isValid && onLayOff ? () => onLayOff(selectedCard!, meld) : undefined}
+                      onClick={isInteractive ? handleTap : undefined}
                       style={{
                         backgroundColor: '#1e4a2e',
-                        border: isValid ? '1px solid #6aad7a' : '1px solid #2d5a3a',
+                        border: isLayOffValid
+                          ? '1px solid #6aad7a'
+                          : isSwapValid
+                            ? '1px solid #e2b858'
+                            : '1px solid #2d5a3a',
                         borderRadius: 6,
                         padding: '6px 8px',
                         display: 'flex',
-                        flexDirection: 'row',
-                        gap: 4,
-                        alignItems: 'center',
+                        flexDirection: 'column',
+                        gap: 3,
                         opacity: isDimmed ? 0.35 : 1,
-                        cursor: isValid ? 'pointer' : 'default',
+                        cursor: isInteractive ? 'pointer' : 'default',
                         transition: 'opacity 0.15s',
-                        animation: isValid ? 'tmPulse 1.4s ease-in-out infinite' : 'none',
+                        animation: isLayOffValid
+                          ? 'tmPulse 1.4s ease-in-out infinite'
+                          : isSwapValid
+                            ? 'tmSwapPulse 1.4s ease-in-out infinite'
+                            : 'none',
                       }}
                     >
-                      {displayCards.map(card => (
-                        <MicroCard key={card.id} card={card} meld={meld} />
-                      ))}
+                      {/* Tap hint label */}
+                      {isLayOffValid && (
+                        <span style={{ fontSize: 8, color: '#6aad7a', fontWeight: 600, lineHeight: 1 }}>
+                          tap to lay off
+                        </span>
+                      )}
+                      {isSwapValid && (
+                        <span style={{ fontSize: 8, color: '#e2b858', fontWeight: 600, lineHeight: 1 }}>
+                          tap to swap joker
+                        </span>
+                      )}
+
+                      {/* Cards row */}
+                      <div style={{ display: 'flex', flexDirection: 'row', gap: 4, alignItems: 'center' }}>
+                        {displayCards.map(card => (
+                          <MicroCard
+                            key={card.id}
+                            card={card}
+                            meld={meld}
+                            highlight={swapJoker ? card.id === swapJoker.id : false}
+                          />
+                        ))}
+                      </div>
                     </div>
                   )
                 })}

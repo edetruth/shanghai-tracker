@@ -18,7 +18,7 @@ import { SUIT_ORDER } from './HandDisplay'
 import { haptic } from '../../lib/haptics'
 import PrivacyScreen from './PrivacyScreen'
 import MeldModal from './MeldModal'
-import LayOffModal from './LayOffModal'
+// LayOffModal removed — lay-offs now happen inline via TableMelds
 import RoundSummary from './RoundSummary'
 import GameOver from './GameOver'
 import HandDisplay from './HandDisplay'
@@ -183,7 +183,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set())
   const [handSort, setHandSort] = useState<'rank' | 'suit'>('rank')
   const [showMeldModal, setShowMeldModal] = useState(false)
-  const [showLayOffModal, setShowLayOffModal] = useState(false)
+  const [jokerPositionPrompt, setJokerPositionPrompt] = useState<{ card: CardType; meld: Meld } | null>(null)
   const [buyerOrder, setBuyerOrder] = useState<number[]>([])
   const [buyerStep, setBuyerStep] = useState(0)
   const [roundResults, setRoundResults] = useState<{ playerId: string; score: number; shanghaied: boolean }[] | null>(null)
@@ -313,6 +313,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
   const declinedPendingCardRef = useRef<CardType | null>(null)
   useEffect(() => { gameStateRef.current = gameState }, [gameState])
   useEffect(() => { uiPhaseRef.current = uiPhase }, [uiPhase])
+  useEffect(() => { if (uiPhase !== 'action') setJokerPositionPrompt(null) }, [uiPhase])
   useEffect(() => { buyerOrderRef.current = buyerOrder }, [buyerOrder])
   useEffect(() => { buyerStepRef.current = buyerStep }, [buyerStep])
   useEffect(() => { pendingBuyDiscardRef.current = pendingBuyDiscard }, [pendingBuyDiscard])
@@ -877,9 +878,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
       setSelectedCardIds(new Set())
       setLayOffError(null)
       haptic('heavy')
-      // Close the LayOffModal and return player to action phase — do NOT advance turns
-      // or set pendingBuyDiscard (the unplayable card stays in hand, not offered as a buy).
-      setShowLayOffModal(false)
+      // Clear any joker prompt and return player to action phase — do NOT advance turns
+      setJokerPositionPrompt(null)
       setUiPhase('action')
       setDiscardError('Lay-off reversed — discard the unplayable card and keep the playable one for next turn.')
       setTimeout(() => setDiscardError(null), 4000)
@@ -893,7 +893,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
 
     if (wentOut) {
       addBuyLog({ round: prev.currentRound, turn: turnCountRef.current, event: 'went_out', playerName: player.name, card: '', detail: 'hand was empty' })
-      setShowLayOffModal(false)
+      setJokerPositionPrompt(null)
       const topCard = updated.roundState.discardPile[updated.roundState.discardPile.length - 1] ?? null
       startBuyingWindow(updated, playerIdx, topCard)
     }
@@ -928,6 +928,29 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     getTelemetryCounters(swapPlayer.id).jokerSwaps++
     setGameState(prev => computeJokerSwap(prev, naturalCard, meld) ?? prev)
     setSelectedCardIds(new Set())
+  }
+
+  // ── Inline lay-off (from TableMelds tap) ─────────────────────────────────
+  function handleInlineLayOff(card: CardType, meld: Meld) {
+    if (card.suit === 'joker' && meld.type === 'run') {
+      const canLow = (meld.runMin ?? 1) > 1
+      const canHigh = (meld.runMax ?? 13) < 14
+      if (canLow && canHigh) {
+        setJokerPositionPrompt({ card, meld })
+        return
+      }
+      const pos: 'low' | 'high' = canLow ? 'low' : 'high'
+      handleLayOff(card, meld, pos)
+      return
+    }
+    handleLayOff(card, meld)
+  }
+
+  function handleJokerPositionChoice(position: 'low' | 'high') {
+    if (!jokerPositionPrompt) return
+    haptic('tap')
+    handleLayOff(jokerPositionPrompt.card, jokerPositionPrompt.meld, position)
+    setJokerPositionPrompt(null)
   }
 
   // ── Discard (with undo support for human players) ─────────────────────────
@@ -1699,6 +1722,14 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
   const lastCardStuck = uiPhase === 'action' && !currentPlayer.isAI &&
     currentPlayer.hand.length === 1 && currentPlayer.hasLaidDown &&
     !rs.tablesMelds.some(m => canLayOff(currentPlayer.hand[0], m))
+  // Card to pass to TableMelds for inline lay-off/swap highlighting
+  const inlineSelectedCard: CardType | null = (() => {
+    if (uiPhase !== 'action' || currentPlayer.isAI || !currentPlayer.hasLaidDown) return null
+    if (selectedCardIds.size !== 1) return null
+    const cardId = [...selectedCardIds][0]
+    return currentPlayer.hand.find(c => c.id === cardId) ?? null
+  })()
+
   const buyLimitStr = gameState.buyLimit >= 999 ? '∞' : String(gameState.buyLimit)
   const isHumanDraw = uiPhase === 'draw' && !currentPlayer.isAI
 
@@ -1854,6 +1885,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
         <TableMelds
           melds={rs.tablesMelds}
           currentPlayerId={currentPlayer.id}
+          selectedCard={inlineSelectedCard}
+          onLayOff={handleInlineLayOff}
+          onJokerSwap={handleJokerSwap}
         />
       </div>
 
@@ -2041,103 +2075,146 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
           </div>
         )}
 
-        {/* Action buttons — Lay Down | Lay Off | Discard (spec §2.6) */}
-        {uiPhase === 'action' && !currentPlayer.isAI && !pendingUndo && (
+        {/* Inline joker position prompt */}
+        {jokerPositionPrompt && (
+          <div style={{
+            backgroundColor: '#2e1a0e',
+            borderRadius: 10,
+            border: '1px solid #e2b858',
+            padding: '8px 12px',
+            marginTop: 4,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}>
+            <p style={{ color: '#f0d480', fontSize: 11, fontWeight: 600, margin: 0, flex: 1 }}>
+              Place Joker where?
+            </p>
+            <button
+              onClick={() => handleJokerPositionChoice('low')}
+              style={{
+                background: '#6aad7a', color: '#0f2218', border: 'none', borderRadius: 8,
+                padding: '6px 12px', fontSize: 11, fontWeight: 700, cursor: 'pointer', minHeight: 36,
+              }}
+            >
+              Low
+            </button>
+            <button
+              onClick={() => handleJokerPositionChoice('high')}
+              style={{
+                background: '#e2b858', color: '#2c1810', border: 'none', borderRadius: 8,
+                padding: '6px 12px', fontSize: 11, fontWeight: 700, cursor: 'pointer', minHeight: 36,
+              }}
+            >
+              High
+            </button>
+          </div>
+        )}
+
+        {/* Action buttons */}
+        {uiPhase === 'action' && !currentPlayer.isAI && !pendingUndo && !jokerPositionPrompt && (
           <div className="space-y-2 mt-2">
-            <div className="flex gap-2">
+            {!currentPlayer.hasLaidDown ? (
+              /* Pre-lay-down: [Swap Joker?] [Lay Down] [Discard] */
+              <>
+                <div className="flex gap-2">
+                  {hasSwappableJokersBeforeLayDown && (
+                    <button
+                      onClick={() => { setNewCardIds(new Set()); setShowPreLayDownSwapModal(true) }}
+                      style={{
+                        flex: 1, minHeight: 38, borderRadius: 10,
+                        border: '1px solid #e2b858',
+                        background: '#1e4a2e', color: '#e2b858',
+                        fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                      }}
+                    >
+                      Swap Joker
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowMeldModal(true)}
+                    style={{
+                      flex: 1, minHeight: 38, borderRadius: 10, border: 'none',
+                      background: '#e2b858', color: '#2c1810',
+                      fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                    }}
+                  >
+                    Lay Down
+                  </button>
+                  <button
+                    onClick={selectedCardIds.size === 1 ? () => { setNewCardIds(new Set()); handleDiscard() } : undefined}
+                    disabled={selectedCardIds.size !== 1}
+                    style={{
+                      flex: 1, minHeight: 38, borderRadius: 10, border: 'none',
+                      background: selectedCardIds.size !== 1 ? '#1e4a2e' : 'white',
+                      color: selectedCardIds.size !== 1 ? '#3a5a3a' : '#2c1810',
+                      fontSize: 13, fontWeight: 600,
+                      cursor: selectedCardIds.size !== 1 ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    Discard
+                  </button>
+                </div>
+              </>
+            ) : (
+              /* Post-lay-down: contextual hint + [Discard] or [End Turn] */
+              <>
+                {/* Contextual hint */}
+                <p style={{ color: '#a8d0a8', fontSize: 11, textAlign: 'center', margin: 0 }}>
+                  {selectedCardIds.size === 0
+                    ? 'Select a card to lay off or discard'
+                    : selectedCardIds.size === 1
+                      ? 'Tap a glowing meld to lay off, or discard below'
+                      : 'Select exactly 1 card'}
+                </p>
 
-              {/* Lay Down button */}
-              <button
-                onClick={!currentPlayer.hasLaidDown ? () => setShowMeldModal(true) : undefined}
-                disabled={currentPlayer.hasLaidDown}
-                style={{
-                  flex: 1, minHeight: 38, borderRadius: 10, border: 'none',
-                  background: currentPlayer.hasLaidDown ? '#1e4a2e' : '#e2b858',
-                  color: currentPlayer.hasLaidDown ? '#3a5a3a' : '#2c1810',
-                  fontSize: 13, fontWeight: 700,
-                  cursor: currentPlayer.hasLaidDown ? 'not-allowed' : 'pointer',
-                }}
-              >
-                Lay Down
-              </button>
+                {/* Discard error */}
+                {discardError && (
+                  <p
+                    className="text-center text-xs rounded-lg px-3 py-2 border"
+                    style={{ color: '#e87070', background: 'rgba(44,24,16,0.6)', borderColor: 'rgba(232,112,112,0.3)' }}
+                  >
+                    {discardError}
+                  </p>
+                )}
 
-              {/* Lay Off / Swap Joker button */}
-              {currentPlayer.hasLaidDown ? (
-                <button
-                  onClick={() => { setNewCardIds(new Set()); setShowLayOffModal(true) }}
-                  style={{
-                    flex: 1, minHeight: 38, borderRadius: 10,
-                    border: '1px solid #2d5a3a',
-                    background: selectedCardIds.size > 0 ? '#3d7a4c' : '#1e4a2e',
-                    color: '#a8d0a8', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                  }}
-                >
-                  Lay Off
-                </button>
-              ) : hasSwappableJokersBeforeLayDown ? (
-                <button
-                  onClick={() => { setNewCardIds(new Set()); setShowPreLayDownSwapModal(true) }}
-                  style={{
-                    flex: 1, minHeight: 38, borderRadius: 10,
-                    border: '1px solid #2d5a3a',
-                    background: '#1e4a2e', color: '#a8d0a8',
-                    fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                  }}
-                >
-                  Swap Joker
-                </button>
-              ) : (
-                <button
-                  disabled
-                  title="Lay down your hand first"
-                  style={{
-                    flex: 1, minHeight: 38, borderRadius: 10,
-                    border: '1px solid #2d5a3a',
-                    background: '#1e4a2e', color: '#3a5a3a',
-                    fontSize: 13, fontWeight: 600, cursor: 'not-allowed', opacity: 0.5,
-                  }}
-                >
-                  Lay Off
-                </button>
-              )}
-            </div>
+                {lastCardStuck ? (
+                  <button
+                    onClick={handleEndTurnStuck}
+                    style={{
+                      width: '100%', minHeight: 38, borderRadius: 10, border: 'none',
+                      background: '#e2b858', color: '#2c1810',
+                      fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                    }}
+                  >
+                    End Turn (draw next turn)
+                  </button>
+                ) : (
+                  <button
+                    onClick={selectedCardIds.size === 1 ? () => { setNewCardIds(new Set()); handleDiscard() } : undefined}
+                    disabled={selectedCardIds.size !== 1}
+                    style={{
+                      width: '100%', minHeight: 38, borderRadius: 10, border: 'none',
+                      background: selectedCardIds.size !== 1 ? '#1e4a2e' : '#e2b858',
+                      color: selectedCardIds.size !== 1 ? '#3a5a3a' : '#2c1810',
+                      fontSize: 13, fontWeight: 700,
+                      cursor: selectedCardIds.size !== 1 ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {selectedCardIds.size === 1 ? 'Discard Selected Card' : 'Select a card to discard'}
+                  </button>
+                )}
+              </>
+            )}
 
-            {/* Discard error */}
-            {discardError && (
+            {/* Discard error (pre-lay-down) */}
+            {!currentPlayer.hasLaidDown && discardError && (
               <p
                 className="text-center text-xs rounded-lg px-3 py-2 border"
                 style={{ color: '#e87070', background: 'rgba(44,24,16,0.6)', borderColor: 'rgba(232,112,112,0.3)' }}
               >
                 {discardError}
               </p>
-            )}
-
-            {/* End Turn button — shown when stuck with 1 unplayable card after laying down */}
-            {lastCardStuck ? (
-              <button
-                onClick={handleEndTurnStuck}
-                style={{
-                  width: '100%', minHeight: 38, borderRadius: 10, border: 'none',
-                  background: '#e2b858', color: '#2c1810',
-                  fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                }}
-              >
-                End Turn (draw next turn)
-              </button>
-            ) : (
-              <button
-                onClick={selectedCardIds.size === 1 ? () => { setNewCardIds(new Set()); handleDiscard() } : undefined}
-                disabled={selectedCardIds.size !== 1}
-                style={{
-                  width: '100%', minHeight: 38, borderRadius: 10, border: 'none',
-                  background: selectedCardIds.size !== 1 ? '#1e4a2e' : 'white',
-                  color: selectedCardIds.size !== 1 ? '#3a5a3a' : '#2c1810',
-                  fontSize: 13, fontWeight: 600,
-                  cursor: selectedCardIds.size !== 1 ? 'not-allowed' : 'pointer',
-                }}
-              >
-                {selectedCardIds.size === 1 ? 'Discard Selected Card' : 'Select a card to discard'}
-              </button>
             )}
           </div>
         )}
@@ -2322,20 +2399,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
           </div>
         )
       })()}
-
-      {showLayOffModal && (
-        <LayOffModal
-          melds={rs.tablesMelds}
-          currentPlayerId={currentPlayer.id}
-          currentPlayerName={currentPlayer.name}
-          hand={currentPlayer.hand}
-          players={gameState.players}
-          onLayOff={handleLayOff}
-          onGoOut={() => setShowLayOffModal(false)}
-          onDone={() => setShowLayOffModal(false)}
-          onJokerSwap={handleJokerSwap}
-        />
-      )}
 
       {/* Pause modal */}
       {showPauseModal && (
