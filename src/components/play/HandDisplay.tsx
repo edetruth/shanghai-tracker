@@ -19,11 +19,11 @@ export const SUIT_ORDER: Record<string, number> = { hearts: 0, diamonds: 1, club
 
 // Horizontal overlap offset per card based on hand size
 function cardOffset(count: number): number {
-  if (count <= 5) return 56
-  if (count <= 7) return 48
-  if (count <= 10) return 36
-  if (count <= 12) return 28
-  return 24
+  if (count <= 5) return 48
+  if (count <= 7) return 41
+  if (count <= 10) return 31
+  if (count <= 12) return 24
+  return 20
 }
 
 export default function HandDisplay({
@@ -54,9 +54,9 @@ export default function HandDisplay({
   }, [cards, sortMode])
 
   const offset = cardOffset(sorted.length)
-  const containerWidth = sorted.length > 0 ? (sorted.length - 1) * offset + 48 : 48
-  // 72px card height + 12px selected lift + 4px new badge headroom
-  const containerHeight = 88
+  const containerWidth = sorted.length > 0 ? (sorted.length - 1) * offset + 41 : 41
+  // 61px card height + 10px selected lift + 4px new badge headroom
+  const containerHeight = 75
 
   return (
     <div>

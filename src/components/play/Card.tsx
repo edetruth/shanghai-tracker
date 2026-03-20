@@ -67,11 +67,11 @@ export default function Card({ card, selected, onClick, compact, disabled, joker
   const symbol = suitSymbol(card.suit)
   const isInteractive = !!(onClick && !disabled)
 
-  // Card size — enforce 44px minimum touch target for interactive cards
-  const width = compact ? 40 : 48
-  const height = compact ? 64 : 72
-  const minW = isInteractive ? 44 : undefined
-  const minH = isInteractive ? 44 : undefined
+  // Card size — enforce 38px minimum touch target for interactive cards
+  const width = compact ? 34 : 41
+  const height = compact ? 54 : 61
+  const minW = isInteractive ? 38 : undefined
+  const minH = isInteractive ? 38 : undefined
 
   if (faceDown) {
     return (

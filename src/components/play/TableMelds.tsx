@@ -86,8 +86,8 @@ function MicroCard({ card, meld }: { card: Card; meld: Meld }) {
   return (
     <div
       style={{
-        width: 45,
-        height: 62,
+        width: 38,
+        height: 53,
         backgroundColor: suitBg(card.suit),
         border: '1px solid rgba(0,0,0,0.12)',
         borderRadius: 5,
@@ -102,8 +102,8 @@ function MicroCard({ card, meld }: { card: Card; meld: Meld }) {
         userSelect: 'none',
       }}
     >
-      <span style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.3px' }}>{rankPart}</span>
-      {suitPart && <span style={{ fontSize: 14 }}>{suitPart}</span>}
+      <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.3px' }}>{rankPart}</span>
+      {suitPart && <span style={{ fontSize: 12 }}>{suitPart}</span>}
     </div>
   )
 }
@@ -158,7 +158,7 @@ export default function TableMelds({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          minHeight: 58,
+          minHeight: 49,
         }}
       >
         <p style={{ color: '#3a5a3a', fontSize: 11, fontStyle: 'italic', margin: 0 }}>
@@ -234,7 +234,7 @@ export default function TableMelds({
                         backgroundColor: '#1e4a2e',
                         border: isValid ? '1px solid #6aad7a' : '1px solid #2d5a3a',
                         borderRadius: 6,
-                        padding: '8px 10px',
+                        padding: '6px 8px',
                         display: 'flex',
                         flexDirection: 'row',
                         gap: 4,

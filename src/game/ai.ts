@@ -42,7 +42,9 @@ function tryFindRun(hand: Card[], allJokers: Card[], jokersUsed: number): Card[]
     const sorted = [...suitCards].sort((a, b) => a.rank - b.rank)
     for (let jCount = 0; jCount <= available.length; jCount++) {
       for (let start = 0; start < sorted.length; start++) {
-        for (let end = sorted.length; end > start + MIN_RUN_SIZE - 1 - jCount; end--) {
+        // Search from shortest (MIN_RUN_SIZE) upward — prefer minimal runs to conserve
+        // jokers and cards for subsequent melds in multi-run rounds
+        for (let end = start + Math.max(MIN_RUN_SIZE - jCount, 1); end <= sorted.length; end++) {
           const sub = sorted.slice(start, end)
           const testCards = [...sub, ...available.slice(0, jCount)]
           if (testCards.length >= MIN_RUN_SIZE && isValidRun(testCards)) return testCards
@@ -223,8 +225,10 @@ export function aiShouldTakeDiscard(
       aiFindBestMelds(hand, requirement) === null) return true
 
   // Card makes a set: hand already holds 2+ of same rank → adding this gives 3+
+  // Skip in pure-run rounds where sets cannot be melded
+  const isPureRunRound = requirement.sets === 0 && requirement.runs > 0
   const sameRank = hand.filter(c => !isJoker(c) && c.rank === discardCard.rank).length
-  if (sameRank >= 2) return true
+  if (sameRank >= 2 && !isPureRunRound) return true
 
   // For rounds with run requirements, commit to enough suits to cover ALL runs needed.
   // Round 7 (3 runs) must consider 3+ suits, not just 2.
@@ -288,8 +292,10 @@ export function aiShouldTakeDiscardHard(
       aiFindBestMelds(hand, requirement) === null) return true
 
   // 4. Card completes a set (hand has 2+ of same rank already → guaranteed 3-of-a-kind)
+  // Skip in pure-run rounds where sets cannot be melded
+  const isPureRunRound = requirement.sets === 0 && requirement.runs > 0
   const sameRank = hand.filter(c => !isJoker(c) && c.rank === discardCard.rank).length
-  if (sameRank >= 2) return true
+  if (sameRank >= 2 && !isPureRunRound) return true
 
   // 5 & 6. Gap-fill or extension in a STRONG committed run (3+ cards in the window)
   const hasRunReq = requirement.runs >= 1
@@ -333,7 +339,7 @@ export function aiShouldTakeDiscardEasy(_hand: Card[], _discardCard: Card, _requ
 //
 // CHANGED: Was run-protection strategy (committed-suit analysis, protected window IDs).
 // Now simply returns the non-joker candidate with the highest cardPoints() value.
-export function aiChooseDiscard(hand: Card[], _requirement?: RoundRequirement, tablesMelds: Meld[] = []): Card {
+export function aiChooseDiscard(hand: Card[], requirement?: RoundRequirement, tablesMelds: Meld[] = []): Card {
   if (hand.length === 0) throw new Error('Empty hand')
 
   const runsOnTable = tablesMelds.filter(m => m.type === 'run')
@@ -342,6 +348,27 @@ export function aiChooseDiscard(hand: Card[], _requirement?: RoundRequirement, t
   const candidates = (runsOnTable.length > 0 || nonJokers.length > 0)
     ? (nonJokers.length > 0 ? nonJokers : hand)
     : hand
+
+  const isPureRunRound = requirement ? (requirement.sets === 0 && requirement.runs > 0) : false
+
+  // In pure-run rounds, use run-aware discard: dump non-committed suit cards and rank clusters
+  if (isPureRunRound && requirement) {
+    const commitN = Math.min(requirement.runs + 1, 3)
+    const committedSuits = getCommittedSuits(hand, commitN)
+
+    function runUtility(card: Card): number {
+      if (isJoker(card)) return 10000
+      if (!committedSuits.has(card.suit)) return -cardPoints(card.rank) // dump non-committed
+      const sameSuit = hand.filter(c => !isJoker(c) && c.suit === card.suit && c.id !== card.id)
+      const contribution = getRunContribution(sameSuit, card.rank)
+      if (contribution === 'gap-fill') return 100
+      if (contribution === 'extension') return 70
+      if (contribution === 'near') return 30
+      return -cardPoints(card.rank) // not contributing to any run window
+    }
+
+    return candidates.reduce((worst, card) => runUtility(card) < runUtility(worst) ? card : worst)
+  }
 
   // Connectivity-based utility: keep cards with rank partners (sets) or suit neighbours (runs);
   // discard isolated high-point-value cards first.
@@ -373,6 +400,11 @@ export function aiShouldBuy(
   const withCard = aiFindBestMelds([...hand, discardCard], requirement)
   const without = aiFindBestMelds(hand, requirement)
   if (withCard !== null && without === null) return true
+
+  // Card completes a set — skip in pure-run rounds
+  const isPureRunRound = requirement.sets === 0 && requirement.runs > 0
+  const sameRank = hand.filter(c => !isJoker(c) && c.rank === discardCard.rank).length
+  if (sameRank >= 2 && !isPureRunRound) return true
 
   // For rounds with run requirements, buy based on how precisely the card advances the run
   if (requirement.runs >= 1) {
@@ -570,6 +602,7 @@ export function aiChooseDiscardHard(
   tablesMelds: Meld[] = [],
   opponentHistory?: Map<string, OpponentHistory>,
   opponents?: Player[],
+  requirement?: RoundRequirement,
 ): Card {
   if (hand.length === 0) throw new Error('Empty hand')
 
@@ -579,6 +612,53 @@ export function aiChooseDiscardHard(
   const candidateHand = (runsOnTable.length > 0 || nonJokerHand.length > 0)
     ? (nonJokerHand.length > 0 ? nonJokerHand : hand)
     : hand
+
+  const isPureRunRound = requirement ? (requirement.sets === 0 && requirement.runs > 0) : false
+
+  // In pure-run rounds, use run-focused utility that ignores same-rank value
+  if (isPureRunRound && requirement) {
+    const commitN = Math.min(requirement.runs + 1, 3)
+    const committedSuits = getCommittedSuits(hand, commitN)
+
+    function runUtility(card: Card): number {
+      if (isJoker(card)) return 10000
+      if (!committedSuits.has(card.suit)) return -cardPoints(card.rank) // dump non-committed
+      const sameSuit = hand.filter(c => !isJoker(c) && c.suit === card.suit && c.id !== card.id)
+      const contribution = getRunContribution(sameSuit, card.rank)
+      if (contribution === 'gap-fill') return 100
+      if (contribution === 'extension') return 70
+      if (contribution === 'near') return 30
+      return -cardPoints(card.rank)
+    }
+
+    function runDanger(card: Card): number {
+      if (isJoker(card)) return 0
+      let d = 0
+      if (opponents) {
+        for (const opp of opponents) {
+          if (!opp.hasLaidDown) continue
+          const oppMelds = tablesMelds.filter(m => m.ownerId === opp.id)
+          if (oppMelds.some(m => canLayOff(card, m))) d += 100
+        }
+      }
+      if (opponentHistory) {
+        for (const [, hist] of opponentHistory) {
+          const suitPicked = hist.picked.filter(c => c.suit === card.suit).length
+          if (suitPicked >= 2) d += 50
+          else if (suitPicked === 1) d += 20
+          if (hist.discarded.some(c => c.suit === card.suit)) d -= 15
+        }
+      }
+      return d
+    }
+
+    const DANGER_WEIGHT = 0.5
+    return candidateHand.reduce((worst, card) => {
+      const keepCard = runUtility(card) + runDanger(card) * DANGER_WEIGHT
+      const keepWorst = runUtility(worst) + runDanger(worst) * DANGER_WEIGHT
+      return keepCard < keepWorst ? card : worst
+    })
+  }
 
   function utility(card: Card): number {
     if (isJoker(card)) return 10000
@@ -646,9 +726,10 @@ export function aiShouldBuyHard(
   const without = aiFindBestMelds(hand, requirement)
   if (withCard !== null && without === null) return true
 
-  // Completes a set (2+ same rank in hand)
+  // Completes a set (2+ same rank in hand) — skip in pure-run rounds
+  const isPureRunRound = requirement.sets === 0 && requirement.runs > 0
   const sameRank = hand.filter(c => !isJoker(c) && c.rank === discardCard.rank).length
-  if (sameRank >= 2) return true
+  if (sameRank >= 2 && !isPureRunRound) return true
 
   // Gap-fill or extension in a strong committed run (3+ cards in window)
   if (requirement.runs >= 1) {

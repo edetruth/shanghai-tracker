@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { createPlayedGame, saveGameEvents } from '../../lib/gameStore'
 import { Pause } from 'lucide-react'
 import type { GameState, Player, Card as CardType, Meld, PlayerConfig, AIDifficulty, OpponentHistory } from '../../game/types'
-import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, MAX_BUYS } from '../../game/rules'
+import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, MAX_BUYS, cardPoints } from '../../game/rules'
 import { createDecks, shuffle, dealHands } from '../../game/deck'
 import { buildMeld, isValidSet, canLayOff, findSwappableJoker, getNextJokerOptions, isLegalDiscard, evaluateLayOffReversal } from '../../game/meld-validator'
 import { scoreRound } from '../../game/scoring'
@@ -217,6 +217,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
   const opponentHistoryRef = useRef<Map<string, OpponentHistory>>(new Map())
   // Hard AI going-down timing: how many turns this AI could have gone down but chose to wait
   const aiTurnsCouldGoDownRef = useRef<Map<string, number>>(new Map())
+  // Panic mode: total turns elapsed per AI player per round (resets each round)
+  const aiTurnsElapsedRef = useRef<Map<string, number>>(new Map())
 
   // Post-draw buying: when true, after buying window resolves the CURRENT player acts (they already drew)
   const buyingIsPostDrawRef = useRef(false)
@@ -1072,6 +1074,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     drawPileDepletionsRef.current = 0
     opponentHistoryRef.current = new Map()
     aiTurnsCouldGoDownRef.current = new Map()
+    aiTurnsElapsedRef.current = new Map()
     const nextRound = gameState.currentRound + 1
     if (nextRound > TOTAL_ROUNDS) {
       setGameState(prev => ({ ...prev, gameOver: true }))
@@ -1093,6 +1096,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     const { tablesMelds, requirement } = state.roundState
     const isHard = aiDifficulty === 'hard'
     const isEasy = aiDifficulty === 'easy'
+
+    // Track turns elapsed for panic mode
+    const turnsElapsed = (aiTurnsElapsedRef.current.get(player.id) ?? 0) + 1
+    aiTurnsElapsedRef.current.set(player.id, turnsElapsed)
 
     // Build joker positions for AI runs: place extra jokers at the low end
     function aiJokerPositions(meldGroups: CardType[][]): Map<string, number> {
@@ -1213,12 +1220,22 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     // Discard
     if (player.hand.length > 0) {
       aiLayOffCountRef.current = 0
-      const card = isHard
-        ? aiChooseDiscardHard(player.hand, tablesMelds, opponentHistoryRef.current,
-            state.players.filter(p => p.id !== player.id))
-        : aiChooseDiscard(player.hand, requirement, tablesMelds)
+
+      // Panic mode: stuck for 8+ turns without laying down — dump highest-point card to minimize damage
+      let card: CardType
+      if (!player.hasLaidDown && turnsElapsed >= 8) {
+        const nonJokers = player.hand.filter(c => c.suit !== 'joker')
+        const pool = nonJokers.length > 0 ? nonJokers : player.hand
+        card = pool.reduce((worst, c) => cardPoints(c.rank) > cardPoints(worst.rank) ? c : worst)
+        setAiMessage(`${player.name} dumps a card`)
+      } else {
+        card = isHard
+          ? aiChooseDiscardHard(player.hand, tablesMelds, opponentHistoryRef.current,
+              state.players.filter(p => p.id !== player.id), requirement)
+          : aiChooseDiscard(player.hand, requirement, tablesMelds)
+        setAiMessage(`${player.name} discards`)
+      }
       console.log(`[Buy] AI ${player.name} discarded [${card.rank === 0 ? 'Joker' : `${card.rank}${card.suit}`}]`)
-      setAiMessage(`${player.name} discards`)
       setTimeout(() => setAiMessage(null), 800)
       handleDiscard(card.id)
     }
@@ -1422,13 +1439,13 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
         {/* Top bar: round badge | requirement badge | pause (spec §2.1) */}
         <div
           className="flex items-center justify-between px-3 pb-2"
-          style={{ borderBottom: '1px solid #2d5a3a', minHeight: 36 }}
+          style={{ borderBottom: '1px solid #2d5a3a', minHeight: 30 }}
         >
           {/* Round badge */}
           <div style={{
             background: '#0f2218', color: '#a8d0a8',
             border: '1px solid #2d5a3a', borderRadius: 20,
-            padding: '5px 12px', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap',
+            padding: '4px 10px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
           }}>
             Round {gameState.currentRound}/{TOTAL_ROUNDS}
           </div>
@@ -1437,7 +1454,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
           <div style={{
             background: '#0f2218', color: '#e2b858',
             border: '1px solid #8b6914', borderRadius: 20,
-            padding: '5px 12px', fontSize: 13, fontWeight: 600,
+            padding: '4px 10px', fontSize: 11, fontWeight: 600,
             textAlign: 'center', flex: '0 1 auto', margin: '0 8px',
           }}>
             {rs.requirement.description}
@@ -1449,12 +1466,12 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
             aria-label="Pause game"
             style={{
               background: '#0f2218', border: '1px solid #2d5a3a', borderRadius: 8,
-              color: '#a8d0a8', minWidth: 48, minHeight: 48,
+              color: '#a8d0a8', minWidth: 40, minHeight: 40,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer', flexShrink: 0,
             }}
           >
-            <Pause size={22} />
+            <Pause size={18} />
           </button>
         </div>
 
@@ -1490,19 +1507,19 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
                     background: isMe ? '#1e3010' : '#0f2218',
                     border: `1px solid ${borderColor}`,
                     borderRadius: 10,
-                    padding: '8px 10px',
-                    minWidth: 80,
+                    padding: '6px 8px',
+                    minWidth: 68,
                   }}
                 >
                   {/* Name row with meld dot */}
                   <div className="flex items-center gap-1 mb-0.5">
                     <div style={{
-                      width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                      width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
                       background: p.hasLaidDown ? '#6aad7a' : '#2d5a3a',
                     }} />
                     <p style={{
-                      color: isMe ? '#e2b858' : '#a8d0a8', fontSize: 13, fontWeight: 500,
-                      maxWidth: 64, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      color: isMe ? '#e2b858' : '#a8d0a8', fontSize: 11, fontWeight: 500,
+                      maxWidth: 56, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>
                       {isMe ? 'You' : `${p.name.split(' ')[0]}${p.isAI ? ' 🤖' : ''}`}
                     </p>
@@ -1514,11 +1531,11 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
                       <p style={{ color: '#e2b858', fontSize: 9, fontWeight: 700, margin: 0 }}>their turn</p>
                     </div>
                   )}
-                  <p style={{ color: '#6aad7a', fontSize: 12, fontFamily: 'monospace', fontWeight: 700 }}>
+                  <p style={{ color: '#6aad7a', fontSize: 10, fontFamily: 'monospace', fontWeight: 700 }}>
                     {total} pts
                   </p>
-                  <p style={{ color: '#a8d0a8', fontSize: 11 }}>🃏 {p.hand.length}</p>
-                  <p style={{ color: buysColor, fontSize: 11, fontWeight: 600 }}>
+                  <p style={{ color: '#a8d0a8', fontSize: 10 }}>🃏 {p.hand.length}</p>
+                  <p style={{ color: buysColor, fontSize: 10, fontWeight: 600 }}>
                     {p.buysRemaining}/{buyLimitStr} buys
                   </p>
                 </div>
@@ -1544,7 +1561,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
 
         {/* Draw pile + Discard pile: centered side by side (spec §2.3) */}
         {(uiPhase === 'draw' || uiPhase === 'action' || uiPhase === 'buying') && (
-          <div className="flex justify-center items-end gap-8 mb-4">
+          <div className="flex justify-center items-end gap-6 mb-3">
 
             {/* Draw pile */}
             <div className="flex flex-col items-center gap-1">
@@ -1562,7 +1579,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
               ) : (
                 <div
                   className="rounded-lg border-2 border-dashed border-[#2d5a3a] flex items-center justify-center"
-                  style={{ width: 48, height: 72, color: '#2d5a3a', fontSize: 9, textAlign: 'center' }}
+                  style={{ width: 41, height: 61, color: '#2d5a3a', fontSize: 9, textAlign: 'center' }}
                 >
                   Empty
                 </div>
@@ -1586,7 +1603,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
               ) : (
                 <div
                   className="rounded-lg border-2 border-dashed border-[#2d5a3a]"
-                  style={{ width: 48, height: 72 }}
+                  style={{ width: 41, height: 61 }}
                 />
               )}
               {isHumanBuyerTurn && (
@@ -1689,10 +1706,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
                 onClick={!currentPlayer.hasLaidDown ? () => setShowMeldModal(true) : undefined}
                 disabled={currentPlayer.hasLaidDown}
                 style={{
-                  flex: 1, minHeight: 44, borderRadius: 12, border: 'none',
+                  flex: 1, minHeight: 38, borderRadius: 10, border: 'none',
                   background: currentPlayer.hasLaidDown ? '#1e4a2e' : '#e2b858',
                   color: currentPlayer.hasLaidDown ? '#3a5a3a' : '#2c1810',
-                  fontSize: 14, fontWeight: 700,
+                  fontSize: 13, fontWeight: 700,
                   cursor: currentPlayer.hasLaidDown ? 'not-allowed' : 'pointer',
                 }}
               >
@@ -1704,10 +1721,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
                 <button
                   onClick={() => { setNewCardIds(new Set()); setShowLayOffModal(true) }}
                   style={{
-                    flex: 1, minHeight: 44, borderRadius: 12,
+                    flex: 1, minHeight: 38, borderRadius: 10,
                     border: '1px solid #2d5a3a',
                     background: selectedCardIds.size > 0 ? '#3d7a4c' : '#1e4a2e',
-                    color: '#a8d0a8', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                    color: '#a8d0a8', fontSize: 13, fontWeight: 600, cursor: 'pointer',
                   }}
                 >
                   Lay Off
@@ -1716,10 +1733,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
                 <button
                   onClick={() => { setNewCardIds(new Set()); setShowPreLayDownSwapModal(true) }}
                   style={{
-                    flex: 1, minHeight: 44, borderRadius: 12,
+                    flex: 1, minHeight: 38, borderRadius: 10,
                     border: '1px solid #2d5a3a',
                     background: '#1e4a2e', color: '#a8d0a8',
-                    fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                    fontSize: 13, fontWeight: 600, cursor: 'pointer',
                   }}
                 >
                   Swap Joker
@@ -1729,10 +1746,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
                   disabled
                   title="Lay down your hand first"
                   style={{
-                    flex: 1, minHeight: 44, borderRadius: 12,
+                    flex: 1, minHeight: 38, borderRadius: 10,
                     border: '1px solid #2d5a3a',
                     background: '#1e4a2e', color: '#3a5a3a',
-                    fontSize: 14, fontWeight: 600, cursor: 'not-allowed', opacity: 0.5,
+                    fontSize: 13, fontWeight: 600, cursor: 'not-allowed', opacity: 0.5,
                   }}
                 >
                   Lay Off
@@ -1756,10 +1773,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
               disabled={discardDisabled}
               title={lastCardStuck ? 'Play your last card onto a meld to go out' : undefined}
               style={{
-                width: '100%', minHeight: 44, borderRadius: 12, border: 'none',
+                width: '100%', minHeight: 38, borderRadius: 10, border: 'none',
                 background: discardDisabled ? '#1e4a2e' : 'white',
                 color: discardDisabled ? '#3a5a3a' : '#2c1810',
-                fontSize: 14, fontWeight: 600,
+                fontSize: 13, fontWeight: 600,
                 cursor: discardDisabled ? 'not-allowed' : 'pointer',
               }}
             >
