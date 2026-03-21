@@ -14,20 +14,21 @@ interface Props {
 
 const SUIT_SORT: Record<string, number> = { hearts: 0, diamonds: 1, clubs: 2, spades: 3, joker: 4 }
 
+// Match the hand Card.tsx suit colors exactly for visual consistency
 function suitBg(suit: string): string {
-  if (suit === 'joker') return '#fff3c4'
-  if (suit === 'hearts') return '#ffe0e0'
-  if (suit === 'diamonds') return '#dde8ff'
-  if (suit === 'clubs') return '#c8f0d5'
-  return '#dedaff' // spades
+  if (suit === 'joker') return '#fff8e0'
+  if (suit === 'hearts') return '#fff0f0'
+  if (suit === 'diamonds') return '#f0f5ff'
+  if (suit === 'clubs') return '#e0f7e8'
+  return '#eeecff' // spades
 }
 
 function suitColor(suit: string): string {
-  if (suit === 'joker') return '#7a5800'
-  if (suit === 'hearts') return '#b01020'
-  if (suit === 'diamonds') return '#1a48a8'
-  if (suit === 'clubs') return '#0e5528'
-  return '#2d1a7e' // spades
+  if (suit === 'joker') return '#8b6914'
+  if (suit === 'hearts') return '#c0393b'
+  if (suit === 'diamonds') return '#2158b8'
+  if (suit === 'clubs') return '#1a6b3a'
+  return '#3d2b8e' // spades
 }
 
 function rankLabel(rank: number): string {
@@ -77,28 +78,69 @@ function MicroCard({ card, meld, highlight }: { card: Card; meld: Meld; highligh
     suitPart = suitSymbol(card.suit)
   }
 
+  const color = suitColor(card.suit)
+
   return (
     <div
       style={{
-        width: 34,
-        height: 48,
+        width: 36,
+        height: 52,
         backgroundColor: suitBg(card.suit),
-        border: highlight ? '2px solid #e2b858' : '1px solid rgba(0,0,0,0.25)',
-        borderRadius: 4,
+        border: highlight ? '2px solid #e2b858' : '1.5px solid rgba(255,255,255,0.25)',
+        borderRadius: 5,
+        position: 'relative',
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
         flexShrink: 0,
-        color: suitColor(card.suit),
+        color,
         lineHeight: 1,
         overflow: 'hidden',
         userSelect: 'none',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+        boxShadow: highlight
+          ? '0 0 6px rgba(226,184,88,0.6), 0 1px 3px rgba(0,0,0,0.3)'
+          : '0 1px 3px rgba(0,0,0,0.25)',
+        padding: 2,
       }}
     >
-      <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '-0.3px' }}>{rankPart}</span>
-      {suitPart && <span style={{ fontSize: 11, fontWeight: 600 }}>{suitPart}</span>}
+      {isJoker ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', gap: 1 }}>
+          <span style={{ fontSize: 11, fontWeight: 800 }}>{rankPart}</span>
+          <span style={{ fontSize: 13, lineHeight: 1 }}>🃏</span>
+        </div>
+      ) : (
+        <>
+          {/* Top-left rank + suit */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1 }}>
+            <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '-0.3px' }}>{rankPart}</span>
+            <span style={{ fontSize: 10, fontWeight: 700, lineHeight: 1, marginTop: -1 }}>{suitPart}</span>
+          </div>
+
+          {/* Center suit watermark */}
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 16,
+              opacity: 0.15,
+              pointerEvents: 'none',
+              color,
+            }}
+          >
+            {suitPart}
+          </div>
+
+          {/* Bottom-right rank + suit (rotated) */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', alignSelf: 'flex-end', lineHeight: 1, transform: 'rotate(180deg)' }}>
+            <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '-0.3px' }}>{rankPart}</span>
+            <span style={{ fontSize: 10, fontWeight: 700, lineHeight: 1, marginTop: -1 }}>{suitPart}</span>
+          </div>
+        </>
+      )}
     </div>
   )
 }
