@@ -44,7 +44,8 @@ src/
 ├── hooks/
 │   └── useRealtimeScores.ts # Supabase Realtime subscriptions for score tracker multiplayer
 └── components/
-    ├── HomePage.tsx          # Landing screen: 3 nav cards + HelpCircle tutorial button
+    ├── HomePage.tsx          # Landing screen: 4 nav cards (Play, Score Tracker, Stats, Analytics) + HelpCircle tutorial button
+    ├── AnalyticsPage.tsx     # Telemetry dashboard: Overview / AI Quality / Rounds / Decisions tabs
     ├── PlayTab.tsx           # Hosts play mode flow: GameSetup → GameBoard → GameOver
     ├── ScoreTrackerPage.tsx  # Score tracker home: game list, import/export
     ├── PlayerSetup.tsx       # Player selection + game date picker (score tracker)
@@ -108,6 +109,8 @@ Key functions: `getPlayers`, `upsertPlayer`, `createGame(playerIds, date, gameTy
 
 Telemetry functions (fire-and-forget, never break gameplay): `saveAIDecisions`, `backfillDecisionOutcomes`, `savePlayerRoundStats`, `savePlayerGameStats`.
 
+Telemetry read functions (used by AnalyticsPage): `getPlayerRoundStats(limit?)`, `getPlayerGameStats(limit?)`, `getAIDecisions(limit?)`.
+
 ## Play Mode
 
 Play mode (`section === 'play'`) runs entirely in `PlayTab` → `GameBoard`. State machine:
@@ -148,6 +151,18 @@ Every stat number in `StatsLeaderboard` and `PlayerProfileModal` is tappable. Ta
 - **`getWinStreakGames()`** in `StatsLeaderboard` returns actual `GameWithScores[]` for the streak (used by both win-streak drilldown and `getWinStreak()` count).
 - **`getImprovement()`** returns `firstGames`/`lastGames` arrays alongside averages so the improvement drilldown has its source data.
 
+## Analytics Dashboard
+
+`AnalyticsPage` (`section === 'analytics'`) — self-contained telemetry viewer. Fetches data once on mount via `getPlayerRoundStats`, `getPlayerGameStats`, `getAIDecisions` from gameStore. All computation is client-side with `useMemo`.
+
+Four tabs:
+- **Overview** — game/round/decision counts, win rates by difficulty, shanghai rates
+- **AI Quality** — Recharts bar charts: avg score, take accuracy, shanghai rate, going-down timing by difficulty; decision breakdown table
+- **Rounds** — performance by round number (1–7); rounds 3 & 7 highlighted as pure-run rounds; difficulty ranking
+- **Decisions** — filterable by difficulty + decision type; outcome summary, reason breakdown table, recent decisions list
+
+Warm cream theme (not dark table). Uses `safe-top` for header padding.
+
 ## Game Rules (Shanghai Rummy)
 
 - 7 rounds total; lowest cumulative score wins
@@ -164,7 +179,7 @@ Every stat number in `StatsLeaderboard` and `PlayerProfileModal` is tappable. Ta
 ## Key Conventions
 
 - **State lives in `App.tsx`** — no Context or Redux. Components receive props.
-- **`section`** drives top-level navigation: `'home' | 'play' | 'scoretracker' | 'stats'`
+- **`section`** drives top-level navigation: `'home' | 'play' | 'scoretracker' | 'stats' | 'analytics'`
 - **`scoreTrackerState`** drives the score tracker sub-machine: `'list' | 'setup' | 'playing' | 'summary' | 'joining'`
 - **Play mode state** is self-contained in `GameBoard` — does not touch App.tsx.
 - **Player colors** are assigned deterministically from `PLAYER_COLORS` in constants.

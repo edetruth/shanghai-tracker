@@ -269,7 +269,7 @@ export default function TableMelds({
                   marginBottom: 4,
                 }}
               >
-                {isCurrentPlayer ? 'You' : group.ownerName}
+                {isCurrentPlayer && isHuman ? 'You' : group.ownerName}
               </span>
 
               {/* Melds row — wraps to next line as needed */}

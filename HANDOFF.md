@@ -95,6 +95,7 @@ src/
 │   │   ├── TableMelds.tsx       # Vertical meld table grouped by player
 │   │   ├── RoundSummary.tsx     # Full-screen round end screen
 │   │   └── BuyPrompt.tsx        # Buying banner (free vs paid styling)
+│   ├── AnalyticsPage.tsx       # Telemetry dashboard — 4 tabs (Overview/AI Quality/Rounds/Decisions)
 │   └── [score tracker components]
 │
 ├── game/__tests__/              # 238 tests across 14 files — all must pass
@@ -121,17 +122,25 @@ Shanghai_UIUX_Spec_v1.0.docx    # UI/UX visual contract for all screens
 
 ## Database Schema
 
-**5 tables in Supabase (no row-level security — public anon key):**
+**8 tables in Supabase (no row-level security — public anon key):**
 
 ```sql
-players         — id, name, created_at
-games           — id, date, room_code, notes, is_complete, game_type, 
-                  buy_limit (integer default 5), created_at
-game_scores     — id, game_id, player_id, round_scores (number[]), 
-                  total_score (GENERATED column — never write to it)
-shanghai_events — id, game_id, player_id, round_number, created_at
-game_events     — id, game_id, round_number, turn_number, event_type,
-                  player_name, card, detail (jsonb), created_at
+players             — id, name, created_at
+games               — id, date, room_code, notes, is_complete, game_type,
+                      buy_limit (integer default 5), created_at
+game_scores         — id, game_id, player_id, round_scores (number[]),
+                      total_score (GENERATED column — never write to it)
+shanghai_events     — id, game_id, player_id, round_number, created_at
+game_events         — id, game_id, round_number, turn_number, event_type,
+                      player_name, card, detail (jsonb), created_at
+ai_decisions        — id, game_id, round_number, turn_number, player_name,
+                      decision_type, decision_result, hand_size, hand_points,
+                      has_laid_down, buys_remaining, difficulty, is_human, ...
+player_round_stats  — id, game_id, round_number, player_name, round_score,
+                      went_out, went_down, shanghaied, total_turns, free_takes,
+                      buys_made, lay_offs_made, joker_swaps, ... (per-round summary)
+player_game_stats   — id, game_id, player_name, total_score, final_rank, won,
+                      rounds_won, rounds_shanghaied, avg_score_per_round, ... (per-game summary)
 ```
 
 **Critical database rules:**
@@ -146,6 +155,14 @@ completePlayedGame(gameId, players) → Promise<void>                          /
 saveGameEvents(gameId, events) → Promise<void>                               // telemetry — silent fail
 createGame(playerIds, date, gameType?, buyLimit?) → Promise<Game>            // score tracker
 savePlayedGame(players, date, gameType, buyLimit?) → Promise<string>         // legacy — score tracker
+// Telemetry write (fire-and-forget):
+saveAIDecisions(decisions) → Promise<void>
+savePlayerRoundStats(stats) → Promise<void>
+savePlayerGameStats(stats) → Promise<void>
+// Telemetry read (used by AnalyticsPage):
+getPlayerRoundStats(limit?) → Promise<PlayerRoundStats[]>
+getPlayerGameStats(limit?) → Promise<PlayerGameStats[]>
+getAIDecisions(limit?) → Promise<AIDecision[]>
 ```
 
 ---
@@ -230,34 +247,29 @@ const pendingCard = pendingBuyDiscard ?? pendingBuyDiscardRef.current ?? (wasExp
 
 ## Telemetry System
 
-Game events are saved to `game_events` table for AI tuning and analytics.
+Three layers of telemetry, all fire-and-forget (never block gameplay):
 
-**Flow:**
-1. `createPlayedGame()` called at game START → creates Supabase record immediately
-2. `addBuyLog()` called throughout game for every significant event
-3. `flushTelemetry(buyLog)` called at every round end → saves unsaved events to Supabase
-4. `completePlayedGame()` called at game END → marks is_complete: true, saves final scores
-5. `saveGameEvents()` called at game END → flushes any remaining events
+**Layer 1 — Game Events** (`game_events` table):
+- `addBuyLog()` called throughout game for every significant event
+- `flushTelemetry(buyLog)` called at every round end
+- Event types: `discard, free_offer, free_taken, free_declined, buy_window_open, buy_offered, bought, passed, window_closed, went_down, went_out, shanghaied, joker_swap, scenario_b, scenario_c, stalemate, reshuffle`
 
-**Event types tracked:**
-`discard, free_offer, free_taken, free_declined, buy_window_open, buy_offered, bought, passed, window_closed, went_down, went_out, shanghaied, joker_swap, scenario_b, scenario_c, stalemate, reshuffle`
+**Layer 2 — AI Decisions** (`ai_decisions` table):
+- `recordDecision()` called at every decision point (draw, buy, discard, go_down, lay_off, joker_swap)
+- Batched in `pendingDecisionsRef`, flushed via `flushDecisions()` at round end
+- `backfillDecisionOutcomes()` marks which taken cards ended up in melds vs wasted
 
-**Useful analytics queries:**
-```sql
--- Buying window open rate
-SELECT COUNT(CASE WHEN event_type='buy_window_open' THEN 1 END) * 100.0 / 
-       COUNT(CASE WHEN event_type='discard' THEN 1 END) as open_rate
-FROM game_events;
+**Layer 3 — Summary Stats** (`player_round_stats` + `player_game_stats` tables):
+- `computeRoundStats()` + `savePlayerRoundStats()` called in `endRound()` and `forceEndRound()` for every player
+- `computeAndSaveGameStats()` called in `handleNextRound()` when game ends
+- Per-player counters tracked in `telemetryCountersRef` (reset each round via `resetRoundTelemetry()`)
 
--- AI take rate by difficulty  
-SELECT detail->>'difficulty' as diff, event_type, COUNT(*)
-FROM game_events WHERE event_type IN ('free_taken','free_declined')
-GROUP BY 1, 2;
-
--- Shanghaied rate by round
-SELECT round_number, COUNT(CASE WHEN event_type='shanghaied' THEN 1 END) as shanghaied
-FROM game_events GROUP BY round_number ORDER BY round_number;
-```
+**Telemetry lifecycle:**
+1. `createPlayedGame()` at game START → creates Supabase game record, sets `gameId`
+2. `recordDecision()` during play → batches decisions in memory
+3. `flushDecisions()` + `savePlayerRoundStats()` at round end
+4. `computeAndSaveGameStats()` at game end
+5. `completePlayedGame()` at game END → marks is_complete: true, saves final scores
 
 ---
 
@@ -354,7 +366,7 @@ These are confirmed issues to fix, in rough priority order:
 | 6 | **General engagement pass** | Active state on all actionable elements, reduce visual hunting |
 | 7 | **Card animations** | Cards fly from pile to hand on draw, fan to table on meld |
 | 8 | **Sound effects** | tap, draw, go down, go out, buy, shanghaied, round end |
-| 9 | **Analytics tab** | New tab in app — Overview, AI Behavior, Round Analysis, Events. Wait for 10+ games of data first |
+| 9 | **Analytics tab** | BUILT — AnalyticsPage with 4 tabs (Overview, AI Quality, Rounds, Decisions). Accessible from HomePage |
 | 10 | **Expert AI — Level 1** | 2-turn look-ahead, urgency mode when opponents close to going out |
 | 11 | **Expert AI — Level 3** | Monte Carlo expectimax, opponent hand modeling, 12-17 sessions |
 | 12 | **Online multiplayer** | Hidden hands per device, real-time game state sync |
@@ -431,135 +443,26 @@ Vercel auto-deploys on every git push to main. No manual deploy needed. Wait 2-3
 
 ---
 
-## AI Decision Telemetry System (Planned — Not Yet Built)
+## AI Decision Telemetry System (BUILT)
 
-### Purpose
-Beyond the existing `game_events` table, a deeper AI decision telemetry system has been designed to answer specific questions about AI behavior quality. This is the next major data engineering task.
+Three Supabase tables power the telemetry:
 
-### Two New Tables Needed
+**`ai_decisions`** — one row per decision point (draw, buy, discard, go_down, lay_off, joker_swap):
+- Recorded via `recordDecision()` in GameBoard.tsx, batched in `pendingDecisionsRef`
+- Flushed via `flushDecisions()` → `saveAIDecisions()` at round end
+- `backfillDecisionOutcomes()` marks cards as used-in-meld or wasted after round scores
 
-**`ai_turn_decisions`** — one row per AI turn:
-```sql
-CREATE TABLE ai_turn_decisions (
-  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  game_id uuid REFERENCES games(id) ON DELETE CASCADE,
-  round_number integer NOT NULL,
-  turn_number integer NOT NULL,
-  player_name text NOT NULL,
-  difficulty text NOT NULL,         -- 'easy' | 'medium' | 'hard'
-  draw_action text,                 -- 'took_discard' | 'drew_pile' | 'pass_free'
-  draw_card text,
-  draw_reason text,
-  buy_offered_card text,
-  buy_decision text,                -- 'bought' | 'passed'
-  buy_reason text,
-  buys_remaining integer,
-  went_down boolean DEFAULT false,
-  turns_could_have_gone_down integer,
-  melds_laid jsonb,
-  bonus_melds_laid integer DEFAULT 0,
-  layoffs_made integer DEFAULT 0,
-  joker_swaps_made integer DEFAULT 0,
-  discard_card text,
-  discard_reason text,
-  discard_card_point_value integer,
-  had_better_discard boolean,
-  hand_size_before integer,
-  hand_size_after integer,
-  hand_point_value_before integer,
-  hand_point_value_after integer,
-  hand_improvement integer,
-  has_laid_down boolean DEFAULT false,
-  opponent_min_card_count integer,
-  created_at timestamptz DEFAULT now()
-);
-```
+**`player_round_stats`** — one row per player per round:
+- Built by `computeRoundStats()` from telemetry counter refs + round results
+- Saved via `savePlayerRoundStats()` in both `endRound()` and `forceEndRound()`
+- Tracks: round_score, went_out/down/shanghaied, free_takes, buys, lay_offs, joker_swaps, etc.
 
-**`ai_round_summary`** — one row per AI player per round:
-```sql
-CREATE TABLE ai_round_summary (
-  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  game_id uuid REFERENCES games(id) ON DELETE CASCADE,
-  round_number integer NOT NULL,
-  player_name text NOT NULL,
-  difficulty text NOT NULL,
-  went_out boolean DEFAULT false,
-  went_down boolean DEFAULT false,
-  shanghaied boolean DEFAULT false,
-  round_score integer,
-  final_hand_value integer,
-  total_turns integer,
-  turns_before_going_down integer,
-  turns_after_going_down integer,
-  free_takes integer DEFAULT 0,
-  free_passes integer DEFAULT 0,
-  buys_made integer DEFAULT 0,
-  buy_opportunities integer DEFAULT 0,
-  layoffs_total integer DEFAULT 0,
-  joker_swaps_total integer DEFAULT 0,
-  scenario_b_triggers integer DEFAULT 0,
-  scenario_c_triggers integer DEFAULT 0,
-  avg_hand_value_before_discard numeric,
-  best_hand_value integer,
-  worst_hand_value integer,
-  created_at timestamptz DEFAULT now()
-);
-```
+**`player_game_stats`** — one row per player per game:
+- Built by `computeAndSaveGameStats()` from cumulative round scores
+- Saved when game ends in `handleNextRound()`
+- Tracks: total_score, final_rank, won, rounds_won, avg/best/worst scores
 
-### Key Analytics Queries
-
-```sql
--- Does difficulty affect win rate?
-SELECT difficulty,
-  ROUND(AVG(round_score), 1) as avg_score,
-  COUNT(CASE WHEN went_out THEN 1 END) as times_went_out,
-  COUNT(CASE WHEN shanghaied THEN 1 END) as times_shanghaied,
-  COUNT(*) as total_rounds
-FROM ai_round_summary
-GROUP BY difficulty ORDER BY avg_score;
-
--- Going down timing by difficulty
-SELECT difficulty,
-  ROUND(AVG(turns_before_going_down), 1) as avg_turns_to_go_down,
-  MIN(turns_before_going_down) as fastest,
-  MAX(turns_before_going_down) as slowest
-FROM ai_round_summary
-WHERE turns_before_going_down IS NOT NULL
-GROUP BY difficulty;
-
--- Free take rate by difficulty (target: Easy ~50%, Medium ~20-30%, Hard ~35-45%)
-SELECT difficulty,
-  ROUND(COUNT(CASE WHEN draw_action='took_discard' THEN 1 END) * 100.0 /
-        NULLIF(COUNT(CASE WHEN draw_action IN ('took_discard','pass_free') THEN 1 END), 0), 1) as take_rate_pct
-FROM ai_turn_decisions
-WHERE draw_action IN ('took_discard', 'pass_free')
-GROUP BY difficulty;
-
--- Discard quality
-SELECT difficulty,
-  ROUND(AVG(discard_card_point_value), 1) as avg_points_discarded,
-  ROUND(AVG(hand_improvement), 1) as avg_hand_improvement_per_turn
-FROM ai_turn_decisions
-WHERE discard_card IS NOT NULL
-GROUP BY difficulty;
-
--- Full picture
-SELECT r.difficulty,
-  ROUND(AVG(r.round_score), 1) as avg_score,
-  ROUND(AVG(r.turns_before_going_down), 1) as avg_turns_to_go_down,
-  ROUND(AVG(t.discard_card_point_value), 1) as avg_discard_value,
-  ROUND(COUNT(CASE WHEN r.shanghaied THEN 1 END) * 100.0 / COUNT(*), 1) as shanghaied_pct
-FROM ai_round_summary r
-JOIN ai_turn_decisions t ON t.game_id = r.game_id
-  AND t.player_name = r.player_name
-  AND t.round_number = r.round_number
-GROUP BY r.difficulty ORDER BY avg_score;
-```
-
-### Implementation Plan (3 sessions)
-1. **Backend agent** — create both tables, add `saveAITurnDecision()` and `saveAIRoundSummary()` to gameStore.ts (silent fail)
-2. **AI Systems agent** — add `buildTurnDecision()` to ai.ts that captures reasoning alongside decisions, no logic changes
-3. **Frontend agent (GameBoard.tsx)** — call save functions after each AI turn and at round end, add to flushTelemetry()
+All three tables are visualized in the Analytics Dashboard (AnalyticsPage.tsx).
 
 ---
 
@@ -609,17 +512,17 @@ GROUP BY r.difficulty ORDER BY avg_score;
 
 ---
 
-## Analytics Tab (Planned — Not Yet Built)
+## Analytics Dashboard (BUILT)
 
-A new tab in the main app navigation, powered by `game_events` and future `ai_turn_decisions` / `ai_round_summary` tables.
+Accessible from HomePage as 4th navigation card. `AnalyticsPage.tsx` fetches data from `player_round_stats`, `player_game_stats`, and `ai_decisions` tables on mount.
 
-**Four sections:**
-1. **Overview** — total games, buy window open rate, most Shanghaied round
-2. **AI Behavior** — free take rate by difficulty, buy rate, going down timing
-3. **Round Analysis** — avg turns per round (bar chart), Shanghaied rate per round, most bought cards
-4. **Game Events** — Scenario B/C frequency, joker swap frequency, stalemate count
+**Four tabs:**
+1. **Overview** — game/round/decision counts, win rates by difficulty, shanghai rates
+2. **AI Quality** — Recharts bar charts (avg score, take accuracy, shanghai rate, going-down timing by difficulty), decision breakdown table
+3. **Rounds** — performance by round number 1–7, rounds 3 & 7 highlighted (pure run rounds), difficulty ranking
+4. **Decisions** — filterable by difficulty + decision type, outcome summary, reason breakdown, recent decisions list
 
-**Wait until 10+ games of data are accumulated before building this.**
+All data fetched once on mount, computed client-side with `useMemo`. No re-fetch on tab switch.
 
 ---
 
