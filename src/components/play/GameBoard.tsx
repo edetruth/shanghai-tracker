@@ -1281,8 +1281,13 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     setBuyLog([])
     setGameId(null)
     pendingSaveRef.current = 0
+    turnCountRef.current = 0
     noProgressTurnsRef.current = 0
     drawPileDepletionsRef.current = 0
+    aiLayOffCountRef.current = 0
+    opponentHistoryRef.current = new Map()
+    aiTurnsCouldGoDownRef.current = new Map()
+    aiTurnsElapsedRef.current = new Map()
     resetRoundTelemetry()
     const date = new Date().toISOString().split('T')[0]
     const playerNames = initialPlayers.map(p => p.name)
@@ -1994,7 +1999,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
       </div>
 
       {/* ── ZONE 3: Piles strip — hidden during AI turns in solo-human games ── */}
-      {(uiPhase === 'draw' || uiPhase === 'action' || uiPhase === 'buying') &&
+      {(uiPhase === 'draw' || uiPhase === 'buying') &&
        (!soloHuman || !currentPlayer.isAI || isHumanBuyerTurn) && (
         <div
           style={{
