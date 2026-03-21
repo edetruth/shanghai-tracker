@@ -23,7 +23,8 @@ export default function PlayerProfileModal({ playerId, onClose }: Props) {
 
   useEffect(() => {
     getCompletedGames().then((g) => { setGames(g); setLoading(false) })
-    requestAnimationFrame(() => setVisible(true))
+    const raf = requestAnimationFrame(() => setVisible(true))
+    return () => cancelAnimationFrame(raf)
   }, [])
 
   const handleClose = () => {

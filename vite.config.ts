@@ -13,8 +13,8 @@ export default defineConfig({
         name: 'Shanghai Tracker',
         short_name: 'Shanghai',
         description: 'Shanghai Rummy Score Tracker',
-        theme_color: '#0c1220',
-        background_color: '#0c1220',
+        theme_color: '#f8f6f1',
+        background_color: '#f8f6f1',
         display: 'standalone',
         orientation: 'portrait',
         icons: [

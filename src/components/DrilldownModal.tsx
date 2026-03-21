@@ -354,7 +354,8 @@ export default function DrilldownModal({ stack, onPush, onPop, onClose, onPlayer
   const current = stack[stack.length - 1]
 
   useEffect(() => {
-    requestAnimationFrame(() => setVisible(true))
+    const raf = requestAnimationFrame(() => setVisible(true))
+    return () => cancelAnimationFrame(raf)
   }, [])
 
   const handleClose = () => {

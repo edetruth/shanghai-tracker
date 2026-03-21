@@ -10,7 +10,6 @@ export interface Game {
   room_code: string | null
   notes: string | null
   is_complete: boolean
-  created_by: string | null
   created_at: string
   game_type?: string | null  // 'manual' | 'pass-and-play' | 'ai' | 'online' (null = legacy)
 }
