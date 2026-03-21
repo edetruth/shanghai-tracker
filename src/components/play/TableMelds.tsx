@@ -5,6 +5,7 @@ import { canLayOff, findSwappableJoker } from '../../game/meld-validator'
 interface Props {
   melds: Meld[]
   currentPlayerId?: string
+  humanPlayerIds?: Set<string>
   selectedCard?: Card | null
   onLayOff?: (card: Card, meld: Meld) => void
   onJokerSwap?: (naturalCard: Card, meld: Meld) => void
@@ -153,16 +154,9 @@ interface PlayerGroup {
   melds: Meld[]
 }
 
-function buildGroups(melds: Meld[], currentPlayerId: string): PlayerGroup[] {
+function buildGroups(melds: Meld[], humanPlayerIds: Set<string>): PlayerGroup[] {
+  // Build groups in first-seen order (order players laid down)
   const map = new Map<string, PlayerGroup>()
-
-  // Current player's group first
-  for (const meld of melds) {
-    if (meld.ownerId === currentPlayerId && !map.has(meld.ownerId)) {
-      map.set(meld.ownerId, { ownerId: meld.ownerId, ownerName: meld.ownerName, melds: [] })
-    }
-  }
-  // Then others
   for (const meld of melds) {
     if (!map.has(meld.ownerId)) {
       map.set(meld.ownerId, { ownerId: meld.ownerId, ownerName: meld.ownerName, melds: [] })
@@ -170,7 +164,17 @@ function buildGroups(melds: Meld[], currentPlayerId: string): PlayerGroup[] {
     map.get(meld.ownerId)!.melds.push(meld)
   }
 
-  return [...map.values()]
+  // Partition: human players first (preserving first-laid-down order), then AI
+  const humans: PlayerGroup[] = []
+  const others: PlayerGroup[] = []
+  for (const group of map.values()) {
+    if (humanPlayerIds.has(group.ownerId)) {
+      humans.push(group)
+    } else {
+      others.push(group)
+    }
+  }
+  return [...humans, ...others]
 }
 
 // ── TableMelds ────────────────────────────────────────────────────────────────
@@ -178,6 +182,7 @@ function buildGroups(melds: Meld[], currentPlayerId: string): PlayerGroup[] {
 export default function TableMelds({
   melds,
   currentPlayerId = '',
+  humanPlayerIds = new Set(),
   selectedCard = null,
   onLayOff,
   onJokerSwap,
@@ -219,7 +224,7 @@ export default function TableMelds({
     )
   }
 
-  const groups = buildGroups(melds, currentPlayerId)
+  const groups = buildGroups(melds, humanPlayerIds)
 
   return (
     <>
@@ -247,22 +252,14 @@ export default function TableMelds({
       >
         {groups.map((group, gi) => {
           const isCurrentPlayer = group.ownerId === currentPlayerId
-
-          // Sort melds: valid lay-off targets first, then swap targets, then the rest
-          const sortedMelds = isLayOffMode
-            ? [...group.melds].sort((a, b) => {
-                const aPri = validLayOffIds.has(a.id) ? 0 : swapMeldIds.has(a.id) ? 1 : 2
-                const bPri = validLayOffIds.has(b.id) ? 0 : swapMeldIds.has(b.id) ? 1 : 2
-                return aPri - bPri
-              })
-            : group.melds
+          const isHuman = humanPlayerIds.has(group.ownerId)
 
           return (
             <div key={group.ownerId}>
               {/* Player label */}
               <span
                 style={{
-                  color: isCurrentPlayer ? '#e2b858' : '#6aad7a',
+                  color: isCurrentPlayer ? '#e2b858' : isHuman ? '#c8e0c8' : '#6aad7a',
                   fontSize: 9,
                   fontWeight: 700,
                   textTransform: 'uppercase',
@@ -284,7 +281,7 @@ export default function TableMelds({
                   gap: 6,
                 }}
               >
-                {sortedMelds.map(meld => {
+                {group.melds.map(meld => {
                   const isLayOffValid = isLayOffMode && validLayOffIds.has(meld.id)
                   const isSwapValid = isLayOffMode && !isLayOffValid && swapMeldIds.has(meld.id)
                   const isDimmed = isLayOffMode && !isLayOffValid && !isSwapValid

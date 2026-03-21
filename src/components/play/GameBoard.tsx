@@ -320,6 +320,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
 
   // Solo human = only 1 human player (rest are AI). Skip privacy screen, show turn banner instead.
   const soloHuman = useMemo(() => initialPlayers.filter(p => !p.isAI).length <= 1, [initialPlayers])
+
+  // Stable set of human player IDs for TableMelds ordering
+  const humanPlayerIds = useMemo(() => new Set(gameState.players.filter(p => !p.isAI).map(p => p.id)), [gameState.players])
   const [turnBanner, setTurnBanner] = useState<string | null>(null)
 
   // Show "Your turn!" banner when solo human's draw phase starts
@@ -1982,6 +1985,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
         <TableMelds
           melds={rs.tablesMelds}
           currentPlayerId={currentPlayer.id}
+          humanPlayerIds={humanPlayerIds}
           selectedCard={inlineSelectedCard}
           onLayOff={handleInlineLayOff}
           onJokerSwap={handleJokerSwap}
