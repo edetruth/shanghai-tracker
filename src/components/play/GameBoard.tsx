@@ -198,6 +198,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
   const [gameId, setGameId] = useState<string | null>(null)
   // True after player taps "Pass" on the free discard offer — hides banner until next offer
   const [freeOfferDeclined, setFreeOfferDeclined] = useState(false)
+  const [stripExpanded, setStripExpanded] = useState(false)
   const turnCountRef = useRef(0)
   const pendingSaveRef = useRef<number>(0)
   const [discardError, setDiscardError] = useState<string | null>(null)
@@ -1790,12 +1791,12 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
         </div>
       )}
 
-      {/* ── ZONE 1: Fixed top — top bar + opponent strip + toasts ─────── */}
+      {/* ── ZONE 1: Fixed top — top bar + collapsible opponent strip ─── */}
       <div
         className="bg-[#0f2218]"
         style={{ flexShrink: 0, paddingTop: 'max(8px, env(safe-area-inset-top))' }}
       >
-        {/* Top bar: round badge | requirement badge | pause (spec §2.1) */}
+        {/* Top bar: round badge | requirement badge | pause */}
         <div
           className="flex items-center justify-between px-3 pb-2"
           style={{ borderBottom: '1px solid #2d5a3a', minHeight: 30 }}
@@ -1819,7 +1820,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
             {rs.requirement.description}
           </div>
 
-          {/* Pause button — 48px minimum touch target */}
+          {/* Pause button */}
           <button
             onClick={() => setShowPauseModal(true)}
             aria-label="Pause game"
@@ -1834,102 +1835,150 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
           </button>
         </div>
 
-        {/* Opponent strip — horizontal scroll, no wrap, hidden scrollbar (spec §2.2) */}
+        {/* Compressed opponent strip — single-line ticker, tap to expand */}
         <div
-          className="flex gap-2 px-3 py-2"
-          style={{ overflowX: 'auto', overflowY: 'hidden', flexWrap: 'nowrap', scrollbarWidth: 'none' }}
+          onClick={() => setStripExpanded(!stripExpanded)}
+          style={{ cursor: 'pointer', userSelect: 'none' }}
         >
-          {gameState.players
-            .map(p => {
-              const total = p.roundScores.reduce((s, n) => s + n, 0)
-              const isBuyingNow = uiPhase === 'buying' && activeBuyer?.id === p.id
-              const isMe = p.id === displayPlayer.id
-              const isActiveTurn = p.id === currentPlayer.id
-              const buysColor = p.buysRemaining === 0
-                ? '#b83232'
-                : p.buysRemaining <= 2
-                  ? '#c08040'
-                  : '#6aad7a'
-              const borderColor = isMe
-                ? '#e2b858'
-                : isBuyingNow
-                  ? '#e2b858'
-                  : isActiveTurn
-                    ? '#4a7a5a'
-                    : '#2d5a3a'
-              return (
-                <div
-                  key={p.id}
-                  className={isBuyingNow && !isMe ? 'animate-pulse' : ''}
-                  style={{
-                    flexShrink: 0,
-                    background: isMe ? '#1e3010' : '#0f2218',
-                    border: `1px solid ${borderColor}`,
-                    borderRadius: 10,
-                    padding: '6px 8px',
-                    minWidth: 68,
-                  }}
-                >
-                  {/* Name row with meld dot */}
-                  <div className="flex items-center gap-1 mb-0.5">
-                    <div style={{
-                      width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+          {!stripExpanded ? (
+            /* ── Collapsed: compact single-line view ── */
+            <div
+              className="flex items-center gap-1 px-3 py-1.5"
+              style={{ overflowX: 'auto', scrollbarWidth: 'none', flexWrap: 'nowrap' }}
+            >
+              {gameState.players.map((p, i) => {
+                const total = p.roundScores.reduce((s, n) => s + n, 0)
+                const isMe = p.id === displayPlayer.id
+                const isActiveTurn = p.id === currentPlayer.id
+                const isBuyingNow = uiPhase === 'buying' && activeBuyer?.id === p.id
+                return (
+                  <span key={p.id} style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
+                    {i > 0 && <span style={{ color: '#2d5a3a', margin: '0 5px', fontSize: 10 }}>·</span>}
+                    {/* Meld dot */}
+                    <span style={{
+                      width: 5, height: 5, borderRadius: '50%', display: 'inline-block', marginRight: 3, flexShrink: 0,
                       background: p.hasLaidDown ? '#6aad7a' : '#2d5a3a',
                     }} />
-                    <p style={{
-                      color: isMe ? '#e2b858' : '#a8d0a8', fontSize: 11, fontWeight: 500,
-                      maxWidth: 56, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    <span style={{
+                      color: isMe ? '#e2b858' : isActiveTurn ? '#ffffff' : '#a8d0a8',
+                      fontSize: 11, fontWeight: isMe || isActiveTurn ? 700 : 500,
+                      maxWidth: 52, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>
-                      {isMe ? 'You' : `${p.name.split(' ')[0]}${p.isAI ? ' 🤖' : ''}`}
-                    </p>
-                  </div>
-                  {/* Active turn dot */}
-                  {isActiveTurn && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginBottom: 2 }}>
-                      <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#e2b858', flexShrink: 0 }} />
-                      <p style={{ color: '#e2b858', fontSize: 9, fontWeight: 700, margin: 0 }}>their turn</p>
-                    </div>
-                  )}
-                  <p style={{ color: '#6aad7a', fontSize: 10, fontFamily: 'monospace', fontWeight: 700 }}>
-                    {total} pts
-                  </p>
-                  <p style={{ color: '#a8d0a8', fontSize: 10 }}>🃏 {p.hand.length}</p>
-                  <p style={{ color: buysColor, fontSize: 10, fontWeight: 600 }}>
-                    {p.buysRemaining}/{buyLimitStr} buys
-                  </p>
-                </div>
-              )
-            })}
-        </div>
-
-        {/* Toast slot — always reserves space, content fades in/out */}
-        <div
-          style={{
-            minHeight: 28,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'opacity 150ms ease',
-            opacity: reshuffleMsg || aiMessage ? 1 : 0,
-            background: reshuffleMsg ? '#e2b858' : '#1e4a2e',
-            padding: reshuffleMsg || aiMessage ? '4px 16px' : '4px 16px',
-          }}
-        >
-          {reshuffleMsg ? (
-            <span className="text-xs font-medium text-[#2c1810]">Draw pile reshuffled from discards</span>
-          ) : aiMessage ? (
-            <span className="text-xs text-[#a8d0a8] animate-pulse">{aiMessage}</span>
+                      {isMe ? 'You' : p.name.split(' ')[0]}{p.isAI ? '🤖' : ''}
+                    </span>
+                    <span style={{ color: '#6aad7a', fontSize: 10, fontFamily: 'monospace', fontWeight: 700, marginLeft: 3 }}>
+                      {total}
+                    </span>
+                    <span style={{ color: '#a8d0a8', fontSize: 10, marginLeft: 2 }}>
+                      🃏{p.hand.length}
+                    </span>
+                    {isBuyingNow && !isMe && (
+                      <span style={{ color: '#e2b858', fontSize: 9, marginLeft: 2, fontWeight: 700 }}>BUY</span>
+                    )}
+                  </span>
+                )
+              })}
+              {/* Expand chevron */}
+              <span style={{ color: '#6aad7a', fontSize: 10, marginLeft: 'auto', paddingLeft: 6, flexShrink: 0 }}>▼</span>
+            </div>
           ) : (
-            <span className="text-xs">{'\u00A0'}</span>
+            /* ── Expanded: full detail cards ── */
+            <>
+              <div
+                className="flex gap-2 px-3 py-2"
+                style={{ overflowX: 'auto', overflowY: 'hidden', flexWrap: 'nowrap', scrollbarWidth: 'none' }}
+              >
+                {gameState.players.map(p => {
+                  const total = p.roundScores.reduce((s, n) => s + n, 0)
+                  const isBuyingNow = uiPhase === 'buying' && activeBuyer?.id === p.id
+                  const isMe = p.id === displayPlayer.id
+                  const isActiveTurn = p.id === currentPlayer.id
+                  const buysColor = p.buysRemaining === 0
+                    ? '#b83232'
+                    : p.buysRemaining <= 2
+                      ? '#c08040'
+                      : '#6aad7a'
+                  const borderColor = isMe
+                    ? '#e2b858'
+                    : isBuyingNow
+                      ? '#e2b858'
+                      : isActiveTurn
+                        ? '#4a7a5a'
+                        : '#2d5a3a'
+                  return (
+                    <div
+                      key={p.id}
+                      className={isBuyingNow && !isMe ? 'animate-pulse' : ''}
+                      style={{
+                        flexShrink: 0,
+                        background: isMe ? '#1e3010' : '#0f2218',
+                        border: `1px solid ${borderColor}`,
+                        borderRadius: 10,
+                        padding: '6px 8px',
+                        minWidth: 68,
+                      }}
+                    >
+                      <div className="flex items-center gap-1 mb-0.5">
+                        <div style={{
+                          width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
+                          background: p.hasLaidDown ? '#6aad7a' : '#2d5a3a',
+                        }} />
+                        <p style={{
+                          color: isMe ? '#e2b858' : '#a8d0a8', fontSize: 11, fontWeight: 500,
+                          maxWidth: 56, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}>
+                          {isMe ? 'You' : `${p.name.split(' ')[0]}${p.isAI ? ' 🤖' : ''}`}
+                        </p>
+                      </div>
+                      {isActiveTurn && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginBottom: 2 }}>
+                          <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#e2b858', flexShrink: 0 }} />
+                          <p style={{ color: '#e2b858', fontSize: 9, fontWeight: 700, margin: 0 }}>their turn</p>
+                        </div>
+                      )}
+                      <p style={{ color: '#6aad7a', fontSize: 10, fontFamily: 'monospace', fontWeight: 700 }}>
+                        {total} pts
+                      </p>
+                      <p style={{ color: '#a8d0a8', fontSize: 10 }}>🃏 {p.hand.length}</p>
+                      <p style={{ color: buysColor, fontSize: 10, fontWeight: 600 }}>
+                        {p.buysRemaining}/{buyLimitStr} buys
+                      </p>
+                    </div>
+                  )
+                })}
+              </div>
+              {/* Collapse chevron */}
+              <div style={{ textAlign: 'center', paddingBottom: 2 }}>
+                <span style={{ color: '#6aad7a', fontSize: 10 }}>▲ tap to collapse</span>
+              </div>
+            </>
           )}
         </div>
       </div>
 
-      {/* ── ZONE 2: Scrollable middle — table melds ONLY ──────────────── */}
-      <div
-        className="px-3 py-3"
-        style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}
-      >
+      {/* ── ZONE 2: Scrollable middle — table melds + overlay toast ──── */}
+      <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+        {/* Toast overlay — floats over melds, no layout shift */}
+        {(reshuffleMsg || aiMessage) && (
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
+            display: 'flex', justifyContent: 'center', padding: '4px 16px',
+            background: reshuffleMsg
+              ? 'linear-gradient(180deg, #e2b858 0%, rgba(226,184,88,0) 100%)'
+              : 'linear-gradient(180deg, rgba(30,74,46,0.95) 0%, rgba(30,74,46,0) 100%)',
+            pointerEvents: 'none',
+          }}>
+            {reshuffleMsg ? (
+              <span className="text-xs font-medium text-[#2c1810]">Draw pile reshuffled from discards</span>
+            ) : (
+              <span className="text-xs text-[#a8d0a8] animate-pulse">{aiMessage}</span>
+            )}
+          </div>
+        )}
+        <div
+          className="px-3 py-3"
+          style={{ height: '100%', overflowY: 'auto' }}
+        >
         <TableMelds
           melds={rs.tablesMelds}
           currentPlayerId={currentPlayer.id}
@@ -1937,6 +1986,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
           onLayOff={handleInlineLayOff}
           onJokerSwap={handleJokerSwap}
         />
+        </div>
       </div>
 
       {/* ── ZONE 3: Piles strip — hidden during AI turns in solo-human games ── */}

@@ -15,19 +15,19 @@ interface Props {
 const SUIT_SORT: Record<string, number> = { hearts: 0, diamonds: 1, clubs: 2, spades: 3, joker: 4 }
 
 function suitBg(suit: string): string {
-  if (suit === 'joker') return '#fff8e0'
-  if (suit === 'hearts') return '#fff0f0'
-  if (suit === 'diamonds') return '#f0f5ff'
-  if (suit === 'clubs') return '#e0f7e8'
-  return '#eeecff' // spades
+  if (suit === 'joker') return '#fff3c4'
+  if (suit === 'hearts') return '#ffe0e0'
+  if (suit === 'diamonds') return '#dde8ff'
+  if (suit === 'clubs') return '#c8f0d5'
+  return '#dedaff' // spades
 }
 
 function suitColor(suit: string): string {
-  if (suit === 'joker') return '#8b6914'
-  if (suit === 'hearts') return '#c0393b'
-  if (suit === 'diamonds') return '#2158b8'
-  if (suit === 'clubs') return '#1a6b3a'
-  return '#3d2b8e' // spades
+  if (suit === 'joker') return '#7a5800'
+  if (suit === 'hearts') return '#b01020'
+  if (suit === 'diamonds') return '#1a48a8'
+  if (suit === 'clubs') return '#0e5528'
+  return '#2d1a7e' // spades
 }
 
 function rankLabel(rank: number): string {
@@ -55,7 +55,7 @@ function sortedSetCards(cards: Card[]): Card[] {
   })
 }
 
-// ── Micro card (45×62px) ─────────────────────────────────────────────────────
+// ── Micro card (34×48px) ─────────────────────────────────────────────────────
 
 function MicroCard({ card, meld, highlight }: { card: Card; meld: Meld; highlight?: boolean }) {
   const isJoker = card.suit === 'joker'
@@ -80,11 +80,11 @@ function MicroCard({ card, meld, highlight }: { card: Card; meld: Meld; highligh
   return (
     <div
       style={{
-        width: 38,
-        height: 53,
+        width: 34,
+        height: 48,
         backgroundColor: suitBg(card.suit),
-        border: highlight ? '2px solid #e2b858' : '1px solid rgba(0,0,0,0.12)',
-        borderRadius: 5,
+        border: highlight ? '2px solid #e2b858' : '1px solid rgba(0,0,0,0.25)',
+        borderRadius: 4,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -94,10 +94,11 @@ function MicroCard({ card, meld, highlight }: { card: Card; meld: Meld; highligh
         lineHeight: 1,
         overflow: 'hidden',
         userSelect: 'none',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
       }}
     >
-      <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.3px' }}>{rankPart}</span>
-      {suitPart && <span style={{ fontSize: 12 }}>{suitPart}</span>}
+      <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: '-0.3px' }}>{rankPart}</span>
+      {suitPart && <span style={{ fontSize: 11, fontWeight: 600 }}>{suitPart}</span>}
     </div>
   )
 }
@@ -162,11 +163,11 @@ export default function TableMelds({
           width: '100%',
           backgroundColor: '#0f2218',
           borderRadius: 10,
-          padding: 8,
+          padding: 6,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          minHeight: 49,
+          minHeight: 42,
         }}
       >
         <p style={{ color: '#3a5a3a', fontSize: 11, fontStyle: 'italic', margin: 0 }}>
@@ -196,10 +197,10 @@ export default function TableMelds({
           width: '100%',
           backgroundColor: '#0f2218',
           borderRadius: 10,
-          padding: 8,
+          padding: 6,
           display: 'flex',
           flexDirection: 'column',
-          gap: 8,
+          gap: 6,
         }}
       >
         {groups.map((group, gi) => {
@@ -274,10 +275,10 @@ export default function TableMelds({
                             ? '1px solid #e2b858'
                             : '1px solid #2d5a3a',
                         borderRadius: 6,
-                        padding: '6px 8px',
+                        padding: '4px 6px',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: 3,
+                        gap: 2,
                         opacity: isDimmed ? 0.35 : 1,
                         cursor: isInteractive ? 'pointer' : 'default',
                         transition: 'opacity 0.15s',
@@ -301,7 +302,7 @@ export default function TableMelds({
                       )}
 
                       {/* Cards row */}
-                      <div style={{ display: 'flex', flexDirection: 'row', gap: 4, alignItems: 'center' }}>
+                      <div style={{ display: 'flex', flexDirection: 'row', gap: 3, alignItems: 'center' }}>
                         {displayCards.map(card => (
                           <MicroCard
                             key={card.id}
