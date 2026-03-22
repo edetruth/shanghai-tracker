@@ -315,6 +315,7 @@ export default function TableMelds({
                   return (
                     <div
                       key={meld.id}
+                      data-meld-id={meld.id}
                       onClick={isInteractive ? handleTap : undefined}
                       style={{
                         backgroundColor: '#1e4a2e',
