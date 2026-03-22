@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import GameSetup from './play/GameSetup'
 import GameBoard from './play/GameBoard'
-import type { PlayerConfig, AIDifficulty } from '../game/types'
+import GameOver from './play/GameOver'
+import TournamentTrophy from './play/TournamentTrophy'
+import type { PlayerConfig, Player, AIPersonality, TournamentState, TournamentGameResult, TournamentPlayerStats } from '../game/types'
 
-type PlayView = 'landing' | 'setup' | 'game'
+type PlayView = 'landing' | 'setup' | 'game' | 'tournament-gameover' | 'tournament-trophy'
 
 const ROUNDS = [
   { num: 1, req: '2 Sets of 3+',    cards: 10 },
@@ -113,14 +115,127 @@ function FanCard({ index }: { index: number }) {
 export default function PlayTab({ onBack }: Props) {
   const [view, setView] = useState<PlayView>('landing')
   const [playerConfigs, setPlayerConfigs] = useState<PlayerConfig[]>([])
-  const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>('medium')
+  const [aiPersonality, setAiPersonality] = useState<AIPersonality>('steady-sam')
   const [buyLimit, setBuyLimit] = useState(5)
+  const [tournamentState, setTournamentState] = useState<TournamentState | null>(null)
+  const [lastGamePlayers, setLastGamePlayers] = useState<Player[]>([])
+  const [gameKey, setGameKey] = useState(0) // force remount GameBoard for new tournament games
 
-  function handleStart(players: PlayerConfig[], difficulty: AIDifficulty, limit: number) {
+  function handleStart(players: PlayerConfig[], personality: AIPersonality, limit: number, tournamentMode: boolean) {
     setPlayerConfigs(players)
-    setAiDifficulty(difficulty)
+    setAiPersonality(personality)
     setBuyLimit(limit)
+    if (tournamentMode) {
+      const standings = new Map<string, TournamentPlayerStats>()
+      players.forEach((_p, i) => {
+        standings.set(`p${i}`, {
+          gamesWon: 0,
+          totalScore: 0,
+          roundsWon: 0,
+          avgScore: 0,
+          shanghaiCount: 0,
+        })
+      })
+      setTournamentState({
+        enabled: true,
+        totalGames: 3,
+        currentGameNumber: 1,
+        gameResults: [],
+        standings,
+      })
+    } else {
+      setTournamentState(null)
+    }
+    setGameKey(k => k + 1)
     setView('game')
+  }
+
+  // Helper: compute total score for a player
+  function playerTotal(p: Player): number {
+    return p.roundScores.reduce((s, n) => s + n, 0)
+  }
+
+  // Tournament: handle game completion
+  function handleTournamentGameComplete(players: Player[]) {
+    if (!tournamentState) return
+    setLastGamePlayers(players)
+
+    // Determine winner(s) of this game
+    const sorted = [...players].sort((a, b) => playerTotal(a) - playerTotal(b))
+    const winnerScore = playerTotal(sorted[0])
+    const winners = sorted.filter(p => playerTotal(p) === winnerScore)
+
+    // Build game result
+    const result: TournamentGameResult = {
+      gameNumber: tournamentState.currentGameNumber,
+      winnerId: winners[0].id,
+      winnerName: winners[0].name,
+      playerScores: sorted.map((p, idx) => ({
+        playerId: p.id,
+        name: p.name,
+        totalScore: playerTotal(p),
+        rank: idx + 1,
+      })),
+    }
+
+    // Update standings
+    const newStandings = new Map(tournamentState.standings)
+    for (const p of players) {
+      const stats = newStandings.get(p.id) ?? {
+        gamesWon: 0, totalScore: 0, roundsWon: 0, avgScore: 0, shanghaiCount: 0,
+      }
+      const total = playerTotal(p)
+      const isWinner = winners.some(w => w.id === p.id)
+      const roundsWon = p.roundScores.filter(s => s === 0).length
+      const newTotalScore = stats.totalScore + total
+      const gameCount = tournamentState.currentGameNumber
+      newStandings.set(p.id, {
+        gamesWon: stats.gamesWon + (isWinner ? 1 : 0),
+        totalScore: newTotalScore,
+        roundsWon: stats.roundsWon + roundsWon,
+        avgScore: Math.round(newTotalScore / gameCount),
+        shanghaiCount: stats.shanghaiCount + p.roundScores.filter(s => s >= 80).length,
+      })
+    }
+
+    const newResults = [...tournamentState.gameResults, result]
+    const updatedState: TournamentState = {
+      ...tournamentState,
+      gameResults: newResults,
+      standings: newStandings,
+    }
+    setTournamentState(updatedState)
+
+    // Check if someone has 2 wins (tournament clinched)
+    const champion = Array.from(newStandings.entries()).find(([, s]) => s.gamesWon >= 2)
+    if (champion) {
+      setView('tournament-trophy')
+    } else {
+      setView('tournament-gameover')
+    }
+  }
+
+  // Tournament: start next game
+  function handleNextTournamentGame() {
+    if (!tournamentState) return
+    setTournamentState(prev => prev ? {
+      ...prev,
+      currentGameNumber: prev.currentGameNumber + 1 as 1 | 2 | 3,
+    } : null)
+    setGameKey(k => k + 1)
+    setView('game')
+  }
+
+  // Tournament: exit back to landing
+  function handleExitTournament() {
+    setTournamentState(null)
+    setView('landing')
+  }
+
+  // Tournament: play again (back to setup)
+  function handleTournamentPlayAgain() {
+    setTournamentState(null)
+    setView('setup')
   }
 
   if (view === 'setup') {
@@ -132,13 +247,60 @@ export default function PlayTab({ onBack }: Props) {
     )
   }
 
+  if (view === 'tournament-trophy' && tournamentState) {
+    const champion = Array.from(tournamentState.standings.entries()).find(([, s]) => s.gamesWon >= 2)
+    const championName = champion
+      ? playerConfigs.find((_, i) => `p${i}` === champion[0])?.name ?? 'Champion'
+      : 'Champion'
+    const standings = playerConfigs.map((p, i) => {
+      const stats = tournamentState.standings.get(`p${i}`)
+      return {
+        name: p.name,
+        gamesWon: stats?.gamesWon ?? 0,
+        totalScore: stats?.totalScore ?? 0,
+        isChampion: champion ? `p${i}` === champion[0] : false,
+      }
+    })
+    return (
+      <TournamentTrophy
+        championName={championName}
+        standings={standings}
+        seriesLength={tournamentState.currentGameNumber}
+        onPlayAgain={handleTournamentPlayAgain}
+        onExit={handleExitTournament}
+      />
+    )
+  }
+
+  if (view === 'tournament-gameover' && tournamentState && lastGamePlayers.length > 0) {
+    return (
+      <GameOver
+        players={lastGamePlayers}
+        buyLimit={buyLimit}
+        buyLog={[]}
+        gameId={null}
+        onPlayAgain={handleNextTournamentGame}
+        onBack={handleExitTournament}
+        tournamentState={tournamentState}
+        onNextGame={handleNextTournamentGame}
+        onExitTournament={handleExitTournament}
+      />
+    )
+  }
+
   if (view === 'game') {
     return (
       <GameBoard
+        key={gameKey}
         initialPlayers={playerConfigs}
-        aiDifficulty={aiDifficulty}
+        aiPersonality={aiPersonality}
         buyLimit={buyLimit}
-        onExit={() => setView('landing')}
+        onExit={() => {
+          setTournamentState(null)
+          setView('landing')
+        }}
+        onGameComplete={tournamentState ? handleTournamentGameComplete : undefined}
+        tournamentGameNumber={tournamentState?.currentGameNumber}
       />
     )
   }

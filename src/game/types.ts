@@ -42,6 +42,157 @@ export interface Player {
 
 export type AIDifficulty = 'easy' | 'medium' | 'hard'
 
+export type AIPersonality =
+  | 'rookie-riley'
+  | 'steady-sam'
+  | 'lucky-lou'
+  | 'patient-pat'
+  | 'the-shark'
+  | 'the-mastermind'
+
+export interface PersonalityConfig {
+  id: AIPersonality
+  name: string
+  emoji: string
+  description: string
+  difficulty: number  // 1-5
+  takeStyle: 'basic' | 'medium' | 'selective' | 'aggressive-denial'
+  buyStyle: 'never' | 'conservative' | 'aggressive' | 'denial' | 'heavy-denial'
+  discardStyle: 'random' | 'highest-value' | 'run-aware' | 'opponent-aware'
+  goDownStyle: 'immediate' | 'immediate-random-hold' | 'strategic' | 'hold-for-out'
+  layOffStyle: 'never' | 'capped-1' | 'unlimited'
+  jokerSwapStyle: 'never' | 'random' | 'beneficial' | 'optimal'
+  denialEnabled: boolean
+  opponentAwareness: boolean
+  randomFactor: number
+  buySelfLimit: number
+  panicThreshold: number
+  denialOpponentCardThreshold: number
+}
+
+export const PERSONALITIES: PersonalityConfig[] = [
+  {
+    id: 'rookie-riley',
+    name: 'Rookie Riley',
+    emoji: '🐣',
+    description: 'Learning the ropes — plays it safe',
+    difficulty: 1,
+    takeStyle: 'basic',
+    buyStyle: 'never',
+    discardStyle: 'random',
+    goDownStyle: 'immediate',
+    layOffStyle: 'never',
+    jokerSwapStyle: 'never',
+    denialEnabled: false,
+    opponentAwareness: false,
+    randomFactor: 0,
+    buySelfLimit: 0,
+    panicThreshold: 10,
+    denialOpponentCardThreshold: 0,
+  },
+  {
+    id: 'steady-sam',
+    name: 'Steady Sam',
+    emoji: '🧢',
+    description: 'Reliable and predictable — no surprises',
+    difficulty: 2,
+    takeStyle: 'medium',
+    buyStyle: 'conservative',
+    discardStyle: 'highest-value',
+    goDownStyle: 'immediate',
+    layOffStyle: 'capped-1',
+    jokerSwapStyle: 'never',
+    denialEnabled: false,
+    opponentAwareness: false,
+    randomFactor: 0,
+    buySelfLimit: 2,
+    panicThreshold: 10,
+    denialOpponentCardThreshold: 0,
+  },
+  {
+    id: 'lucky-lou',
+    name: 'Lucky Lou',
+    emoji: '🎲',
+    description: 'Wild and unpredictable — chaos agent',
+    difficulty: 3,
+    takeStyle: 'medium',
+    buyStyle: 'aggressive',
+    discardStyle: 'highest-value',
+    goDownStyle: 'immediate-random-hold',
+    layOffStyle: 'unlimited',
+    jokerSwapStyle: 'random',
+    denialEnabled: false,
+    opponentAwareness: false,
+    randomFactor: 0.2,
+    buySelfLimit: 5,
+    panicThreshold: 8,
+    denialOpponentCardThreshold: 0,
+  },
+  {
+    id: 'patient-pat',
+    name: 'Patient Pat',
+    emoji: '🧘',
+    description: 'Waits for the perfect moment to strike',
+    difficulty: 4,
+    takeStyle: 'selective',
+    buyStyle: 'conservative',
+    discardStyle: 'run-aware',
+    goDownStyle: 'strategic',
+    layOffStyle: 'unlimited',
+    jokerSwapStyle: 'beneficial',
+    denialEnabled: false,
+    opponentAwareness: false,
+    randomFactor: 0,
+    buySelfLimit: 3,
+    panicThreshold: 8,
+    denialOpponentCardThreshold: 0,
+  },
+  {
+    id: 'the-shark',
+    name: 'The Shark',
+    emoji: '🦈',
+    description: 'Reads opponents and blocks their plays',
+    difficulty: 5,
+    takeStyle: 'aggressive-denial',
+    buyStyle: 'denial',
+    discardStyle: 'opponent-aware',
+    goDownStyle: 'strategic',
+    layOffStyle: 'unlimited',
+    jokerSwapStyle: 'optimal',
+    denialEnabled: true,
+    opponentAwareness: true,
+    randomFactor: 0,
+    buySelfLimit: 5,
+    panicThreshold: 7,
+    denialOpponentCardThreshold: 3,
+  },
+  {
+    id: 'the-mastermind',
+    name: 'The Mastermind',
+    emoji: '🧠',
+    description: 'Only goes down when going out — ruthless',
+    difficulty: 5,
+    takeStyle: 'aggressive-denial',
+    buyStyle: 'heavy-denial',
+    discardStyle: 'opponent-aware',
+    goDownStyle: 'hold-for-out',
+    layOffStyle: 'unlimited',
+    jokerSwapStyle: 'optimal',
+    denialEnabled: true,
+    opponentAwareness: true,
+    randomFactor: 0,
+    buySelfLimit: 5,
+    panicThreshold: 5,
+    denialOpponentCardThreshold: 4,
+  },
+]
+
+export function personalityToLegacyDifficulty(p: AIPersonality): AIDifficulty {
+  if (p === 'rookie-riley' || p === 'steady-sam') return 'easy'
+  if (p === 'lucky-lou' || p === 'patient-pat') return 'medium'
+  return 'hard'
+}
+
 export interface OpponentHistory {
   picked: Card[]     // cards this player took from the discard pile (free take or buy)
   discarded: Card[]  // cards this player discarded
@@ -50,6 +201,7 @@ export interface OpponentHistory {
 export interface PlayerConfig {
   name: string
   isAI: boolean
+  personality?: AIPersonality
 }
 
 export interface RoundRequirement {
@@ -78,6 +230,31 @@ export interface GameState {
   deckCount: number
   gameOver: boolean
   buyLimit: number      // configured at setup; default 5; 0 = buying disabled; resets buysRemaining each round
+}
+
+// ── Tournament types ─────────────────────────────────────────────────────────
+
+export interface TournamentState {
+  enabled: boolean
+  totalGames: 3
+  currentGameNumber: number  // 1, 2, or 3
+  gameResults: TournamentGameResult[]
+  standings: Map<string, TournamentPlayerStats>
+}
+
+export interface TournamentGameResult {
+  gameNumber: number
+  winnerId: string
+  winnerName: string
+  playerScores: { playerId: string; name: string; totalScore: number; rank: number }[]
+}
+
+export interface TournamentPlayerStats {
+  gamesWon: number
+  totalScore: number
+  roundsWon: number
+  avgScore: number
+  shanghaiCount: number
 }
 
 // ── Telemetry types ──────────────────────────────────────────────────────────

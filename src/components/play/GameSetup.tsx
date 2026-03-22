@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { ChevronLeft } from 'lucide-react'
 import { PLAYER_COLORS } from '../../lib/constants'
-import type { PlayerConfig, AIDifficulty } from '../../game/types'
+import type { PlayerConfig, AIPersonality } from '../../game/types'
+import { PERSONALITIES } from '../../game/types'
 
 interface Props {
-  onStart: (players: PlayerConfig[], difficulty: AIDifficulty, buyLimit: number) => void
+  onStart: (players: PlayerConfig[], personality: AIPersonality, buyLimit: number, tournamentMode: boolean) => void
   onBack: () => void
 }
 
@@ -15,7 +16,7 @@ const BUY_OPTIONS: { label: string; value: number }[] = [
   { label: '5', value: 5 },
   { label: '7', value: 7 },
   { label: '10', value: 10 },
-  { label: '∞', value: -1 },
+  { label: '\u221e', value: -1 },
 ]
 
 function deckCount(n: number) { return n <= 4 ? 2 : 3 }
@@ -56,7 +57,7 @@ function Step1({
         How many players?
       </h2>
 
-      {/* 2×4 preset grid */}
+      {/* 2x4 preset grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
         {[2, 3, 4, 5, 6, 7, 8].map(count => {
           const isOn = selected === count
@@ -117,7 +118,7 @@ function Step1({
         }}
       >
         {selected
-          ? `${selected} players · ${deckCount(selected)} decks · ${jokerCount(selected)} jokers`
+          ? `${selected} players \u00b7 ${deckCount(selected)} decks \u00b7 ${jokerCount(selected)} jokers`
           : 'Select a player count above'}
       </div>
     </div>
@@ -245,21 +246,29 @@ function Step2({
 function Step3({
   players,
   aiCount,
-  aiDifficulty,
-  onDifficultyChange,
+  selectedPersonality,
+  onPersonalityChange,
   buyLimit,
   onBuyLimitChange,
   decks,
+  tournamentMode,
+  onTournamentToggle,
 }: {
   players: PlayerConfig[]
   aiCount: number
-  aiDifficulty: AIDifficulty
-  onDifficultyChange: (d: AIDifficulty) => void
+  selectedPersonality: AIPersonality
+  onPersonalityChange: (p: AIPersonality) => void
   buyLimit: number
   onBuyLimitChange: (v: number) => void
   decks: number
+  tournamentMode: boolean
+  onTournamentToggle: () => void
 }) {
-  const buyLabel = buyLimit === 0 ? 'No buys' : buyLimit === -1 ? '∞ buys/round' : `${buyLimit} buys/round`
+  const buyLabel = buyLimit === 0 ? 'No buys' : buyLimit === -1 ? '\u221e buys/round' : `${buyLimit} buys/round`
+
+  function starRating(difficulty: number): string {
+    return '\u2605'.repeat(difficulty) + '\u2606'.repeat(5 - difficulty)
+  }
 
   return (
     <div>
@@ -268,7 +277,7 @@ function Step3({
         Game settings
       </h2>
 
-      {/* AI difficulty — only when at least 1 AI player */}
+      {/* AI personality picker — only when at least 1 AI player */}
       {aiCount > 0 && (
         <div
           style={{
@@ -280,36 +289,54 @@ function Step3({
           }}
         >
           <p style={{ color: '#e2b858', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
-            AI Difficulty
+            AI Opponent
           </p>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {(['easy', 'medium', 'hard'] as AIDifficulty[]).map(level => (
-              <button
-                key={level}
-                onClick={() => onDifficultyChange(level)}
-                style={{
-                  flex: 1, padding: '9px 4px',
-                  borderRadius: 8,
-                  border: `1px solid ${aiDifficulty === level ? '#e2b858' : '#2d5a3a'}`,
-                  background: aiDifficulty === level ? '#e2b858' : 'transparent',
-                  color: aiDifficulty === level ? '#2c1810' : '#6aad7a',
-                  fontSize: 13, fontWeight: 600,
-                  cursor: 'pointer',
-                  textTransform: 'capitalize',
-                  minHeight: 40,
-                }}
-              >
-                {level.charAt(0).toUpperCase() + level.slice(1)}
-              </button>
-            ))}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            {PERSONALITIES.map(p => {
+              const isSelected = selectedPersonality === p.id
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => onPersonalityChange(p.id)}
+                  style={{
+                    border: `2px solid ${isSelected ? '#e2b858' : '#2d5a3a'}`,
+                    background: isSelected ? 'rgba(226, 184, 88, 0.1)' : '#0f2218',
+                    borderRadius: 10,
+                    padding: '10px 10px 8px',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 2,
+                    transition: 'border-color 150ms, background 150ms',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 18, lineHeight: 1 }}>{p.emoji}</span>
+                    <span style={{
+                      fontSize: 12, fontWeight: 700,
+                      color: isSelected ? '#e2b858' : '#a8d0a8',
+                    }}>
+                      {p.name}
+                    </span>
+                  </div>
+                  <p style={{
+                    fontSize: 10, color: '#6aad7a', margin: '2px 0',
+                    lineHeight: 1.3,
+                  }}>
+                    {p.description}
+                  </p>
+                  <span style={{
+                    fontSize: 10,
+                    color: isSelected ? '#e2b858' : '#8b9e8b',
+                    letterSpacing: 1,
+                  }}>
+                    {starRating(p.difficulty)}
+                  </span>
+                </button>
+              )
+            })}
           </div>
-          <p style={{ color: '#8b9e8b', fontSize: 11, marginTop: 8, lineHeight: 1.4 }}>
-            {aiDifficulty === 'easy'
-              ? 'Random plays, never buys — good for learning the game flow'
-              : aiDifficulty === 'medium'
-                ? 'Strategic drawing, commits to runs — good for casual games'
-                : 'Smarter discards, aggressive buying — a real challenge'}
-          </p>
         </div>
       )}
 
@@ -349,6 +376,58 @@ function Step3({
         </div>
       </div>
 
+      {/* Tournament mode toggle */}
+      <div
+        style={{
+          border: `1px solid ${tournamentMode ? '#8b6914' : '#2d5a3a'}`,
+          background: tournamentMode ? '#1e3010' : '#0f2218',
+          borderRadius: 10,
+          padding: 14,
+          marginBottom: 14,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+          transition: 'border-color 150ms, background 150ms',
+        }}
+        onClick={onTournamentToggle}
+      >
+        <div>
+          <p style={{ color: tournamentMode ? '#e2b858' : '#a8d0a8', fontSize: 13, fontWeight: 600, margin: 0 }}>
+            Tournament Mode
+          </p>
+          <p style={{ color: '#6aad7a', fontSize: 11, margin: '3px 0 0' }}>
+            Best of 3 games — crown a champion
+          </p>
+        </div>
+        <div
+          style={{
+            width: 44,
+            height: 24,
+            borderRadius: 12,
+            background: tournamentMode ? '#e2b858' : '#2d5a3a',
+            position: 'relative',
+            flexShrink: 0,
+            marginLeft: 12,
+            transition: 'background 200ms ease',
+          }}
+        >
+          <div
+            style={{
+              width: 18,
+              height: 18,
+              borderRadius: '50%',
+              background: '#ffffff',
+              position: 'absolute',
+              top: 3,
+              left: tournamentMode ? 23 : 3,
+              transition: 'left 200ms ease',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+            }}
+          />
+        </div>
+      </div>
+
       {/* Game summary chips */}
       <div
         style={{
@@ -374,7 +453,7 @@ function Step3({
               }}
             >
               {p.name.trim() || `Player ${i + 1}`}
-              {p.isAI ? ' 🤖' : ''}
+              {p.isAI ? ' \ud83e\udd16' : ''}
             </span>
           ))}
           <span
@@ -413,8 +492,9 @@ export default function GameSetup({ onStart, onBack }: Props) {
     { name: '', isAI: false },
     { name: '', isAI: false },
   ])
-  const [aiDifficulty, setAiDifficulty] = useState<AIDifficulty>('medium')
+  const [selectedPersonality, setSelectedPersonality] = useState<AIPersonality>('steady-sam')
   const [buyLimit, setBuyLimit] = useState(5)
+  const [tournamentMode, setTournamentMode] = useState(false)
 
   function handleCountSelect(count: number) {
     setPlayerCount(count)
@@ -468,8 +548,9 @@ export default function GameSetup({ onStart, onBack }: Props) {
     if (!playerCount || !allNamed) return
     onStart(
       players.map(p => ({ name: p.name.trim(), isAI: p.isAI })),
-      aiDifficulty,
+      selectedPersonality,
       buyLimit,
+      tournamentMode,
     )
   }
 
@@ -517,11 +598,13 @@ export default function GameSetup({ onStart, onBack }: Props) {
           <Step3
             players={players}
             aiCount={aiCount}
-            aiDifficulty={aiDifficulty}
-            onDifficultyChange={setAiDifficulty}
+            selectedPersonality={selectedPersonality}
+            onPersonalityChange={setSelectedPersonality}
             buyLimit={buyLimit}
             onBuyLimitChange={setBuyLimit}
             decks={decks}
+            tournamentMode={tournamentMode}
+            onTournamentToggle={() => setTournamentMode(t => !t)}
           />
         )}
       </div>
@@ -552,7 +635,7 @@ export default function GameSetup({ onStart, onBack }: Props) {
               transition: 'background 150ms, color 150ms',
             }}
           >
-            Next →
+            Next \u2192
           </button>
         ) : (
           <button
@@ -569,7 +652,7 @@ export default function GameSetup({ onStart, onBack }: Props) {
               cursor: 'pointer',
             }}
           >
-            Deal the cards →
+            {tournamentMode ? 'Start Tournament \u2192' : 'Deal the cards \u2192'}
           </button>
         )}
       </div>

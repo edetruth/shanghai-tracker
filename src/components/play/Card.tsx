@@ -129,6 +129,7 @@ export default function Card({ card, selected, onClick, compact, disabled, joker
 
   return (
     <div
+      data-card-id={card.id}
       className={`relative flex flex-col items-start justify-between select-none flex-shrink-0 transition-all duration-100 p-0.5${isInteractive ? ' cursor-pointer active:opacity-70' : ' cursor-default'}`}
       style={cardStyle}
       onClick={isInteractive ? () => { haptic('tap'); onClick!() } : undefined}

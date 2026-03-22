@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { createPlayedGame, saveGameEvents, saveAIDecisions, backfillDecisionOutcomes, savePlayerRoundStats, savePlayerGameStats } from '../../lib/gameStore'
 import type { AIDecision, PlayerRoundStats, PlayerGameStats } from '../../game/types'
 import { Pause } from 'lucide-react'
-import type { GameState, Player, Card as CardType, Meld, PlayerConfig, AIDifficulty, OpponentHistory } from '../../game/types'
+import type { GameState, Player, Card as CardType, Meld, PlayerConfig, AIDifficulty, AIPersonality, PersonalityConfig, OpponentHistory } from '../../game/types'
+import { PERSONALITIES, personalityToLegacyDifficulty } from '../../game/types'
 import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, MAX_BUYS, cardPoints } from '../../game/rules'
 import { createDecks, shuffle, dealHands } from '../../game/deck'
 import { buildMeld, isValidSet, canLayOff, findSwappableJoker, getNextJokerOptions, isLegalDiscard, evaluateLayOffReversal } from '../../game/meld-validator'
@@ -31,8 +32,11 @@ import RoundAnnouncement, { type AnnouncementStage } from './RoundAnnouncement'
 interface Props {
   initialPlayers: PlayerConfig[]
   aiDifficulty?: AIDifficulty
+  aiPersonality?: AIPersonality
   buyLimit?: number
   onExit: () => void
+  onGameComplete?: (players: Player[]) => void
+  tournamentGameNumber?: number
 }
 
 type UIPhase =
@@ -177,7 +181,24 @@ function getAIDelay(speed: GameSpeed): number {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buyLimit = 5, onExit }: Props) {
+export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyProp = 'medium', aiPersonality, buyLimit = 5, onExit, onGameComplete, tournamentGameNumber }: Props) {
+  // Resolve personality config — if personality is set, use it; otherwise fall back to legacy difficulty
+  const personalityConfig: PersonalityConfig | null = aiPersonality
+    ? (PERSONALITIES.find(p => p.id === aiPersonality) ?? PERSONALITIES[0])
+    : null
+  const aiDifficulty: AIDifficulty = personalityConfig
+    ? personalityToLegacyDifficulty(personalityConfig.id)
+    : aiDifficultyProp
+
+  // Helper to get the active personality config (falls back to a config derived from legacy difficulty)
+  function getPersonalityConfig(): PersonalityConfig {
+    if (personalityConfig) return personalityConfig
+    // Map legacy difficulty to the closest personality
+    if (aiDifficultyProp === 'easy') return PERSONALITIES.find(p => p.id === 'rookie-riley')!
+    if (aiDifficultyProp === 'hard') return PERSONALITIES.find(p => p.id === 'the-shark')!
+    return PERSONALITIES.find(p => p.id === 'steady-sam')!
+  }
+
   const [gameState, setGameState] = useState<GameState>(() => initGame(initialPlayers, buyLimit))
   const [uiPhase, setUiPhase] = useState<UIPhase>('round-start')
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set())
@@ -242,6 +263,19 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     meldsLaidDown: number; bonusMelds: number; layOffs: number; jokerSwaps: number
     handSizeWentDown: number | null; scenarioB: number; scenarioC: number
   }>>(new Map())
+
+  // ── Flying card animation state ──────────────────────────────────────────
+  const [flyingCard, setFlyingCard] = useState<{
+    from: { x: number, y: number }
+    to: { x: number, y: number }
+    card?: CardType
+    faceDown: boolean
+  } | null>(null)
+  const [reduceAnimations, setReduceAnimations] = useState(false)
+  const drawPileRef = useRef<HTMLDivElement>(null)
+  const handAreaRef = useRef<HTMLDivElement>(null)
+  const discardPileRef = useRef<HTMLDivElement>(null)
+  const [justLaidOffCardIds, setJustLaidOffCardIds] = useState<Set<string>>(new Set())
 
   // ── Cinematic round announcement ──────────────────────────────────────────
   const [announcementStage, setAnnouncementStage] = useState<AnnouncementStage | null>(null)
@@ -369,7 +403,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
       round_number: state.currentRound,
       turn_number: turnNum,
       player_name: player.name,
-      difficulty: player.isAI ? aiDifficulty : null,
+      difficulty: player.isAI ? (aiPersonality ?? aiDifficulty) : null,
       is_human: !player.isAI,
       decision_type: decisionType,
       decision_result: decisionResult,
@@ -422,6 +456,66 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
   useEffect(() => { buyerStepRef.current = buyerStep }, [buyerStep])
   useEffect(() => { pendingBuyDiscardRef.current = pendingBuyDiscard }, [pendingBuyDiscard])
   useEffect(() => { freeOfferDeclinedRef.current = freeOfferDeclined }, [freeOfferDeclined])
+
+  // ── Flying card animation helpers ─────────────────────────────────────────
+  function getRefCenter(ref: React.RefObject<HTMLDivElement | null>): { x: number, y: number } | null {
+    if (!ref.current) return null
+    const rect = ref.current.getBoundingClientRect()
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+  }
+
+  function animateDrawFromPile(isAI: boolean) {
+    if (reduceAnimations) return
+    const from = getRefCenter(drawPileRef)
+    const to = getRefCenter(handAreaRef)
+    if (!from || !to) return
+    const duration = isAI ? 150 : 300
+    setFlyingCard({ from, to, faceDown: true })
+    setTimeout(() => setFlyingCard(null), duration)
+  }
+
+  function animateTakeDiscard(card: CardType, isAI: boolean) {
+    if (reduceAnimations) return
+    const from = getRefCenter(discardPileRef)
+    const to = getRefCenter(handAreaRef)
+    if (!from || !to) return
+    const duration = isAI ? 150 : 300
+    setFlyingCard({ from, to, card, faceDown: false })
+    setTimeout(() => setFlyingCard(null), duration)
+  }
+
+  function animateDiscard(card: CardType) {
+    if (reduceAnimations) return
+    // Try to find the card element by data-card-id for precise origin
+    const cardEl = document.querySelector(`[data-card-id="${card.id}"]`)
+    const from = cardEl
+      ? { x: cardEl.getBoundingClientRect().left + cardEl.getBoundingClientRect().width / 2,
+          y: cardEl.getBoundingClientRect().top + cardEl.getBoundingClientRect().height / 2 }
+      : getRefCenter(handAreaRef)
+    const to = getRefCenter(discardPileRef)
+    if (!from || !to) return
+    setFlyingCard({ from, to, card, faceDown: false })
+    setTimeout(() => setFlyingCard(null), 300)
+  }
+
+  function animateBuy(discardCard: CardType, isAI: boolean) {
+    if (reduceAnimations) return
+    const discardPos = getRefCenter(discardPileRef)
+    const handPos = getRefCenter(handAreaRef)
+    const drawPos = getRefCenter(drawPileRef)
+    if (!discardPos || !handPos) return
+    const duration = isAI ? 150 : 300
+    // First: discard card flies to hand
+    setFlyingCard({ from: discardPos, to: handPos, card: discardCard, faceDown: false })
+    setTimeout(() => {
+      setFlyingCard(null)
+      // Second: penalty card flies from draw pile to hand
+      if (drawPos) {
+        setFlyingCard({ from: drawPos, to: handPos, faceDown: true })
+        setTimeout(() => setFlyingCard(null), duration)
+      }
+    }, duration)
+  }
 
   // Solo human = only 1 human player (rest are AI). Skip privacy screen, show turn banner instead.
   const soloHuman = useMemo(() => initialPlayers.filter(p => !p.isAI).length <= 1, [initialPlayers])
@@ -677,6 +771,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
 
     if (drawnCard) {
       setNewCardIds(new Set([drawnCard.id]))
+      // Flying card animation: draw pile → hand
+      animateDrawFromPile(!!gameState.players[gameState.roundState.currentPlayerIndex]?.isAI)
       // Shimmer the drawn card briefly for the human drawing player
       if (!gameState.players[gameState.roundState.currentPlayerIndex]?.isAI) {
         setShimmerCardId(drawnCard.id)
@@ -735,8 +831,11 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     setPendingBuyDiscard(null) // clear pending buy — card is taken
     setNewCardIds(new Set([card.id]))
 
-    // Record for opponent awareness (Hard AI)
+    // Flying card animation: discard pile → hand
     const taker = gameState.players[gameState.roundState.currentPlayerIndex]
+    animateTakeDiscard(card, !!taker.isAI)
+
+    // Record for opponent awareness (Hard AI)
     recordOpponentEvent(taker.id, 'picked', card)
 
     // Telemetry: record free take or draw decision
@@ -1114,6 +1213,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     setSelectedCardIds(new Set())
     setLayOffError(null)
 
+    // Trigger card-join animation for the laid-off card
+    setJustLaidOffCardIds(new Set([card.id]))
+    setTimeout(() => setJustLaidOffCardIds(new Set()), 500)
+
     // Moment 2: going out via lay-off
     if (wentOut) {
       queueToast({ message: `${player.name} goes out!`, subtext: `Round ${prev.currentRound} complete`, style: 'drama', icon: '🎯', duration: 2500 })
@@ -1286,6 +1389,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
       roundState: { ...rs, discardPile },
     }
 
+    // Flying card animation: hand → discard pile
+    animateDiscard(card)
+
     setGameState(afterDiscard)
     setSelectedCardIds(new Set())
     haptic('heavy')
@@ -1374,6 +1480,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
       const penaltyCard = drawPile.shift()
       const newHand = [...buyer.hand, buyingDiscard, ...(penaltyCard ? [penaltyCard] : [])]
       const discardPile = gameState.roundState.discardPile.slice(0, -1)
+
+      // Flying card animation: buy (discard → hand, then penalty from draw pile → hand)
+      animateBuy(buyingDiscard, !!buyer.isAI)
+
       const players = gameState.players.map((p, i) =>
         i === buyerIdx ? { ...p, hand: newHand, buysRemaining: p.buysRemaining - 1 } : p
       )
@@ -1533,7 +1643,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
       round_number: roundNum,
       player_name: p.name,
       is_human: !p.isAI,
-      difficulty: p.isAI ? aiDifficulty : null,
+      difficulty: p.isAI ? (aiPersonality ?? aiDifficulty) : null,
       round_score: result?.score ?? handPoints,
       went_out: result?.score === 0,
       went_down: p.hasLaidDown,
@@ -1584,7 +1694,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
         game_id: gId,
         player_name: p.name,
         is_human: !p.isAI,
-        difficulty: p.isAI ? aiDifficulty : null,
+        difficulty: p.isAI ? (aiPersonality ?? aiDifficulty) : null,
         total_score: total,
         final_rank: rank + 1,
         won: total === winnerTotal && rank === 0,
@@ -1621,6 +1731,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
       setUiPhase('game-over')
       // Telemetry: save game-level stats
       if (gameId) computeAndSaveGameStats(gameId, gameState.players)
+      // Tournament callback — let PlayTab handle the game-over flow
+      if (onGameComplete) onGameComplete(gameState.players)
     } else {
       const next = setupRound(gameState, nextRound)
       setGameState(next)
@@ -1636,8 +1748,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     const state = gameStateRef.current
     const player = getCurrentPlayer(state)
     const { tablesMelds, requirement } = state.roundState
-    const isHard = aiDifficulty === 'hard'
-    const isEasy = aiDifficulty === 'easy'
+    const config = getPersonalityConfig()
 
     // Track turns elapsed for panic mode
     const turnsElapsed = (aiTurnsElapsedRef.current.get(player.id) ?? 0) + 1
@@ -1648,12 +1759,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
       const positions = new Map<string, number>()
       for (const cards of meldGroups) {
         if (isValidSet(cards)) continue
-        // Iteratively resolve ambiguous jokers, always picking the low-end option
         let placed = new Map<string, number>()
         for (;;) {
           const placement = getNextJokerOptions(cards, placed)
           if (!placement) break
-          // options[0] is low-end, options[1] is high-end — pick low end
           const choice = placement.options[0]
           placed.set(placement.joker.id, choice.rank)
         }
@@ -1662,8 +1771,62 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
       return positions
     }
 
-    // Easy AI: lay down required melds, 1 lay-off per turn (jokers exempt), then discard
-    if (isEasy) {
+    // ── Go-down decision helper (personality-aware) ──
+    function shouldGoDownNow(melds: CardType[][]): boolean {
+      const style = config.goDownStyle
+      if (style === 'immediate') return true
+
+      if (style === 'immediate-random-hold') {
+        // Lucky Lou: 25% chance to hold one extra turn
+        if (config.randomFactor > 0 && Math.random() < 0.25) {
+          const turnsWaited = aiTurnsCouldGoDownRef.current.get(player.id) ?? 0
+          if (turnsWaited === 0) {
+            aiTurnsCouldGoDownRef.current.set(player.id, 1)
+            turnsHeldRef.current.set(player.id, (turnsHeldRef.current.get(player.id) ?? 0) + 1)
+            recordDecision(player, 'go_down', 'held', null, 'random hold')
+            return false
+          }
+        }
+        return true
+      }
+
+      if (style === 'hold-for-out') {
+        // The Mastermind: only go down if going out OR panic
+        const totalMeldCards = melds.reduce((sum, m) => sum + m.length, 0)
+        const remainingCards = player.hand.length - totalMeldCards
+        if (remainingCards === 0) return true // going out!
+        // Check panic threshold
+        if (turnsElapsed >= config.panicThreshold) return true
+        // Check opponent pressure
+        const someoneClose = state.players.some(p => p.id !== player.id && p.hand.length <= 3 && p.hasLaidDown)
+        if (someoneClose) return true
+        aiTurnsCouldGoDownRef.current.set(player.id, (aiTurnsCouldGoDownRef.current.get(player.id) ?? 0) + 1)
+        turnsHeldRef.current.set(player.id, (turnsHeldRef.current.get(player.id) ?? 0) + 1)
+        recordDecision(player, 'go_down', 'held', null, 'hold-for-out')
+        return false
+      }
+
+      // 'strategic' — use existing hard AI logic
+      const turnsWaited = aiTurnsCouldGoDownRef.current.get(player.id) ?? 0
+      const shouldGoDown = aiShouldGoDownHard(
+        player.hand, melds, requirement, tablesMelds,
+        state.players, state.roundState.currentPlayerIndex, turnsWaited,
+      )
+      if (!shouldGoDown) {
+        aiTurnsCouldGoDownRef.current.set(player.id, turnsWaited + 1)
+        turnsHeldRef.current.set(player.id, (turnsHeldRef.current.get(player.id) ?? 0) + 1)
+        recordDecision(player, 'go_down', 'held', null, 'strategic hold')
+      }
+      return shouldGoDown
+    }
+
+    // Lay-off style: never / capped-1 / unlimited
+    const layOffCap = config.layOffStyle === 'never' ? 0
+      : config.layOffStyle === 'capped-1' ? 1
+      : Infinity
+
+    // ── Basic/Easy personality: lay down required melds only, simple discard ──
+    if (config.discardStyle === 'random' && config.layOffStyle === 'never') {
       if (!player.hasLaidDown) {
         const melds = aiFindBestMelds(player.hand, requirement)
         if (melds && melds.length > 0) {
@@ -1674,7 +1837,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
           return
         }
       }
-      // Easy: never lays off (GDD Section 11) — discard a random isolated card
       aiLayOffCountRef.current = 0
       const card = aiChooseDiscardEasy(player.hand)
       setAiMessage(`${player.name} discards`)
@@ -1683,77 +1845,66 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
       return
     }
 
-    // Medium/Hard: try pre-lay-down joker swap if it unlocks laying down
-    if (!player.hasLaidDown && tablesMelds.length > 0) {
+    // ── Pre-lay-down joker swap (medium+ personalities) ──
+    if (config.jokerSwapStyle !== 'never' && !player.hasLaidDown && tablesMelds.length > 0) {
       const swap = aiFindPreLayDownJokerSwap(player.hand, tablesMelds, requirement)
       if (swap) {
-        setAiMessage(`${player.name} swaps a joker to lay down`)
-        setTimeout(() => setAiMessage(null), 1500)
-        handleJokerSwap(swap.card, swap.meld)
-        setAiActionTick(t => t + 1) // re-trigger AI so it can now meld
-        return
+        // Random personality: 50% chance to skip the swap
+        if (config.jokerSwapStyle === 'random' && Math.random() < 0.5) {
+          // skip
+        } else {
+          setAiMessage(`${player.name} swaps a joker to lay down`)
+          setTimeout(() => setAiMessage(null), 1500)
+          handleJokerSwap(swap.card, swap.meld)
+          setAiActionTick(t => t + 1)
+          return
+        }
       }
     }
 
-    // Medium/Hard: try to lay down including bonus melds
+    // ── Try to lay down including bonus melds ──
     if (!player.hasLaidDown) {
       const melds = aiFindAllMelds(player.hand, requirement)
       if (melds && melds.length > 0) {
-        // Hard AI: evaluate whether to go down now or wait for a better hand
-        if (isHard) {
-          const turnsWaited = aiTurnsCouldGoDownRef.current.get(player.id) ?? 0
-          const shouldGoDown = aiShouldGoDownHard(
-            player.hand, melds, requirement, tablesMelds,
-            state.players, state.roundState.currentPlayerIndex, turnsWaited,
-          )
-          if (!shouldGoDown) {
-            aiTurnsCouldGoDownRef.current.set(player.id, turnsWaited + 1)
-            turnsHeldRef.current.set(player.id, (turnsHeldRef.current.get(player.id) ?? 0) + 1)
-            recordDecision(player, 'go_down', 'held', null, 'strategic hold')
-            setAiMessage(`${player.name} holds...`)
-            setTimeout(() => setAiMessage(null), 1000)
-            // Fall through to discard instead of melding
-          } else {
-            aiTurnsCouldGoDownRef.current.delete(player.id)
-            aiLayOffCountRef.current = 0
-            noProgressTurnsRef.current = 0
-            setAiMessage(`${player.name} lays down!`)
-            setTimeout(() => setAiMessage(null), 1500)
-            handleMeldConfirm(melds, aiJokerPositions(melds))
-            return
-          }
-        } else {
-          // Medium: always go down immediately
+        if (shouldGoDownNow(melds)) {
+          aiTurnsCouldGoDownRef.current.delete(player.id)
           aiLayOffCountRef.current = 0
           noProgressTurnsRef.current = 0
           setAiMessage(`${player.name} lays down!`)
           setTimeout(() => setAiMessage(null), 1500)
           handleMeldConfirm(melds, aiJokerPositions(melds))
           return
+        } else {
+          setAiMessage(`${player.name} holds...`)
+          setTimeout(() => setAiMessage(null), 1000)
+          // Fall through to discard
         }
       }
     }
 
-    // Hard only: try joker swap to reclaim a joker
-    if (isHard && player.hasLaidDown && tablesMelds.length > 0) {
+    // ── Joker swap after laying down (beneficial/optimal/random personalities) ──
+    if (config.jokerSwapStyle !== 'never' && player.hasLaidDown && tablesMelds.length > 0) {
       const swap = aiFindJokerSwap(player.hand, tablesMelds)
       if (swap) {
-        setAiMessage(`${player.name} swaps a joker`)
-        setTimeout(() => setAiMessage(null), 1200)
-        handleJokerSwap(swap.card, swap.meld)
-        setAiActionTick(t => t + 1)
-        return
+        if (config.jokerSwapStyle === 'random' && Math.random() < 0.5) {
+          // skip
+        } else {
+          setAiMessage(`${player.name} swaps a joker`)
+          setTimeout(() => setAiMessage(null), 1200)
+          handleJokerSwap(swap.card, swap.meld)
+          setAiActionTick(t => t + 1)
+          return
+        }
       }
     }
 
-    // Try to lay off (Easy: max 1/turn; Medium: max 2/turn; Hard: unlimited; jokers always exempt)
-    const layOffCap = isHard ? Infinity : isEasy ? 1 : 2
+    // ── Try to lay off ──
     const hasJokerInHand = player.hand.some(c => c.suit === 'joker')
-    if (player.hasLaidDown && tablesMelds.length > 0 &&
+    if (layOffCap > 0 && player.hasLaidDown && tablesMelds.length > 0 &&
         (aiLayOffCountRef.current < layOffCap || player.hand.length === 1 || hasJokerInHand)) {
       const layOff = aiFindLayOff(player.hand, tablesMelds)
       if (layOff) {
-        if (layOff.card.suit !== 'joker') aiLayOffCountRef.current++  // jokers don't count toward cap
+        if (layOff.card.suit !== 'joker') aiLayOffCountRef.current++
         setAiMessage(`${player.name} lays off`)
         setTimeout(() => setAiMessage(null), 1000)
         handleLayOff(layOff.card, layOff.meld, layOff.jokerPosition)
@@ -1761,22 +1912,31 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
       }
     }
 
-    // Discard
+    // ── Discard ──
     if (player.hand.length > 0) {
       aiLayOffCountRef.current = 0
 
-      // Panic mode: stuck for 8+ turns without laying down — dump highest-point card to minimize damage
+      // Panic mode: stuck too long without laying down
       let card: CardType
-      if (!player.hasLaidDown && turnsElapsed >= 8) {
+      if (!player.hasLaidDown && turnsElapsed >= config.panicThreshold) {
         const nonJokers = player.hand.filter(c => c.suit !== 'joker')
         const pool = nonJokers.length > 0 ? nonJokers : player.hand
         card = pool.reduce((worst, c) => cardPoints(c.rank) > cardPoints(worst.rank) ? c : worst)
         setAiMessage(`${player.name} dumps a card`)
+      } else if (config.discardStyle === 'opponent-aware') {
+        card = aiChooseDiscardHard(player.hand, tablesMelds, opponentHistoryRef.current,
+            state.players.filter(p => p.id !== player.id), requirement)
+        setAiMessage(`${player.name} discards`)
+      } else if (config.discardStyle === 'run-aware' || config.discardStyle === 'highest-value') {
+        card = aiChooseDiscard(player.hand, requirement, tablesMelds)
+        // Lucky Lou: 15% chance to pick a random card instead
+        if (config.randomFactor > 0 && Math.random() < 0.15 && player.hand.length > 1) {
+          const randomIdx = Math.floor(Math.random() * player.hand.length)
+          card = player.hand[randomIdx]
+        }
+        setAiMessage(`${player.name} discards`)
       } else {
-        card = isHard
-          ? aiChooseDiscardHard(player.hand, tablesMelds, opponentHistoryRef.current,
-              state.players.filter(p => p.id !== player.id), requirement)
-          : aiChooseDiscard(player.hand, requirement, tablesMelds)
+        card = aiChooseDiscardEasy(player.hand)
         setAiMessage(`${player.name} discards`)
       }
       console.log(`[Buy] AI ${player.name} discarded [${card.rank === 0 ? 'Joker' : `${card.rank}${card.suit}`}]`)
@@ -1798,16 +1958,26 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
         const player = getCurrentPlayer(state)
         const top = state.roundState.discardPile[state.roundState.discardPile.length - 1] ?? null
 
-        const isEasy = aiDifficulty === 'easy'
-        const isHard = aiDifficulty === 'hard'
-        const shouldTake = top !== null && (
-          isEasy
-            ? aiShouldTakeDiscardEasy(player.hand, top, state.roundState.requirement)
-            : isHard
-              ? aiShouldTakeDiscardHard(player.hand, top, state.roundState.requirement, player.hasLaidDown,
-                  state.roundState.tablesMelds, state.players.filter(p => p.id !== player.id))
-              : aiShouldTakeDiscard(player.hand, top, state.roundState.requirement, player.hasLaidDown, aiDifficulty, state.roundState.tablesMelds)
-        )
+        const cfg = getPersonalityConfig()
+        let shouldTake = false
+        if (top !== null) {
+          if (cfg.takeStyle === 'basic') {
+            shouldTake = aiShouldTakeDiscardEasy(player.hand, top, state.roundState.requirement)
+          } else if (cfg.takeStyle === 'aggressive-denial') {
+            shouldTake = aiShouldTakeDiscardHard(player.hand, top, state.roundState.requirement, player.hasLaidDown,
+                state.roundState.tablesMelds, state.players.filter(p => p.id !== player.id))
+          } else if (cfg.takeStyle === 'selective') {
+            // Selective: use medium logic but with stricter criteria
+            shouldTake = aiShouldTakeDiscard(player.hand, top, state.roundState.requirement, player.hasLaidDown, 'hard', state.roundState.tablesMelds)
+          } else {
+            shouldTake = aiShouldTakeDiscard(player.hand, top, state.roundState.requirement, player.hasLaidDown, aiDifficulty, state.roundState.tablesMelds)
+          }
+          // Lucky Lou random factor: 20% chance to take any discard, 10% chance to decline a good one
+          if (cfg.randomFactor > 0) {
+            if (!shouldTake && Math.random() < 0.2) shouldTake = true
+            else if (shouldTake && Math.random() < 0.1) shouldTake = false
+          }
+        }
 
         setAiMessage(shouldTake
           ? `${player.name} takes the discard`
@@ -1842,13 +2012,29 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
         handleBuyDecision(false)
         return
       }
-      const isEasy = aiDifficulty === 'easy'
-      const shouldBuy = isEasy
-        ? aiShouldBuyEasy(currentBuyer.hand, disc, req, currentBuyer.buysRemaining)
-        : aiDifficulty === 'hard'
-          ? aiShouldBuyHard(currentBuyer.hand, disc, req, currentBuyer.buysRemaining,
+      const buyConfig = getPersonalityConfig()
+      // Enforce personality buy self limit
+      const personalityBuysUsed = (state.buyLimit >= 999 ? 999 : state.buyLimit) - currentBuyer.buysRemaining
+      const atPersonalityLimit = buyConfig.buySelfLimit > 0 && personalityBuysUsed >= buyConfig.buySelfLimit
+
+      let shouldBuy = false
+      if (atPersonalityLimit || buyConfig.buyStyle === 'never') {
+        shouldBuy = false
+      } else if (buyConfig.buyStyle === 'denial' || buyConfig.buyStyle === 'heavy-denial') {
+        shouldBuy = aiShouldBuyHard(currentBuyer.hand, disc, req, currentBuyer.buysRemaining,
+            state.roundState.tablesMelds, state.players.filter(p => p.id !== currentBuyer.id))
+      } else if (buyConfig.buyStyle === 'conservative') {
+        shouldBuy = aiShouldBuy(currentBuyer.hand, disc, req, currentBuyer.buysRemaining, state.buyLimit)
+      } else if (buyConfig.buyStyle === 'aggressive') {
+        // Aggressive: use medium logic but always buy if it fits a meld
+        shouldBuy = aiShouldBuy(currentBuyer.hand, disc, req, currentBuyer.buysRemaining, state.buyLimit)
+        if (!shouldBuy) {
+          shouldBuy = aiShouldBuyHard(currentBuyer.hand, disc, req, currentBuyer.buysRemaining,
               state.roundState.tablesMelds, state.players.filter(p => p.id !== currentBuyer.id))
-          : aiShouldBuy(currentBuyer.hand, disc, req, currentBuyer.buysRemaining, state.buyLimit)
+        }
+      } else {
+        shouldBuy = aiShouldBuyEasy(currentBuyer.hand, disc, req, currentBuyer.buysRemaining)
+      }
 
       if (shouldBuy) setAiMessage(`${currentBuyer.name} buys!`)
       else setAiMessage(`${currentBuyer.name} passes`)
@@ -1938,6 +2124,14 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
   }
 
   if (uiPhase === 'game-over') {
+    // Tournament mode — PlayTab handles game-over rendering
+    if (onGameComplete) {
+      return (
+        <div style={{ minHeight: '100dvh', background: '#1a3a2a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <p style={{ color: '#6aad7a', fontSize: 14 }}>Loading results...</p>
+        </div>
+      )
+    }
     return (
       <GameOver
         players={gameState.players}
@@ -1946,6 +2140,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
         gameId={gameId}
         onPlayAgain={startNewGame}
         onBack={onExit}
+        aiPersonality={aiPersonality}
       />
     )
   }
@@ -2215,6 +2410,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
           selectedCard={inlineSelectedCard}
           onLayOff={handleInlineLayOff}
           onJokerSwap={handleJokerSwap}
+          justLaidOffCardIds={justLaidOffCardIds}
         />
         </div>
       </div>
@@ -2236,7 +2432,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
           }}
         >
           {/* Draw pile */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+          <div ref={drawPileRef} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
             <p style={{
               color: isHumanDraw ? '#ffffff' : '#6aad7a',
               fontSize: isHumanDraw ? 10 : 9,
@@ -2273,7 +2469,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
           </div>
 
           {/* Discard pile */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+          <div ref={discardPileRef} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
             <p style={{
               color: isHumanDraw ? '#e2b858' : isHumanBuyerTurn ? '#e2b858' : '#6aad7a',
               fontSize: isHumanDraw ? 10 : 9,
@@ -2352,6 +2548,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
         </div>
 
         {/* Player hand — sort toggle + fan layout */}
+        <div ref={handAreaRef}>
         {!displayPlayer.isAI ? (
           <HandDisplay
             cards={displayPlayer.hand}
@@ -2376,6 +2573,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
             onSortChange={setHandSort}
           />
         ) : null}
+        </div>
 
         {/* Status slot — stable height, content fades */}
         <div style={{ minHeight: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -2737,7 +2935,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
           <div className="w-full bg-[#0f2218] border-t border-[#2d5a3c] rounded-t-2xl px-4 pt-5 pb-10">
             <h2 className="text-lg font-bold text-white text-center mb-1">Game Paused</h2>
             <p className="text-sm text-[#6aad7a] text-center mb-4">
-              Round {gameState.currentRound} of {TOTAL_ROUNDS} · {currentPlayer.name}'s turn
+              {tournamentGameNumber ? `Game ${tournamentGameNumber} of 3 · ` : ''}Round {gameState.currentRound} of {TOTAL_ROUNDS} · {currentPlayer.name}'s turn
             </p>
             <p className="text-xs text-[#6aad7a] text-center mb-2">AI Speed</p>
             <div className="bg-[#1e4a2e] rounded-xl p-1 flex gap-1 mb-4">
@@ -2753,6 +2951,22 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
                 </button>
               ))}
             </div>
+            {/* Reduce animations toggle */}
+            <button
+              onClick={() => setReduceAnimations(prev => !prev)}
+              className="w-full flex items-center justify-between bg-[#1e4a2e] rounded-xl px-4 py-3 mb-4"
+            >
+              <span className="text-sm text-[#a8d0a8]">Reduce animations</span>
+              <div
+                className="w-10 h-6 rounded-full transition-colors flex items-center px-0.5"
+                style={{ backgroundColor: reduceAnimations ? '#e2b858' : '#2d5a3a' }}
+              >
+                <div
+                  className="w-5 h-5 rounded-full bg-white transition-transform"
+                  style={{ transform: reduceAnimations ? 'translateX(16px)' : 'translateX(0)' }}
+                />
+              </div>
+            </button>
             <div className="space-y-2">
               <button
                 onClick={() => setShowPauseModal(false)}
@@ -2760,18 +2974,58 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
               >
                 Resume Game
               </button>
-              <button
-                onClick={() => {
-                  setShowPauseModal(false)
-                  if (pendingUndo) clearTimeout(pendingUndo.timerId)
-                  onExit()
-                }}
-                className="w-full rounded-xl py-3 text-sm font-semibold text-[#f87171] bg-[#1e4a2e] active:opacity-80"
-              >
-                Abandon Game
-              </button>
+              {tournamentGameNumber ? (
+                <button
+                  onClick={() => {
+                    setShowPauseModal(false)
+                    if (pendingUndo) clearTimeout(pendingUndo.timerId)
+                    onExit()
+                  }}
+                  className="w-full rounded-xl py-3 text-sm font-semibold text-[#f87171] bg-[#1e4a2e] active:opacity-80"
+                >
+                  Exit Tournament
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    setShowPauseModal(false)
+                    if (pendingUndo) clearTimeout(pendingUndo.timerId)
+                    onExit()
+                  }}
+                  className="w-full rounded-xl py-3 text-sm font-semibold text-[#f87171] bg-[#1e4a2e] active:opacity-80"
+                >
+                  Abandon Game
+                </button>
+              )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Flying card animation overlay */}
+      {flyingCard && (
+        <div
+          className="fixed z-[100] pointer-events-none"
+          style={{
+            left: flyingCard.from.x - 24,
+            top: flyingCard.from.y,
+            width: 48,
+            height: 68,
+            willChange: 'transform',
+            animation: `fly-card ${currentPlayer.isAI ? 150 : 300}ms ease-out forwards`,
+            '--fly-to-x': `${flyingCard.to.x - flyingCard.from.x}px`,
+            '--fly-to-y': `${flyingCard.to.y - flyingCard.from.y}px`,
+          } as React.CSSProperties}
+        >
+          {flyingCard.faceDown ? (
+            <div className="w-full h-full rounded-lg bg-[#2d5a3c] border-2 border-[#e2b858]" />
+          ) : flyingCard.card ? (
+            <div className="w-full h-full rounded-lg overflow-hidden" style={{ backgroundColor: '#fff', border: '1.5px solid #e2ddd2' }}>
+              <div className="text-center pt-1 text-xs font-bold" style={{ color: flyingCard.card.suit === 'hearts' || flyingCard.card.suit === 'diamonds' ? '#c0393b' : '#2c1810' }}>
+                {flyingCard.card.rank === 0 ? 'JKR' : flyingCard.card.rank === 1 ? 'A' : flyingCard.card.rank === 11 ? 'J' : flyingCard.card.rank === 12 ? 'Q' : flyingCard.card.rank === 13 ? 'K' : flyingCard.card.rank}
+              </div>
+            </div>
+          ) : null}
         </div>
       )}
     </div>

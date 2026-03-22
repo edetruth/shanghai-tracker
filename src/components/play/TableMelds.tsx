@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import type { Card, Meld } from '../../game/types'
 import { canLayOff, findSwappableJoker } from '../../game/meld-validator'
 
@@ -9,6 +9,7 @@ interface Props {
   selectedCard?: Card | null
   onLayOff?: (card: Card, meld: Meld) => void
   onJokerSwap?: (naturalCard: Card, meld: Meld) => void
+  justLaidOffCardIds?: Set<string>
 }
 
 // ── Card overlap helper ───────────────────────────────────────────────────────
@@ -196,7 +197,21 @@ export default function TableMelds({
   selectedCard = null,
   onLayOff,
   onJokerSwap,
+  justLaidOffCardIds,
 }: Props) {
+  // ── Meld appear animation tracking ──────────────────────────────────────
+  const prevMeldIdsRef = useRef<Set<string>>(new Set())
+  const [animatingMeldIds, setAnimatingMeldIds] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    const currentIds = new Set(melds.map(m => m.id))
+    const newIds = [...currentIds].filter(id => !prevMeldIdsRef.current.has(id))
+    if (newIds.length > 0) {
+      setAnimatingMeldIds(new Set(newIds))
+      setTimeout(() => setAnimatingMeldIds(new Set()), 600)
+    }
+    prevMeldIdsRef.current = currentIds
+  }, [melds])
   const isLayOffMode = selectedCard !== null
 
   // Compute valid lay-off targets and joker swap targets
@@ -316,6 +331,7 @@ export default function TableMelds({
                     <div
                       key={meld.id}
                       data-meld-id={meld.id}
+                      className={animatingMeldIds.has(meld.id) ? 'animate-meld-appear' : ''}
                       onClick={isInteractive ? handleTap : undefined}
                       style={{
                         backgroundColor: '#1e4a2e',
@@ -336,7 +352,9 @@ export default function TableMelds({
                           ? 'tmPulse 1.4s ease-in-out infinite'
                           : isSwapValid
                             ? 'tmSwapPulse 1.4s ease-in-out infinite'
-                            : 'none',
+                            : animatingMeldIds.has(meld.id)
+                              ? 'meld-appear 400ms ease-out both'
+                              : 'none',
                       }}
                     >
                       {/* Tap hint label */}
@@ -356,6 +374,7 @@ export default function TableMelds({
                         {displayCards.map((card, i) => (
                           <div
                             key={card.id}
+                            className={justLaidOffCardIds?.has(card.id) ? 'animate-card-join' : ''}
                             style={{
                               marginLeft: i === 0 ? 0 : 3 - getMeldCardOverlap(displayCards.length),
                               zIndex: i,

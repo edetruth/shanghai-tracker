@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { CheckCircle, AlertCircle, Loader } from 'lucide-react'
-import type { Player } from '../../game/types'
+import type { Player, TournamentState, AIPersonality } from '../../game/types'
+import { PERSONALITIES } from '../../game/types'
 import { completePlayedGame, saveGameEvents, type GameEvent } from '../../lib/gameStore'
 import { PLAYER_COLORS } from '../../lib/constants'
 
@@ -11,6 +12,10 @@ interface Props {
   gameId: string | null
   onPlayAgain: () => void
   onBack: () => void
+  tournamentState?: TournamentState | null
+  onNextGame?: () => void
+  onExitTournament?: () => void
+  aiPersonality?: AIPersonality
 }
 
 // ── Confetti (spec §8.1) ─────────────────────────────────────────────────────
@@ -154,7 +159,8 @@ function Avatar({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId, onPlayAgain, onBack }: Props) {
+export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId, onPlayAgain, onBack, tournamentState, onNextGame, onExitTournament, aiPersonality }: Props) {
+  const personalityInfo = aiPersonality ? PERSONALITIES.find(p => p.id === aiPersonality) : null
   const [saveStatus, setSaveStatus] = useState<'saving' | 'saved' | 'error'>('saving')
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -220,7 +226,9 @@ export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId,
             fontSize: 10, color: '#6aad7a',
             letterSpacing: 2, textTransform: 'uppercase', margin: 0,
           }}>
-            Game over
+            {tournamentState
+              ? `Game ${tournamentState.currentGameNumber} of ${tournamentState.totalGames} — Tournament`
+              : 'Game over'}
           </p>
 
           {/* Trophy icon */}
@@ -343,9 +351,14 @@ export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId,
                         padding: '6px 5px',
                         color: isWinnerRow ? '#e2b858' : '#a8d0a8',
                         fontWeight: isWinnerRow ? 600 : 400,
-                        maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       }}>
                         {player.name}
+                        {player.isAI && personalityInfo && (
+                          <span style={{ fontSize: 9, marginLeft: 3, opacity: 0.7 }}>
+                            {personalityInfo.emoji}
+                          </span>
+                        )}
                       </td>
 
                       {/* R1–R7 */}
@@ -392,6 +405,84 @@ export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId,
         </div>
       </div>
 
+      {/* ── Tournament standings section ─────────────────────────────────── */}
+      {tournamentState && (() => {
+        const standingsArr = players.map((p) => {
+          const stats = tournamentState.standings.get(p.id)
+          return {
+            id: p.id,
+            name: p.name,
+            gamesWon: stats?.gamesWon ?? 0,
+            totalScore: stats?.totalScore ?? 0,
+          }
+        }).sort((a, b) => {
+          if (b.gamesWon !== a.gamesWon) return b.gamesWon - a.gamesWon
+          return a.totalScore - b.totalScore
+        })
+        const maxWins = standingsArr[0]?.gamesWon ?? 0
+        const hasClinched = maxWins >= 2
+
+        return (
+          <div style={{ padding: '0 12px 16px' }}>
+            <p style={{
+              fontSize: 10, color: '#e2b858',
+              letterSpacing: 1, textTransform: 'uppercase',
+              margin: '0 0 8px', fontWeight: 600,
+            }}>
+              Tournament Standings
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {standingsArr.map((s, idx) => {
+                const isLeader = s.gamesWon === maxWins && maxWins > 0
+                return (
+                  <div
+                    key={s.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: '10px 12px',
+                      background: '#0f2218',
+                      border: isLeader ? '1px solid #e2b858' : '1px solid #2d5a3a',
+                      borderRadius: 8,
+                    }}
+                  >
+                    <span style={{ fontSize: 12, color: '#6aad7a', width: 18, textAlign: 'center' }}>
+                      {idx + 1}
+                    </span>
+                    <span style={{
+                      flex: 1, fontSize: 13,
+                      color: isLeader ? '#e2b858' : '#a8d0a8',
+                      fontWeight: isLeader ? 700 : 500,
+                    }}>
+                      {s.name} {isLeader && '\u{1F451}'}
+                    </span>
+                    <span style={{
+                      fontSize: 14, fontWeight: 700,
+                      color: isLeader ? '#e2b858' : '#a8d0a8',
+                      minWidth: 24, textAlign: 'center',
+                    }}>
+                      {s.gamesWon}
+                    </span>
+                    <span style={{ fontSize: 9, color: '#6aad7a', minWidth: 26 }}>
+                      wins
+                    </span>
+                    <span style={{ fontSize: 12, color: '#6aad7a' }}>
+                      {s.totalScore} pts
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+            {hasClinched && (
+              <p style={{ fontSize: 11, color: '#e2b858', textAlign: 'center', marginTop: 10 }}>
+                Tournament clinched!
+              </p>
+            )}
+          </div>
+        )
+      })()}
+
       {/* ── Action buttons (spec §8.1) ────────────────────────────────────── */}
       <div
         style={{
@@ -402,36 +493,98 @@ export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId,
           borderTop: '1px solid #2d5a3a',
         }}
       >
-        <button
-          onClick={onBack}
-          style={{
-            flex: 1,
-            background: 'transparent',
-            border: '1.5px solid #6aad7a',
-            color: '#6aad7a',
-            borderRadius: 10,
-            padding: '12px 0',
-            fontSize: 14, fontWeight: 600,
-            cursor: 'pointer', minHeight: 44,
-          }}
-        >
-          New game
-        </button>
-        <button
-          onClick={onPlayAgain}
-          style={{
-            flex: 1,
-            background: '#e2b858',
-            color: '#2c1810',
-            border: 'none',
-            borderRadius: 10,
-            padding: '12px 0',
-            fontSize: 14, fontWeight: 700,
-            cursor: 'pointer', minHeight: 44,
-          }}
-        >
-          Play again
-        </button>
+        {tournamentState ? (
+          <>
+            <button
+              onClick={onExitTournament ?? onBack}
+              style={{
+                flex: 1,
+                background: 'transparent',
+                border: '1.5px solid #6aad7a',
+                color: '#6aad7a',
+                borderRadius: 10,
+                padding: '12px 0',
+                fontSize: 14, fontWeight: 600,
+                cursor: 'pointer', minHeight: 44,
+              }}
+            >
+              Exit Tournament
+            </button>
+            {(() => {
+              const maxWins = Math.max(...Array.from(tournamentState.standings.values()).map(s => s.gamesWon))
+              const hasClinched = maxWins >= 2
+              if (hasClinched) {
+                return (
+                  <button
+                    onClick={onNextGame ?? onPlayAgain}
+                    style={{
+                      flex: 1,
+                      background: '#e2b858',
+                      color: '#2c1810',
+                      border: 'none',
+                      borderRadius: 10,
+                      padding: '12px 0',
+                      fontSize: 14, fontWeight: 700,
+                      cursor: 'pointer', minHeight: 44,
+                    }}
+                  >
+                    View Trophy {'\u{1F3C6}'}
+                  </button>
+                )
+              }
+              return (
+                <button
+                  onClick={onNextGame ?? onPlayAgain}
+                  style={{
+                    flex: 1,
+                    background: '#e2b858',
+                    color: '#2c1810',
+                    border: 'none',
+                    borderRadius: 10,
+                    padding: '12px 0',
+                    fontSize: 14, fontWeight: 700,
+                    cursor: 'pointer', minHeight: 44,
+                  }}
+                >
+                  Next Game {'\u2192'}
+                </button>
+              )
+            })()}
+          </>
+        ) : (
+          <>
+            <button
+              onClick={onBack}
+              style={{
+                flex: 1,
+                background: 'transparent',
+                border: '1.5px solid #6aad7a',
+                color: '#6aad7a',
+                borderRadius: 10,
+                padding: '12px 0',
+                fontSize: 14, fontWeight: 600,
+                cursor: 'pointer', minHeight: 44,
+              }}
+            >
+              New game
+            </button>
+            <button
+              onClick={onPlayAgain}
+              style={{
+                flex: 1,
+                background: '#e2b858',
+                color: '#2c1810',
+                border: 'none',
+                borderRadius: 10,
+                padding: '12px 0',
+                fontSize: 14, fontWeight: 700,
+                cursor: 'pointer', minHeight: 44,
+              }}
+            >
+              Play again
+            </button>
+          </>
+        )}
       </div>
     </div>
   )

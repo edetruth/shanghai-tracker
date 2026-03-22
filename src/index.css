@@ -169,3 +169,24 @@
   80% { opacity: 1; }
   100% { opacity: 0; transform: scale(0.95); }
 }
+
+/* Card animations — physical feel */
+@keyframes fly-card {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--fly-to-x), var(--fly-to-y)) scale(0.9); opacity: 0.8; }
+}
+@keyframes meld-appear {
+  0% { opacity: 0; transform: translateY(20px) scale(0.9); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-meld-appear {
+  animation: meld-appear 400ms ease-out both;
+}
+@keyframes card-join {
+  0% { opacity: 0; transform: translateX(-20px); }
+  50% { box-shadow: 0 0 15px rgba(226, 184, 88, 0.6); }
+  100% { opacity: 1; transform: translateX(0); box-shadow: none; }
+}
+.animate-card-join {
+  animation: card-join 400ms ease-out both;
+}
