@@ -26,6 +26,7 @@ import TableMelds from './TableMelds'
 import CardComponent from './Card'
 import BuyPrompt from './BuyPrompt'
 import GameToast, { type QueuedToast } from './GameToast'
+import RoundAnnouncement, { type AnnouncementStage } from './RoundAnnouncement'
 
 interface Props {
   initialPlayers: PlayerConfig[]
@@ -241,6 +242,102 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     meldsLaidDown: number; bonusMelds: number; layOffs: number; jokerSwaps: number
     handSizeWentDown: number | null; scenarioB: number; scenarioC: number
   }>>(new Map())
+
+  // ── Cinematic round announcement ──────────────────────────────────────────
+  const [announcementStage, setAnnouncementStage] = useState<AnnouncementStage | null>(null)
+  const [showDealAnimation, setShowDealAnimation] = useState(false)
+  const previousLeaderRef = useRef<string | null>(null)
+  const announcementTimersRef = useRef<ReturnType<typeof setTimeout>[]>([])
+
+  // Drive announcement stage sequence when entering round-start
+  useEffect(() => {
+    if (uiPhase !== 'round-start') {
+      setAnnouncementStage(null)
+      return
+    }
+
+    const gs = gameState
+    const isFirstRound = gs.currentRound === 1
+    const isFinalRound = gs.currentRound === TOTAL_ROUNDS
+    const countdownSpeed = isFinalRound ? 600 : 500
+
+    const startStage: AnnouncementStage = isFirstRound ? (isFinalRound ? 'blackout' : 'blackout') : 'standings'
+    setAnnouncementStage(startStage)
+
+    const timers: ReturnType<typeof setTimeout>[] = []
+    announcementTimersRef.current = timers
+    let offset = 0
+
+    if (!isFirstRound) {
+      // Standings flash: 2 seconds
+      offset = 2000
+      if (isFinalRound) {
+        timers.push(setTimeout(() => setAnnouncementStage('final-round'), offset))
+        offset += 1500
+        timers.push(setTimeout(() => setAnnouncementStage('blackout'), offset))
+      } else {
+        timers.push(setTimeout(() => setAnnouncementStage('blackout'), offset))
+      }
+    } else if (isFinalRound) {
+      // First round AND final (shouldn't happen, but just in case)
+      timers.push(setTimeout(() => setAnnouncementStage('final-round'), 0))
+      offset = 1500
+      timers.push(setTimeout(() => setAnnouncementStage('blackout'), offset))
+    }
+
+    // Blackout holds for 1.5s → requirement
+    offset += 1500
+    timers.push(setTimeout(() => setAnnouncementStage('requirement'), offset))
+    // Requirement → dealer (1s)
+    offset += 1000
+    timers.push(setTimeout(() => setAnnouncementStage('dealer'), offset))
+    // Dealer → countdown (1s)
+    offset += 1000
+    timers.push(setTimeout(() => { setAnnouncementStage('countdown-3'); haptic('tap') }, offset))
+    offset += countdownSpeed
+    timers.push(setTimeout(() => { setAnnouncementStage('countdown-2'); haptic('tap') }, offset))
+    offset += countdownSpeed
+    timers.push(setTimeout(() => { setAnnouncementStage('countdown-1'); haptic('tap') }, offset))
+    offset += countdownSpeed
+    timers.push(setTimeout(() => setAnnouncementStage('dealing'), offset))
+    offset += 400
+    timers.push(setTimeout(() => {
+      // Save current leader for next round's standings
+      const totals = gs.players.map(p => ({
+        name: p.name,
+        score: p.roundScores.reduce((a, b) => a + b, 0),
+      }))
+      const leader = totals.reduce((a, b) => a.score < b.score ? a : b)
+      previousLeaderRef.current = leader.name
+
+      setAnnouncementStage(null)
+      setShowDealAnimation(true)
+      setTimeout(() => setShowDealAnimation(false), 1000)
+      const cp = getCurrentPlayer(gs)
+      setUiPhase(cp.isAI ? 'draw' : (soloHuman ? 'draw' : 'privacy'))
+    }, offset))
+
+    return () => timers.forEach(clearTimeout)
+  }, [uiPhase]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function skipAnnouncement() {
+    announcementTimersRef.current.forEach(clearTimeout)
+    announcementTimersRef.current = []
+
+    // Save current leader
+    const totals = gameState.players.map(p => ({
+      name: p.name,
+      score: p.roundScores.reduce((a, b) => a + b, 0),
+    }))
+    const leader = totals.reduce((a, b) => a.score < b.score ? a : b)
+    previousLeaderRef.current = leader.name
+
+    setAnnouncementStage(null)
+    setShowDealAnimation(true)
+    setTimeout(() => setShowDealAnimation(false), 1000)
+    const cp = getCurrentPlayer(gameState)
+    setUiPhase(cp.isAI ? 'draw' : (soloHuman ? 'draw' : 'privacy'))
+  }
 
   function getTelemetryCounters(playerId: string) {
     if (!telemetryCountersRef.current.has(playerId)) {
@@ -1796,33 +1893,26 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
       currentPlayer.hand.some(c => c.suit !== 'joker' && findSwappableJoker(c, meld) !== null)
     )
 
-  if (uiPhase === 'round-start') {
-    // Show round info + first player's starting state
-    const firstHumanPlayer = gameState.players.find(p => !p.isAI)
+  if (uiPhase === 'round-start' && announcementStage) {
     return (
-      <div className="min-h-screen bg-[#1a3a2a] flex flex-col items-center justify-center px-6">
-        <div className="w-full max-w-xs text-center">
-          <div className="w-16 h-16 rounded-full bg-[#e2b858] flex items-center justify-center mx-auto mb-4">
-            <span className="text-2xl font-bold text-[#2c1810]">{gameState.currentRound}</span>
-          </div>
-          <h2 className="text-2xl font-bold text-white mb-2">Round {gameState.currentRound}</h2>
-          <p className="text-base text-[#a8d0a8] mb-1">{rs.requirement.description}</p>
-          <p className="text-sm text-[#6aad7a] mb-6">{rs.cardsDealt} cards dealt · {MAX_BUYS} buys available</p>
-
-          {firstHumanPlayer && (
-            <p className="text-xs text-[#6aad7a] mb-4">
-              Starting player: {gameState.players[rs.currentPlayerIndex]?.name}
-            </p>
-          )}
-
-          <button
-            onClick={() => setUiPhase(nextPhaseForPlayer(currentPlayer))}
-            className="bg-[#e2b858] text-[#2c1810] font-bold rounded-xl px-8 py-3 text-base active:opacity-80 w-full"
-          >
-            Begin Round
-          </button>
-        </div>
-      </div>
+      <RoundAnnouncement
+        stage={announcementStage}
+        roundNumber={gameState.currentRound}
+        requirementDescription={rs.requirement.description}
+        cardsDealt={rs.cardsDealt}
+        dealerName={gameState.players[rs.dealerIndex]?.name ?? ''}
+        firstPlayerName={gameState.players[rs.currentPlayerIndex]?.name ?? ''}
+        isHumanFirst={!gameState.players[rs.currentPlayerIndex]?.isAI}
+        isFinalRound={gameState.currentRound === TOTAL_ROUNDS}
+        isLateRound={gameState.currentRound >= 5}
+        standings={gameState.players.map(p => ({
+          name: p.name,
+          score: p.roundScores.reduce((a: number, b: number) => a + b, 0),
+          isHuman: !p.isAI,
+        }))}
+        previousLeader={previousLeaderRef.current}
+        onSkip={skipAnnouncement}
+      />
     )
   }
 
@@ -2273,6 +2363,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
             onSortChange={setHandSort}
             newCardId={[...newCardIds][0]}
             shimmerCardId={shimmerCardId}
+            dealAnimation={showDealAnimation}
           />
         ) : aiTurnHumanViewer ? (
           <HandDisplay

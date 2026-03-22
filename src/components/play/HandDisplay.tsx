@@ -14,6 +14,7 @@ interface Props {
   disabled?: boolean
   newCardId?: string
   shimmerCardId?: string | null
+  dealAnimation?: boolean
 }
 
 export const SUIT_ORDER: Record<string, number> = { hearts: 0, diamonds: 1, clubs: 2, spades: 3, joker: 4 }
@@ -37,6 +38,7 @@ export default function HandDisplay({
   disabled,
   newCardId,
   shimmerCardId,
+  dealAnimation,
 }: Props) {
   const sorted = useMemo(() => {
     return [...cards].sort((a, b) => {
@@ -122,6 +124,7 @@ export default function HandDisplay({
                     left: `${index * offset}px`,
                     zIndex: isSelected ? sorted.length + 10 : card.id === newCardId ? sorted.length + 5 : index + 1,
                     transition: 'left 150ms ease',
+                    ...(dealAnimation ? { animation: `card-deal-in 200ms ease-out ${index * 50}ms both` } : {}),
                   }}
                 >
                   <CardComponent
