@@ -311,9 +311,13 @@ export function simulateLayOff(card: Card, meld: Meld, jokerPosition?: 'low' | '
   let runMin = meld.runMin, runMax = meld.runMax, runAceHigh = meld.runAceHigh
   if (card.suit === 'joker') {
     if (jokerPosition === 'low') {
-      runMin = (runMin ?? 1) - 1
+      const newMin = (runMin ?? 1) - 1
+      if (newMin < 1) return meld  // can't extend below Ace
+      runMin = newMin
     } else {
-      runMax = (runMax ?? 0) + 1
+      const newMax = (runMax ?? 0) + 1
+      if (newMax > 14) return meld  // can't extend above Ace-high
+      runMax = newMax
     }
   } else {
     let r = card.rank
@@ -415,7 +419,12 @@ export function canLayOff(card: Card, meld: Meld): boolean {
     return card.rank === setRank
   } else {
     // Run
-    if (card.suit === 'joker') return true
+    if (card.suit === 'joker') {
+      // Joker can only extend a run if at least one end has room
+      const min = meld.runMin ?? 1
+      const max = meld.runMax ?? 13
+      return min > 1 || max < 14
+    }
     if (card.suit !== meld.runSuit) return false
     const min = meld.runMin!
     const max = meld.runMax!

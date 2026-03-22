@@ -25,6 +25,7 @@ import HandDisplay from './HandDisplay'
 import TableMelds from './TableMelds'
 import CardComponent from './Card'
 import BuyPrompt from './BuyPrompt'
+import GameToast, { type QueuedToast } from './GameToast'
 
 interface Props {
   initialPlayers: PlayerConfig[]
@@ -203,6 +204,13 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
   const pendingSaveRef = useRef<number>(0)
   const [discardError, setDiscardError] = useState<string | null>(null)
   const [layOffError, setLayOffError] = useState<string | null>(null)
+  // ── Game-feel toast queue ─────────────────────────────────────────────────
+  const toastQueueRef = useRef<QueuedToast[]>([])
+  const toastIdRef = useRef(0)
+  const [activeToast, setActiveToast] = useState<QueuedToast | null>(null)
+  const activeToastRef = useRef<QueuedToast | null>(null)
+  const [shimmerCardId, setShimmerCardId] = useState<string | null>(null)
+  const streaksRef = useRef<Map<string, number>>(new Map())
   const [preLayDownSwap, setPreLayDownSwap] = useState(false)
   const [showPreLayDownSwapModal, setShowPreLayDownSwapModal] = useState(false)
   // Selection state for the inline pre-lay-down swap modal
@@ -418,6 +426,25 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     return () => clearTimeout(timer)
   }, [newCardIds])
 
+  // ── Toast queue helpers ───────────────────────────────────────────────────
+  function showNextToast() {
+    const next = toastQueueRef.current.shift()
+    if (!next) { setActiveToast(null); activeToastRef.current = null; return }
+    setActiveToast(next)
+    activeToastRef.current = next
+    setTimeout(() => {
+      setActiveToast(null)
+      activeToastRef.current = null
+      setTimeout(() => showNextToast(), 200)
+    }, next.duration)
+  }
+
+  function queueToast(toast: Omit<QueuedToast, 'id'>) {
+    const t: QueuedToast = { ...toast, id: toastIdRef.current++ }
+    toastQueueRef.current.push(t)
+    if (!activeToastRef.current) showNextToast()
+  }
+
   const rs = gameState.roundState
   const currentPlayer = getCurrentPlayer(gameState)
   const topDiscard = rs.discardPile[rs.discardPile.length - 1] ?? null
@@ -521,7 +548,14 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
       setGameState(updatedState)
     }
 
-    if (drawnCard) setNewCardIds(new Set([drawnCard.id]))
+    if (drawnCard) {
+      setNewCardIds(new Set([drawnCard.id]))
+      // Shimmer the drawn card briefly for the human drawing player
+      if (!gameState.players[gameState.roundState.currentPlayerIndex]?.isAI) {
+        setShimmerCardId(drawnCard.id)
+        setTimeout(() => setShimmerCardId(null), 1500)
+      }
+    }
 
     // Telemetry: record pile draw
     {
@@ -688,6 +722,21 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
         addBuyLog({ round: state.currentRound, turn: turnCountRef.current, event: 'shanghaied', playerName: p.name, card: '', detail: `score: ${r?.score ?? 0}` })
       }
     })
+    // Streaks: track consecutive rounds going out
+    const goOutPlayer = state.players.find(p => p.id === goOutId)
+    if (goOutPlayer) {
+      const prev = streaksRef.current.get(goOutId) ?? 0
+      const newStreak = prev + 1
+      streaksRef.current.set(goOutId, newStreak)
+      if (newStreak >= 2) {
+        setTimeout(() => {
+          queueToast({ message: `On fire! ${newStreak} in a row`, style: 'celebration', icon: '🔥', duration: 2000 })
+        }, 500)
+      }
+      state.players.forEach(p => {
+        if (p.id !== goOutId) streaksRef.current.set(p.id, 0)
+      })
+    }
     const players = state.players.map(p => {
       const result = results.find(r => r.playerId === p.id)
       return result ? { ...p, roundScores: [...p.roundScores, result.score] } : p
@@ -793,6 +842,18 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
 
     addBuyLog({ round: prev.currentRound, turn: turnCountRef.current, event: 'went_down', playerName: player.name, card: '', detail: `melds: ${newMelds.length}` })
     if (wentOut) addBuyLog({ round: prev.currentRound, turn: turnCountRef.current, event: 'went_out', playerName: player.name, card: '', detail: 'hand was empty' })
+
+    // Moment 1: first player to the table this round
+    const isFirstDown = prev.players.every(p => !p.hasLaidDown)
+    if (isFirstDown && !wentOut) {
+      const msgs = ['First to the table!', 'Setting the pace!', 'Bold move.', `${player.name} leads the way!`]
+      queueToast({ message: msgs[Math.floor(Math.random() * msgs.length)], style: 'celebration', icon: '💪', duration: 2000 })
+    }
+    // Moment 2: going out via meld
+    if (wentOut) {
+      queueToast({ message: `${player.name} goes out!`, subtext: `Round ${prev.currentRound} complete`, style: 'drama', icon: '🎯', duration: 2500 })
+    }
+
     setGameState(updated)
     setShowMeldModal(false)
     setPreLayDownSwap(false)
@@ -822,12 +883,24 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
       if (card.suit === 'joker') {
         if (jokerPosition === 'low') {
           const newMin = (meld.runMin ?? 1) - 1
+          if (newMin < 1) {
+            setLayOffError('Cannot extend run below Ace.')
+            haptic('error')
+            setTimeout(() => setLayOffError(null), 3000)
+            return
+          }
           updatedRunMin = newMin
           newJokerMappings.push({ cardId: card.id, representsRank: newMin, representsSuit: meld.runSuit! })
           newMeldCards = [card, ...meld.cards]
         } else {
           // Default: extend at high end
           const newMax = (meld.runMax ?? 0) + 1
+          if (newMax > 14) {
+            setLayOffError('Cannot extend run above Ace.')
+            haptic('error')
+            setTimeout(() => setLayOffError(null), 3000)
+            return
+          }
           updatedRunMax = newMax
           newJokerMappings.push({ cardId: card.id, representsRank: newMax, representsSuit: meld.runSuit! })
           newMeldCards = [...meld.cards, card]
@@ -914,6 +987,11 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     setSelectedCardIds(new Set())
     setLayOffError(null)
 
+    // Moment 2: going out via lay-off
+    if (wentOut) {
+      queueToast({ message: `${player.name} goes out!`, subtext: `Round ${prev.currentRound} complete`, style: 'drama', icon: '🎯', duration: 2500 })
+    }
+
     if (wentOut) {
       addBuyLog({ round: prev.currentRound, turn: turnCountRef.current, event: 'went_out', playerName: player.name, card: '', detail: 'hand was empty' })
       setJokerPositionPrompt(null)
@@ -949,6 +1027,14 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     addBuyLog({ round: gameState.currentRound, turn: turnCountRef.current, event: 'joker_swap', playerName: swapPlayer.name, card: formatCard(naturalCard), detail: '' })
     recordDecision(swapPlayer, 'joker_swap', 'swapped', naturalCard)
     getTelemetryCounters(swapPlayer.id).jokerSwaps++
+    // Moment 5: Joker Heist
+    const isFromOtherMeld = meld.ownerId !== swapPlayer.id
+    queueToast({
+      message: isFromOtherMeld ? 'The heist!' : 'Joker reclaimed!',
+      subtext: isFromOtherMeld ? `${swapPlayer.name} takes a joker` : undefined,
+      style: 'taunt', icon: '🃏', duration: 1500,
+    })
+    haptic('heavy')
     setGameState(prev => computeJokerSwap(prev, naturalCard, meld) ?? prev)
     setSelectedCardIds(new Set())
   }
@@ -1799,6 +1885,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
         </div>
       )}
 
+      {/* Game-feel toast overlay */}
+      <GameToast toast={activeToast} />
+
       {/* ── ZONE 1: Fixed top — top bar + collapsible opponent strip ─── */}
       <div
         className="bg-[#0f2218]"
@@ -1983,6 +2072,17 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
             )}
           </div>
         )}
+        {/* Close race indicator */}
+        {(() => {
+          const racers = gameState.players.filter(p => p.hasLaidDown && p.hand.length <= 3)
+          return racers.length >= 2 ? (
+            <div className="absolute top-2 left-0 right-0 flex justify-center z-10 pointer-events-none">
+              <span className="bg-[#e2b858]/90 text-[#2c1810] text-xs font-bold px-3 py-1 rounded-full">
+                🔥 Race to finish
+              </span>
+            </div>
+          ) : null
+        })()}
         <div
           className="px-3 py-3"
           style={{ height: '100%', overflowY: 'auto' }}
@@ -2141,6 +2241,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
             sortMode={handSort}
             onSortChange={setHandSort}
             newCardId={[...newCardIds][0]}
+            shimmerCardId={shimmerCardId}
           />
         ) : aiTurnHumanViewer ? (
           <HandDisplay

@@ -89,7 +89,57 @@ describe('canLayOff — chain scenario', () => {
     expect(updatedMeld.runMax).toBe(9)
     expect(canLayOff(c('hearts', 10), updatedMeld)).toBe(true)
   })
+})
 
+describe('canLayOff — joker bounds', () => {
+  it('joker CANNOT lay off on a full-range run (runMin=1, runMax=14)', () => {
+    // Build a run A-2-3-...-K-A (conceptually full range); simulate runMin=1, runMax=14
+    const runCards = [c('hearts', 1), c('hearts', 2), c('hearts', 3), c('hearts', 4)]
+    const meld = makeMeld(runCards, 'run')
+    // Manually set bounds to simulate full-range
+    const fullMeld = { ...meld, runMin: 1, runMax: 14 }
+    expect(canLayOff(joker(), fullMeld)).toBe(false)
+  })
+
+  it('joker CAN lay off on run 2-3-4-5 (room below at rank 1)', () => {
+    const runCards = [c('hearts', 2), c('hearts', 3), c('hearts', 4), c('hearts', 5)]
+    const meld = makeMeld(runCards, 'run')
+    expect(canLayOff(joker(), meld)).toBe(true)
+  })
+
+  it('joker CAN lay off on run J-Q-K (room above up to 14)', () => {
+    const runCards = [c('hearts', 11), c('hearts', 12), c('hearts', 13)]
+    const meld = makeMeld([...runCards, c('hearts', 10)], 'run') // 10-J-Q-K
+    expect(canLayOff(joker(), meld)).toBe(true)
+  })
+
+  it('simulateLayOff with joker on full-range run (1-14) returns meld unchanged', () => {
+    const runCards = [c('hearts', 1), c('hearts', 2), c('hearts', 3), c('hearts', 4)]
+    const meld = makeMeld(runCards, 'run')
+    const fullMeld = { ...meld, runMin: 1, runMax: 14 }
+    const result = simulateLayOff(joker(), fullMeld, 'low')
+    expect(result.runMin).toBe(1)
+    expect(result.runMax).toBe(14)
+  })
+
+  it('simulateLayOff with joker on run 1-13 at high end → runMax=14', () => {
+    const runCards = [c('hearts', 1), c('hearts', 2), c('hearts', 3), c('hearts', 4)]
+    const meld = makeMeld(runCards, 'run')
+    const almostFullMeld = { ...meld, runMin: 1, runMax: 13 }
+    const result = simulateLayOff(joker(), almostFullMeld, 'high')
+    expect(result.runMax).toBe(14)
+  })
+
+  it('simulateLayOff with joker going below rank 1 returns meld unchanged', () => {
+    const runCards = [c('hearts', 1), c('hearts', 2), c('hearts', 3), c('hearts', 4)]
+    const meld = makeMeld(runCards, 'run')
+    const aceLowMeld = { ...meld, runMin: 1, runMax: 4 }
+    const result = simulateLayOff(joker(), aceLowMeld, 'low')
+    expect(result.runMin).toBe(1) // unchanged, can't go below 1
+  })
+})
+
+describe('canLayOff — chain scenario (continued)', () => {
   it('chain lay-off into run with joker at high end — hand [3♥, 4♥] on run 5♥-8♥-JKR(9♥)', () => {
     // Run: 5♥-6♥-7♥-8♥-JKR(9♥), runMin=5, runMax=9
     const jkr = joker('jkr-chain')

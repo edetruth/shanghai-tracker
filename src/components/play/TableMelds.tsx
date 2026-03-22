@@ -11,6 +11,16 @@ interface Props {
   onJokerSwap?: (naturalCard: Card, meld: Meld) => void
 }
 
+// ── Card overlap helper ───────────────────────────────────────────────────────
+
+function getMeldCardOverlap(cardCount: number): number {
+  if (cardCount <= 5) return 0
+  if (cardCount <= 7) return 10
+  if (cardCount <= 9) return 16
+  if (cardCount <= 11) return 22
+  return 26
+}
+
 // ── Suit helpers ──────────────────────────────────────────────────────────────
 
 const SUIT_SORT: Record<string, number> = { hearts: 0, diamonds: 1, clubs: 2, spades: 3, joker: 4 }
@@ -340,15 +350,23 @@ export default function TableMelds({
                         </span>
                       )}
 
-                      {/* Cards row */}
-                      <div style={{ display: 'flex', flexDirection: 'row', gap: 3, alignItems: 'center' }}>
-                        {displayCards.map(card => (
-                          <MicroCard
+                      {/* Cards row — overlap for long melds */}
+                      <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', overflow: 'hidden' }}>
+                        {displayCards.map((card, i) => (
+                          <div
                             key={card.id}
-                            card={card}
-                            meld={meld}
-                            highlight={swapJoker ? card.id === swapJoker.id : false}
-                          />
+                            style={{
+                              marginLeft: i === 0 ? 0 : 3 - getMeldCardOverlap(displayCards.length),
+                              zIndex: i,
+                              flexShrink: 0,
+                            }}
+                          >
+                            <MicroCard
+                              card={card}
+                              meld={meld}
+                              highlight={swapJoker ? card.id === swapJoker.id : false}
+                            />
+                          </div>
                         ))}
                       </div>
                     </div>

@@ -550,6 +550,9 @@ export function aiFindPreLayDownJokerSwap(
 export function aiChooseJokerLayOffPosition(meld: Meld): 'low' | 'high' {
   const roomBelow = (meld.runMin ?? 1) - 1       // ranks available below (runMin-1 down to 1)
   const roomAbove = 14 - (meld.runMax ?? 13)      // ranks available above (runMax+1 up to 14)
+  // Safety: if one side has no room, always pick the other
+  if (roomBelow <= 0) return 'high'
+  if (roomAbove <= 0) return 'low'
   return roomBelow >= roomAbove ? 'low' : 'high'
 }
 

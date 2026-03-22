@@ -13,6 +13,7 @@ interface Props {
   label?: string
   disabled?: boolean
   newCardId?: string
+  shimmerCardId?: string | null
 }
 
 export const SUIT_ORDER: Record<string, number> = { hearts: 0, diamonds: 1, clubs: 2, spades: 3, joker: 4 }
@@ -35,6 +36,7 @@ export default function HandDisplay({
   label,
   disabled,
   newCardId,
+  shimmerCardId,
 }: Props) {
   const sorted = useMemo(() => {
     return [...cards].sort((a, b) => {
@@ -126,6 +128,7 @@ export default function HandDisplay({
                     card={card}
                     selected={isSelected}
                     isNew={card.id === newCardId}
+                    shimmer={shimmerCardId ? card.id === shimmerCardId : false}
                     onClick={disabled ? undefined : () => onToggle(card.id)}
                     disabled={disabled}
                   />

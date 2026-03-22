@@ -95,10 +95,10 @@ export default function RoundSummary({ players, roundResults, roundNum, onNext, 
     return () => cancelAnimationFrame(id)
   }, [])
 
-  // Dramatic Shanghai overlay — 2+ players caught
+  // Dramatic Shanghai overlay — 1+ players caught
   const shanghaiedCount = roundResults.filter(r => r.shanghaied).length
   useEffect(() => {
-    if (shanghaiedCount >= 2) {
+    if (shanghaiedCount >= 1) {
       setShowShanghai(true)
       const t = setTimeout(() => setShowShanghai(false), 2500)
       return () => clearTimeout(t)
@@ -155,10 +155,12 @@ export default function RoundSummary({ players, roundResults, roundNum, onNext, 
           }}
         >
           <div style={{ textAlign: 'center' }}>
-            <p style={{ fontSize: 52, fontWeight: 900, color: '#e2b858', letterSpacing: 4, margin: 0 }}>
+            <p style={{ fontSize: 52, fontWeight: 900, color: '#e2b858', letterSpacing: 4, margin: 0, animation: 'slam-in 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards' }}>
               SHANGHAI!
             </p>
-            <p style={{ fontSize: 16, color: '#fff', marginTop: 8 }}>{shanghaiedCount} players caught!</p>
+            <p style={{ fontSize: 16, color: '#fff', marginTop: 8 }}>
+              {shanghaiedCount >= 2 ? `${shanghaiedCount} players caught!` : 'Caught without laying down!'}
+            </p>
           </div>
         </div>
       )}
@@ -311,9 +313,10 @@ export default function RoundSummary({ players, roundResults, roundNum, onNext, 
                         </span>
                       )}
                       {isShanghaied && (
-                        <span style={{
+                        <span className="animate-slam-in" style={{
                           background: '#b83232', color: '#fff',
                           fontSize: 9, fontWeight: 700, borderRadius: 4, padding: '1px 5px',
+                          display: 'inline-block',
                         }}>
                           Shanghaied!
                         </span>
@@ -323,12 +326,14 @@ export default function RoundSummary({ players, roundResults, roundNum, onNext, 
                     {/* Card detail pills — for non-out players with remaining cards (spec §6) */}
                     {!isOut && player.hand.length > 0 && (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 4 }}>
-                        {player.hand.map((card: CardType) => (
+                        {player.hand.map((card: CardType, cardIdx: number) => (
                           <span
                             key={card.id}
                             style={{
                               background: '#1e4a2e', color: '#6aad7a',
                               fontSize: 8, fontWeight: 600, borderRadius: 3, padding: '1px 5px',
+                              animationDelay: `${cardIdx * 50}ms`,
+                              ...(isShanghaied ? { animation: 'slam-in 0.3s cubic-bezier(0.34,1.56,0.64,1) both' } : {}),
                             }}
                           >
                             {cardLabel(card)}

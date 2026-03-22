@@ -11,6 +11,7 @@ interface Props {
   jokerLabel?: string
   isNew?: boolean
   faceDown?: boolean
+  shimmer?: boolean
   style?: React.CSSProperties
 }
 
@@ -49,7 +50,7 @@ function suitTextColor(suit: string): string {
   return '#3d2b8e' // spades
 }
 
-export default function Card({ card, selected, onClick, compact, disabled, jokerLabel, isNew, faceDown, style }: Props) {
+export default function Card({ card, selected, onClick, compact, disabled, jokerLabel, isNew, faceDown, shimmer, style }: Props) {
   // Auto-clear NEW badge after 3 seconds
   const [showNew, setShowNew] = useState(isNew ?? false)
   useEffect(() => {
@@ -148,6 +149,13 @@ export default function Card({ card, selected, onClick, compact, disabled, joker
             boxShadow: '0 0 0 2px #e2b858, 0 0 10px rgba(226,184,88,0.6)',
           }}
         />
+      )}
+
+      {/* Shimmer overlay for freshly drawn card */}
+      {shimmer && !faceDown && (
+        <div className="absolute inset-0 rounded-[6px] overflow-hidden pointer-events-none">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-[#e2b858]/40 to-transparent animate-shimmer" />
+        </div>
       )}
 
       {isJoker ? (
