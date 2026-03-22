@@ -635,7 +635,7 @@ export default function GameSetup({ onStart, onBack }: Props) {
               transition: 'background 150ms, color 150ms',
             }}
           >
-            Next \u2192
+            Next →
           </button>
         ) : (
           <button

@@ -334,7 +334,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     timers.push(setTimeout(() => { setAnnouncementStage('countdown-2'); haptic('tap') }, offset))
     offset += countdownSpeed
     timers.push(setTimeout(() => { setAnnouncementStage('countdown-1'); haptic('tap') }, offset))
-    offset += countdownSpeed
+    offset += countdownSpeed + 400 // hold "1" longer so it's visible
     timers.push(setTimeout(() => setAnnouncementStage('dealing'), offset))
     offset += 400
     timers.push(setTimeout(() => {
