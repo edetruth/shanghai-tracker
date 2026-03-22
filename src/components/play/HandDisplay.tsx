@@ -47,17 +47,18 @@ export default function HandDisplay({
   const sorted = useMemo(() => {
     return [...cards].sort((a, b) => {
       if (sortMode === 'suit') {
-        // Group by suit (hearts, diamonds, clubs, spades, jokers last), rank ascending within suit
         const s = (SUIT_ORDER[a.suit] ?? 4) - (SUIT_ORDER[b.suit] ?? 4)
         if (s !== 0) return s
-        return a.rank - b.rank
+        if (a.rank !== b.rank) return a.rank - b.rank
+        return a.id < b.id ? -1 : a.id > b.id ? 1 : 0 // stable tiebreaker
       }
-      // Rank sort: jokers last, then rank ascending, tie-break by suit order
-      if (a.suit === 'joker' && b.suit === 'joker') return 0
+      if (a.suit === 'joker' && b.suit === 'joker') return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
       if (a.suit === 'joker') return 1
       if (b.suit === 'joker') return -1
       if (a.rank !== b.rank) return a.rank - b.rank
-      return (SUIT_ORDER[a.suit] ?? 4) - (SUIT_ORDER[b.suit] ?? 4)
+      const suitDiff = (SUIT_ORDER[a.suit] ?? 4) - (SUIT_ORDER[b.suit] ?? 4)
+      if (suitDiff !== 0) return suitDiff
+      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0 // stable tiebreaker
     })
   }, [cards, sortMode])
 
@@ -116,7 +117,7 @@ export default function HandDisplay({
         >
           <div
             className="relative"
-            style={{ width: `${containerWidth}px`, height: `${containerHeight}px`, flexShrink: 0 }}
+            style={{ width: `${containerWidth}px`, height: `${containerHeight}px`, flexShrink: 0, transition: 'width 300ms ease-out' }}
           >
             {sorted.map((card, index) => {
               const isSelected = selectedIds.has(card.id)
@@ -130,7 +131,7 @@ export default function HandDisplay({
                   style={{
                     left: `${index * offset}px`,
                     zIndex: isSelected ? sorted.length + 10 : card.id === newCardId ? sorted.length + 5 : index + 1,
-                    transition: isLeaving ? 'none' : 'left 150ms ease',
+                    transition: isLeaving ? 'none' : 'left 300ms ease-out, transform 300ms ease-out',
                     ...(dealAnimation && !isFlipping ? { animation: `card-deal-in 200ms ease-out ${index * 50}ms both` } : {}),
                   }}
                 >

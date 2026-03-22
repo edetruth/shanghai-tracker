@@ -182,10 +182,51 @@
   100% { opacity: 0; transform: scale(0.95); }
 }
 
+/* Race intensity heartbeat pulses */
+@keyframes tension-pulse-slow {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 0.03; }
+}
+@keyframes tension-pulse-medium {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 0.05; }
+}
+@keyframes tension-pulse-fast {
+  0%, 100% { opacity: 0; }
+  30% { opacity: 0.07; }
+  45% { opacity: 0.04; }
+  60% { opacity: 0.07; }
+}
+
+/* Joker card shimmer */
+@keyframes joker-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+.joker-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.3) 45%,
+    rgba(255, 255, 255, 0.5) 50%,
+    rgba(255, 255, 255, 0.3) 55%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  animation: joker-shimmer 3s ease-in-out infinite;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
 /* Card animations — physical feel */
 @keyframes fly-card {
   0% { transform: translate(0, 0) scale(1); opacity: 1; }
-  100% { transform: translate(var(--fly-to-x), var(--fly-to-y)) scale(0.9); opacity: 0.8; }
+  70% { transform: translate(var(--fly-to-x), var(--fly-to-y)) scale(0.95); opacity: 1; }
+  85% { transform: translate(var(--fly-to-x), var(--fly-to-y)) scale(0.92); opacity: 0.9; }
+  100% { transform: translate(var(--fly-to-x), var(--fly-to-y)) scale(1); opacity: 0; }
 }
 @keyframes meld-appear {
   0% { opacity: 0; transform: translateY(20px) scale(0.9); }

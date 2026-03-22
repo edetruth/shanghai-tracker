@@ -163,16 +163,6 @@ function advancePlayer(state: GameState): GameState {
 
 // (nextPhaseForPlayer is defined inside GameBoard to account for solo-human games)
 
-function buildBuyerOrder(state: GameState, discarderIndex: number): number[] {
-  const order: number[] = []
-  const count = state.players.length
-  for (let i = 1; i < count; i++) {
-    const idx = (discarderIndex + i) % count
-    if (state.players[idx].buysRemaining > 0) order.push(idx)
-  }
-  return order
-}
-
 function getAIDelay(speed: GameSpeed): number {
   if (speed === 'fast') return 200 + Math.random() * 200
   if (speed === 'slow') return 2000 + Math.random() * 1000
@@ -283,95 +273,11 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const [announcementStage, setAnnouncementStage] = useState<AnnouncementStage | null>(null)
   const [showDealAnimation, setShowDealAnimation] = useState(false)
   const previousLeaderRef = useRef<string | null>(null)
-  const announcementTimersRef = useRef<ReturnType<typeof setTimeout>[]>([])
+  const countdownActiveRef = useRef(false)
 
-  // Drive announcement stage sequence when entering round-start
-  useEffect(() => {
-    if (uiPhase !== 'round-start') {
-      setAnnouncementStage(null)
-      return
-    }
-
-    const gs = gameState
-    const isFirstRound = gs.currentRound === 1
-    const isFinalRound = gs.currentRound === TOTAL_ROUNDS
-    const countdownSpeed = isFinalRound ? 600 : 500
-
-    const startStage: AnnouncementStage = isFirstRound ? (isFinalRound ? 'blackout' : 'blackout') : 'standings'
-    setAnnouncementStage(startStage)
-
-    const timers: ReturnType<typeof setTimeout>[] = []
-    announcementTimersRef.current = timers
-    let offset = 0
-
-    if (!isFirstRound) {
-      // Standings flash: 2 seconds
-      offset = 2000
-      if (isFinalRound) {
-        timers.push(setTimeout(() => setAnnouncementStage('final-round'), offset))
-        offset += 1500
-        timers.push(setTimeout(() => setAnnouncementStage('blackout'), offset))
-      } else {
-        timers.push(setTimeout(() => setAnnouncementStage('blackout'), offset))
-      }
-    } else if (isFinalRound) {
-      // First round AND final (shouldn't happen, but just in case)
-      timers.push(setTimeout(() => setAnnouncementStage('final-round'), 0))
-      offset = 1500
-      timers.push(setTimeout(() => setAnnouncementStage('blackout'), offset))
-    }
-
-    // Blackout holds for 1.5s → requirement
-    offset += 1500
-    timers.push(setTimeout(() => setAnnouncementStage('requirement'), offset))
-    // Requirement → dealer (1s)
-    offset += 1000
-    timers.push(setTimeout(() => setAnnouncementStage('dealer'), offset))
-    // Dealer → countdown (1s)
-    offset += 1000
-    timers.push(setTimeout(() => { setAnnouncementStage('countdown-3'); haptic('tap') }, offset))
-    offset += countdownSpeed
-    timers.push(setTimeout(() => { setAnnouncementStage('countdown-2'); haptic('tap') }, offset))
-    offset += countdownSpeed
-    timers.push(setTimeout(() => { setAnnouncementStage('countdown-1'); haptic('tap') }, offset))
-    offset += countdownSpeed + 400 // hold "1" longer so it's visible
-    timers.push(setTimeout(() => setAnnouncementStage('dealing'), offset))
-    offset += 400
-    timers.push(setTimeout(() => {
-      // Save current leader for next round's standings
-      const totals = gs.players.map(p => ({
-        name: p.name,
-        score: p.roundScores.reduce((a, b) => a + b, 0),
-      }))
-      const leader = totals.reduce((a, b) => a.score < b.score ? a : b)
-      previousLeaderRef.current = leader.name
-
-      setAnnouncementStage(null)
-      if (reduceAnimations) {
-        setShowDealAnimation(true)
-        setTimeout(() => setShowDealAnimation(false), 1000)
-      } else {
-        // Phase 1: deal cards face-down with stagger
-        setDealFlipPhase('facedown')
-        setShowDealAnimation(true)
-        // Phase 2: flip to reveal after cards deal in
-        setTimeout(() => setDealFlipPhase('flipping'), 700)
-        // Phase 3: clean up
-        setTimeout(() => { setShowDealAnimation(false); setDealFlipPhase(null) }, 1500)
-      }
-      const cp = getCurrentPlayer(gs)
-      setUiPhase(cp.isAI ? 'draw' : (soloHuman ? 'draw' : 'privacy'))
-    }, offset))
-
-    return () => timers.forEach(clearTimeout)
-  }, [uiPhase]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  function skipAnnouncement() {
-    announcementTimersRef.current.forEach(clearTimeout)
-    announcementTimersRef.current = []
-
-    // Save current leader
-    const totals = gameState.players.map(p => ({
+  // Finish announcement: save leader, start deal animation, transition to game
+  function finishAnnouncement(gs: GameState) {
+    const totals = gs.players.map(p => ({
       name: p.name,
       score: p.roundScores.reduce((a, b) => a + b, 0),
     }))
@@ -388,8 +294,87 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       setTimeout(() => setDealFlipPhase('flipping'), 700)
       setTimeout(() => { setShowDealAnimation(false); setDealFlipPhase(null) }, 1500)
     }
-    const cp = getCurrentPlayer(gameState)
+    const cp = getCurrentPlayer(gs)
     setUiPhase(cp.isAI ? 'draw' : (soloHuman ? 'draw' : 'privacy'))
+  }
+
+  // Drive announcement stage sequence with a single interval (immune to re-renders)
+  useEffect(() => {
+    if (uiPhase !== 'round-start') {
+      setAnnouncementStage(null)
+      countdownActiveRef.current = false
+      return
+    }
+
+    const gs = gameState
+    const isFirstRound = gs.currentRound === 1
+    const isFinalRound = gs.currentRound === TOTAL_ROUNDS
+    const countdownSpeed = isFinalRound ? 700 : 600
+
+    // Build timeline: [time_ms, stage, haptic?]
+    const timeline: [number, AnnouncementStage | 'done', boolean][] = []
+    let t = 0
+
+    if (!isFirstRound) {
+      timeline.push([t, 'standings', false])
+      t += 2000
+      if (isFinalRound) {
+        timeline.push([t, 'final-round', false])
+        t += 1500
+      }
+    }
+    timeline.push([t, 'blackout', false])
+    t += 1500
+    timeline.push([t, 'requirement', false])
+    t += 1000
+    timeline.push([t, 'dealer', false])
+    t += 1000
+    timeline.push([t, 'countdown-3', true])
+    t += countdownSpeed
+    timeline.push([t, 'countdown-2', true])
+    t += countdownSpeed
+    timeline.push([t, 'countdown-1', true])
+    t += countdownSpeed + 400 // hold "1" longer so it's visible
+    timeline.push([t, 'dealing', false])
+    t += 600
+    timeline.push([t, 'done', false])
+
+    // Set initial stage
+    setAnnouncementStage(timeline[0][1] as AnnouncementStage)
+    countdownActiveRef.current = true
+    let lastIdx = 0
+    const startTime = Date.now()
+
+    const intervalId = setInterval(() => {
+      if (!countdownActiveRef.current) {
+        clearInterval(intervalId)
+        return
+      }
+      const elapsed = Date.now() - startTime
+      // Advance to the correct stage based on elapsed time
+      while (lastIdx < timeline.length - 1 && elapsed >= timeline[lastIdx + 1][0]) {
+        lastIdx++
+        const [, stage, doHaptic] = timeline[lastIdx]
+        if (doHaptic) haptic('tap')
+        if (stage === 'done') {
+          clearInterval(intervalId)
+          countdownActiveRef.current = false
+          finishAnnouncement(gs)
+          return
+        }
+        setAnnouncementStage(stage)
+      }
+    }, 50) // check every 50ms for smooth transitions
+
+    return () => {
+      clearInterval(intervalId)
+      countdownActiveRef.current = false
+    }
+  }, [uiPhase]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function skipAnnouncement() {
+    countdownActiveRef.current = false
+    finishAnnouncement(gameState)
   }
 
   function getTelemetryCounters(playerId: string) {
@@ -488,7 +473,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     const from = getRefCenter(drawPileRef)
     const to = getRefCenter(handAreaRef)
     if (!from || !to) return
-    const duration = isAI ? 150 : 300
+    const duration = isAI ? 200 : 500
     setFlyingCard({ from, to, faceDown: true })
     setTimeout(() => setFlyingCard(null), duration)
   }
@@ -498,7 +483,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     const from = getRefCenter(discardPileRef)
     const to = getRefCenter(handAreaRef)
     if (!from || !to) return
-    const duration = isAI ? 150 : 300
+    const duration = isAI ? 200 : 500
     setFlyingCard({ from, to, card, faceDown: false })
     setTimeout(() => setFlyingCard(null), duration)
   }
@@ -525,7 +510,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     const handPos = getRefCenter(handAreaRef)
     const drawPos = getRefCenter(drawPileRef)
     if (!discardPos || !handPos) return
-    const duration = isAI ? 150 : 300
+    const duration = isAI ? 200 : 500
     // First: discard card flies to hand
     setFlyingCard({ from: discardPos, to: handPos, card: discardCard, faceDown: false })
     setTimeout(() => {
@@ -795,7 +780,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       // Flying card animation: draw pile → hand
       animateDrawFromPile(isAI)
       // Delay NEW badge until after the flying animation lands
-      const animDuration = reduceAnimations ? 0 : (isAI ? 150 : 300)
+      const animDuration = reduceAnimations ? 0 : (isAI ? 200 : 500)
       setTimeout(() => {
         setNewCardIds(new Set([drawnCard.id]))
         // Shimmer the drawn card briefly for the human drawing player
@@ -860,7 +845,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     const taker = gameState.players[gameState.roundState.currentPlayerIndex]
     animateTakeDiscard(card, !!taker.isAI)
     // Delay NEW badge until after the flying animation lands
-    const animDuration = reduceAnimations ? 0 : (taker.isAI ? 150 : 300)
+    const animDuration = reduceAnimations ? 0 : (taker.isAI ? 200 : 500)
     setTimeout(() => setNewCardIds(new Set([card.id])), animDuration)
 
     // Record for opponent awareness (Hard AI)
@@ -888,41 +873,14 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     setUiPhase('action')
   }
 
-  // ── Start buying window (normal — before next player draws) ───────────────
-  function startBuyingWindow(state: GameState, discarder: number, discardCard: CardType | null) {
-    const order = buildBuyerOrder(state, discarder)
-    setBuyingDiscard(discardCard)
-    setBuyerOrder(order)
-    setBuyerStep(0)
-    buyingIsPostDrawRef.current = false
-
-    if (order.length === 0) {
-      if (state.roundState.goOutPlayerId !== null) {
-        endRound(state)
-      } else {
-        const next = advancePlayer(state)
-        const nextPlayer = next.players[next.roundState.currentPlayerIndex]
-        setGameState(next)
-        setUiPhase(nextPhaseForPlayer(nextPlayer))
-      }
-    } else {
-      if (discardCard) {
-        addBuyLog({
-          turn: turnCountRef.current,
-          round: state.currentRound,
-          event: 'buy_window_open',
-          playerName: state.players[discarder]?.name ?? '?',
-          card: formatCard(discardCard),
-          detail: `${order.length} buyer(s)`,
-        })
-      }
-      setUiPhase('buying')
-    }
-  }
-
   // ── Start buying window AFTER current player drew from pile (Rule 9A) ─────
   // Buyers are players AFTER currentPlayerIdx; current player will act after buying resolves
   function startBuyingWindowPostDraw(state: GameState, drewPlayerIdx: number, discardCard: CardType) {
+    // Don't open buying if someone went out — round is over
+    if (state.roundState.goOutPlayerId) {
+      endRound(state)
+      return
+    }
     const order: number[] = []
     const count = state.players.length
     const originalDiscarder = lastDiscarderIdxRef.current
@@ -1115,8 +1073,18 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     haptic(wentOut ? 'success' : 'heavy')
 
     if (wentOut) {
-      const topCard = updated.roundState.discardPile[updated.roundState.discardPile.length - 1] ?? null
-      startBuyingWindow(updated, playerIdx, topCard)
+      // Round ends immediately — no buying window, no further actions
+      setPendingBuyDiscard(null)
+      pendingBuyDiscardRef.current = null
+      setBuyerOrder([])
+      setBuyingDiscard(null)
+      setFreeOfferDeclined(false)
+      freeOfferDeclinedRef.current = false
+      if (pendingUndo) {
+        clearTimeout(pendingUndo.timerId)
+        setPendingUndo(null)
+      }
+      endRound(updated)
     }
   }
 
@@ -1253,8 +1221,18 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     if (wentOut) {
       addBuyLog({ round: prev.currentRound, turn: turnCountRef.current, event: 'went_out', playerName: player.name, card: '', detail: 'hand was empty' })
       setJokerPositionPrompt(null)
-      const topCard = updated.roundState.discardPile[updated.roundState.discardPile.length - 1] ?? null
-      startBuyingWindow(updated, playerIdx, topCard)
+      // Round ends immediately — no buying window, no further actions
+      setPendingBuyDiscard(null)
+      pendingBuyDiscardRef.current = null
+      setBuyerOrder([])
+      setBuyingDiscard(null)
+      setFreeOfferDeclined(false)
+      freeOfferDeclinedRef.current = false
+      if (pendingUndo) {
+        clearTimeout(pendingUndo.timerId)
+        setPendingUndo(null)
+      }
+      endRound(updated)
     }
   }
 
@@ -1978,9 +1956,13 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   useEffect(() => {
     if (!currentPlayer.isAI) return
     if (uiPhase !== 'draw' && uiPhase !== 'action') return
+    // BAIL if someone has gone out — round is over
+    if (gameState.roundState.goOutPlayerId) return
 
     const delay = getAIDelay(gameSpeed)
     const timerId = setTimeout(() => {
+      // Re-check goOutPlayerId inside the timeout (state may have changed)
+      if (gameStateRef.current.roundState.goOutPlayerId) return
       if (uiPhaseRef.current === 'draw') {
         const state = gameStateRef.current
         const player = getCurrentPlayer(state)
@@ -2025,6 +2007,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   // ── AI buying automation ──────────────────────────────────────────────────
   useEffect(() => {
     if (uiPhase !== 'buying') return
+    // BAIL if someone has gone out — round is over
+    if (gameState.roundState.goOutPlayerId) return
     const buyerIdx = buyerOrder[buyerStep]
     if (buyerIdx === undefined) return
     const buyer = gameState.players[buyerIdx]
@@ -2032,6 +2016,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
     const delay = getAIDelay(gameSpeed)
     const timerId = setTimeout(() => {
+      // Re-check goOutPlayerId inside the timeout
+      if (gameStateRef.current.roundState.goOutPlayerId) return
       const state = gameStateRef.current
       const currentBuyer = state.players[buyerOrderRef.current[buyerStepRef.current]]
       const disc = buyingDiscard
@@ -2190,10 +2176,39 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const buyLimitStr = gameState.buyLimit >= 999 ? '∞' : String(gameState.buyLimit)
   const isHumanDraw = uiPhase === 'draw' && !currentPlayer.isAI
 
+  // ── Race intensity tension system ──────────────────────────────────────────
+  const tensionLevel = useMemo(() => {
+    const playersCloseToOut = gameState.players.filter(p => p.hasLaidDown && p.hand.length <= 5)
+    if (playersCloseToOut.length === 0) return 0
+    const minCards = Math.min(...playersCloseToOut.map(p => p.hand.length))
+    const isRace = playersCloseToOut.length >= 2 && minCards <= 3
+    if (isRace || minCards <= 1) return 3
+    if (playersCloseToOut.length >= 1 && minCards <= 3) return 2
+    if (playersCloseToOut.length >= 1 && minCards <= 5) return 1
+    return 0
+  }, [gameState.players])
+
+  // Snap off tension when someone goes out
+  const effectiveTension = gameState.roundState.goOutPlayerId ? 0 : tensionLevel
+
+  const feltColor = effectiveTension === 0
+    ? '#1a3a2a'
+    : effectiveTension === 1
+    ? '#1e3a28'
+    : effectiveTension === 2
+    ? '#243826'
+    : '#2a3522'
+
   return (
     <div
-      className="bg-[#1a3a2a]"
-      style={{ height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+      style={{
+        height: '100dvh',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        backgroundColor: feltColor,
+        transition: 'background-color 2s ease',
+      }}
     >
       <style>{`
         @keyframes gbPulseGold{0%,100%{box-shadow:0 0 0 0 rgba(226,184,88,0)}50%{box-shadow:0 0 22px 8px rgba(226,184,88,0.85)}}
@@ -2201,6 +2216,54 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         @keyframes turnBannerIn{0%{opacity:0;transform:translateY(-20px)}100%{opacity:1;transform:translateY(0)}}
         @keyframes turnBannerOut{0%{opacity:1}100%{opacity:0}}
       `}</style>
+
+      {/* Race intensity: edge glow overlay */}
+      {effectiveTension > 0 && (
+        <div
+          className="fixed inset-0 pointer-events-none z-30"
+          style={{
+            boxShadow: effectiveTension === 1
+              ? 'inset 0 0 60px rgba(226, 184, 88, 0.08)'
+              : effectiveTension === 2
+              ? 'inset 0 0 80px rgba(226, 184, 88, 0.15)'
+              : 'inset 0 0 100px rgba(232, 150, 50, 0.25)',
+            transition: 'box-shadow 1s ease',
+          }}
+        />
+      )}
+
+      {/* Race intensity: heartbeat pulse overlay */}
+      {effectiveTension > 0 && (
+        <div
+          className="fixed inset-0 pointer-events-none z-30"
+          style={{
+            backgroundColor: '#e2b858',
+            animation: effectiveTension === 1
+              ? 'tension-pulse-slow 4s ease-in-out infinite'
+              : effectiveTension === 2
+              ? 'tension-pulse-medium 2.5s ease-in-out infinite'
+              : 'tension-pulse-fast 1.5s ease-in-out infinite',
+          }}
+        />
+      )}
+
+      {/* Race intensity: "Race to finish" text at level 3 */}
+      {effectiveTension === 3 && (
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 z-40" style={{ top: 'max(52px, calc(env(safe-area-inset-top) + 44px))' }}>
+          <div style={{
+            background: 'rgba(42,53,34,0.9)',
+            backdropFilter: 'blur(4px)',
+            padding: '4px 16px',
+            borderRadius: '0 0 12px 12px',
+            border: '1px solid rgba(226,184,88,0.3)',
+            borderTop: 'none',
+          }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: '#e2b858', display: 'flex', alignItems: 'center', gap: 6 }}>
+              🔥 Race to finish
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Turn banner — non-blocking overlay for solo-human games */}
       {turnBanner && (
@@ -2304,7 +2367,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
                       fontSize: 11, fontWeight: isMe || isActiveTurn ? 700 : 500,
                       maxWidth: 52, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>
-                      {isMe ? 'You' : p.name.split(' ')[0]}{p.isAI ? '🤖' : ''}
+                      {isMe && !p.isAI ? 'You' : p.name.split(' ')[0]}{p.isAI ? '🤖' : ''}
                     </span>
                     <span style={{ color: '#6aad7a', fontSize: 10, fontFamily: 'monospace', fontWeight: 700, marginLeft: 3 }}>
                       {total}
@@ -2367,13 +2430,15 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
                           color: isMe ? '#e2b858' : '#a8d0a8', fontSize: 11, fontWeight: 500,
                           maxWidth: 56, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                         }}>
-                          {isMe ? 'You' : `${p.name.split(' ')[0]}${p.isAI ? ' 🤖' : ''}`}
+                          {isMe && !p.isAI ? 'You' : `${p.name.split(' ')[0]}${p.isAI ? ' 🤖' : ''}`}
                         </p>
                       </div>
                       {isActiveTurn && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginBottom: 2 }}>
                           <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#e2b858', flexShrink: 0 }} />
-                          <p style={{ color: '#e2b858', fontSize: 9, fontWeight: 700, margin: 0 }}>their turn</p>
+                          <p style={{ color: '#e2b858', fontSize: 9, fontWeight: 700, margin: 0 }}>
+                            {p.isAI ? `${p.name.split(' ')[0]}'s turn` : 'your turn'}
+                          </p>
                         </div>
                       )}
                       <p style={{ color: '#6aad7a', fontSize: 10, fontFamily: 'monospace', fontWeight: 700 }}>
@@ -2415,17 +2480,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
             )}
           </div>
         )}
-        {/* Close race indicator */}
-        {(() => {
-          const racers = gameState.players.filter(p => p.hasLaidDown && p.hand.length <= 3)
-          return racers.length >= 2 ? (
-            <div className="absolute top-2 left-0 right-0 flex justify-center z-10 pointer-events-none">
-              <span className="bg-[#e2b858]/90 text-[#2c1810] text-xs font-bold px-3 py-1 rounded-full">
-                🔥 Race to finish
-              </span>
-            </div>
-          ) : null
-        })()}
+        {/* Close race indicator — replaced by tension system overlays above */}
         <div
           ref={zone2ScrollRef}
           className="px-3 py-3"
@@ -3042,7 +3097,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
             width: 48,
             height: 68,
             willChange: 'transform',
-            animation: `fly-card ${currentPlayer.isAI ? 150 : 300}ms ease-out forwards`,
+            animation: `fly-card ${currentPlayer.isAI ? 200 : 500}ms ease-out forwards`,
             '--fly-to-x': `${flyingCard.to.x - flyingCard.from.x}px`,
             '--fly-to-y': `${flyingCard.to.y - flyingCard.from.y}px`,
           } as React.CSSProperties}

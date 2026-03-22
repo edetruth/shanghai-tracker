@@ -97,8 +97,12 @@ function MicroCard({ card, meld, highlight }: { card: Card; meld: Meld; highligh
       style={{
         width: 36,
         height: 52,
-        backgroundColor: suitBg(card.suit),
-        border: highlight ? '2px solid #e2b858' : '1.5px solid rgba(255,255,255,0.25)',
+        background: isJoker
+          ? 'linear-gradient(135deg, #f5e6a3, #e2b858 50%, #c9952c)'
+          : suitBg(card.suit),
+        border: isJoker
+          ? (highlight ? '2px solid #e2b858' : '2px solid #c9952c')
+          : (highlight ? '2px solid #e2b858' : '1.5px solid rgba(255,255,255,0.25)'),
         borderRadius: 5,
         position: 'relative',
         display: 'flex',
@@ -106,20 +110,22 @@ function MicroCard({ card, meld, highlight }: { card: Card; meld: Meld; highligh
         alignItems: 'flex-start',
         justifyContent: 'space-between',
         flexShrink: 0,
-        color,
+        color: isJoker ? '#6b4c1e' : color,
         lineHeight: 1,
         overflow: 'hidden',
         userSelect: 'none',
         boxShadow: highlight
           ? '0 0 6px rgba(226,184,88,0.6), 0 1px 3px rgba(0,0,0,0.3)'
-          : '0 1px 3px rgba(0,0,0,0.25)',
+          : isJoker
+            ? '0 0 6px rgba(226,184,88,0.25), 0 1px 3px rgba(0,0,0,0.25)'
+            : '0 1px 3px rgba(0,0,0,0.25)',
         padding: 2,
       }}
     >
       {isJoker ? (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', gap: 1 }}>
-          <span style={{ fontSize: 11, fontWeight: 800 }}>{rankPart}</span>
-          <span style={{ fontSize: 13, lineHeight: 1 }}>🃏</span>
+          <span style={{ fontSize: 12, lineHeight: 1 }}>👑</span>
+          <span style={{ fontSize: 7, fontWeight: 900, letterSpacing: '0.5px' }}>{rankPart || 'JKR'}</span>
         </div>
       ) : (
         <>

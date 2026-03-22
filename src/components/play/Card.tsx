@@ -12,6 +12,7 @@ interface Props {
   isNew?: boolean
   faceDown?: boolean
   shimmer?: boolean
+  inMeld?: boolean
   style?: React.CSSProperties
 }
 
@@ -50,7 +51,7 @@ function suitTextColor(suit: string): string {
   return '#3d2b8e' // spades
 }
 
-export default function Card({ card, selected, onClick, compact, disabled, jokerLabel, isNew, faceDown, shimmer, style }: Props) {
+export default function Card({ card, selected, onClick, compact, disabled, jokerLabel, isNew, faceDown, shimmer, inMeld, style }: Props) {
   // Auto-clear NEW badge after 3 seconds
   const [showNew, setShowNew] = useState(isNew ?? false)
   useEffect(() => {
@@ -112,18 +113,29 @@ export default function Card({ card, selected, onClick, compact, disabled, joker
   const bg = suitBackground(card.suit)
   const color = suitTextColor(card.suit)
 
+  const jokerBorder = isJoker
+    ? (selected ? '2px solid #e2b858' : '2px solid #c9952c')
+    : (selected ? '2px solid #e2b858' : '1.5px solid rgba(255,255,255,0.2)')
+
+  const jokerGlow = isJoker && !selected
+    ? '0 0 8px rgba(226,184,88,0.3)'
+    : (selected ? '0 4px 12px rgba(0,0,0,0.3)' : undefined)
+
   const cardStyle: React.CSSProperties = {
-    backgroundColor: bg,
+    background: isJoker
+      ? 'linear-gradient(135deg, #f5e6a3, #e2b858 50%, #c9952c)'
+      : bg,
     borderRadius: '6px',
-    border: selected ? '2px solid #e2b858' : '1.5px solid rgba(255,255,255,0.2)',
+    border: jokerBorder,
     transform: selected ? 'translateY(-10px)' : undefined,
-    boxShadow: selected ? '0 4px 12px rgba(0,0,0,0.3)' : undefined,
+    boxShadow: jokerGlow,
     opacity: disabled ? 0.25 : 1,
     pointerEvents: disabled ? 'none' : undefined,
     width: `${width}px`,
     height: `${height}px`,
     minWidth: minW ? `${minW}px` : undefined,
     minHeight: minH ? `${minH}px` : undefined,
+    overflow: 'hidden',
     ...style,
   }
 
@@ -159,14 +171,21 @@ export default function Card({ card, selected, onClick, compact, disabled, joker
         </div>
       )}
 
+      {/* Joker shimmer overlay — in hand only, not in melds */}
+      {isJoker && !inMeld && !faceDown && (
+        <div className="absolute inset-0 rounded-[5px] overflow-hidden pointer-events-none joker-shimmer" />
+      )}
+
       {isJoker ? (
-        <div className="flex flex-col items-center justify-center w-full h-full gap-0.5">
-          <span className="text-xs font-bold" style={{ color }}>JKR</span>
-          <span className="text-base leading-none">🃏</span>
+        <div className="flex flex-col items-center justify-center w-full h-full" style={{ gap: 1 }}>
+          <span style={{ fontSize: 16, lineHeight: 1 }}>👑</span>
+          <span className="font-black tracking-widest" style={{ fontSize: 7, color: '#6b4c1e', lineHeight: 1 }}>
+            JOKER
+          </span>
           {jokerLabel && (
             <span
-              className="text-[9px] rounded px-0.5 leading-tight font-semibold border"
-              style={{ backgroundColor: '#fff8e0', color, borderColor: '#e2b858' }}
+              className="text-[8px] rounded px-0.5 leading-tight font-semibold border"
+              style={{ backgroundColor: 'rgba(255,255,255,0.5)', color: '#6b4c1e', borderColor: '#c9952c', marginTop: 1 }}
             >
               {jokerLabel}
             </span>
