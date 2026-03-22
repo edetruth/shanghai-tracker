@@ -63,8 +63,10 @@ src/
         ├── GameSetup.tsx     # 2–8 players, Human/AI toggle per slot, name autocomplete, difficulty selector
         ├── GameBoard.tsx     # Main game board: hand, melds, piles, AI automation, pause
         ├── GameOver.tsx      # End-of-game results + auto-save badge
-        ├── Card.tsx          # Card component: suit tints, haptic on tap
+        ├── GameToast.tsx     # Queued toast overlay: 5 styles (celebration/pressure/neutral/drama/taunt)
+        ├── Card.tsx          # Card component: suit tints, haptic on tap, shimmer prop
         ├── MeldModal.tsx     # Step-through meld builder: required melds → bonus-prompt → bonus phase
+        ├── TableMelds.tsx    # Table meld display: overlap layout for long runs, data-meld-id for auto-scroll
         └── HandDisplay.tsx   # Scrollable hand with controlled sort (Rank / Suit) + fade gradient
 
 supabase/
@@ -127,6 +129,9 @@ GameSetup (PlayerConfig[] configured)
   - Medium: commits to top-2 suits for runs, run-aware drawing/buying/discarding
   - Hard: all Medium + joker swaps, unlimited lay-offs, very aggressive buying
 - **AI automation** — two `useEffect` blocks in `GameBoard` watch `uiPhase` + `currentPlayer.isAI`. Uses `useRef` refs (`gameStateRef`, `uiPhaseRef`, `buyerOrderRef`, `buyerStepRef`, `pendingBuyDiscardRef`, `buyingIsPostDrawRef`) to read fresh state inside `setTimeout` callbacks without stale closures.
+- **Toast queue** — `toastQueueRef` + `queueToast()` + `showNextToast()` in `GameBoard`. `GameToast` renders from `activeToast` state. Fired at: going-down-first, going-out, joker swap ("The heist!"), consecutive-round-out streaks. CSS animations: `toast-enter`, `shimmer-sweep`, `slam-in`, `pulse-border-red` in `index.css`.
+- **Game feel moments** — Close race indicator ("🔥 Race to finish") appears in Zone 2 when 2+ players have laid down and hold ≤ 3 cards. `shimmerCardId` state triggers a gold shimmer sweep on the drawn card for human players. `RoundSummary` shows slam-in animation on Shanghaied badges and staggered card pill reveals; drama overlay fires for 1+ shanghaied (not just 2+).
+- **Inline lay-off auto-scroll** — `zone2ScrollRef` on the Zone 2 scroll container. When `inlineSelectedCard` changes, a `useEffect` queries `[data-meld-id]` in the scroll container and smoothly scrolls to the first matching meld if it is off-screen.
 - **Game speed** — `gameSpeed: 'fast' | 'normal' | 'slow'` state in `GameBoard`; toggleable from pause menu. Controls AI action delays.
 - **Dark table** — GameBoard uses `bg-[#1a3a2a]` (dark green felt) for the game screen; all text/icons adjusted for dark background.
 - **Fan hand layout** — `HandDisplay` uses absolute positioning with overlap offset computed by hand size. All cards visible without scrolling. Selected cards lift via Card's `-translate-y-3`.
@@ -174,6 +179,7 @@ Warm cream theme (not dark table). Uses `safe-top` for header padding.
 - Aces can be used **ace-low** (A-2-3-4) or **ace-high** (...Q-K-A) in runs; lay-off at either end of a run is allowed
 - **Going out** is ONLY possible by melding or laying off ALL remaining cards — discarding your last card does NOT end the round. Going out is checked after meld/lay-off, never after discard. A player with 1 card they can't lay off is "stuck" — they draw on their next turn and try again.
 - **Joker swaps are from RUNS only** — jokers in sets cannot be swapped (their suit is ambiguous). Only jokers in runs have a fixed identity (position-based) and can be replaced by the natural card they represent. `findSwappableJoker` enforces this.
+- **Joker run bounds** — a joker may not extend a run below rank 1 (Ace-low) or above rank 14 (Ace-high). `canLayOff` returns false when `runMin === 1 && runMax === 14`. `simulateLayOff` clamps silently. `handleLayOff` shows an error toast and returns early as a safety net. AI `aiChooseJokerLayOffPosition` always picks the end that has room.
 - The next player in turn order gets **first right** to take a discarded card as their normal draw (no buy used). Only if they draw from the pile does a buying window open for the remaining players.
 
 ## Key Conventions
@@ -187,7 +193,7 @@ Warm cream theme (not dark table). Uses `safe-top` for header padding.
 - **Winner** = player with the lowest total score (`computeWinner()` in gameStore.ts).
 - **Dates** are stored as ISO strings; displayed with date-fns, no timezone conversion.
 - **Import** groups rows by date + notes to reconstruct individual games.
-- **No test runner** is configured — there are no tests in this project.
+- **Tests** use **Vitest** (`npx vitest run`). Test files live in `src/game/__tests__/` (runs, sets, layoff, jokerswap, meldbuilder, requirements, scoring, goingout, buying, ai, deck). 281 tests.
 - **`onPlayerClick`** is threaded from `App.tsx` → `StatsLeaderboard`, `GameSummary` to open `PlayerProfileModal`. Also passed into `DrilldownModal` so player names in drilldown views are tappable.
 - **`total_score`** is a generated column in Supabase — never insert or update it directly.
 - **`created_by`** column does not exist in the `games` table — do not reference it.
