@@ -2093,6 +2093,21 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       currentPlayer.hand.some(c => c.suit !== 'joker' && findSwappableJoker(c, meld) !== null)
     )
 
+  // ── Race intensity tension system (must be before early returns — hooks rule) ──
+  const tensionLevel = useMemo(() => {
+    const playersCloseToOut = gameState.players.filter(p => p.hasLaidDown && p.hand.length <= 5)
+    if (playersCloseToOut.length === 0) return 0
+    const minCards = Math.min(...playersCloseToOut.map(p => p.hand.length))
+    const isRace = playersCloseToOut.length >= 2 && minCards <= 3
+    if (isRace || minCards <= 1) return 3
+    if (playersCloseToOut.length >= 1 && minCards <= 3) return 2
+    if (playersCloseToOut.length >= 1 && minCards <= 5) return 1
+    return 0
+  }, [gameState.players])
+
+  // Snap off tension when someone goes out
+  const effectiveTension = gameState.roundState.goOutPlayerId ? 0 : tensionLevel
+
   if (uiPhase === 'round-start' && announcementStage) {
     return (
       <RoundAnnouncement
@@ -2175,21 +2190,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
   const buyLimitStr = gameState.buyLimit >= 999 ? '∞' : String(gameState.buyLimit)
   const isHumanDraw = uiPhase === 'draw' && !currentPlayer.isAI
-
-  // ── Race intensity tension system ──────────────────────────────────────────
-  const tensionLevel = useMemo(() => {
-    const playersCloseToOut = gameState.players.filter(p => p.hasLaidDown && p.hand.length <= 5)
-    if (playersCloseToOut.length === 0) return 0
-    const minCards = Math.min(...playersCloseToOut.map(p => p.hand.length))
-    const isRace = playersCloseToOut.length >= 2 && minCards <= 3
-    if (isRace || minCards <= 1) return 3
-    if (playersCloseToOut.length >= 1 && minCards <= 3) return 2
-    if (playersCloseToOut.length >= 1 && minCards <= 5) return 1
-    return 0
-  }, [gameState.players])
-
-  // Snap off tension when someone goes out
-  const effectiveTension = gameState.roundState.goOutPlayerId ? 0 : tensionLevel
 
   const feltColor = effectiveTension === 0
     ? '#1a3a2a'
