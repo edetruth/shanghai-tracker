@@ -422,6 +422,33 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
   // Zone 2 scroll container — used to auto-scroll to matching melds when a card is selected
   const zone2ScrollRef = useRef<HTMLDivElement>(null)
 
+  // Auto-scroll Zone 2 to the first matching meld when the player selects a card
+  useEffect(() => {
+    const player = getCurrentPlayer(gameState)
+    if (uiPhase !== 'action' || player.isAI || !player.hasLaidDown) return
+    if (selectedCardIds.size !== 1) return
+    const cardId = [...selectedCardIds][0]
+    const card = player.hand.find(c => c.id === cardId)
+    if (!card || !zone2ScrollRef.current) return
+    const container = zone2ScrollRef.current
+    const melds = gameState.roundState.tablesMelds
+    const timer = setTimeout(() => {
+      const matching = melds.filter(m => canLayOff(card, m))
+      if (matching.length === 0) return
+      const el = container.querySelector<HTMLElement>(`[data-meld-id="${matching[0].id}"]`)
+      if (!el) return
+      const elRect = el.getBoundingClientRect()
+      const containerRect = container.getBoundingClientRect()
+      if (elRect.top < containerRect.top || elRect.bottom > containerRect.bottom) {
+        container.scrollTo({
+          top: container.scrollTop + elRect.top - containerRect.top - 16,
+          behavior: 'smooth',
+        })
+      }
+    }, 50)
+    return () => clearTimeout(timer)
+  }, [selectedCardIds, uiPhase, gameState]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Auto-clear new card indicator after 3 seconds
   useEffect(() => {
     if (newCardIds.size === 0) return
@@ -1846,29 +1873,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty = 'medium', buy
     const cardId = [...selectedCardIds][0]
     return currentPlayer.hand.find(c => c.id === cardId) ?? null
   })()
-
-  // Auto-scroll Zone 2 to the first matching meld when the player selects a card
-  useEffect(() => {
-    if (!inlineSelectedCard || !zone2ScrollRef.current) return
-    const container = zone2ScrollRef.current
-    // Small delay so the meld highlights have rendered before we scroll
-    const timer = setTimeout(() => {
-      const matchingMelds = rs.tablesMelds.filter(m => canLayOff(inlineSelectedCard, m))
-      if (matchingMelds.length === 0) return
-      const el = container.querySelector<HTMLElement>(`[data-meld-id="${matchingMelds[0].id}"]`)
-      if (!el) return
-      const elRect = el.getBoundingClientRect()
-      const containerRect = container.getBoundingClientRect()
-      // Only scroll if the element is not already fully visible
-      if (elRect.top < containerRect.top || elRect.bottom > containerRect.bottom) {
-        container.scrollTo({
-          top: container.scrollTop + elRect.top - containerRect.top - 16,
-          behavior: 'smooth',
-        })
-      }
-    }, 50)
-    return () => clearTimeout(timer)
-  }, [inlineSelectedCard]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const buyLimitStr = gameState.buyLimit >= 999 ? '∞' : String(gameState.buyLimit)
   const isHumanDraw = uiPhase === 'draw' && !currentPlayer.isAI
