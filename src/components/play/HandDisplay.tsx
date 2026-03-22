@@ -15,6 +15,8 @@ interface Props {
   newCardId?: string
   shimmerCardId?: string | null
   dealAnimation?: boolean
+  leavingCardId?: string | null
+  dealFlipPhase?: 'facedown' | 'flipping' | null
 }
 
 export const SUIT_ORDER: Record<string, number> = { hearts: 0, diamonds: 1, clubs: 2, spades: 3, joker: 4 }
@@ -39,6 +41,8 @@ export default function HandDisplay({
   newCardId,
   shimmerCardId,
   dealAnimation,
+  leavingCardId,
+  dealFlipPhase,
 }: Props) {
   const sorted = useMemo(() => {
     return [...cards].sort((a, b) => {
@@ -116,25 +120,64 @@ export default function HandDisplay({
           >
             {sorted.map((card, index) => {
               const isSelected = selectedIds.has(card.id)
+              const isLeaving = card.id === leavingCardId
+              const showFaceDown = dealFlipPhase === 'facedown'
+              const isFlipping = dealFlipPhase === 'flipping'
               return (
                 <div
                   key={card.id}
-                  className="absolute bottom-0"
+                  className={`absolute bottom-0${isLeaving ? ' animate-card-exit' : ''}`}
                   style={{
                     left: `${index * offset}px`,
                     zIndex: isSelected ? sorted.length + 10 : card.id === newCardId ? sorted.length + 5 : index + 1,
-                    transition: 'left 150ms ease',
-                    ...(dealAnimation ? { animation: `card-deal-in 200ms ease-out ${index * 50}ms both` } : {}),
+                    transition: isLeaving ? 'none' : 'left 150ms ease',
+                    ...(dealAnimation && !isFlipping ? { animation: `card-deal-in 200ms ease-out ${index * 50}ms both` } : {}),
                   }}
                 >
-                  <CardComponent
-                    card={card}
-                    selected={isSelected}
-                    isNew={card.id === newCardId}
-                    shimmer={shimmerCardId ? card.id === shimmerCardId : false}
-                    onClick={disabled ? undefined : () => onToggle(card.id)}
-                    disabled={disabled}
-                  />
+                  {isFlipping ? (
+                    /* 3D flip: wrapper rotates, back hides, face reveals */
+                    <div
+                      style={{
+                        perspective: '400px',
+                        width: 41,
+                        height: 61,
+                      }}
+                    >
+                      <div
+                        style={{
+                          position: 'relative',
+                          width: '100%',
+                          height: '100%',
+                          transformStyle: 'preserve-3d',
+                          animation: `card-flip-in 500ms ease-out ${index * 60}ms both`,
+                        }}
+                      >
+                        {/* Back face (visible at start, rotateY=0) */}
+                        <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden' }}>
+                          <CardComponent card={card} faceDown />
+                        </div>
+                        {/* Front face (hidden at start, pre-rotated 180deg) */}
+                        <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
+                          <CardComponent
+                            card={card}
+                            selected={false}
+                            onClick={disabled ? undefined : () => onToggle(card.id)}
+                            disabled={disabled}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <CardComponent
+                      card={card}
+                      selected={isLeaving ? false : isSelected}
+                      isNew={card.id === newCardId}
+                      shimmer={shimmerCardId ? card.id === shimmerCardId : false}
+                      onClick={disabled || isLeaving ? undefined : () => onToggle(card.id)}
+                      disabled={disabled || isLeaving}
+                      faceDown={showFaceDown}
+                    />
+                  )}
                 </div>
               )
             })}

@@ -215,6 +215,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const [reshuffleMsg, setReshuffleMsg] = useState(false)
   const [aiMessage, setAiMessage] = useState<string | null>(null)
   const [newCardIds, setNewCardIds] = useState<Set<string>>(new Set())
+  const [leavingCardId, setLeavingCardId] = useState<string | null>(null)
+  const [dealFlipPhase, setDealFlipPhase] = useState<'facedown' | 'flipping' | null>(null)
   const [aiActionTick, setAiActionTick] = useState(0)
   const [gameSpeed, setGameSpeed] = useState<GameSpeed>('normal')
   const [buyLog, setBuyLog] = useState<BuyLogEntry[]>([])
@@ -345,8 +347,18 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       previousLeaderRef.current = leader.name
 
       setAnnouncementStage(null)
-      setShowDealAnimation(true)
-      setTimeout(() => setShowDealAnimation(false), 1000)
+      if (reduceAnimations) {
+        setShowDealAnimation(true)
+        setTimeout(() => setShowDealAnimation(false), 1000)
+      } else {
+        // Phase 1: deal cards face-down with stagger
+        setDealFlipPhase('facedown')
+        setShowDealAnimation(true)
+        // Phase 2: flip to reveal after cards deal in
+        setTimeout(() => setDealFlipPhase('flipping'), 700)
+        // Phase 3: clean up
+        setTimeout(() => { setShowDealAnimation(false); setDealFlipPhase(null) }, 1500)
+      }
       const cp = getCurrentPlayer(gs)
       setUiPhase(cp.isAI ? 'draw' : (soloHuman ? 'draw' : 'privacy'))
     }, offset))
@@ -367,8 +379,15 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     previousLeaderRef.current = leader.name
 
     setAnnouncementStage(null)
-    setShowDealAnimation(true)
-    setTimeout(() => setShowDealAnimation(false), 1000)
+    if (reduceAnimations) {
+      setShowDealAnimation(true)
+      setTimeout(() => setShowDealAnimation(false), 1000)
+    } else {
+      setDealFlipPhase('facedown')
+      setShowDealAnimation(true)
+      setTimeout(() => setDealFlipPhase('flipping'), 700)
+      setTimeout(() => { setShowDealAnimation(false); setDealFlipPhase(null) }, 1500)
+    }
     const cp = getCurrentPlayer(gameState)
     setUiPhase(cp.isAI ? 'draw' : (soloHuman ? 'draw' : 'privacy'))
   }
@@ -486,6 +505,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
   function animateDiscard(card: CardType) {
     if (reduceAnimations) return
+    // Mark card as leaving so it shrinks out of the hand
+    setLeavingCardId(card.id)
     // Try to find the card element by data-card-id for precise origin
     const cardEl = document.querySelector(`[data-card-id="${card.id}"]`)
     const from = cardEl
@@ -495,7 +516,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     const to = getRefCenter(discardPileRef)
     if (!from || !to) return
     setFlyingCard({ from, to, card, faceDown: false })
-    setTimeout(() => setFlyingCard(null), 300)
+    setTimeout(() => { setFlyingCard(null); setLeavingCardId(null) }, 300)
   }
 
   function animateBuy(discardCard: CardType, isAI: boolean) {
@@ -770,14 +791,19 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     }
 
     if (drawnCard) {
-      setNewCardIds(new Set([drawnCard.id]))
+      const isAI = !!gameState.players[gameState.roundState.currentPlayerIndex]?.isAI
       // Flying card animation: draw pile → hand
-      animateDrawFromPile(!!gameState.players[gameState.roundState.currentPlayerIndex]?.isAI)
-      // Shimmer the drawn card briefly for the human drawing player
-      if (!gameState.players[gameState.roundState.currentPlayerIndex]?.isAI) {
-        setShimmerCardId(drawnCard.id)
-        setTimeout(() => setShimmerCardId(null), 1500)
-      }
+      animateDrawFromPile(isAI)
+      // Delay NEW badge until after the flying animation lands
+      const animDuration = reduceAnimations ? 0 : (isAI ? 150 : 300)
+      setTimeout(() => {
+        setNewCardIds(new Set([drawnCard.id]))
+        // Shimmer the drawn card briefly for the human drawing player
+        if (!isAI) {
+          setShimmerCardId(drawnCard.id)
+          setTimeout(() => setShimmerCardId(null), 1500)
+        }
+      }, animDuration)
     }
 
     // Telemetry: record pile draw
@@ -829,11 +855,13 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     }
 
     setPendingBuyDiscard(null) // clear pending buy — card is taken
-    setNewCardIds(new Set([card.id]))
 
     // Flying card animation: discard pile → hand
     const taker = gameState.players[gameState.roundState.currentPlayerIndex]
     animateTakeDiscard(card, !!taker.isAI)
+    // Delay NEW badge until after the flying animation lands
+    const animDuration = reduceAnimations ? 0 : (taker.isAI ? 150 : 300)
+    setTimeout(() => setNewCardIds(new Set([card.id])), animDuration)
 
     // Record for opponent awareness (Hard AI)
     recordOpponentEvent(taker.id, 'picked', card)
@@ -2561,6 +2589,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
             newCardId={[...newCardIds][0]}
             shimmerCardId={shimmerCardId}
             dealAnimation={showDealAnimation}
+            leavingCardId={leavingCardId}
+            dealFlipPhase={dealFlipPhase}
           />
         ) : aiTurnHumanViewer ? (
           <HandDisplay
