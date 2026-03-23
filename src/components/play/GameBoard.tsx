@@ -192,6 +192,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const [gameState, setGameState] = useState<GameState>(() => initGame(initialPlayers, buyLimit))
   const [uiPhase, setUiPhase] = useState<UIPhase>('round-start')
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set())
+  const selectedCardOrderRef = useRef<string[]>([])
   const [handSort, setHandSort] = useState<'rank' | 'suit'>('rank')
   const [showMeldModal, setShowMeldModal] = useState(false)
   const [jokerPositionPrompt, setJokerPositionPrompt] = useState<{ card: CardType; meld: Meld } | null>(null)
@@ -241,6 +242,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const aiTurnsCouldGoDownRef = useRef<Map<string, number>>(new Map())
   // Panic mode: total turns elapsed per AI player per round (resets each round)
   const aiTurnsElapsedRef = useRef<Map<string, number>>(new Map())
+  // Last action indicator — briefly shows what the previous player did
+  const [lastAction, setLastAction] = useState<string | null>(null)
+  const lastActionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ── Telemetry tracking refs ─────────────────────────────────────────────────
   const pendingDecisionsRef = useRef<AIDecision[]>([])
@@ -557,6 +561,12 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     map.get(playerId)![type].push(card)
   }
 
+  function showLastAction(msg: string) {
+    if (lastActionTimerRef.current) clearTimeout(lastActionTimerRef.current)
+    setLastAction(msg)
+    lastActionTimerRef.current = setTimeout(() => setLastAction(null), 2500)
+  }
+
   // ── Create game record on mount ───────────────────────────────────────────
   useEffect(() => {
     const date = new Date().toISOString().split('T')[0]
@@ -690,13 +700,23 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     })
   }, [currentPlayer.hand, handSort])
 
+  function clearSelection() {
+    setSelectedCardIds(new Set())
+    selectedCardOrderRef.current = []
+  }
+
   // ── Toggle card selection ─────────────────────────────────────────────────
   function toggleCard(cardId: string) {
     setNewCardIds(new Set()) // clear new badge on any action
     setSelectedCardIds(prev => {
       const next = new Set(prev)
-      if (next.has(cardId)) next.delete(cardId)
-      else next.add(cardId)
+      if (next.has(cardId)) {
+        next.delete(cardId)
+        selectedCardOrderRef.current = selectedCardOrderRef.current.filter(id => id !== cardId)
+      } else {
+        next.add(cardId)
+        selectedCardOrderRef.current = [...selectedCardOrderRef.current, cardId]
+      }
       return next
     })
   }
@@ -1069,7 +1089,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     setGameState(updated)
     setShowMeldModal(false)
     setPreLayDownSwap(false)
-    setSelectedCardIds(new Set()) // always reset selection after meld
+    clearSelection() // always reset selection after meld
     haptic(wentOut ? 'success' : 'heavy')
 
     if (wentOut) {
@@ -1193,7 +1213,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       addBuyLog({ round: prev.currentRound, turn: turnCountRef.current, event: 'scenario_c', playerName: player.name, card: '', detail: 'lay-off reversed' })
       getTelemetryCounters(player.id).scenarioC++
       setGameState(afterReversal)
-      setSelectedCardIds(new Set())
+      clearSelection()
       setLayOffError(null)
       haptic('heavy')
       // Clear any joker prompt and return player to action phase — do NOT advance turns
@@ -1206,7 +1226,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
     const updated: GameState = { ...prev, players, roundState: { ...prev.roundState, tablesMelds, goOutPlayerId } }
     setGameState(updated)
-    setSelectedCardIds(new Set())
+    clearSelection()
     setLayOffError(null)
 
     // Trigger card-join animation for the laid-off card
@@ -1272,7 +1292,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     })
     haptic('heavy')
     setGameState(prev => computeJokerSwap(prev, naturalCard, meld) ?? prev)
-    setSelectedCardIds(new Set())
+    clearSelection()
   }
 
   // ── Inline lay-off (from TableMelds tap) ─────────────────────────────────
@@ -1346,7 +1366,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         addBuyLog({ round: gameState.currentRound, turn: turnCountRef.current, event: 'scenario_b', playerName: player.name, card: '', detail: 'bonus meld reversed' })
         getTelemetryCounters(player.id).scenarioB++
         setGameState(afterRollback)
-        setSelectedCardIds(new Set())
+        clearSelection()
         haptic('heavy')
         const advanced = advancePlayer(afterRollback)
         const nextPlayer = advanced.players[advanced.roundState.currentPlayerIndex]
@@ -1399,7 +1419,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     animateDiscard(card)
 
     setGameState(afterDiscard)
-    setSelectedCardIds(new Set())
+    clearSelection()
     haptic('heavy')
 
     turnCountRef.current += 1
@@ -1604,7 +1624,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     setGameState(initGame(initialPlayers, buyLimit))
     setUiPhase('round-start')
     setRoundResults(null)
-    setSelectedCardIds(new Set())
+    clearSelection()
     setPendingUndo(null)
     setPendingBuyDiscard(null)
     setBuyLog([])
@@ -1743,7 +1763,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       const next = setupRound(gameState, nextRound)
       setGameState(next)
       setRoundResults(null)
-      setSelectedCardIds(new Set())
+      clearSelection()
       setPendingBuyDiscard(null)
       setUiPhase('round-start')
     }
@@ -1839,6 +1859,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           aiLayOffCountRef.current = 0
           setAiMessage(`${player.name} lays down`)
           setTimeout(() => setAiMessage(null), 1200)
+          showLastAction(`${player.name} lays down!`)
           handleMeldConfirm(melds, aiJokerPositions(melds))
           return
         }
@@ -1847,6 +1868,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       const card = aiChooseDiscardEasy(player.hand)
       setAiMessage(`${player.name} discards`)
       setTimeout(() => setAiMessage(null), 800)
+      showLastAction(`${player.name} discards`)
       handleDiscard(card.id)
       return
     }
@@ -1878,6 +1900,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           noProgressTurnsRef.current = 0
           setAiMessage(`${player.name} lays down!`)
           setTimeout(() => setAiMessage(null), 1500)
+          showLastAction(`${player.name} lays down!`)
           handleMeldConfirm(melds, aiJokerPositions(melds))
           return
         } else {
@@ -1913,6 +1936,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         if (layOff.card.suit !== 'joker') aiLayOffCountRef.current++
         setAiMessage(`${player.name} lays off`)
         setTimeout(() => setAiMessage(null), 1000)
+        showLastAction(`${player.name} lays off`)
         handleLayOff(layOff.card, layOff.meld, layOff.jokerPosition)
         return
       }
@@ -1947,6 +1971,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       }
       console.log(`[Buy] AI ${player.name} discarded [${card.rank === 0 ? 'Joker' : `${card.rank}${card.suit}`}]`)
       setTimeout(() => setAiMessage(null), 800)
+      showLastAction(`${player.name} discards`)
       handleDiscard(card.id)
     }
   }
@@ -1993,6 +2018,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           ? `${player.name} takes the discard`
           : `${player.name} draws from pile`)
         setTimeout(() => setAiMessage(null), 1000)
+        showLastAction(shouldTake ? `${player.name} took the discard` : `${player.name} drew from pile`)
 
         if (shouldTake) handleTakeDiscard()
         else handleDrawFromPile()
@@ -2050,8 +2076,12 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         shouldBuy = aiShouldBuyEasy(currentBuyer.hand, disc, req, currentBuyer.buysRemaining)
       }
 
-      if (shouldBuy) setAiMessage(`${currentBuyer.name} buys!`)
-      else setAiMessage(`${currentBuyer.name} passes`)
+      if (shouldBuy) {
+        setAiMessage(`${currentBuyer.name} buys!`)
+        showLastAction(`${currentBuyer.name} buys!`)
+      } else {
+        setAiMessage(`${currentBuyer.name} passes`)
+      }
       setTimeout(() => setAiMessage(null), 800)
       handleBuyDecision(shouldBuy)
     }, Math.min(delay, 900))
@@ -2136,6 +2166,22 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       <PrivacyScreen
         playerName={currentPlayer.name}
         onReady={() => setUiPhase('draw')}
+        roundNum={rs.roundNumber}
+        requirement={rs.requirement.description}
+        rank={(() => {
+          const sorted = [...gameState.players].sort((a, b) =>
+            a.roundScores.reduce((s, n) => s + n, 0) - b.roundScores.reduce((s, n) => s + n, 0)
+          )
+          return sorted.findIndex(p => p.id === currentPlayer.id) + 1
+        })()}
+        totalPlayers={gameState.players.length}
+        scoreDiff={(() => {
+          const totals = gameState.players.map(p => ({ id: p.id, total: p.roundScores.reduce((s, n) => s + n, 0) }))
+          const sorted = [...totals].sort((a, b) => a.total - b.total)
+          const myTotal = totals.find(t => t.id === currentPlayer.id)?.total ?? 0
+          const leaderTotal = sorted[0]?.total ?? 0
+          return myTotal - leaderTotal
+        })()}
       />
     )
   }
@@ -2355,7 +2401,12 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
                 const isActiveTurn = p.id === currentPlayer.id
                 const isBuyingNow = uiPhase === 'buying' && activeBuyer?.id === p.id
                 return (
-                  <span key={p.id} style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
+                  <span key={p.id} style={{
+                    display: 'inline-flex', alignItems: 'center', flexShrink: 0,
+                    borderLeft: isActiveTurn ? '3px solid #e2b858' : '3px solid transparent',
+                    paddingLeft: isActiveTurn ? 4 : 0,
+                    transition: 'border-color 200ms ease, padding-left 200ms ease',
+                  }}>
                     {i > 0 && <span style={{ color: '#2d5a3a', margin: '0 5px', fontSize: 10 }}>·</span>}
                     {/* Meld dot */}
                     <span style={{
@@ -2372,7 +2423,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
                     <span style={{ color: '#6aad7a', fontSize: 10, fontFamily: 'monospace', fontWeight: 700, marginLeft: 3 }}>
                       {total}
                     </span>
-                    <span style={{ color: '#a8d0a8', fontSize: 10, marginLeft: 2 }}>
+                    <span key={p.hand.length} style={{ color: '#a8d0a8', fontSize: 10, marginLeft: 2, animation: 'number-roll 300ms ease-out' }}>
                       🃏{p.hand.length}
                     </span>
                     {isBuyingNow && !isMe && (
@@ -2414,11 +2465,13 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
                       className={isBuyingNow && !isMe ? 'animate-pulse' : ''}
                       style={{
                         flexShrink: 0,
-                        background: isMe ? '#1e3010' : '#0f2218',
+                        background: isActiveTurn ? '#1e4a2e' : (isMe ? '#1e3010' : '#0f2218'),
                         border: `1px solid ${borderColor}`,
+                        borderLeft: isActiveTurn ? '3px solid #e2b858' : `1px solid ${borderColor}`,
                         borderRadius: 10,
                         padding: '6px 8px',
                         minWidth: 68,
+                        transition: 'all 200ms ease',
                       }}
                     >
                       <div className="flex items-center gap-1 mb-0.5">
@@ -2432,6 +2485,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
                         }}>
                           {isMe && !p.isAI ? 'You' : `${p.name.split(' ')[0]}${p.isAI ? ' 🤖' : ''}`}
                         </p>
+                        {p.hasLaidDown && (
+                          <span style={{ color: '#6aad7a', fontSize: 8, fontWeight: 700, marginLeft: 2 }}>DOWN</span>
+                        )}
                       </div>
                       {isActiveTurn && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginBottom: 2 }}>
@@ -2444,7 +2500,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
                       <p style={{ color: '#6aad7a', fontSize: 10, fontFamily: 'monospace', fontWeight: 700 }}>
                         {total} pts
                       </p>
-                      <p style={{ color: '#a8d0a8', fontSize: 10 }}>🃏 {p.hand.length}</p>
+                      <p key={p.hand.length} style={{ color: '#a8d0a8', fontSize: 10, animation: 'number-roll 300ms ease-out' }}>🃏 {p.hand.length}</p>
                       <p style={{ color: buysColor, fontSize: 10, fontWeight: 600 }}>
                         {p.buysRemaining}/{buyLimitStr} buys
                       </p>
@@ -2460,6 +2516,50 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           )}
         </div>
       </div>
+
+      {/* Phase indicator */}
+      <div style={{
+        height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: '#0f2218', borderBottom: '1px solid #2d5a3a',
+      }}>
+        <span style={{
+          fontSize: 10, fontWeight: 600, textTransform: 'uppercase' as const,
+          letterSpacing: '0.1em', color: '#6aad7a',
+        }}>
+          {(() => {
+            if (uiPhase === 'draw' && !currentPlayer.isAI) return 'Draw a card'
+            if (uiPhase === 'action' && !currentPlayer.isAI) return 'Play your hand'
+            if ((uiPhase === 'draw' || uiPhase === 'action') && currentPlayer.isAI) return `${currentPlayer.name} is thinking`
+            if (uiPhase === 'buying') return 'Buying window'
+            return ''
+          })()}
+          {((uiPhase === 'draw' || uiPhase === 'action') && currentPlayer.isAI) && (
+            <>
+              <span style={{ display: 'inline-block', animation: 'thinking-dot 1s ease-in-out infinite' }}>.</span>
+              <span style={{ display: 'inline-block', animation: 'thinking-dot 1s ease-in-out 200ms infinite' }}>.</span>
+              <span style={{ display: 'inline-block', animation: 'thinking-dot 1s ease-in-out 400ms infinite' }}>.</span>
+            </>
+          )}
+        </span>
+      </div>
+
+      {/* Last action indicator */}
+      {lastAction && (
+        <div style={{
+          height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: '#0f2218',
+        }}>
+          <span
+            key={lastAction}
+            style={{
+              fontSize: 10, color: '#8bc48b', fontStyle: 'italic',
+              animation: 'fade-in-out 2.5s ease both',
+            }}
+          >
+            {lastAction}
+          </span>
+        </div>
+      )}
 
       {/* ── ZONE 2: Scrollable middle — table melds + overlay toast ──── */}
       <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
@@ -2525,7 +2625,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
               {isHumanDraw ? 'TAP TO DRAW' : 'Draw'}
             </p>
             {rs.drawPile.length > 0 ? (
-              <div style={{
+              <div className="draw-pile-press" style={{
                 borderRadius: 6,
                 animation: isHumanDraw ? 'gbPulseGreen 1.2s ease-in-out 0.3s infinite' : 'none',
                 transform: 'scale(0.85)', transformOrigin: 'top center',
@@ -2548,7 +2648,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
                 Empty
               </div>
             )}
-            <p style={{ color: '#6aad7a', fontSize: 9, margin: 0 }}>{rs.drawPile.length} cards</p>
+            <p key={rs.drawPile.length} style={{ color: '#6aad7a', fontSize: 9, margin: 0, animation: 'number-roll 300ms ease-out' }}>{rs.drawPile.length} cards</p>
           </div>
 
           {/* Discard pile */}
@@ -2562,11 +2662,13 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
               {isHumanDraw ? 'TAP TO TAKE' : isHumanBuyerTurn ? 'FOR SALE' : 'Discard'}
             </p>
             {(isHumanBuyerTurn ? buyingDiscard : topDiscard) ? (
-              <div style={{
-                borderRadius: 6,
-                animation: isHumanDraw ? 'gbPulseGold 1.2s ease-in-out infinite' : 'none',
-                transform: 'scale(0.85)', transformOrigin: 'top center',
-              }}>
+              <div
+                key={(isHumanBuyerTurn && buyingDiscard ? buyingDiscard.id : topDiscard?.id) ?? 'empty'}
+                style={{
+                  borderRadius: 6,
+                  animation: isHumanBuyerTurn ? 'for-sale-pulse 1.5s ease-in-out infinite' : isHumanDraw ? 'gbPulseGold 1.2s ease-in-out infinite' : 'card-land 250ms ease-out',
+                  transform: 'scale(0.85)', transformOrigin: 'top center',
+                }}>
                 <CardComponent
                   card={(isHumanBuyerTurn && buyingDiscard ? buyingDiscard : topDiscard)!}
                   onClick={isHumanDraw ? handleTakeDiscard : undefined}
@@ -2636,6 +2738,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           <HandDisplay
             cards={displayPlayer.hand}
             selectedIds={selectedCardIds}
+            selectionOrder={selectedCardOrderRef.current}
             onToggle={toggleCard}
             label={`${isHumanBuyerTurn ? displayPlayer.name + "'s " : 'Your '}hand (${displayPlayer.hand.length} cards)`}
             disabled={false}
@@ -2728,6 +2831,14 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         {/* Action buttons */}
         {uiPhase === 'action' && !currentPlayer.isAI && !pendingUndo && !jokerPositionPrompt && (
           <div className="space-y-2 mt-2">
+            {!currentPlayer.hasLaidDown && (
+              <p style={{
+                fontSize: 10, color: '#6aad7a', textAlign: 'center',
+                margin: '0 0 4px', padding: 0,
+              }}>
+                Need: {rs.requirement.description}
+              </p>
+            )}
             {!currentPlayer.hasLaidDown ? (
               /* Pre-lay-down: [Swap Joker?] [Lay Down] [Discard] */
               <>
@@ -2878,7 +2989,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           const canLayDown = aiFindBestMelds(newHand, rs.requirement) !== null
           if (canLayDown) {
             setGameState(afterSwap)
-            setSelectedCardIds(new Set())
+            clearSelection()
             preLayDownSwapBaseStateRef.current = null
             setPreSwapCardId(null)
             setPreSwapMeldId(null)
@@ -2893,14 +3004,14 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
             )
             if (moreSwapsPossible) {
               setGameState(afterSwap)
-              setSelectedCardIds(new Set())
+              clearSelection()
               setPreSwapCardId(null)
               setPreSwapMeldId(null)
             } else {
               const baseState = preLayDownSwapBaseStateRef.current
               setGameState(baseState ?? gameState)
               preLayDownSwapBaseStateRef.current = null
-              setSelectedCardIds(new Set())
+              clearSelection()
               setPreSwapCardId(null)
               setPreSwapMeldId(null)
               setShowPreLayDownSwapModal(false)

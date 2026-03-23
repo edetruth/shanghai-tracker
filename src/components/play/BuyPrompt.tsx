@@ -107,7 +107,7 @@ export default function BuyPrompt({
           borderRadius: 10,
           marginBottom: 8,
           overflow: 'hidden',
-          animation: 'bpGlow 2s ease-in-out infinite',
+          animation: 'slide-up-prompt 250ms ease-out both, bpGlow 2s ease-in-out infinite',
           flexShrink: 0,
         }}
       >
@@ -181,6 +181,7 @@ export default function BuyPrompt({
           ) : (
             <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
               <button
+                className="pass-btn"
                 onClick={handleDecline}
                 style={{
                   background: 'transparent',
@@ -193,11 +194,13 @@ export default function BuyPrompt({
                   cursor: 'pointer',
                   minHeight: 36,
                   minWidth: 52,
+                  transition: 'transform 100ms ease',
                 }}
               >
                 Pass
               </button>
               <button
+                className="buy-btn"
                 onClick={handleAccept}
                 disabled={!canBuy}
                 style={{
@@ -212,6 +215,7 @@ export default function BuyPrompt({
                   minHeight: 36,
                   minWidth: 58,
                   opacity: canBuy ? 1 : 0.35,
+                  transition: 'transform 100ms ease',
                 }}
               >
                 {isFree ? 'Take it' : 'Buy it'}

@@ -17,6 +17,26 @@ interface Props {
   isLastRound: boolean
 }
 
+// ── AnimatedNumber (count-up effect) ────────────────────────────────────────
+
+function AnimatedNumber({ from, to, duration = 500 }: { from: number; to: number; duration?: number }) {
+  const [display, setDisplay] = useState(from)
+
+  useEffect(() => {
+    if (from === to) { setDisplay(to); return }
+    const start = Date.now()
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - start
+      const progress = Math.min(elapsed / duration, 1)
+      setDisplay(Math.round(from + (to - from) * progress))
+      if (progress >= 1) clearInterval(interval)
+    }, 16)
+    return () => clearInterval(interval)
+  }, [from, to, duration])
+
+  return <>{display}</>
+}
+
 // ── Card label helpers ────────────────────────────────────────────────────────
 
 function rankLabel(rank: number): string {
@@ -86,8 +106,12 @@ export default function RoundSummary({ players, roundResults, roundNum, onNext, 
   const [tab, setTab] = useState<'round' | 'standings'>('round')
   const [visible, setVisible] = useState(false)
   const [showShanghai, setShowShanghai] = useState(false)
+  const [revealedCount, setRevealedCount] = useState(0)
 
   const roundInfo = ROUNDS[roundNum - 1]
+
+  // Next round preview info
+  const nextRoundInfo = !isLastRound ? ROUNDS[roundNum] : null // roundNum is current (1-indexed), so ROUNDS[roundNum] is next
 
   // Fade in on mount (spec §6.1)
   useEffect(() => {
@@ -120,6 +144,14 @@ export default function RoundSummary({ players, roundResults, roundNum, onNext, 
     [players, roundResults]
   )
 
+  // Staggered reveal for round tab
+  useEffect(() => {
+    const timers = sortedByRound.map((_, i) =>
+      setTimeout(() => setRevealedCount(i + 1), 500 + i * 400)
+    )
+    return () => timers.forEach(clearTimeout)
+  }, [sortedByRound.length])
+
   // Sorted for "Standings" tab: cumulative total ascending
   const sortedByTotal = useMemo(
     () =>
@@ -132,6 +164,7 @@ export default function RoundSummary({ players, roundResults, roundNum, onNext, 
   )
 
   const activeList = tab === 'round' ? sortedByRound : sortedByTotal
+  const displayList = tab === 'round' ? activeList.slice(0, revealedCount) : activeList
 
   return (
     <div
@@ -264,7 +297,7 @@ export default function RoundSummary({ players, roundResults, roundNum, onNext, 
 
         {/* Score rows (spec §6 score rows) */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {activeList.map((player, rankIdx) => {
+          {displayList.map((player, rankIdx) => {
             const playerIdx = players.indexOf(player)
             const result = roundResults.find(r => r.playerId === player.id)
             if (!result) return null
@@ -289,6 +322,7 @@ export default function RoundSummary({ players, roundResults, roundNum, onNext, 
                   borderRadius: 8,
                   padding: '8px 10px',
                   opacity: isShanghaied ? 0.9 : 1,
+                  animation: tab === 'round' ? 'slide-up-fade 300ms ease-out both' : undefined,
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -351,7 +385,7 @@ export default function RoundSummary({ players, roundResults, roundNum, onNext, 
                           {result.score === 0 ? '0' : `+${result.score}`}
                         </p>
                         <p style={{ fontSize: 10, color: '#6aad7a', margin: '2px 0 0' }}>
-                          {total} total
+                          <AnimatedNumber from={total - result.score} to={total} /> total
                         </p>
                       </>
                     ) : (
@@ -395,7 +429,14 @@ export default function RoundSummary({ players, roundResults, roundNum, onNext, 
             cursor: 'pointer',
           }}
         >
-          {isLastRound ? 'See Final Results →' : `Start Round ${roundNum + 1} →`}
+          <span style={{ display: 'block', fontWeight: 700, fontSize: 15 }}>
+            {isLastRound ? 'See Final Results \u2192' : `Start Round ${roundNum + 1} \u2192`}
+          </span>
+          {nextRoundInfo && (
+            <span style={{ display: 'block', fontSize: 11, opacity: 0.7, marginTop: 2 }}>
+              {nextRoundInfo.name} \u00b7 {nextRoundInfo.cards} cards
+            </span>
+          )}
         </button>
       </div>
     </div>

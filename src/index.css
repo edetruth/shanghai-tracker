@@ -134,11 +134,10 @@
   100% { opacity: 1; transform: translateY(0); }
 }
 @keyframes countdown-pulse {
-  0% { opacity: 0; transform: scale(0.8); }
-  20% { opacity: 1; transform: scale(1.15); }
-  50% { transform: scale(1); }
-  80% { opacity: 1; }
-  100% { opacity: 0; transform: scale(0.95); }
+  0% { opacity: 0; transform: scale(0.5); }
+  25% { opacity: 1; transform: scale(1.1); }
+  50% { opacity: 1; transform: scale(1); }
+  100% { opacity: 1; transform: scale(1); }
 }
 @keyframes ripple {
   0% { transform: scale(0.8); opacity: 0.5; }
@@ -173,29 +172,20 @@
   50% { text-shadow: 0 0 40px rgba(232, 112, 112, 0.8), 0 0 60px rgba(226, 184, 88, 0.4); }
 }
 @keyframes heartbeat-pulse {
-  0% { opacity: 0; transform: scale(0.8); }
+  0% { opacity: 0; transform: scale(0.5); }
   15% { opacity: 1; transform: scale(1.15); }
-  30% { transform: scale(1.05); }
-  45% { transform: scale(1.12); }
-  60% { transform: scale(1); }
-  80% { opacity: 1; }
-  100% { opacity: 0; transform: scale(0.95); }
+  30% { opacity: 1; transform: scale(1.05); }
+  45% { opacity: 1; transform: scale(1.12); }
+  60% { opacity: 1; transform: scale(1); }
+  100% { opacity: 1; transform: scale(1); }
 }
 
-/* Race intensity heartbeat pulses */
-@keyframes tension-pulse-slow {
-  0%, 100% { opacity: 0; }
-  50% { opacity: 0.03; }
-}
-@keyframes tension-pulse-medium {
-  0%, 100% { opacity: 0; }
-  50% { opacity: 0.05; }
-}
-@keyframes tension-pulse-fast {
-  0%, 100% { opacity: 0; }
-  30% { opacity: 0.07; }
-  45% { opacity: 0.04; }
-  60% { opacity: 0.07; }
+/* Race commentary fade animation */
+@keyframes race-message-fade {
+  0% { opacity: 0; transform: translateY(4px); }
+  15% { opacity: 1; transform: translateY(0); }
+  85% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-4px); }
 }
 
 /* Joker card shimmer */
@@ -242,4 +232,149 @@
 }
 .animate-card-join {
   animation: card-join 400ms ease-out both;
+}
+
+/* Living felt — floating particles */
+@keyframes particle-float {
+  0% { transform: translateY(100%) translateX(0); opacity: 0; }
+  10% { opacity: 0.15; }
+  90% { opacity: 0.15; }
+  100% { transform: translateY(-20px) translateX(20px); opacity: 0; }
+}
+
+/* Your-turn hand pulse */
+@keyframes your-turn-pulse {
+  0%, 100% { border-color: rgba(226, 184, 88, 0); }
+  50% { border-color: rgba(226, 184, 88, 0.3); }
+}
+
+/* Discard label fade */
+@keyframes fade-in-out {
+  0% { opacity: 0; }
+  15% { opacity: 1; }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Card felt pattern */
+.card-felt-pattern {
+  width: 100%;
+  height: 100%;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Ctext x='5' y='20' font-size='14' fill='%23a8d0a8'%3E%E2%99%A0%3C/text%3E%3Ctext x='35' y='20' font-size='14' fill='%23a8d0a8'%3E%E2%99%A5%3C/text%3E%3Ctext x='5' y='48' font-size='14' fill='%23a8d0a8'%3E%E2%99%A6%3C/text%3E%3Ctext x='35' y='48' font-size='14' fill='%23a8d0a8'%3E%E2%99%A3%3C/text%3E%3C/svg%3E");
+  background-repeat: repeat;
+}
+
+/* ── Screen transitions ────────────────────────────────────────────────────── */
+
+/* HomePage staggered card entrance */
+@keyframes slide-up-fade {
+  0% { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* GameSetup step transitions */
+@keyframes step-forward-in {
+  0% { opacity: 0; transform: translateX(30px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+@keyframes step-back-in {
+  0% { opacity: 0; transform: translateX(-30px); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+/* RoundSummary slide-up entrance */
+@keyframes slide-up-screen {
+  0% { opacity: 0; transform: translateY(40px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* GameOver slide-up entrance */
+@keyframes game-over-entrance {
+  0% { opacity: 0; transform: translateY(30px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* GAME OVER text reveal */
+@keyframes game-over-text {
+  0% { opacity: 0; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1.05); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* Fade to black overlay */
+@keyframes fade-in-black {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* ── Polish Batch 2: Card Interactions ──────────────────────────────────────── */
+
+/* Sort toggle press feel */
+.sort-toggle-btn:active {
+  transform: scale(0.95) !important;
+}
+
+/* Draw pile count roll animation */
+@keyframes number-roll {
+  0% { opacity: 0; transform: translateY(-8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Draw pile press effect */
+.draw-pile-press:active {
+  transform: scale(0.92) !important;
+}
+
+/* Discard landing bounce */
+@keyframes card-land {
+  0% { transform: scale(1.05); }
+  50% { transform: scale(0.98); }
+  100% { transform: scale(1); }
+}
+
+/* ── Polish Batch 3: Table Interactions ─────────────────────────────────────── */
+
+@keyframes meld-slam {
+  0% { opacity: 0; transform: translateY(30px) scale(0.9); }
+  60% { opacity: 1; transform: translateY(-4px) scale(1.02); }
+  80% { transform: translateY(2px) scale(1); }
+  100% { transform: translateY(0) scale(1); }
+}
+@keyframes border-flash {
+  0%, 100% { border-color: rgba(255, 255, 255, 0); }
+  30% { border-color: rgba(255, 255, 255, 0.5); }
+}
+@keyframes meld-expand {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+@keyframes for-sale-pulse {
+  0%, 100% { box-shadow: 0 0 4px rgba(226, 184, 88, 0.3); }
+  50% { box-shadow: 0 0 12px rgba(226, 184, 88, 0.8); }
+}
+@keyframes slide-up-prompt {
+  0% { transform: translateY(100%); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+@keyframes unwanted-dim {
+  0% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+.buy-btn:active, .pass-btn:active {
+  transform: scale(0.95) !important;
+}
+
+/* ── Polish Batch 4: Turn Flow & Indicators ─────────────────────────────────── */
+
+@keyframes thinking-dot {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
+}
+
+/* ── Polish Batch 6: Game Over & Round Summary ──────────────────────────────── */
+
+.play-again-btn:active {
+  transform: scale(0.98) !important;
 }

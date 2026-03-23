@@ -205,16 +205,34 @@ export default function TableMelds({
   onJokerSwap,
   justLaidOffCardIds,
 }: Props) {
-  // ── Meld appear animation tracking ──────────────────────────────────────
+  // ── Staggered meld entrance animation ──────────────────────────────────
   const prevMeldIdsRef = useRef<Set<string>>(new Set())
-  const [animatingMeldIds, setAnimatingMeldIds] = useState<Set<string>>(new Set())
+  const [newMeldIds, setNewMeldIds] = useState<Set<string>>(new Set())
+  const [visibleMeldIds, setVisibleMeldIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     const currentIds = new Set(melds.map(m => m.id))
-    const newIds = [...currentIds].filter(id => !prevMeldIdsRef.current.has(id))
-    if (newIds.length > 0) {
-      setAnimatingMeldIds(new Set(newIds))
-      setTimeout(() => setAnimatingMeldIds(new Set()), 600)
+    const fresh = [...currentIds].filter(id => !prevMeldIdsRef.current.has(id))
+
+    if (fresh.length > 0) {
+      setNewMeldIds(new Set(fresh))
+      // Stagger: reveal each meld 300ms apart
+      const timers = fresh.map((id, i) =>
+        setTimeout(() => {
+          setVisibleMeldIds(prev => new Set([...prev, id]))
+        }, i * 300)
+      )
+      // Clear animation state after all are shown
+      const clearTimer = setTimeout(() => {
+        setNewMeldIds(new Set())
+        setVisibleMeldIds(new Set())
+      }, fresh.length * 300 + 500)
+
+      prevMeldIdsRef.current = currentIds
+      return () => {
+        timers.forEach(clearTimeout)
+        clearTimeout(clearTimer)
+      }
     }
     prevMeldIdsRef.current = currentIds
   }, [melds])
@@ -325,6 +343,13 @@ export default function TableMelds({
                     ? findSwappableJoker(selectedCard, meld)
                     : null
 
+                  // Check if any card in this meld was just laid off
+                  const hasNewLayOff = displayCards.some(c => justLaidOffCardIds?.has(c.id))
+
+                  // Staggered entrance animation logic
+                  const isNewMeld = newMeldIds.has(meld.id)
+                  const isVisibleNew = visibleMeldIds.has(meld.id)
+
                   function handleTap() {
                     if (isLayOffValid && onLayOff && selectedCard) {
                       onLayOff(selectedCard, meld)
@@ -337,7 +362,6 @@ export default function TableMelds({
                     <div
                       key={meld.id}
                       data-meld-id={meld.id}
-                      className={animatingMeldIds.has(meld.id) ? 'animate-meld-appear' : ''}
                       onClick={isInteractive ? handleTap : undefined}
                       style={{
                         backgroundColor: '#1e4a2e',
@@ -351,16 +375,18 @@ export default function TableMelds({
                         display: 'flex',
                         flexDirection: 'column',
                         gap: 2,
-                        opacity: isDimmed ? 0.35 : 1,
+                        opacity: isNewMeld && !isVisibleNew ? 0 : isDimmed ? 0.35 : 1,
                         cursor: isInteractive ? 'pointer' : 'default',
                         transition: 'opacity 0.15s',
                         animation: isLayOffValid
                           ? 'tmPulse 1.4s ease-in-out infinite'
                           : isSwapValid
                             ? 'tmSwapPulse 1.4s ease-in-out infinite'
-                            : animatingMeldIds.has(meld.id)
-                              ? 'meld-appear 400ms ease-out both'
-                              : 'none',
+                            : isNewMeld && isVisibleNew
+                              ? 'meld-slam 400ms ease-out both'
+                              : hasNewLayOff
+                                ? 'meld-expand 400ms ease-out'
+                                : 'none',
                       }}
                     >
                       {/* Tap hint label */}

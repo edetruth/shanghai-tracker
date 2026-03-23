@@ -5,6 +5,7 @@ import { haptic } from '../../lib/haptics'
 interface Props {
   card: CardType
   selected?: boolean
+  selectionIndex?: number
   onClick?: () => void
   compact?: boolean
   disabled?: boolean
@@ -51,7 +52,7 @@ function suitTextColor(suit: string): string {
   return '#3d2b8e' // spades
 }
 
-export default function Card({ card, selected, onClick, compact, disabled, jokerLabel, isNew, faceDown, shimmer, inMeld, style }: Props) {
+export default function Card({ card, selected, selectionIndex, onClick, compact, disabled, jokerLabel, isNew, faceDown, shimmer, inMeld, style }: Props) {
   // Auto-clear NEW badge after 3 seconds
   const [showNew, setShowNew] = useState(isNew ?? false)
   useEffect(() => {
@@ -117,9 +118,9 @@ export default function Card({ card, selected, onClick, compact, disabled, joker
     ? (selected ? '2px solid #e2b858' : '2px solid #c9952c')
     : (selected ? '2px solid #e2b858' : '1.5px solid rgba(255,255,255,0.2)')
 
-  const jokerGlow = isJoker && !selected
-    ? '0 0 8px rgba(226,184,88,0.3)'
-    : (selected ? '0 4px 12px rgba(0,0,0,0.3)' : undefined)
+  const computedShadow = selected
+    ? (isJoker ? '0 0 8px rgba(226,184,88,0.3), 0 4px 12px rgba(0,0,0,0.3)' : '0 4px 12px rgba(0,0,0,0.3)')
+    : (isJoker ? '0 0 8px rgba(226,184,88,0.3)' : undefined)
 
   const cardStyle: React.CSSProperties = {
     background: isJoker
@@ -128,7 +129,8 @@ export default function Card({ card, selected, onClick, compact, disabled, joker
     borderRadius: '6px',
     border: jokerBorder,
     transform: selected ? 'translateY(-10px)' : undefined,
-    boxShadow: jokerGlow,
+    boxShadow: computedShadow,
+    transition: 'transform 150ms ease-out, box-shadow 150ms ease-out, border-color 150ms ease-out',
     opacity: disabled ? 0.25 : 1,
     pointerEvents: disabled ? 'none' : undefined,
     width: `${width}px`,
@@ -150,6 +152,19 @@ export default function Card({ card, selected, onClick, compact, disabled, joker
       {showNew && (
         <div className="absolute -top-1.5 -right-1 z-10 bg-[#e2b858] text-[#2c1810] text-[8px] font-bold px-1 rounded leading-4">
           NEW
+        </div>
+      )}
+
+      {/* Multi-select order badge */}
+      {selected && selectionIndex !== undefined && selectionIndex >= 0 && (
+        <div
+          className="absolute -top-1.5 -right-1.5 z-10 flex items-center justify-center"
+          style={{
+            width: 16, height: 16, borderRadius: '50%',
+            background: '#e2b858',
+          }}
+        >
+          <span style={{ fontSize: 9, fontWeight: 700, color: '#2c1810' }}>{selectionIndex + 1}</span>
         </div>
       )}
 

@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { CheckCircle, AlertCircle, Loader } from 'lucide-react'
+import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts'
 import type { Player, TournamentState, AIPersonality } from '../../game/types'
 import { PERSONALITIES } from '../../game/types'
 import { completePlayedGame, saveGameEvents, type GameEvent } from '../../lib/gameStore'
@@ -163,6 +164,14 @@ export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId,
   const personalityInfo = aiPersonality ? PERSONALITIES.find(p => p.id === aiPersonality) : null
   const [saveStatus, setSaveStatus] = useState<'saving' | 'saved' | 'error'>('saving')
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [stage, setStage] = useState<'title' | 'winner' | 'full'>('title')
+
+  // ── Staged reveal sequence ──────────────────────────────────────────────
+  useEffect(() => {
+    const t1 = setTimeout(() => setStage('winner'), 800)
+    const t2 = setTimeout(() => setStage('full'), 2000)
+    return () => { clearTimeout(t1); clearTimeout(t2) }
+  }, [])
 
   // ── Auto-save via pre-created game record ─────────────────────────────────
   useEffect(() => {
@@ -188,6 +197,22 @@ export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId,
   const winners = sorted.filter(p => playerTotal(p) === winnerScore)
   const isTie = winners.length > 1
   const soleWinner = isTie ? null : winners[0]
+
+  // ── Score progression timeline data ───────────────────────────────────────
+  const timelineData = useMemo(() => {
+    const rounds = Array.from({ length: 7 }, (_, i) => {
+      const entry: Record<string, number> = { round: i + 1 }
+      sorted.forEach(player => {
+        let cumulative = 0
+        for (let r = 0; r <= i; r++) {
+          cumulative += player.roundScores[r] ?? 0
+        }
+        entry[player.name] = cumulative
+      })
+      return entry
+    })
+    return rounds
+  }, [sorted])
 
   return (
     <div
@@ -221,188 +246,267 @@ export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId,
             textAlign: 'center',
           }}
         >
-          {/* "Game over" label */}
+          {/* "Game over" label — large during title stage, small after */}
           <p style={{
-            fontSize: 10, color: '#6aad7a',
-            letterSpacing: 2, textTransform: 'uppercase', margin: 0,
+            fontSize: stage === 'title' ? 32 : 10,
+            fontWeight: stage === 'title' ? 900 : 400,
+            color: stage === 'title' ? '#e2b858' : '#6aad7a',
+            letterSpacing: stage === 'title' ? 4 : 2,
+            textTransform: 'uppercase',
+            margin: 0,
+            transition: 'all 400ms ease',
           }}>
             {tournamentState
               ? `Game ${tournamentState.currentGameNumber} of ${tournamentState.totalGames} — Tournament`
               : 'Game over'}
           </p>
 
-          {/* Trophy icon */}
-          <div style={{ fontSize: 36, margin: '10px 0 8px', lineHeight: 1 }}>🏆</div>
+          {/* Trophy, avatars, winner name — shown after title stage */}
+          {stage !== 'title' && (
+            <>
+              {/* Trophy icon */}
+              <div style={{ fontSize: 36, margin: '10px 0 8px', lineHeight: 1, animation: 'slam-in 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards' }}>
+                {'\uD83C\uDFC6'}
+              </div>
 
-          {/* Winner avatar(s) — side by side for ties (spec §8.2) */}
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginBottom: 10 }}>
-            {winners.map(w => (
-              <Avatar key={w.id} player={w} playerIdx={players.indexOf(w)} size={64} />
-            ))}
-          </div>
-
-          {/* Winner name (spec §8.2: tie detection) */}
-          <p style={{ fontSize: 20, fontWeight: 700, color: '#e2b858', margin: 0 }}>
-            {isTie
-              ? `${winners.map(w => w.name).join(' and ')} tie!`
-              : `${winners[0].name} wins!`}
-          </p>
-          <p style={{ fontSize: 11, color: '#6aad7a', margin: '4px 0 10px' }}>
-            Lowest score after 7 rounds
-          </p>
-
-          {/* Save status badge */}
-          <SaveBadge status={saveStatus} />
-
-          {/* Winner stats bar — solo winner only (spec §8.1) */}
-          {soleWinner && (() => {
-            const timesOut = soleWinner.roundScores.filter(s => s === 0).length
-            // Heuristic: rounds with score ≥ 80 indicate a full-hand (likely Shanghaied)
-            const timesShanghaied = soleWinner.roundScores.filter(s => s >= 80).length
-            const stats = [
-              { label: 'Final score', value: String(playerTotal(soleWinner)) },
-              { label: 'Went out', value: String(timesOut) },
-              { label: 'Shanghaied', value: String(timesShanghaied) },
-            ]
-            return (
-              <div
-                style={{
-                  background: '#0f2218',
-                  border: '1px solid #e2b858',
-                  borderRadius: 8,
-                  display: 'flex',
-                  marginTop: 12,
-                }}
-              >
-                {stats.map((stat, si) => (
-                  <div
-                    key={si}
-                    style={{
-                      flex: 1, textAlign: 'center', padding: '10px 4px',
-                      borderRight: si < stats.length - 1 ? '1px solid #2d5a3a' : 'none',
-                    }}
-                  >
-                    <p style={{ fontSize: 16, fontWeight: 700, color: '#e2b858', margin: 0 }}>
-                      {stat.value}
-                    </p>
-                    <p style={{ fontSize: 9, color: '#6aad7a', margin: '2px 0 0' }}>
-                      {stat.label}
-                    </p>
-                  </div>
+              {/* Winner avatar(s) — side by side for ties (spec §8.2) */}
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginBottom: 10 }}>
+                {winners.map(w => (
+                  <Avatar key={w.id} player={w} playerIdx={players.indexOf(w)} size={64} />
                 ))}
               </div>
-            )
-          })()}
+
+              {/* Winner name (spec §8.2: tie detection) */}
+              <p style={{ fontSize: 20, fontWeight: 700, color: '#e2b858', margin: 0 }}>
+                {isTie
+                  ? `${winners.map(w => w.name).join(' and ')} tie!`
+                  : `${winners[0].name} wins!`}
+              </p>
+              <p style={{ fontSize: 11, color: '#6aad7a', margin: '4px 0 10px' }}>
+                Lowest score after 7 rounds
+              </p>
+
+              {/* Save status badge */}
+              <SaveBadge status={saveStatus} />
+
+              {/* Winner stats bar — solo winner only (spec §8.1) */}
+              {soleWinner && (() => {
+                const timesOut = soleWinner.roundScores.filter(s => s === 0).length
+                // Heuristic: rounds with score ≥ 80 indicate a full-hand (likely Shanghaied)
+                const timesShanghaied = soleWinner.roundScores.filter(s => s >= 80).length
+                const stats = [
+                  { label: 'Final score', value: String(playerTotal(soleWinner)) },
+                  { label: 'Went out', value: String(timesOut) },
+                  { label: 'Shanghaied', value: String(timesShanghaied) },
+                ]
+                return (
+                  <div
+                    style={{
+                      background: '#0f2218',
+                      border: '1px solid #e2b858',
+                      borderRadius: 8,
+                      display: 'flex',
+                      marginTop: 12,
+                    }}
+                  >
+                    {stats.map((stat, si) => (
+                      <div
+                        key={si}
+                        style={{
+                          flex: 1, textAlign: 'center', padding: '10px 4px',
+                          borderRight: si < stats.length - 1 ? '1px solid #2d5a3a' : 'none',
+                        }}
+                      >
+                        <p style={{ fontSize: 16, fontWeight: 700, color: '#e2b858', margin: 0 }}>
+                          {stat.value}
+                        </p>
+                        <p style={{ fontSize: 9, color: '#6aad7a', margin: '2px 0 0' }}>
+                          {stat.label}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
+            </>
+          )}
         </div>
+
+        {/* ── Score progression sparkline ─────────────────────────────────── */}
+        {stage === 'full' && (
+          <div style={{ padding: '8px 12px 16px' }}>
+            <p style={{
+              fontSize: 10, color: '#6aad7a',
+              letterSpacing: 0.5, textTransform: 'uppercase',
+              margin: '0 0 8px',
+            }}>
+              Score progression
+            </p>
+            <ResponsiveContainer width="100%" height={120}>
+              <LineChart data={timelineData}>
+                <XAxis dataKey="round" tick={{ fontSize: 9, fill: '#6aad7a' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 9, fill: '#6aad7a' }} axisLine={false} tickLine={false} width={30} />
+                {sorted.map((player) => (
+                  <Line
+                    key={player.id}
+                    type="monotone"
+                    dataKey={player.name}
+                    stroke={PLAYER_COLORS[players.indexOf(player) % PLAYER_COLORS.length]}
+                    strokeWidth={playerTotal(player) === winnerScore ? 3 : 1.5}
+                    dot={false}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* ── Round highlights ────────────────────────────────────────────── */}
+        {stage === 'full' && (
+          <div style={{ padding: '0 12px 12px' }}>
+            <p style={{
+              fontSize: 10, color: '#6aad7a',
+              letterSpacing: 0.5, textTransform: 'uppercase',
+              margin: '0 0 6px',
+            }}>
+              Round highlights
+            </p>
+            {Array.from({ length: 7 }, (_, i) => {
+              const roundNum = i + 1
+              const roundWinner = sorted.find(p => (p.roundScores[i] ?? 999) === 0)
+              const shanghaiCount = sorted.filter(p => (p.roundScores[i] ?? 0) >= 80).length
+              return (
+                <div key={roundNum} style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '3px 0', fontSize: 11,
+                }}>
+                  <span style={{ color: '#6aad7a', width: 22, flexShrink: 0, fontSize: 10 }}>R{roundNum}</span>
+                  {roundWinner ? (
+                    <span style={{ color: '#a8d0a8', fontWeight: 500 }}>{roundWinner.name} went out</span>
+                  ) : (
+                    <span style={{ color: '#6aad7a', fontStyle: 'italic' }}>No one went out</span>
+                  )}
+                  {shanghaiCount > 0 && (
+                    <span style={{ color: '#b83232', fontSize: 10, marginLeft: 'auto' }}>
+                      {shanghaiCount} Shanghaied
+                    </span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
 
         {/* ── Full scorecard table (spec §8.1) ─────────────────────────────── */}
-        <div style={{ padding: '0 12px 16px' }}>
-          <p style={{
-            fontSize: 10, color: '#6aad7a',
-            letterSpacing: 0.5, textTransform: 'uppercase',
-            margin: '0 0 8px',
-          }}>
-            Full scorecard — all 7 rounds
-          </p>
+        {stage === 'full' && (
+          <div style={{ padding: '0 12px 16px' }}>
+            <p style={{
+              fontSize: 10, color: '#6aad7a',
+              letterSpacing: 0.5, textTransform: 'uppercase',
+              margin: '0 0 8px',
+            }}>
+              Full scorecard — all 7 rounds
+            </p>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table
-              style={{ borderCollapse: 'collapse', width: '100%', minWidth: 360, fontSize: 11 }}
-            >
-              {/* Header */}
-              <thead>
-                <tr style={{ borderBottom: '1px solid #2d5a3a' }}>
-                  {['#', 'Player', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'Total'].map((h, hi) => (
-                    <th
-                      key={h}
-                      style={{
-                        color: '#6aad7a', fontSize: 9, fontWeight: 600,
-                        padding: '4px 5px',
-                        textAlign: hi <= 1 ? 'left' : 'center',
-                        whiteSpace: 'nowrap',
-                        borderLeft: h === 'Total' ? '1px solid #2d5a3a' : 'none',
-                      }}
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
+            <div style={{ overflowX: 'auto' }}>
+              <table
+                style={{ borderCollapse: 'collapse', width: '100%', minWidth: 360, fontSize: 11 }}
+              >
+                {/* Header */}
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #2d5a3a' }}>
+                    {['#', 'Player', 'R1', 'R2', 'R3', 'R4', 'R5', 'R6', 'R7', 'Total'].map((h, hi) => (
+                      <th
+                        key={h}
+                        style={{
+                          color: '#6aad7a', fontSize: 9, fontWeight: 600,
+                          padding: '4px 5px',
+                          textAlign: hi <= 1 ? 'left' : 'center',
+                          whiteSpace: 'nowrap',
+                          borderLeft: h === 'Total' ? '1px solid #2d5a3a' : 'none',
+                        }}
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
 
-              {/* Data rows */}
-              <tbody>
-                {sorted.map((player, rowIdx) => {
-                  const total = playerTotal(player)
-                  const isWinnerRow = total === winnerScore
-                  const rowBg = rowIdx % 2 === 0 ? '#0f2218' : '#1a3a2a'
+                {/* Data rows */}
+                <tbody>
+                  {sorted.map((player, rowIdx) => {
+                    const total = playerTotal(player)
+                    const isWinnerRow = total === winnerScore
+                    const rowBg = rowIdx % 2 === 0 ? '#0f2218' : '#1a3a2a'
 
-                  return (
-                    <tr key={player.id} style={{ background: rowBg }}>
-                      {/* Rank */}
-                      <td style={{
-                        padding: '6px 5px', fontSize: 10,
-                        color: isWinnerRow ? '#e2b858' : '#6aad7a',
-                      }}>
-                        {rowIdx + 1}
-                      </td>
+                    return (
+                      <tr key={player.id} style={{ background: rowBg }}>
+                        {/* Rank */}
+                        <td style={{
+                          padding: '6px 5px', fontSize: 10,
+                          color: isWinnerRow ? '#e2b858' : '#6aad7a',
+                        }}>
+                          {rowIdx + 1}
+                        </td>
 
-                      {/* Player name */}
-                      <td style={{
-                        padding: '6px 5px',
-                        color: isWinnerRow ? '#e2b858' : '#a8d0a8',
-                        fontWeight: isWinnerRow ? 600 : 400,
-                        maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      }}>
-                        {player.name}
-                        {player.isAI && personalityInfo && (
-                          <span style={{ fontSize: 9, marginLeft: 3, opacity: 0.7 }}>
-                            {personalityInfo.emoji}
-                          </span>
-                        )}
-                      </td>
+                        {/* Player name */}
+                        <td style={{
+                          padding: '6px 5px',
+                          color: isWinnerRow ? '#e2b858' : '#a8d0a8',
+                          fontWeight: isWinnerRow ? 600 : 400,
+                          maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}>
+                          {player.name}
+                          {player.isAI && personalityInfo && (
+                            <span style={{ fontSize: 9, marginLeft: 3, opacity: 0.7 }}>
+                              {personalityInfo.emoji}
+                            </span>
+                          )}
+                        </td>
 
-                      {/* R1–R7 */}
-                      {Array.from({ length: 7 }).map((_, rIdx) => {
-                        const s = player.roundScores[rIdx]
-                        const isOut = s === 0
-                        const isHigh = s !== undefined && s >= 80
-                        const cellColor = isWinnerRow
-                          ? '#e2b858'
-                          : isOut
-                            ? '#6aad7a'
-                            : isHigh
-                              ? '#b83232'
-                              : '#a8d0a8'
-                        return (
-                          <td
-                            key={rIdx}
-                            style={{
-                              padding: '6px 4px', textAlign: 'center',
-                              color: cellColor,
-                              fontWeight: isHigh ? 700 : 400,
-                            }}
-                          >
-                            {s === undefined ? '—' : isOut ? 'Out' : isHigh ? `${s}!` : s}
-                          </td>
-                        )
-                      })}
+                        {/* R1–R7 */}
+                        {Array.from({ length: 7 }).map((_, rIdx) => {
+                          const s = player.roundScores[rIdx]
+                          const isOut = s === 0
+                          const isHigh = s !== undefined && s >= 80
+                          const cellColor = isWinnerRow
+                            ? '#e2b858'
+                            : isOut
+                              ? '#6aad7a'
+                              : isHigh
+                                ? '#b83232'
+                                : '#a8d0a8'
+                          return (
+                            <td
+                              key={rIdx}
+                              style={{
+                                padding: '6px 4px', textAlign: 'center',
+                                color: cellColor,
+                                fontWeight: isHigh ? 700 : 400,
+                              }}
+                            >
+                              {s === undefined ? '\u2014' : isOut ? 'Out' : isHigh ? `${s}!` : s}
+                            </td>
+                          )
+                        })}
 
-                      {/* Total */}
-                      <td style={{
-                        padding: '6px 5px', textAlign: 'center',
-                        borderLeft: '1px solid #2d5a3a',
-                        color: isWinnerRow ? '#e2b858' : '#a8d0a8',
-                        fontWeight: 700,
-                      }}>
-                        {total}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                        {/* Total */}
+                        <td style={{
+                          padding: '6px 5px', textAlign: 'center',
+                          borderLeft: '1px solid #2d5a3a',
+                          color: isWinnerRow ? '#e2b858' : '#a8d0a8',
+                          fontWeight: 700,
+                        }}>
+                          {total}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* ── Tournament standings section ─────────────────────────────────── */}
@@ -569,6 +673,7 @@ export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId,
               New game
             </button>
             <button
+              className="play-again-btn"
               onClick={onPlayAgain}
               style={{
                 flex: 1,
@@ -576,12 +681,14 @@ export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId,
                 color: '#2c1810',
                 border: 'none',
                 borderRadius: 10,
-                padding: '12px 0',
-                fontSize: 14, fontWeight: 700,
-                cursor: 'pointer', minHeight: 44,
+                padding: '14px 0',
+                fontSize: 15, fontWeight: 700,
+                cursor: 'pointer', minHeight: 48,
+                boxShadow: '0 4px 16px rgba(226,184,88,0.2)',
+                transition: 'transform 100ms ease',
               }}
             >
-              Play again
+              Play Again {'\uD83C\uDCCF'}
             </button>
           </>
         )}

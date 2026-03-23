@@ -2,9 +2,14 @@ interface Props {
   playerName: string
   onReady: () => void
   message?: string
+  roundNum?: number
+  requirement?: string
+  rank?: number
+  totalPlayers?: number
+  scoreDiff?: number
 }
 
-export default function PrivacyScreen({ playerName, onReady, message }: Props) {
+export default function PrivacyScreen({ playerName, onReady, message, roundNum, requirement, rank, scoreDiff }: Props) {
   const initial = playerName.charAt(0).toUpperCase()
 
   return (
@@ -18,6 +23,15 @@ export default function PrivacyScreen({ playerName, onReady, message }: Props) {
         </div>
 
         <h2 className="text-2xl font-bold text-[#2c1810] mb-2">{playerName}</h2>
+
+        {roundNum && requirement && (
+          <p className="text-sm text-[#8b7355] mb-1">Round {roundNum} &middot; {requirement}</p>
+        )}
+        {rank !== undefined && (
+          <p className="text-sm text-[#a08c6e] mb-6">
+            {rank === 1 ? 'Leading!' : `${rank}${rank === 2 ? 'nd' : rank === 3 ? 'rd' : 'th'} place${scoreDiff ? ` · ${scoreDiff} pts behind` : ''}`}
+          </p>
+        )}
 
         {message && (
           <p className="text-sm text-[#8b7355] mb-8">{message}</p>

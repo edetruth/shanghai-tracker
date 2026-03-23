@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useRef, useLayoutEffect, useCallback } from 'react'
 import type { Card as CardType } from '../../game/types'
 import CardComponent from './Card'
 
@@ -17,6 +17,7 @@ interface Props {
   dealAnimation?: boolean
   leavingCardId?: string | null
   dealFlipPhase?: 'facedown' | 'flipping' | null
+  selectionOrder?: string[]
 }
 
 export const SUIT_ORDER: Record<string, number> = { hearts: 0, diamonds: 1, clubs: 2, spades: 3, joker: 4 }
@@ -43,6 +44,7 @@ export default function HandDisplay({
   dealAnimation,
   leavingCardId,
   dealFlipPhase,
+  selectionOrder,
 }: Props) {
   const sorted = useMemo(() => {
     return [...cards].sort((a, b) => {
@@ -63,9 +65,75 @@ export default function HandDisplay({
   }, [cards, sortMode])
 
   const offset = cardOffset(sorted.length)
-  const containerWidth = sorted.length > 0 ? (sorted.length - 1) * offset + 41 : 41
+
+  // Suit grouping gaps: extra margin between suit groups when sorted by suit
+  const positions = useMemo(() => {
+    if (sortMode !== 'suit' || sorted.length === 0) {
+      return sorted.map((_, i) => i * offset)
+    }
+    const pos: number[] = [0]
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = sorted[i - 1]
+      const curr = sorted[i]
+      const suitChanged = curr.suit !== prev.suit && prev.suit !== 'joker' && curr.suit !== 'joker'
+      pos.push(pos[i - 1] + offset + (suitChanged ? 10 : 0))
+    }
+    return pos
+  }, [sorted, offset, sortMode])
+
+  const containerWidth = sorted.length > 0 ? (positions[positions.length - 1] ?? 0) + 41 : 41
   // 61px card height + 10px selected lift + 4px new badge headroom
   const containerHeight = 75
+
+  // FLIP sort animation refs
+  const cardPositionsRef = useRef<Map<string, DOMRect>>(new Map())
+  const handContainerRef = useRef<HTMLDivElement>(null)
+
+  const capturePositions = useCallback(() => {
+    const container = handContainerRef.current
+    if (!container) return
+    const map = new Map<string, DOMRect>()
+    container.querySelectorAll<HTMLElement>('[data-card-id]').forEach(el => {
+      const id = el.getAttribute('data-card-id')
+      if (id) map.set(id, el.getBoundingClientRect())
+    })
+    cardPositionsRef.current = map
+  }, [])
+
+  // After sort mode changes, animate cards from old positions to new
+  useLayoutEffect(() => {
+    const container = handContainerRef.current
+    if (!container) return
+    const oldPositions = cardPositionsRef.current
+    if (oldPositions.size === 0) return
+
+    container.querySelectorAll<HTMLElement>('[data-card-id]').forEach(el => {
+      const id = el.getAttribute('data-card-id')
+      if (!id) return
+      const oldRect = oldPositions.get(id)
+      if (!oldRect) return
+      const newRect = el.getBoundingClientRect()
+      const dx = oldRect.left - newRect.left
+      const dy = oldRect.top - newRect.top
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return
+      el.animate(
+        [
+          { transform: `translate(${dx}px, ${dy}px)` },
+          { transform: 'translate(0, 0)' },
+        ],
+        { duration: 300, easing: 'ease-out' }
+      )
+    })
+
+    // Clear old positions after animation
+    cardPositionsRef.current = new Map()
+  }, [sortMode])
+
+  // Wrap sort change: capture positions before triggering re-sort
+  const handleSortChange = useCallback((mode: SortMode) => {
+    capturePositions()
+    onSortChange(mode)
+  }, [capturePositions, onSortChange])
 
   return (
     <div>
@@ -88,17 +156,19 @@ export default function HandDisplay({
           {(['rank', 'suit'] as SortMode[]).map((mode) => (
             <button
               key={mode}
-              onClick={() => onSortChange(mode)}
+              className="sort-toggle-btn"
+              onClick={() => handleSortChange(mode)}
               style={{
                 background: sortMode === mode ? '#1e4a2e' : 'transparent',
                 color: sortMode === mode ? '#e2b858' : '#6aad7a',
                 padding: '4px 10px',
                 fontSize: '11px',
-                fontWeight: 600,
+                fontWeight: sortMode === mode ? 700 : 600,
                 border: 'none',
                 cursor: 'pointer',
-                transition: 'background 120ms, color 120ms',
+                transition: 'background 120ms, color 120ms, transform 100ms',
                 minHeight: '28px',
+                transform: sortMode === mode ? 'scale(1.02)' : undefined,
               }}
             >
               {mode === 'rank' ? 'Rank' : 'Suit'}
@@ -116,6 +186,7 @@ export default function HandDisplay({
           style={{ height: `${containerHeight}px`, display: 'flex', justifyContent: sorted.length <= 3 ? 'center' : 'flex-start' }}
         >
           <div
+            ref={handContainerRef}
             className="relative"
             style={{ width: `${containerWidth}px`, height: `${containerHeight}px`, flexShrink: 0, transition: 'width 300ms ease-out' }}
           >
@@ -124,12 +195,13 @@ export default function HandDisplay({
               const isLeaving = card.id === leavingCardId
               const showFaceDown = dealFlipPhase === 'facedown'
               const isFlipping = dealFlipPhase === 'flipping'
+              const selIdx = selectionOrder ? selectionOrder.indexOf(card.id) : undefined
               return (
                 <div
                   key={card.id}
                   className={`absolute bottom-0${isLeaving ? ' animate-card-exit' : ''}`}
                   style={{
-                    left: `${index * offset}px`,
+                    left: `${positions[index]}px`,
                     zIndex: isSelected ? sorted.length + 10 : card.id === newCardId ? sorted.length + 5 : index + 1,
                     transition: isLeaving ? 'none' : 'left 300ms ease-out, transform 300ms ease-out',
                     ...(dealAnimation && !isFlipping ? { animation: `card-deal-in 200ms ease-out ${index * 50}ms both` } : {}),
@@ -172,6 +244,7 @@ export default function HandDisplay({
                     <CardComponent
                       card={card}
                       selected={isLeaving ? false : isSelected}
+                      selectionIndex={selIdx !== undefined && selIdx >= 0 ? selIdx : undefined}
                       isNew={card.id === newCardId}
                       shimmer={shimmerCardId ? card.id === shimmerCardId : false}
                       onClick={disabled || isLeaving ? undefined : () => onToggle(card.id)}
