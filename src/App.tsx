@@ -22,14 +22,20 @@ export default function App() {
   const [activeGame, setActiveGame] = useState<Game | null>(null)
   const [activePlayers, setActivePlayers] = useState<Player[]>([])
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
+  const [transitioning, setTransitioning] = useState(false)
 
   const handlePlayerClick = (id: string) => setSelectedPlayerId(id)
 
   const navigateTo = (s: Section) => {
-    setSection(s)
-    if (s === 'scoretracker' && scoreTrackerState !== 'playing' && scoreTrackerState !== 'summary') {
-      setScoreTrackerState('list')
-    }
+    if (s === section) return  // no-op if already there
+    setTransitioning(true)
+    setTimeout(() => {
+      setSection(s)
+      if (s === 'scoretracker' && scoreTrackerState !== 'playing' && scoreTrackerState !== 'summary') {
+        setScoreTrackerState('list')
+      }
+      setTransitioning(false)
+    }, 150)
   }
 
   const handleGameCreated = (game: Game, players: Player[]) => {
@@ -55,6 +61,16 @@ export default function App() {
   return (
     <div className="max-w-[480px] mx-auto w-full flex flex-col min-h-[100dvh] relative">
       <main className="flex-1 overflow-auto">
+        <div
+          style={{
+            opacity: transitioning ? 0 : 1,
+            transition: 'opacity 150ms ease',
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            minHeight: 0,
+          }}
+        >
 
         {section === 'home' && (
           <HomePage
@@ -116,6 +132,7 @@ export default function App() {
           <AnalyticsPage onBack={() => navigateTo('home')} />
         )}
 
+        </div>
       </main>
 
       {selectedPlayerId && (

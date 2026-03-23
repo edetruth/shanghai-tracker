@@ -274,6 +274,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const discardPileRef = useRef<HTMLDivElement>(null)
   const [justLaidOffCardIds, setJustLaidOffCardIds] = useState<Set<string>>(new Set())
 
+  // ── Round-end transition states ───────────────────────────────────────────
+  const [showDarkBeat, setShowDarkBeat] = useState(false)
+  const [roundSummaryExiting, setRoundSummaryExiting] = useState(false)
+
   // ── Cinematic round announcement ──────────────────────────────────────────
   const [announcementStage, setAnnouncementStage] = useState<AnnouncementStage | null>(null)
   const [showDealAnimation, setShowDealAnimation] = useState(false)
@@ -1007,7 +1011,11 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     })
     setGameState({ ...state, players })
     setRoundResults(results)
-    setUiPhase('round-end')
+    setShowDarkBeat(true)
+    setTimeout(() => {
+      setShowDarkBeat(false)
+      setUiPhase('round-end')
+    }, 500)
     flushTelemetry(buyLog) // fire-and-forget — telemetry must never block game flow
 
     // Telemetry: flush remaining decisions, backfill outcomes, save round stats
@@ -1044,7 +1052,11 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     })
     setGameState({ ...state, players })
     setRoundResults(results)
-    setUiPhase('round-end')
+    setShowDarkBeat(true)
+    setTimeout(() => {
+      setShowDarkBeat(false)
+      setUiPhase('round-end')
+    }, 500)
     setAiMessage('Round ended — no one went out (stalemate)')
     setTimeout(() => setAiMessage(null), 4000)
     flushTelemetry(buyLog) // fire-and-forget — telemetry must never block game flow
@@ -1792,27 +1804,35 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
   // ── Next round / game over ────────────────────────────────────────────────
   function handleNextRound() {
-    noProgressTurnsRef.current = 0
-    drawPileDepletionsRef.current = 0
-    opponentHistoryRef.current = new Map()
-    aiTurnsCouldGoDownRef.current = new Map()
-    aiTurnsElapsedRef.current = new Map()
-    const nextRound = gameState.currentRound + 1
-    if (nextRound > TOTAL_ROUNDS) {
-      setGameState(prev => ({ ...prev, gameOver: true }))
-      setUiPhase('game-over')
-      // Telemetry: save game-level stats
-      if (gameId) computeAndSaveGameStats(gameId, gameState.players)
-      // Tournament callback — let PlayTab handle the game-over flow
-      if (onGameComplete) onGameComplete(gameState.players)
-    } else {
-      const next = setupRound(gameState, nextRound)
-      setGameState(next)
-      setRoundResults(null)
-      clearSelection()
-      setPendingBuyDiscard(null)
-      setUiPhase('round-start')
-    }
+    setRoundSummaryExiting(true)
+    setTimeout(() => {
+      setRoundSummaryExiting(false)
+      noProgressTurnsRef.current = 0
+      drawPileDepletionsRef.current = 0
+      opponentHistoryRef.current = new Map()
+      aiTurnsCouldGoDownRef.current = new Map()
+      aiTurnsElapsedRef.current = new Map()
+      const nextRound = gameState.currentRound + 1
+      if (nextRound > TOTAL_ROUNDS) {
+        setGameState(prev => ({ ...prev, gameOver: true }))
+        // Telemetry: save game-level stats
+        if (gameId) computeAndSaveGameStats(gameId, gameState.players)
+        // Tournament callback — let PlayTab handle the game-over flow
+        if (onGameComplete) onGameComplete(gameState.players)
+        setShowDarkBeat(true)
+        setTimeout(() => {
+          setShowDarkBeat(false)
+          setUiPhase('game-over')
+        }, 800)
+      } else {
+        const next = setupRound(gameState, nextRound)
+        setGameState(next)
+        setRoundResults(null)
+        clearSelection()
+        setPendingBuyDiscard(null)
+        setUiPhase('round-start')
+      }
+    }, 300)
   }
 
   // ── AI: execute action phase turn ─────────────────────────────────────────
@@ -2234,13 +2254,15 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
   if (uiPhase === 'round-end' && roundResults) {
     return (
-      <RoundSummary
-        players={gameState.players}
-        roundResults={roundResults}
-        roundNum={gameState.currentRound}
-        onNext={handleNextRound}
-        isLastRound={gameState.currentRound === TOTAL_ROUNDS}
-      />
+      <div style={roundSummaryExiting ? { animation: 'slide-down-screen 300ms ease-in both' } : undefined}>
+        <RoundSummary
+          players={gameState.players}
+          roundResults={roundResults}
+          roundNum={gameState.currentRound}
+          onNext={handleNextRound}
+          isLastRound={gameState.currentRound === TOTAL_ROUNDS}
+        />
+      </div>
     )
   }
 
@@ -2307,6 +2329,14 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         @keyframes turnBannerIn{0%{opacity:0;transform:translateY(-20px)}100%{opacity:1;transform:translateY(0)}}
         @keyframes turnBannerOut{0%{opacity:1}100%{opacity:0}}
       `}</style>
+
+      {/* Dark beat overlay — briefly flashes black on round end */}
+      {showDarkBeat && (
+        <div
+          className="fixed inset-0 z-40 bg-black"
+          style={{ animation: 'fade-in-black 500ms ease both' }}
+        />
+      )}
 
       {/* Race intensity: edge glow overlay */}
       {effectiveTension > 0 && (

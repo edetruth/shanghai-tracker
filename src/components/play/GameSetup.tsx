@@ -487,6 +487,7 @@ function Step3({
 // ── Root component ──────────────────────────────────────────────────────────
 export default function GameSetup({ onStart, onBack }: Props) {
   const [step, setStep] = useState(1)
+  const [stepDirection, setStepDirection] = useState<'forward' | 'back'>('forward')
   const [playerCount, setPlayerCount] = useState<number | null>(null)
   const [players, setPlayers] = useState<PlayerConfig[]>([
     { name: '', isAI: false },
@@ -536,12 +537,20 @@ export default function GameSetup({ onStart, onBack }: Props) {
 
   function goBack() {
     if (step === 1) onBack()
-    else setStep(s => s - 1)
+    else {
+      setStepDirection('back')
+      setStep(s => s - 1)
+    }
   }
 
   function goNext() {
-    if (step === 1 && playerCount) setStep(2)
-    else if (step === 2 && allNamed) setStep(3)
+    if (step === 1 && playerCount) {
+      setStepDirection('forward')
+      setStep(2)
+    } else if (step === 2 && allNamed) {
+      setStepDirection('forward')
+      setStep(3)
+    }
   }
 
   function handleDeal() {
@@ -584,29 +593,38 @@ export default function GameSetup({ onStart, onBack }: Props) {
 
       {/* Step content */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px 16px' }}>
-        {step === 1 && (
-          <Step1 selected={playerCount} onSelect={handleCountSelect} />
-        )}
-        {step === 2 && playerCount && (
-          <Step2
-            players={players}
-            onNameChange={handleNameChange}
-            onToggleAI={handleToggleAI}
-          />
-        )}
-        {step === 3 && playerCount && (
-          <Step3
-            players={players}
-            aiCount={aiCount}
-            selectedPersonality={selectedPersonality}
-            onPersonalityChange={setSelectedPersonality}
-            buyLimit={buyLimit}
-            onBuyLimitChange={setBuyLimit}
-            decks={decks}
-            tournamentMode={tournamentMode}
-            onTournamentToggle={() => setTournamentMode(t => !t)}
-          />
-        )}
+        <div
+          key={step}
+          style={{
+            animation: stepDirection === 'forward'
+              ? 'step-forward-in 250ms ease-out both'
+              : 'step-back-in 250ms ease-out both',
+          }}
+        >
+          {step === 1 && (
+            <Step1 selected={playerCount} onSelect={handleCountSelect} />
+          )}
+          {step === 2 && playerCount && (
+            <Step2
+              players={players}
+              onNameChange={handleNameChange}
+              onToggleAI={handleToggleAI}
+            />
+          )}
+          {step === 3 && playerCount && (
+            <Step3
+              players={players}
+              aiCount={aiCount}
+              selectedPersonality={selectedPersonality}
+              onPersonalityChange={setSelectedPersonality}
+              buyLimit={buyLimit}
+              onBuyLimitChange={setBuyLimit}
+              decks={decks}
+              tournamentMode={tournamentMode}
+              onTournamentToggle={() => setTournamentMode(t => !t)}
+            />
+          )}
+        </div>
       </div>
 
       {/* Bottom action */}

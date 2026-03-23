@@ -282,6 +282,14 @@
   0% { opacity: 0; transform: translateX(-30px); }
   100% { opacity: 1; transform: translateX(0); }
 }
+@keyframes step-forward-out {
+  0% { opacity: 1; transform: translateX(0); }
+  100% { opacity: 0; transform: translateX(-30px); }
+}
+@keyframes step-back-out {
+  0% { opacity: 1; transform: translateX(0); }
+  100% { opacity: 0; transform: translateX(30px); }
+}
 
 /* RoundSummary slide-up entrance */
 @keyframes slide-up-screen {
@@ -306,6 +314,12 @@
 @keyframes fade-in-black {
   0% { opacity: 0; }
   100% { opacity: 1; }
+}
+
+/* Round summary slide-down exit */
+@keyframes slide-down-screen {
+  0% { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(100%); opacity: 0; }
 }
 
 /* ── Polish Batch 2: Card Interactions ──────────────────────────────────────── */

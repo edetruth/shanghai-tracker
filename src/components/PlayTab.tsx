@@ -120,6 +120,7 @@ export default function PlayTab({ onBack }: Props) {
   const [tournamentState, setTournamentState] = useState<TournamentState | null>(null)
   const [lastGamePlayers, setLastGamePlayers] = useState<Player[]>([])
   const [gameKey, setGameKey] = useState(0) // force remount GameBoard for new tournament games
+  const [startingGame, setStartingGame] = useState(false)
 
   function handleStart(players: PlayerConfig[], personality: AIPersonality, limit: number, tournamentMode: boolean) {
     setPlayerConfigs(players)
@@ -147,7 +148,11 @@ export default function PlayTab({ onBack }: Props) {
       setTournamentState(null)
     }
     setGameKey(k => k + 1)
-    setView('game')
+    setStartingGame(true)
+    setTimeout(() => {
+      setView('game')
+      setStartingGame(false)
+    }, 400)
   }
 
   // Helper: compute total score for a player
@@ -240,10 +245,18 @@ export default function PlayTab({ onBack }: Props) {
 
   if (view === 'setup') {
     return (
-      <GameSetup
-        onStart={handleStart}
-        onBack={() => setView('landing')}
-      />
+      <>
+        <GameSetup
+          onStart={handleStart}
+          onBack={() => setView('landing')}
+        />
+        {startingGame && (
+          <div
+            className="fixed inset-0 z-50 bg-black"
+            style={{ animation: 'fade-in-black 400ms ease both' }}
+          />
+        )}
+      </>
     )
   }
 

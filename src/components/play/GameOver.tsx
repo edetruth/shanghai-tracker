@@ -165,6 +165,27 @@ export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId,
   const [saveStatus, setSaveStatus] = useState<'saving' | 'saved' | 'error'>('saving')
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [stage, setStage] = useState<'title' | 'winner' | 'full'>('title')
+  const [exiting, setExiting] = useState(false)
+
+  function handleBack() {
+    setExiting(true)
+    setTimeout(() => onBack(), 300)
+  }
+
+  function handlePlayAgain() {
+    setExiting(true)
+    setTimeout(() => onPlayAgain(), 300)
+  }
+
+  function handleNextGame() {
+    setExiting(true)
+    setTimeout(() => (onNextGame ?? onPlayAgain)(), 300)
+  }
+
+  function handleExitTournament() {
+    setExiting(true)
+    setTimeout(() => (onExitTournament ?? onBack)(), 300)
+  }
 
   // ── Staged reveal sequence ──────────────────────────────────────────────
   useEffect(() => {
@@ -223,8 +244,17 @@ export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId,
         flexDirection: 'column',
         overflow: 'hidden',
         position: 'relative',
+        animation: 'game-over-entrance 400ms ease-out both',
       }}
     >
+      {/* Exit fade overlay */}
+      {exiting && (
+        <div
+          className="fixed inset-0 z-50 bg-black"
+          style={{ animation: 'fade-in-black 300ms ease both' }}
+        />
+      )}
+
       {/* Confetti canvas — pointer-events none (spec §8.1) */}
       <canvas
         ref={canvasRef}
@@ -600,7 +630,7 @@ export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId,
         {tournamentState ? (
           <>
             <button
-              onClick={onExitTournament ?? onBack}
+              onClick={handleExitTournament}
               style={{
                 flex: 1,
                 background: 'transparent',
@@ -620,7 +650,7 @@ export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId,
               if (hasClinched) {
                 return (
                   <button
-                    onClick={onNextGame ?? onPlayAgain}
+                    onClick={handleNextGame}
                     style={{
                       flex: 1,
                       background: '#e2b858',
@@ -638,7 +668,7 @@ export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId,
               }
               return (
                 <button
-                  onClick={onNextGame ?? onPlayAgain}
+                  onClick={handleNextGame}
                   style={{
                     flex: 1,
                     background: '#e2b858',
@@ -658,7 +688,7 @@ export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId,
         ) : (
           <>
             <button
-              onClick={onBack}
+              onClick={handleBack}
               style={{
                 flex: 1,
                 background: 'transparent',
@@ -674,7 +704,7 @@ export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId,
             </button>
             <button
               className="play-again-btn"
-              onClick={onPlayAgain}
+              onClick={handlePlayAgain}
               style={{
                 flex: 1,
                 background: '#e2b858',
