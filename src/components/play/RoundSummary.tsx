@@ -144,13 +144,17 @@ export default function RoundSummary({ players, roundResults, roundNum, onNext, 
     [players, roundResults]
   )
 
-  // Staggered reveal for round tab
+  // Staggered reveal for round tab — shanghaied players get +200ms extra
   useEffect(() => {
-    const timers = sortedByRound.map((_, i) =>
-      setTimeout(() => setRevealedCount(i + 1), 500 + i * 400)
-    )
+    let cumulativeDelay = 500
+    const timers = sortedByRound.map((p, i) => {
+      const isShanghaied = roundResults.find(r => r.playerId === p.id)?.shanghaied ?? false
+      const delay = cumulativeDelay
+      cumulativeDelay += 400 + (isShanghaied ? 200 : 0)
+      return setTimeout(() => setRevealedCount(i + 1), delay)
+    })
     return () => timers.forEach(clearTimeout)
-  }, [sortedByRound.length])
+  }, [sortedByRound.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sorted for "Standings" tab: cumulative total ascending
   const sortedByTotal = useMemo(
@@ -322,7 +326,9 @@ export default function RoundSummary({ players, roundResults, roundNum, onNext, 
                   borderRadius: 8,
                   padding: '8px 10px',
                   opacity: isShanghaied ? 0.9 : 1,
-                  animation: tab === 'round' ? 'slide-up-fade 300ms ease-out both' : undefined,
+                  animation: tab === 'round'
+                    ? (rank === 1 ? 'slide-up-fade 300ms ease-out both, winner-flash 600ms ease-out 300ms both' : 'slide-up-fade 300ms ease-out both')
+                    : undefined,
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

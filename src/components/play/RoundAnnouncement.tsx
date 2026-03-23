@@ -1,3 +1,5 @@
+import { useState, useEffect } from 'react'
+
 interface Standing {
   name: string
   score: number
@@ -27,6 +29,7 @@ interface Props {
   isLateRound: boolean
   standings: Standing[]
   previousLeader?: string | null
+  previousStandingsPct?: Map<string, number>
   onSkip: () => void
 }
 
@@ -69,14 +72,32 @@ export default function RoundAnnouncement({
   isLateRound,
   standings,
   previousLeader,
+  previousStandingsPct,
   onSkip,
 }: Props) {
   const glowColor = getRoundGlow(roundNumber)
 
+  // ── Animated bar widths (start from previous round widths, transition to new) ──
+  const sorted = [...standings].sort((a, b) => a.score - b.score)
+  const maxScore = Math.max(...standings.map(s => s.score), 1)
+  const [animatedWidths, setAnimatedWidths] = useState<Map<string, number>>(() => {
+    const m = new Map<string, number>()
+    sorted.forEach(s => m.set(s.name, previousStandingsPct?.get(s.name) ?? 0))
+    return m
+  })
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      const m = new Map<string, number>()
+      sorted.forEach(s => {
+        m.set(s.name, maxScore > 0 ? (s.score / maxScore) * 100 : 0)
+      })
+      setAnimatedWidths(m)
+    })
+    return () => cancelAnimationFrame(id)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Standings flash ──────────────────────────────────────────────────────
   if (stage === 'standings') {
-    const maxScore = Math.max(...standings.map(s => s.score), 1)
-    const sorted = [...standings].sort((a, b) => a.score - b.score)
     const leader = sorted[0]
     const isNewLeader = previousLeader !== null && leader && leader.name !== previousLeader
 
@@ -95,7 +116,6 @@ export default function RoundAnnouncement({
 
         <div className="w-full max-w-xs space-y-3">
           {sorted.map((p, i) => {
-            const barWidth = maxScore > 0 ? (p.score / maxScore) * 100 : 0
             const isLeader = i === 0
             return (
               <div key={p.name} className="flex items-center gap-3">
@@ -110,9 +130,8 @@ export default function RoundAnnouncement({
                     className="h-full rounded-full"
                     style={{
                       backgroundColor: isLeader ? '#e2b858' : '#3d7a4c',
-                      width: `${barWidth}%`,
-                      animation: 'bar-grow 800ms ease-out both',
-                      ['--bar-width' as string]: `${barWidth}%`,
+                      width: `${animatedWidths.get(p.name) ?? 0}%`,
+                      transition: 'width 800ms ease-out',
                     }}
                   />
                 </div>

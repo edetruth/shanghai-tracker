@@ -722,22 +722,23 @@ export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId,
               New game
             </button>
             <button
-              className="play-again-btn"
               onClick={handlePlayAgain}
               style={{
                 flex: 1,
                 background: '#e2b858',
                 color: '#2c1810',
                 border: 'none',
-                borderRadius: 10,
+                borderRadius: 12,
                 padding: '14px 0',
-                fontSize: 15, fontWeight: 700,
-                cursor: 'pointer', minHeight: 48,
-                boxShadow: '0 4px 16px rgba(226,184,88,0.2)',
-                transition: 'transform 100ms ease',
+                fontSize: 16,
+                fontWeight: 700,
+                cursor: 'pointer',
+                minHeight: 52,
+                boxShadow: '0 4px 20px rgba(226, 184, 88, 0.25)',
+                transition: 'transform 100ms, box-shadow 100ms',
               }}
             >
-              Play Again {'\uD83C\uDCCF'}
+              Play Again 🃏
             </button>
           </>
         )}

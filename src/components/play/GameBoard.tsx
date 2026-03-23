@@ -284,12 +284,14 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   // ── Round-end transition states ───────────────────────────────────────────
   const [showDarkBeat, setShowDarkBeat] = useState(false)
   const [roundSummaryExiting, setRoundSummaryExiting] = useState(false)
+  const [showBreathingRoom, setShowBreathingRoom] = useState(false)
 
   // ── Cinematic round announcement ──────────────────────────────────────────
   const [announcementStage, setAnnouncementStage] = useState<AnnouncementStage | null>(null)
   const [showDealAnimation, setShowDealAnimation] = useState(false)
   const previousLeaderRef = useRef<string | null>(null)
   const countdownActiveRef = useRef(false)
+  const previousStandingsPctRef = useRef<Map<string, number>>(new Map())
 
   // Finish announcement: save leader, start deal animation, transition to game
   function finishAnnouncement(gs: GameState) {
@@ -1918,12 +1920,26 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           setUiPhase('game-over')
         }, 800)
       } else {
+        // Capture current standings percentages before the new round resets scores
+        const currentTotals = gameState.players.map(p => ({
+          name: p.name,
+          total: p.roundScores.reduce((s, n) => s + n, 0),
+        }))
+        const maxTotal = Math.max(...currentTotals.map(t => t.total), 1)
+        const newPctMap = new Map<string, number>()
+        currentTotals.forEach(t => newPctMap.set(t.name, maxTotal > 0 ? (t.total / maxTotal) * 100 : 0))
+        previousStandingsPctRef.current = newPctMap
+
         const next = setupRound(gameState, nextRound)
         setGameState(next)
         setRoundResults(null)
         clearSelection()
         setPendingBuyDiscard(null)
-        setUiPhase('round-start')
+        setShowBreathingRoom(true)
+        setTimeout(() => {
+          setShowBreathingRoom(false)
+          setUiPhase('round-start')
+        }, 500)
       }
     }, 300)
   }
@@ -2343,6 +2359,12 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     return () => clearInterval(interval)
   }, [effectiveTension]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  if (showBreathingRoom) {
+    return (
+      <div style={{ height: '100dvh', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }} />
+    )
+  }
+
   if (uiPhase === 'round-start' && announcementStage) {
     return (
       <RoundAnnouncement
@@ -2361,6 +2383,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           isHuman: !p.isAI,
         }))}
         previousLeader={previousLeaderRef.current}
+        previousStandingsPct={previousStandingsPctRef.current}
         onSkip={skipAnnouncement}
       />
     )
