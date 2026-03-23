@@ -178,8 +178,8 @@ export default function RoundSummary({ players, roundResults, roundNum, onNext, 
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
+        animation: visible ? 'slide-up-screen 300ms ease-out both' : undefined,
         opacity: visible ? 1 : 0,
-        transition: 'opacity 0.3s ease',
       }}
     >
       {/* Dramatic Shanghai overlay */}

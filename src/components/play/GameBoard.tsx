@@ -247,6 +247,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   // Last action indicator — briefly shows what the previous player did
   const [lastAction, setLastAction] = useState<string | null>(null)
   const lastActionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [yourTurnPulse, setYourTurnPulse] = useState(false)
 
   // ── Telemetry tracking refs ─────────────────────────────────────────────────
   const pendingDecisionsRef = useRef<AIDecision[]>([])
@@ -285,6 +286,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const [showDarkBeat, setShowDarkBeat] = useState(false)
   const [roundSummaryExiting, setRoundSummaryExiting] = useState(false)
   const [showBreathingRoom, setShowBreathingRoom] = useState(false)
+  const [showGameOverText, setShowGameOverText] = useState(false)
 
   // ── Cinematic round announcement ──────────────────────────────────────────
   const [announcementStage, setAnnouncementStage] = useState<AnnouncementStage | null>(null)
@@ -559,6 +561,16 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     if (soloHuman && uiPhase === 'draw' && player && !player.isAI) {
       setTurnBanner(`Your turn, ${player.name}!`)
       const timer = setTimeout(() => setTurnBanner(null), 1500)
+      return () => clearTimeout(timer)
+    }
+  }, [uiPhase, gameState.roundState.currentPlayerIndex]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Your Turn pulse on hand area border
+  useEffect(() => {
+    const player = gameState.players[gameState.roundState.currentPlayerIndex]
+    if (uiPhase === 'draw' && player && !player.isAI) {
+      setYourTurnPulse(true)
+      const timer = setTimeout(() => setYourTurnPulse(false), 2000)
       return () => clearTimeout(timer)
     }
   }, [uiPhase, gameState.roundState.currentPlayerIndex]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -1917,7 +1929,11 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         setShowDarkBeat(true)
         setTimeout(() => {
           setShowDarkBeat(false)
-          setUiPhase('game-over')
+          setShowGameOverText(true)
+          setTimeout(() => {
+            setShowGameOverText(false)
+            setUiPhase('game-over')
+          }, 1500)
         }, 800)
       } else {
         // Capture current standings percentages before the new round resets scores
@@ -2359,6 +2375,20 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     return () => clearInterval(interval)
   }, [effectiveTension]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  if (showGameOverText) {
+    return (
+      <div style={{ height: '100dvh', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <p style={{
+          fontSize: 36, fontWeight: 900, color: '#e2b858',
+          letterSpacing: 6, textTransform: 'uppercase',
+          animation: 'game-over-text 800ms ease-out both',
+        }}>
+          GAME OVER
+        </p>
+      </div>
+    )
+  }
+
   if (showBreathingRoom) {
     return (
       <div style={{ height: '100dvh', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }} />
@@ -2601,11 +2631,18 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
               className="flex items-center gap-1 px-3 py-1.5"
               style={{ overflowX: 'auto', scrollbarWidth: 'none', flexWrap: 'nowrap' }}
             >
-              {gameState.players.map((p, i) => {
+              {(() => {
+                const isCompact = gameState.players.length >= 5
+                return gameState.players.map((p, i) => {
                 const total = p.roundScores.reduce((s, n) => s + n, 0)
                 const isMe = p.id === displayPlayer.id
                 const isActiveTurn = p.id === currentPlayer.id
                 const isBuyingNow = uiPhase === 'buying' && activeBuyer?.id === p.id
+                const displayName = isMe && !p.isAI
+                  ? 'You'
+                  : isCompact && !isActiveTurn
+                    ? p.name.split(' ')[0].slice(0, 3)
+                    : p.name.split(' ')[0]
                 return (
                   <span key={p.id} style={{
                     display: 'inline-flex', alignItems: 'center', flexShrink: 0,
@@ -2621,14 +2658,16 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
                     }} />
                     <span style={{
                       color: isMe ? '#e2b858' : isActiveTurn ? '#ffffff' : '#a8d0a8',
-                      fontSize: 11, fontWeight: isMe || isActiveTurn ? 700 : 500,
-                      maxWidth: 52, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      fontSize: isCompact ? 10 : 11, fontWeight: isMe || isActiveTurn ? 700 : 500,
+                      maxWidth: isCompact ? 36 : 52, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     }}>
-                      {isMe && !p.isAI ? 'You' : p.name.split(' ')[0]}{p.isAI ? '🤖' : ''}
+                      {displayName}{p.isAI ? '🤖' : ''}
                     </span>
-                    <span style={{ color: '#6aad7a', fontSize: 10, fontFamily: 'monospace', fontWeight: 700, marginLeft: 3 }}>
-                      {total}
-                    </span>
+                    {(!isCompact || isActiveTurn) && (
+                      <span style={{ color: '#6aad7a', fontSize: 10, fontFamily: 'monospace', fontWeight: 700, marginLeft: 3 }}>
+                        {total}
+                      </span>
+                    )}
                     <span key={p.hand.length} style={{ color: '#a8d0a8', fontSize: 10, marginLeft: 2, animation: 'number-roll 300ms ease-out' }}>
                       🃏{p.hand.length}
                     </span>
@@ -2637,7 +2676,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
                     )}
                   </span>
                 )
-              })}
+              })
+              })()}
               {/* Expand chevron */}
               <span style={{ color: '#6aad7a', fontSize: 10, marginLeft: 'auto', paddingLeft: 6, flexShrink: 0 }}>▼</span>
             </div>
@@ -2868,7 +2908,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
                 Empty
               </div>
             )}
-            <p key={rs.drawPile.length} style={{ color: '#6aad7a', fontSize: 9, margin: 0, animation: 'number-roll 300ms ease-out' }}>{rs.drawPile.length} cards</p>
+            {rs.drawPile.length < 15 && (
+              <p key={rs.drawPile.length} style={{ color: '#e2b858', fontSize: 9, fontWeight: 600, margin: 0, animation: 'number-roll 300ms ease-out' }}>{rs.drawPile.length} left</p>
+            )}
           </div>
 
           {/* Discard pile */}
@@ -2970,14 +3012,18 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         </div>
 
         {/* Player hand — sort toggle + fan layout */}
-        <div ref={handAreaRef}>
+        <div ref={handAreaRef} style={{
+          border: yourTurnPulse ? '2px solid transparent' : '2px solid transparent',
+          borderRadius: 8,
+          animation: yourTurnPulse ? 'your-turn-pulse 1s ease-in-out 2' : 'none',
+        }}>
         {!displayPlayer.isAI ? (
           <HandDisplay
             cards={displayPlayer.hand}
             selectedIds={selectedCardIds}
             selectionOrder={selectedCardOrderRef.current}
             onToggle={toggleCard}
-            label={`${isHumanBuyerTurn ? displayPlayer.name + "'s " : 'Your '}hand (${displayPlayer.hand.length} cards)`}
+            label={`${isHumanBuyerTurn ? displayPlayer.name + "'s " : 'Your '}hand (${displayPlayer.hand.length} cards) · ${displayPlayer.hand.reduce((sum, c) => sum + cardPoints(c.rank), 0)} pts`}
             disabled={false}
             sortMode={handSort}
             onSortChange={setHandSort}
