@@ -228,10 +228,11 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const [shimmerCardId, setShimmerCardId] = useState<string | null>(null)
   const streaksRef = useRef<Map<string, number>>(new Map())
   const [preLayDownSwap, setPreLayDownSwap] = useState(false)
-  const [showPreLayDownSwapModal, setShowPreLayDownSwapModal] = useState(false)
-  // Selection state for the inline pre-lay-down swap modal
-  const [preSwapCardId, setPreSwapCardId] = useState<string | null>(null)
+  // Selection state for the pre-lay-down swap flow
   const [preSwapMeldId, setPreSwapMeldId] = useState<string | null>(null)
+  // Inline swap mode: replaces the old full-screen pre-lay-down swap modal
+  const [swapMode, setSwapMode] = useState(false)
+  const [swapSelectedMeldId, setSwapSelectedMeldId] = useState<string | null>(null)
   // Snapshot of game state BEFORE any pre-lay-down joker swaps — used to undo if player can't lay down after all swaps
   const preLayDownSwapBaseStateRef = useRef<GameState | null>(null)
   // Stalemate tracking (turns without any meld)
@@ -278,6 +279,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   // Fix D: joker swap meld flash
   const [flashMeldId, setFlashMeldId] = useState<string | null>(null)
   const [flashIsHeist, setFlashIsHeist] = useState(false)
+  const [raceMessage, setRaceMessage] = useState('')
 
   // ── Round-end transition states ───────────────────────────────────────────
   const [showDarkBeat, setShowDarkBeat] = useState(false)
@@ -323,7 +325,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     const gs = gameState
     const isFirstRound = gs.currentRound === 1
     const isFinalRound = gs.currentRound === TOTAL_ROUNDS
-    const countdownSpeed = isFinalRound ? 700 : 600
 
     // Build timeline: [time_ms, stage, haptic?]
     const timeline: [number, AnnouncementStage | 'done', boolean][] = []
@@ -331,26 +332,26 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
     if (!isFirstRound) {
       timeline.push([t, 'standings', false])
-      t += 2000
+      t += 2500
       if (isFinalRound) {
         timeline.push([t, 'final-round', false])
-        t += 1500
+        t += 2000
       }
     }
     timeline.push([t, 'blackout', false])
-    t += 1500
+    t += 2500
     timeline.push([t, 'requirement', false])
-    t += 1000
+    t += 1500
     timeline.push([t, 'dealer', false])
-    t += 1000
+    t += 1200
     timeline.push([t, 'countdown-3', true])
-    t += countdownSpeed
+    t += 800
     timeline.push([t, 'countdown-2', true])
-    t += countdownSpeed
+    t += 1000
     timeline.push([t, 'countdown-1', true])
-    t += countdownSpeed + 400 // hold "1" longer so it's visible
+    t += isFinalRound ? 1500 : 1200 // hold "1" longer; extra long on final round
     timeline.push([t, 'dealing', false])
-    t += 600
+    t += 800
     timeline.push([t, 'done', false])
 
     // Set initial stage
@@ -470,6 +471,12 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   useEffect(() => { gameStateRef.current = gameState }, [gameState])
   useEffect(() => { uiPhaseRef.current = uiPhase }, [uiPhase])
   useEffect(() => { if (uiPhase !== 'action') setJokerPositionPrompt(null) }, [uiPhase])
+  useEffect(() => {
+    if (uiPhase !== 'action') {
+      setSwapMode(false)
+      setSwapSelectedMeldId(null)
+    }
+  }, [uiPhase])
   useEffect(() => { buyerOrderRef.current = buyerOrder }, [buyerOrder])
   useEffect(() => { buyerStepRef.current = buyerStep }, [buyerStep])
   useEffect(() => { pendingBuyDiscardRef.current = pendingBuyDiscard }, [pendingBuyDiscard])
@@ -717,6 +724,19 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
   // ── Toggle card selection ─────────────────────────────────────────────────
   function toggleCard(cardId: string) {
+    // If in swap mode with a meld already selected, tapping a hand card executes the swap
+    if (swapMode && swapSelectedMeldId && preSwapMeldId) {
+      const card = gameStateRef.current.players[gameStateRef.current.roundState.currentPlayerIndex].hand.find(c => c.id === cardId)
+      if (card && card.suit !== 'joker') {
+        const meld = gameStateRef.current.roundState.tablesMelds.find(m => m.id === preSwapMeldId)
+        if (meld && findSwappableJoker(card, meld) !== null) {
+          confirmPreSwapWithCard(card)
+          return
+        }
+      }
+      return // in swap mode but card isn't a valid target — ignore tap
+    }
+
     setNewCardIds(new Set()) // clear new badge on any action
     setSelectedCardIds(prev => {
       const next = new Set(prev)
@@ -1346,6 +1366,68 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     setFlashMeldId(meld.id)
     setFlashIsHeist(isFromOtherMeld)
     setTimeout(() => { setFlashMeldId(null); setFlashIsHeist(false) }, 600)
+  }
+
+  // ── Pre-lay-down joker swap: inline flow ─────────────────────────────────
+  function confirmPreSwapWithCard(naturalCard: CardType) {
+    const psMeld = gameState.roundState.tablesMelds.find(m => m.id === preSwapMeldId) ?? null
+    if (!psMeld || findSwappableJoker(naturalCard, psMeld) === null) return
+
+    if (!preLayDownSwapBaseStateRef.current) {
+      preLayDownSwapBaseStateRef.current = gameState
+    }
+    const afterSwap = computeJokerSwap(gameState, naturalCard, psMeld)
+    if (!afterSwap) return
+    const playerIdx = afterSwap.roundState.currentPlayerIndex
+    const newHand = afterSwap.players[playerIdx].hand
+    const canLayDown = aiFindBestMelds(newHand, gameState.roundState.requirement) !== null
+    if (canLayDown) {
+      setGameState(afterSwap)
+      clearSelection()
+      preLayDownSwapBaseStateRef.current = null
+      setPreSwapMeldId(null)
+      setSwapMode(false)
+      setSwapSelectedMeldId(null)
+      setPreLayDownSwap(true)
+      setShowMeldModal(true)
+    } else {
+      const newTablesMelds = afterSwap.roundState.tablesMelds
+      const moreSwapsPossible = newTablesMelds.some(m =>
+        m.type === 'run' && m.jokerMappings.length > 0 &&
+        newHand.some(c => c.suit !== 'joker' && findSwappableJoker(c, m) !== null)
+      )
+      if (moreSwapsPossible) {
+        setGameState(afterSwap)
+        clearSelection()
+        setPreSwapMeldId(null)
+        setSwapSelectedMeldId(null)
+      } else {
+        const baseState = preLayDownSwapBaseStateRef.current
+        setGameState(baseState ?? gameState)
+        preLayDownSwapBaseStateRef.current = null
+        clearSelection()
+        setPreSwapMeldId(null)
+        setSwapMode(false)
+        setSwapSelectedMeldId(null)
+        setLayOffError('Swap reversed — you still can\'t lay down with this joker. Try a different strategy!')
+        setTimeout(() => setLayOffError(null), 5000)
+      }
+    }
+  }
+
+  // ── Swap-mode joker tap handler (from TableMelds in pre-lay-down mode) ────
+  function handleSwapModeJokerTap(_jokerCard: CardType, meld: Meld) {
+    if (!swapMode) return
+    const hand = gameState.players[gameState.roundState.currentPlayerIndex].hand
+    const matches = hand.filter(c =>
+      c.suit !== 'joker' && findSwappableJoker(c, meld) !== null
+    )
+    if (matches.length === 0) return
+
+    setPreSwapMeldId(meld.id)
+    setSwapSelectedMeldId(meld.id)
+    // Highlight matching hand cards
+    setSelectedCardIds(new Set(matches.map(c => c.id)))
   }
 
   // ── Inline lay-off (from TableMelds tap) ─────────────────────────────────
@@ -2215,6 +2297,52 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   // Snap off tension when someone goes out
   const effectiveTension = gameState.roundState.goOutPlayerId ? 0 : tensionLevel
 
+  // Rotating race commentary
+  useEffect(() => {
+    if (effectiveTension < 2) { setRaceMessage(''); return }
+
+    function pickMessage(): string {
+      const state = gameStateRef.current
+      const players = state.players
+      const me = players.find(p => !p.isAI)
+      const closePlayers = players.filter(p => p.hasLaidDown && p.hand.length <= 5)
+      if (closePlayers.length === 0) return '🔥 Race to finish'
+      const closest = closePlayers.reduce((a, b) => a.hand.length < b.hand.length ? a : b)
+      const myCards = me?.hand.length ?? 99
+      const meInRace = me?.hasLaidDown && myCards <= 5
+
+      const pool: string[] = ['🔥 Race to finish', '⚡ Every card counts', '🃏 One draw could end it']
+
+      if (closePlayers.length >= 2) {
+        pool.push('👀 Who blinks first?')
+        pool.push('⚡ Neck and neck')
+      }
+
+      if (closest && closest.hand.length <= 2 && closest.isAI) {
+        pool.push(`😬 ${closest.name} is about to go out`)
+        pool.push(`🚨 Can anyone stop ${closest.name}?`)
+      }
+
+      if (meInRace && myCards <= 3) {
+        pool.push('🔥 You\'re almost there')
+        pool.push('💪 Finish strong')
+        pool.push('⚡ One good draw away')
+      }
+
+      if (!meInRace && closest?.isAI && closest.hand.length <= 3) {
+        pool.push('😰 Running out of time')
+        pool.push('🚨 Last chance to lay off')
+      }
+
+      const filtered = pool.filter(m => m !== raceMessage)
+      return filtered[Math.floor(Math.random() * filtered.length)] ?? pool[0]
+    }
+
+    setRaceMessage(pickMessage())
+    const interval = setInterval(() => setRaceMessage(pickMessage()), 4500)
+    return () => clearInterval(interval)
+  }, [effectiveTension]) // eslint-disable-line react-hooks/exhaustive-deps
+
   if (uiPhase === 'round-start' && announcementStage) {
     return (
       <RoundAnnouncement
@@ -2318,10 +2446,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const feltColor = effectiveTension === 0
     ? '#1a3a2a'
     : effectiveTension === 1
-    ? '#1e3a28'
+    ? '#1d3a29'
     : effectiveTension === 2
-    ? '#243826'
-    : '#2a3522'
+    ? '#213828'
+    : '#243727'
 
   return (
     <div
@@ -2331,7 +2459,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         flexDirection: 'column',
         overflow: 'hidden',
         backgroundColor: feltColor,
-        transition: 'background-color 2s ease',
+        transition: 'background-color 3s ease',
       }}
     >
       <style>{`
@@ -2349,49 +2477,18 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         />
       )}
 
-      {/* Race intensity: edge glow overlay */}
-      {effectiveTension > 0 && (
-        <div
-          className="fixed inset-0 pointer-events-none z-30"
-          style={{
-            boxShadow: effectiveTension === 1
-              ? 'inset 0 0 60px rgba(226, 184, 88, 0.08)'
-              : effectiveTension === 2
-              ? 'inset 0 0 80px rgba(226, 184, 88, 0.15)'
-              : 'inset 0 0 100px rgba(232, 150, 50, 0.25)',
-            transition: 'box-shadow 1s ease',
-          }}
-        />
-      )}
-
-      {/* Race intensity: heartbeat pulse overlay */}
-      {effectiveTension > 0 && (
-        <div
-          className="fixed inset-0 pointer-events-none z-30"
-          style={{
-            backgroundColor: '#e2b858',
-            animation: effectiveTension === 1
-              ? 'tension-pulse-slow 4s ease-in-out infinite'
-              : effectiveTension === 2
-              ? 'tension-pulse-medium 2.5s ease-in-out infinite'
-              : 'tension-pulse-fast 1.5s ease-in-out infinite',
-          }}
-        />
-      )}
-
-      {/* Race intensity: "Race to finish" text at level 3 */}
-      {effectiveTension === 3 && (
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 z-40" style={{ top: 'max(52px, calc(env(safe-area-inset-top) + 44px))' }}>
+      {/* Rotating race commentary — appears at tension level 2+ */}
+      {effectiveTension >= 2 && raceMessage && (
+        <div className="flex justify-center py-1.5" style={{ position: 'absolute', top: 'max(52px, calc(env(safe-area-inset-top) + 44px))', left: 0, right: 0, zIndex: 40, pointerEvents: 'none' }}>
           <div style={{
-            background: 'rgba(42,53,34,0.9)',
+            background: 'rgba(42,53,34,0.85)',
             backdropFilter: 'blur(4px)',
             padding: '4px 16px',
-            borderRadius: '0 0 12px 12px',
-            border: '1px solid rgba(226,184,88,0.3)',
-            borderTop: 'none',
+            borderRadius: 20,
+            border: '1px solid rgba(226,184,88,0.2)',
           }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: '#e2b858', display: 'flex', alignItems: 'center', gap: 6 }}>
-              🔥 Race to finish
+            <span key={raceMessage} style={{ fontSize: 12, fontWeight: 700, color: '#e2b858', display: 'flex', alignItems: 'center', gap: 6, animation: 'race-message-fade 4.5s ease both' }}>
+              {raceMessage}
             </span>
           </div>
         </div>
@@ -2682,6 +2779,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           cardsDealt={rs.cardsDealt}
           flashMeldId={flashMeldId}
           flashIsHeist={flashIsHeist}
+          swapMode={swapMode && !currentPlayer.hasLaidDown}
+          playerHand={swapMode && !currentPlayer.hasLaidDown ? currentPlayer.hand : undefined}
+          swapSelectedMeldId={swapSelectedMeldId}
+          onSwapModeJokerTap={handleSwapModeJokerTap}
         />
         </div>
       </div>
@@ -2953,46 +3054,94 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
               </p>
             )}
             {!currentPlayer.hasLaidDown ? (
-              /* Pre-lay-down: [Swap Joker?] [Lay Down] [Discard] */
+              /* Pre-lay-down: swap mode UI or [Swap Joker?] [Lay Down] [Discard] */
               <>
-                <div className="flex gap-2">
-                  {hasSwappableJokersBeforeLayDown && (
+                {swapMode ? (
+                  <div>
+                    <p style={{ color: '#e2b858', fontSize: 11, textAlign: 'center', marginBottom: 8, fontWeight: 600 }}>
+                      {swapSelectedMeldId
+                        ? 'Now tap the matching card in your hand'
+                        : 'Tap a glowing joker on the table to swap it'}
+                    </p>
+                    {layOffError && (
+                      <p style={{ color: '#e87070', fontSize: 11, textAlign: 'center', marginBottom: 8 }}>
+                        {layOffError}
+                      </p>
+                    )}
                     <button
-                      onClick={() => { setNewCardIds(new Set()); setShowPreLayDownSwapModal(true) }}
+                      onClick={() => {
+                        setSwapMode(false)
+                        setSwapSelectedMeldId(null)
+                        setPreSwapMeldId(null)
+                        if (preLayDownSwapBaseStateRef.current) {
+                          setGameState(preLayDownSwapBaseStateRef.current)
+                          preLayDownSwapBaseStateRef.current = null
+                        }
+                        clearSelection()
+                      }}
                       style={{
-                        flex: 1, minHeight: 38, borderRadius: 10,
-                        border: '1px solid #e2b858',
-                        background: '#1e4a2e', color: '#e2b858',
+                        width: '100%', minHeight: 38, borderRadius: 10,
+                        border: '1px solid #2d5a3a',
+                        background: '#1e4a2e', color: '#6aad7a',
                         fontSize: 13, fontWeight: 600, cursor: 'pointer',
                       }}
                     >
-                      Swap Joker
+                      Cancel Swap
                     </button>
-                  )}
-                  <button
-                    onClick={() => setShowMeldModal(true)}
-                    style={{
-                      flex: 1, minHeight: 38, borderRadius: 10, border: 'none',
-                      background: '#e2b858', color: '#2c1810',
-                      fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                    }}
-                  >
-                    Lay Down
-                  </button>
-                  <button
-                    onClick={selectedCardIds.size === 1 ? () => { setNewCardIds(new Set()); handleDiscard() } : undefined}
-                    disabled={selectedCardIds.size !== 1}
-                    style={{
-                      flex: 1, minHeight: 38, borderRadius: 10, border: 'none',
-                      background: selectedCardIds.size !== 1 ? '#1e4a2e' : 'white',
-                      color: selectedCardIds.size !== 1 ? '#3a5a3a' : '#2c1810',
-                      fontSize: 13, fontWeight: 600,
-                      cursor: selectedCardIds.size !== 1 ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    Discard
-                  </button>
-                </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    {hasSwappableJokersBeforeLayDown && (
+                      <button
+                        onClick={() => {
+                          const hand = currentPlayer.hand
+                          const hasSwappable = gameState.roundState.tablesMelds.some(meld =>
+                            meld.type === 'run' && meld.jokerMappings.length > 0 &&
+                            hand.some(c => c.suit !== 'joker' && findSwappableJoker(c, meld) !== null)
+                          )
+                          if (!hasSwappable) {
+                            setLayOffError('No swappable jokers — none of your cards match a joker position on the table.')
+                            setTimeout(() => setLayOffError(null), 5000)
+                            return
+                          }
+                          setNewCardIds(new Set())
+                          setSwapMode(true)
+                        }}
+                        style={{
+                          flex: 1, minHeight: 38, borderRadius: 10,
+                          border: '1px solid #e2b858',
+                          background: '#1e4a2e', color: '#e2b858',
+                          fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                        }}
+                      >
+                        Swap Joker
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setShowMeldModal(true)}
+                      style={{
+                        flex: 1, minHeight: 38, borderRadius: 10, border: 'none',
+                        background: '#e2b858', color: '#2c1810',
+                        fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                      }}
+                    >
+                      Lay Down
+                    </button>
+                    <button
+                      onClick={selectedCardIds.size === 1 ? () => { setNewCardIds(new Set()); handleDiscard() } : undefined}
+                      disabled={selectedCardIds.size !== 1}
+                      style={{
+                        flex: 1, minHeight: 38, borderRadius: 10, border: 'none',
+                        background: selectedCardIds.size !== 1 ? '#1e4a2e' : 'white',
+                        color: selectedCardIds.size !== 1 ? '#3a5a3a' : '#2c1810',
+                        fontSize: 13, fontWeight: 600,
+                        cursor: selectedCardIds.size !== 1 ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      Discard
+                    </button>
+                  </div>
+                )}
               </>
             ) : (
               /* Post-lay-down: contextual hint + [Discard] or [End Turn] */
@@ -3071,172 +3220,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           onSortChange={setHandSort}
         />
       )}
-
-      {/* ── Pre-lay-down Swap Joker modal (inline) ──────────────────────── */}
-      {showPreLayDownSwapModal && (() => {
-        const naturalHand = currentPlayer.hand.filter(c => c.suit !== 'joker')
-        const swapRuns = rs.tablesMelds.filter(m => m.type === 'run' && m.jokerMappings.length > 0)
-        const psCard = naturalHand.find(c => c.id === preSwapCardId) ?? null
-        const psMeld = swapRuns.find(m => m.id === preSwapMeldId) ?? null
-        const psValid = psCard !== null && psMeld !== null && findSwappableJoker(psCard, psMeld) !== null
-
-        function closeSwapModal() {
-          if (preLayDownSwapBaseStateRef.current) {
-            setGameState(preLayDownSwapBaseStateRef.current)
-            preLayDownSwapBaseStateRef.current = null
-          }
-          setPreSwapCardId(null)
-          setPreSwapMeldId(null)
-          setShowPreLayDownSwapModal(false)
-        }
-
-        function confirmSwap() {
-          if (!psCard || !psMeld) return
-          if (!preLayDownSwapBaseStateRef.current) {
-            preLayDownSwapBaseStateRef.current = gameState
-          }
-          const afterSwap = computeJokerSwap(gameState, psCard, psMeld)
-          if (!afterSwap) return
-          const playerIdx = afterSwap.roundState.currentPlayerIndex
-          const newHand = afterSwap.players[playerIdx].hand
-          const canLayDown = aiFindBestMelds(newHand, rs.requirement) !== null
-          if (canLayDown) {
-            setGameState(afterSwap)
-            clearSelection()
-            preLayDownSwapBaseStateRef.current = null
-            setPreSwapCardId(null)
-            setPreSwapMeldId(null)
-            setShowPreLayDownSwapModal(false)
-            setPreLayDownSwap(true)
-            setShowMeldModal(true)
-          } else {
-            const newTablesMelds = afterSwap.roundState.tablesMelds
-            const moreSwapsPossible = newTablesMelds.some(m =>
-              m.type === 'run' && m.jokerMappings.length > 0 &&
-              newHand.some(c => c.suit !== 'joker' && findSwappableJoker(c, m) !== null)
-            )
-            if (moreSwapsPossible) {
-              setGameState(afterSwap)
-              clearSelection()
-              setPreSwapCardId(null)
-              setPreSwapMeldId(null)
-            } else {
-              const baseState = preLayDownSwapBaseStateRef.current
-              setGameState(baseState ?? gameState)
-              preLayDownSwapBaseStateRef.current = null
-              clearSelection()
-              setPreSwapCardId(null)
-              setPreSwapMeldId(null)
-              setShowPreLayDownSwapModal(false)
-              setLayOffError('You can only swap jokers if you can lay down afterwards.')
-              setTimeout(() => setLayOffError(null), 4000)
-            }
-          }
-        }
-
-        return (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 50, backgroundColor: '#1e4a2e', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            {/* Header */}
-            <div style={{ flexShrink: 0, backgroundColor: '#0f2218', padding: '12px 14px', paddingTop: 'max(12px, env(safe-area-inset-top))', borderBottom: '1px solid #2d5a3a', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <div>
-                <p style={{ color: '#a8d0a8', fontSize: 13, fontWeight: 500, margin: 0 }}>Swap a Joker</p>
-                <p style={{ color: '#e2b858', fontSize: 11, margin: '2px 0 0' }}>You must lay down after this swap</p>
-              </div>
-              <button onClick={closeSwapModal} style={{ background: 'transparent', border: '1px solid #2d5a3a', borderRadius: 8, color: '#6aad7a', padding: '6px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', minHeight: 44, minWidth: 44 }}>
-                Cancel
-              </button>
-            </div>
-
-            {/* Error */}
-            {layOffError && (
-              <div style={{ padding: '8px 14px', backgroundColor: 'rgba(44,24,16,0.5)', borderBottom: '1px solid #3a1a0a' }}>
-                <p style={{ color: '#e87070', fontSize: 11, margin: 0 }}>{layOffError}</p>
-              </div>
-            )}
-
-            {/* Body */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 16 }}>
-              {/* Step 1: pick natural card */}
-              <div>
-                <p style={{ color: '#a8d0a8', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.8px', margin: '0 0 8px' }}>
-                  Step 1 — Pick a card from your hand
-                </p>
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                  {naturalHand.length === 0
-                    ? <p style={{ color: '#3a5a3a', fontSize: 11, fontStyle: 'italic' }}>No natural cards in hand</p>
-                    : naturalHand.map(card => {
-                      const sel = preSwapCardId === card.id
-                      return (
-                        <div
-                          key={card.id}
-                          onClick={() => { setPreSwapCardId(card.id); setPreSwapMeldId(null) }}
-                          style={{ width: 36, height: 50, minWidth: 44, minHeight: 44, backgroundColor: sel ? '#fff8dc' : ['hearts','diamonds'].includes(card.suit) ? (card.suit === 'hearts' ? '#fff0f0' : '#f0f5ff') : card.suit === 'clubs' ? '#e0f7e8' : '#eeecff', border: sel ? '2px solid #e2b858' : '1.5px solid rgba(0,0,0,0.14)', borderRadius: 5, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transform: sel ? 'translateY(-6px)' : undefined, transition: 'transform 100ms', userSelect: 'none', color: card.suit === 'hearts' ? '#c0393b' : card.suit === 'diamonds' ? '#2158b8' : card.suit === 'clubs' ? '#1a6b3a' : '#3d2b8e' }}>
-                          <span style={{ fontSize: 11, fontWeight: 800 }}>{card.rank === 1 ? 'A' : card.rank === 11 ? 'J' : card.rank === 12 ? 'Q' : card.rank === 13 ? 'K' : String(card.rank)}</span>
-                          <span style={{ fontSize: 14 }}>{card.suit === 'hearts' ? '♥' : card.suit === 'diamonds' ? '♦' : card.suit === 'clubs' ? '♣' : '♠'}</span>
-                        </div>
-                      )
-                    })
-                  }
-                </div>
-              </div>
-
-              {/* Step 2: pick run meld (only shown once a card is selected) */}
-              {psCard && (
-                <div>
-                  <p style={{ color: '#a8d0a8', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.8px', margin: '0 0 8px' }}>
-                    Step 2 — Pick a run with a joker
-                  </p>
-                  {swapRuns.length === 0
-                    ? <p style={{ color: '#3a5a3a', fontSize: 11, fontStyle: 'italic' }}>No runs with jokers on the table</p>
-                    : (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {swapRuns.map(meld => {
-                          const isTarget = findSwappableJoker(psCard, meld) !== null
-                          const sel = preSwapMeldId === meld.id
-                          return (
-                            <div
-                              key={meld.id}
-                              onClick={() => isTarget && setPreSwapMeldId(meld.id)}
-                              style={{ backgroundColor: '#0f2218', border: sel ? '1.5px solid #e2b858' : isTarget ? '1.5px solid #6aad7a' : '1.5px solid #2d5a3a', borderRadius: 8, padding: '6px 8px', display: 'flex', flexDirection: 'column', gap: 4, opacity: isTarget ? 1 : 0.35, cursor: isTarget ? 'pointer' : 'default', flexShrink: 0, animation: isTarget && !sel ? 'lomPulse 1.4s ease-in-out infinite' : 'none' }}>
-                              <p style={{ fontSize: 8, color: isTarget ? '#6aad7a' : '#3a5a3a', margin: 0 }}>run · {meld.ownerName.split(' ')[0]}</p>
-                              <div style={{ display: 'flex', gap: 2 }}>
-                                {meld.cards.map(card => {
-                                  const isJkr = card.suit === 'joker'
-                                  const mapping = isJkr ? meld.jokerMappings.find(j => j.cardId === card.id) : null
-                                  const lbl = isJkr ? (mapping ? `${mapping.representsRank === 1 || mapping.representsRank === 14 ? 'A' : mapping.representsRank === 11 ? 'J' : mapping.representsRank === 12 ? 'Q' : mapping.representsRank === 13 ? 'K' : String(mapping.representsRank)}${mapping.representsSuit === 'hearts' ? '♥' : mapping.representsSuit === 'diamonds' ? '♦' : mapping.representsSuit === 'clubs' ? '♣' : '♠'}` : 'JKR') : `${card.rank === 1 ? 'A' : card.rank === 11 ? 'J' : card.rank === 12 ? 'Q' : card.rank === 13 ? 'K' : card.rank}${card.suit === 'hearts' ? '♥' : card.suit === 'diamonds' ? '♦' : card.suit === 'clubs' ? '♣' : '♠'}`
-                                  return (
-                                    <div key={card.id} style={{ width: 22, height: 30, backgroundColor: isJkr ? '#fff8e0' : card.suit === 'hearts' ? '#fff0f0' : card.suit === 'diamonds' ? '#f0f5ff' : card.suit === 'clubs' ? '#e0f7e8' : '#eeecff', border: '1px solid rgba(0,0,0,0.12)', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 7, fontWeight: 700, color: isJkr ? '#8b6914' : card.suit === 'hearts' ? '#c0393b' : card.suit === 'diamonds' ? '#2158b8' : card.suit === 'clubs' ? '#1a6b3a' : '#3d2b8e', flexShrink: 0 }}>
-                                      {lbl}
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )
-                  }
-                </div>
-              )}
-            </div>
-
-            {/* Confirm button */}
-            <div style={{ flexShrink: 0, backgroundColor: '#0f2218', borderTop: '1px solid #2d5a3a', padding: '12px 14px', paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}>
-              <button
-                onClick={confirmSwap}
-                disabled={!psValid}
-                style={{ width: '100%', minHeight: 48, borderRadius: 12, border: 'none', background: psValid ? '#e2b858' : '#1e4a2e', color: psValid ? '#2c1810' : '#3a5a3a', fontSize: 14, fontWeight: 700, cursor: psValid ? 'pointer' : 'not-allowed' }}
-              >
-                Swap & Lay Down
-              </button>
-            </div>
-
-            {/* Reuse pulse keyframe from LayOffModal */}
-            <style>{`@keyframes lomPulse{0%,100%{box-shadow:0 0 6px rgba(106,173,122,0.4)}50%{box-shadow:0 0 18px rgba(106,173,122,0.9)}}`}</style>
-          </div>
-        )
-      })()}
 
       {/* Pause modal */}
       {showPauseModal && (

@@ -94,6 +94,23 @@ function useConfetti(canvasRef: React.RefObject<HTMLCanvasElement>) {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 }
 
+// ── CountUp animation ─────────────────────────────────────────────────────────
+
+function CountUp({ to, duration = 800 }: { to: number; duration?: number }) {
+  const [value, setValue] = useState(0)
+  useEffect(() => {
+    const start = Date.now()
+    const tick = setInterval(() => {
+      const elapsed = Date.now() - start
+      const progress = Math.min(elapsed / duration, 1)
+      setValue(Math.round(to * progress))
+      if (progress >= 1) clearInterval(tick)
+    }, 16)
+    return () => clearInterval(tick)
+  }, [to, duration])
+  return <>{value}</>
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function playerColor(idx: number): string {
@@ -325,9 +342,9 @@ export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId,
                 // Heuristic: rounds with score ≥ 80 indicate a full-hand (likely Shanghaied)
                 const timesShanghaied = soleWinner.roundScores.filter(s => s >= 80).length
                 const stats = [
-                  { label: 'Final score', value: String(playerTotal(soleWinner)) },
-                  { label: 'Went out', value: String(timesOut) },
-                  { label: 'Shanghaied', value: String(timesShanghaied) },
+                  { label: 'Final score', value: String(playerTotal(soleWinner)), isScore: true },
+                  { label: 'Went out', value: String(timesOut), isScore: false },
+                  { label: 'Shanghaied', value: String(timesShanghaied), isScore: false },
                 ]
                 return (
                   <div
@@ -348,7 +365,9 @@ export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId,
                         }}
                       >
                         <p style={{ fontSize: 16, fontWeight: 700, color: '#e2b858', margin: 0 }}>
-                          {stat.value}
+                          {stat.isScore
+                            ? <CountUp to={playerTotal(soleWinner)} duration={800} />
+                            : stat.value}
                         </p>
                         <p style={{ fontSize: 9, color: '#6aad7a', margin: '2px 0 0' }}>
                           {stat.label}

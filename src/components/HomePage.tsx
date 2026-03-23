@@ -7,11 +7,41 @@ interface Props {
   onShowTutorial?: () => void
 }
 
+const CARDS = [
+  {
+    id: 'play' as Section,
+    Icon: Gamepad2,
+    title: 'Play Game',
+    sub: 'Play against AI or friends',
+  },
+  {
+    id: 'scoretracker' as Section,
+    Icon: ClipboardList,
+    title: 'Score Tracker',
+    sub: 'Enter scores & view history',
+  },
+  {
+    id: 'stats' as Section,
+    Icon: Trophy,
+    title: 'Stats & Records',
+    sub: 'Leaderboards & player stats',
+  },
+  {
+    id: 'analytics' as Section,
+    Icon: BarChart3,
+    title: 'Analytics',
+    sub: 'AI performance & game insights',
+  },
+]
+
 export default function HomePage({ onNavigate, onShowTutorial }: Props) {
   return (
     <div className="flex flex-col min-h-[100dvh] px-4 pt-10 pb-8">
       {/* Title */}
-      <div className="text-center mb-10 relative">
+      <div
+        className="text-center mb-10 relative"
+        style={{ animation: 'slide-up-fade 400ms ease-out 0ms both' }}
+      >
         <div className="text-5xl mb-3">🃏</div>
         <h1 className="font-display text-4xl font-bold text-[#8b6914]">Shanghai</h1>
         <p className="text-[#8b7355] mt-2 text-sm">Shanghai Rummy Score Tracker</p>
@@ -28,57 +58,22 @@ export default function HomePage({ onNavigate, onShowTutorial }: Props) {
 
       {/* Navigation cards */}
       <div className="flex flex-col gap-4">
-        <button
-          onClick={() => onNavigate('play')}
-          className="card p-5 text-left flex items-center gap-4 active:opacity-80 transition-opacity"
-        >
-          <div className="w-14 h-14 bg-[#efe9dd] rounded-2xl flex items-center justify-center flex-shrink-0">
-            <Gamepad2 size={28} className="text-[#8b6914]" />
-          </div>
-          <div>
-            <div className="text-[#2c1810] font-semibold text-lg">Play Game</div>
-            <div className="text-[#8b7355] text-sm mt-0.5">Play against AI or friends</div>
-          </div>
-        </button>
-
-        <button
-          onClick={() => onNavigate('scoretracker')}
-          className="card p-5 text-left flex items-center gap-4 active:opacity-80 transition-opacity"
-        >
-          <div className="w-14 h-14 bg-[#efe9dd] rounded-2xl flex items-center justify-center flex-shrink-0">
-            <ClipboardList size={28} className="text-[#8b6914]" />
-          </div>
-          <div>
-            <div className="text-[#2c1810] font-semibold text-lg">Score Tracker</div>
-            <div className="text-[#8b7355] text-sm mt-0.5">Enter scores & view history</div>
-          </div>
-        </button>
-
-        <button
-          onClick={() => onNavigate('stats')}
-          className="card p-5 text-left flex items-center gap-4 active:opacity-80 transition-opacity"
-        >
-          <div className="w-14 h-14 bg-[#efe9dd] rounded-2xl flex items-center justify-center flex-shrink-0">
-            <Trophy size={28} className="text-[#8b6914]" />
-          </div>
-          <div>
-            <div className="text-[#2c1810] font-semibold text-lg">Stats & Records</div>
-            <div className="text-[#8b7355] text-sm mt-0.5">Leaderboards & player stats</div>
-          </div>
-        </button>
-
-        <button
-          onClick={() => onNavigate('analytics')}
-          className="card p-5 text-left flex items-center gap-4 active:opacity-80 transition-opacity"
-        >
-          <div className="w-14 h-14 bg-[#efe9dd] rounded-2xl flex items-center justify-center flex-shrink-0">
-            <BarChart3 size={28} className="text-[#8b6914]" />
-          </div>
-          <div>
-            <div className="text-[#2c1810] font-semibold text-lg">Analytics</div>
-            <div className="text-[#8b7355] text-sm mt-0.5">AI performance & game insights</div>
-          </div>
-        </button>
+        {CARDS.map((card, i) => (
+          <button
+            key={card.id}
+            onClick={() => onNavigate(card.id)}
+            className="card p-5 text-left flex items-center gap-4 active:opacity-80 transition-opacity"
+            style={{ animation: `slide-up-fade 400ms ease-out ${200 + i * 100}ms both` }}
+          >
+            <div className="w-14 h-14 bg-[#efe9dd] rounded-2xl flex items-center justify-center flex-shrink-0">
+              <card.Icon size={28} className="text-[#8b6914]" />
+            </div>
+            <div>
+              <div className="text-[#2c1810] font-semibold text-lg">{card.title}</div>
+              <div className="text-[#8b7355] text-sm mt-0.5">{card.sub}</div>
+            </div>
+          </button>
+        ))}
       </div>
     </div>
   )

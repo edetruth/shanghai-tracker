@@ -15,6 +15,11 @@ interface Props {
   cardsDealt?: number
   flashMeldId?: string | null
   flashIsHeist?: boolean
+  // Pre-lay-down inline swap mode
+  swapMode?: boolean
+  playerHand?: Card[]
+  swapSelectedMeldId?: string | null
+  onSwapModeJokerTap?: (card: Card, meld: Meld) => void
 }
 
 // ── Card overlap helper ───────────────────────────────────────────────────────
@@ -237,6 +242,10 @@ export default function TableMelds({
   cardsDealt,
   flashMeldId,
   flashIsHeist,
+  swapMode = false,
+  playerHand,
+  swapSelectedMeldId,
+  onSwapModeJokerTap,
 }: Props) {
   // ── Particles state ───────────────────────────────────────────────────────
   const [particlesActive, setParticlesActive] = useState(true)
@@ -365,6 +374,10 @@ export default function TableMelds({
           0%, 100% { box-shadow: 0 0 4px rgba(226,184,88,0.4); }
           50%       { box-shadow: 0 0 12px rgba(226,184,88,0.85); }
         }
+        @keyframes tmJokerPulse {
+          0%, 100% { outline-color: rgba(226,184,88,0.5); box-shadow: 0 0 4px rgba(226,184,88,0.3); }
+          50%       { outline-color: rgba(226,184,88,1);   box-shadow: 0 0 10px rgba(226,184,88,0.8); }
+        }
       `}</style>
 
       <div
@@ -451,6 +464,11 @@ export default function TableMelds({
                   // Fix D: joker swap flash
                   const isFlashing = flashMeldId === meld.id
 
+                  // Pre-lay-down swap mode: does this meld have a swappable joker?
+                  const meldHasSwappableJoker = swapMode && meld.type === 'run' &&
+                    !!playerHand?.some(c => c.suit !== 'joker' && findSwappableJoker(c, meld) !== null)
+                  const isSelectedSwapMeld = swapSelectedMeldId === meld.id
+
                   function handleTap() {
                     if (isLayOffValid && onLayOff && selectedCard) {
                       onLayOff(selectedCard, meld)
@@ -470,13 +488,17 @@ export default function TableMelds({
                           ? '1px solid #6aad7a'
                           : isSwapValid
                             ? '1px solid #e2b858'
-                            : '1px solid #2d5a3a',
+                            : swapMode && meldHasSwappableJoker
+                              ? (isSelectedSwapMeld ? '1px solid #e2b858' : '1px solid rgba(226,184,88,0.5)')
+                              : '1px solid #2d5a3a',
                         borderRadius: 6,
                         padding: '4px 6px',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: 2,
-                        opacity: isNewMeld && !isVisibleNew ? 0 : isDimmed ? 0.35 : 1,
+                        opacity: isNewMeld && !isVisibleNew ? 0 :
+                                 swapMode && !meldHasSwappableJoker && !isDimmed ? 0.35 :
+                                 isDimmed ? 0.35 : 1,
                         cursor: isInteractive ? 'pointer' : 'default',
                         transition: 'opacity 0.15s',
                         animation: isFlashing
@@ -503,31 +525,61 @@ export default function TableMelds({
                           tap to swap joker
                         </span>
                       )}
+                      {swapMode && meldHasSwappableJoker && !isSelectedSwapMeld && (
+                        <span style={{ fontSize: 8, color: '#e2b858', fontWeight: 600, lineHeight: 1 }}>
+                          tap joker to swap
+                        </span>
+                      )}
+                      {swapMode && isSelectedSwapMeld && (
+                        <span style={{ fontSize: 8, color: '#e2b858', fontWeight: 600, lineHeight: 1 }}>
+                          joker selected
+                        </span>
+                      )}
 
                       {/* Cards row — overlap for long melds */}
                       <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', overflow: 'hidden' }}>
                         {displayCards.map((card, i) => {
                           const isJustLaidOff = justLaidOffCardIds?.has(card.id) ?? false
                           const ownerName = meld.cardOwners?.[card.id]
+
+                          // Pre-lay-down swap mode card-level highlighting
+                          const isSwappableJokerCard = swapMode && card.suit === 'joker' &&
+                            meld.type === 'run' && meldHasSwappableJoker
+                          const swapCardDimmed = swapMode && !isSwappableJokerCard
+
                           return (
                             <div
                               key={card.id}
                               className={isJustLaidOff ? 'animate-card-join' : ''}
+                              onClick={isSwappableJokerCard ? (e) => { e.stopPropagation(); onSwapModeJokerTap?.(card, meld) } : undefined}
                               style={{
                                 marginLeft: i === 0 ? 0 : 3 - getMeldCardOverlap(displayCards.length),
                                 zIndex: i,
                                 flexShrink: 0,
                                 position: 'relative',
-                                outline: isJustLaidOff ? '2px solid #e2b858' : undefined,
-                                outlineOffset: isJustLaidOff ? '1px' : undefined,
-                                boxShadow: isJustLaidOff ? '0 0 8px rgba(226,184,88,0.5)' : undefined,
+                                outline: isJustLaidOff
+                                  ? '2px solid #e2b858'
+                                  : isSwappableJokerCard
+                                    ? '2px solid #e2b858'
+                                    : undefined,
+                                outlineOffset: isJustLaidOff || isSwappableJokerCard ? '1px' : undefined,
+                                boxShadow: isJustLaidOff
+                                  ? '0 0 8px rgba(226,184,88,0.5)'
+                                  : isSwappableJokerCard && !isSelectedSwapMeld
+                                    ? '0 0 8px rgba(226,184,88,0.6)'
+                                    : undefined,
                                 borderRadius: 5,
+                                cursor: isSwappableJokerCard ? 'pointer' : 'default',
+                                opacity: swapCardDimmed ? 0.35 : 1,
+                                animation: isSwappableJokerCard && !isSelectedSwapMeld
+                                  ? 'tmJokerPulse 1.4s ease-in-out infinite'
+                                  : undefined,
                               }}
                             >
                               <MicroCard
                                 card={card}
                                 meld={meld}
-                                highlight={swapJoker ? card.id === swapJoker.id : false}
+                                highlight={swapJoker ? card.id === swapJoker.id : isSwappableJokerCard}
                               />
                               {ownerName && (
                                 <span

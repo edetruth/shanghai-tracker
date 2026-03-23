@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import type { Card as CardType, RoundRequirement } from '../../game/types'
 import { isValidSet, isValidRun, getNextJokerOptions } from '../../game/meld-validator'
 import { canFormAnyValidMeld, aiFindBestMelds, aiFindAllMelds } from '../../game/ai'
+import { cardPoints } from '../../game/rules'
 import CardComponent from './Card'
 
 interface Props {
@@ -15,7 +16,7 @@ interface Props {
   onSortChange?: (mode: 'rank' | 'suit') => void
 }
 
-type ModalPhase = 'no-melds' | 'slots' | 'bonus-prompt' | 'bonus-suggest' | 'bonus' | 'joker-placement'
+type ModalPhase = 'suggest' | 'no-melds' | 'slots' | 'bonus-prompt' | 'bonus-suggest' | 'bonus' | 'joker-placement'
 type AllowedMeldType = 'set' | 'run' | 'both'
 
 // ── Unchanged helpers ────────────────────────────────────────────────────────
@@ -264,10 +265,7 @@ export default function MeldModal({
   const total = totalRequired(requirement)
   const allowedBonusTypes = getAllowedBonusTypes(requirement)
 
-  // Check if player can meet the requirement at all
-  const canLayDownAtAll = useMemo(() => aiFindBestMelds(hand, requirement) !== null, [hand, requirement])
-
-  const [phase, setPhase] = useState<ModalPhase>(() => canLayDownAtAll ? 'slots' : 'no-melds')
+  const [phase, setPhase] = useState<ModalPhase>('suggest')
 
   // For bonus-suggest: all melds (required + bonus) the AI can find from the confirmed groups' remaining cards
   const [bonusSuggestedMeld, setBonusSuggestedMeld] = useState<CardType[] | null>(null)
@@ -503,6 +501,151 @@ export default function MeldModal({
       setSelectedHandCards([])
       setPhase('slots')
     }
+  }
+
+  // ── Auto-compute joker positions for suggested melds ─────────────────────
+  function computeJokerPositionsForMelds(melds: CardType[][]): Map<string, number> {
+    const positions = new Map<string, number>()
+    for (const meld of melds) {
+      const jokers = meld.filter(c => c.suit === 'joker')
+      if (jokers.length === 0) continue
+      const naturals = meld.filter(c => c.suit !== 'joker').sort((a, b) => a.rank - b.rank)
+      if (naturals.length === 0) continue
+      if (!isValidSet(meld)) {
+        // Run: use getNextJokerOptions iteratively to place each joker
+        let currentMeld = naturals
+        for (const _joker of jokers) {
+          const placement = getNextJokerOptions(currentMeld, positions)
+          if (placement && placement.options.length > 0) {
+            const chosenRank = placement.options[0].rank
+            positions.set(placement.joker.id, chosenRank)
+            currentMeld = [...currentMeld, { ...placement.joker, rank: chosenRank }].sort((a, b) => a.rank - b.rank)
+          } else {
+            break
+          }
+        }
+      } else {
+        // Set: all jokers take the rank of any natural card
+        const rank = naturals[0]?.rank ?? 1
+        jokers.forEach(j => positions.set(j.id, rank))
+      }
+    }
+    return positions
+  }
+
+  // ─── Suggest screen ───────────────────────────────────────────────────────
+  if (phase === 'suggest') {
+    const suggestedMelds = aiFindBestMelds(hand, requirement)
+
+    if (!suggestedMelds) {
+      // Can't meet requirement — show the no-melds message inline
+      return (
+        <ModalPanel onClose={onClose}>
+          <Header title="Can't Lay Down Yet" onClose={onClose} />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 16px', gap: 12 }}>
+            <p style={{ fontSize: 15, fontWeight: 700, color: '#e8d5a3', margin: 0, textAlign: 'center' }}>
+              Can't lay down yet
+            </p>
+            <p style={{ fontSize: 13, color: '#a8d0a8', margin: 0, textAlign: 'center' }}>
+              Need: {requirement.description}
+            </p>
+            <p style={{ fontSize: 11, color: '#6aad7a', margin: 0, textAlign: 'center' }}>
+              Keep drawing and building your hand.
+            </p>
+          </div>
+          <div style={{ padding: '8px 12px 12px', borderTop: '1px solid #1e4a2e', flexShrink: 0 }}>
+            <button onClick={onClose} style={{ ...primaryBtn(true), width: '100%' }}>
+              Got it
+            </button>
+          </div>
+        </ModalPanel>
+      )
+    }
+
+    const suggestedMeldCardIds = new Set(suggestedMelds.flat().map(c => c.id))
+    const remainingCards = hand.filter(c => !suggestedMeldCardIds.has(c.id))
+    const remainingPts = remainingCards.reduce((sum, c) => sum + cardPoints(c.rank), 0)
+
+    function handleConfirmSuggest() {
+      const jokerPos = computeJokerPositionsForMelds(suggestedMelds!)
+      // Check if any run has ambiguous jokers that need user placement
+      // We'll use the same startJokerProcessing path for correctness,
+      // but first set confirmedGroups to empty so resolveGroups works correctly
+      setConfirmedGroups([])
+      onConfirm(suggestedMelds!, jokerPos)
+    }
+
+    return (
+      <ModalPanel onClose={onClose} locked={mustLayDown}>
+        {mustLayDown && <MustLayDownBanner />}
+        <Header
+          title="Ready to lay down!"
+          subtitle={`${suggestedMelds.length} meld${suggestedMelds.length !== 1 ? 's' : ''} found`}
+          onClose={onClose}
+          locked={mustLayDown}
+        />
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {suggestedMelds.map((meld, i) => (
+            <div
+              key={i}
+              style={{
+                border: '1px solid #2d7a3a',
+                background: '#1e4a2e',
+                borderRadius: 8,
+                padding: '8px 10px',
+                marginBottom: 2,
+              }}
+            >
+              <p style={{ fontSize: 11, color: '#6aad7a', margin: '0 0 6px', fontWeight: 600 }}>
+                {describeMeld(meld)} ✓
+              </p>
+              <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                {meld.map(card => (
+                  <CardComponent key={card.id} card={card} compact />
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {remainingCards.length > 0 && (
+            <div
+              style={{
+                background: '#1a3a2a',
+                borderRadius: 8,
+                padding: '8px 10px',
+                border: '1px solid #1e4a2e',
+              }}
+            >
+              <p style={{
+                fontSize: 11,
+                color: remainingPts > 20 ? '#e2855a' : '#a8d0a8',
+                margin: '0 0 6px',
+                fontWeight: 600,
+              }}>
+                Remaining in hand — {remainingPts} pts
+              </p>
+              <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                {remainingCards.map(card => (
+                  <CardComponent key={card.id} card={card} compact />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: '8px 12px 12px', borderTop: '1px solid #1e4a2e', flexShrink: 0, display: 'flex', gap: 8 }}>
+          {!mustLayDown && (
+            <button onClick={() => setPhase('slots')} style={secondaryBtn}>
+              Adjust
+            </button>
+          )}
+          <button onClick={handleConfirmSuggest} style={primaryBtn(true)}>
+            Confirm &amp; Lay Down
+          </button>
+        </div>
+      </ModalPanel>
+    )
   }
 
   // ─── Can't lay down yet screen ────────────────────────────────────────────
