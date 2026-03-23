@@ -219,6 +219,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const pendingSaveRef = useRef<number>(0)
   const [discardError, setDiscardError] = useState<string | null>(null)
   const [layOffError, setLayOffError] = useState<string | null>(null)
+  const [lastDiscardedLabel, setLastDiscardedLabel] = useState<string | null>(null)
   // ── Game-feel toast queue ─────────────────────────────────────────────────
   const toastQueueRef = useRef<QueuedToast[]>([])
   const toastIdRef = useRef(0)
@@ -1448,6 +1449,20 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
     // Flying card animation: hand → discard pile
     animateDiscard(card)
+
+    // Show discarded card label below discard pile for 2s
+    {
+      const r = card.rank
+      const discLabel = r === 0
+        ? 'Joker'
+        : (() => {
+            const rank = r === 1 ? 'A' : r === 11 ? 'J' : r === 12 ? 'Q' : r === 13 ? 'K' : String(r)
+            const suit = card.suit === 'hearts' ? '♥' : card.suit === 'diamonds' ? '♦' : card.suit === 'clubs' ? '♣' : '♠'
+            return `${rank}${suit}`
+          })()
+      setLastDiscardedLabel(discLabel)
+      setTimeout(() => setLastDiscardedLabel(null), 2000)
+    }
 
     setGameState(afterDiscard)
     clearSelection()
@@ -2719,6 +2734,15 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
             }}>
               {pendingBuyDiscard && uiPhase === 'draw' && !currentPlayer.isAI ? 'Buyable' : '\u00A0'}
             </p>
+            {lastDiscardedLabel && (
+              <p
+                key={lastDiscardedLabel}
+                style={{ animation: 'fade-in-out 2s ease both' }}
+                className="text-[10px] text-[#a8d0a8] font-medium text-center mt-0.5"
+              >
+                {lastDiscardedLabel}
+              </p>
+            )}
           </div>
         </div>
       )}
