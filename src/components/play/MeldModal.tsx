@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { X } from 'lucide-react'
 import type { Card as CardType, RoundRequirement } from '../../game/types'
 import { isValidSet, isValidRun, getNextJokerOptions } from '../../game/meld-validator'
-import { canFormAnyValidMeld } from '../../game/ai'
+import { canFormAnyValidMeld, aiFindBestMelds, aiFindAllMelds } from '../../game/ai'
 import CardComponent from './Card'
 
 interface Props {
@@ -15,7 +15,7 @@ interface Props {
   onSortChange?: (mode: 'rank' | 'suit') => void
 }
 
-type ModalPhase = 'slots' | 'bonus-prompt' | 'bonus' | 'joker-placement'
+type ModalPhase = 'no-melds' | 'slots' | 'bonus-prompt' | 'bonus-suggest' | 'bonus' | 'joker-placement'
 type AllowedMeldType = 'set' | 'run' | 'both'
 
 // ── Unchanged helpers ────────────────────────────────────────────────────────
@@ -225,6 +225,31 @@ function primaryBtn(enabled: boolean): React.CSSProperties {
   }
 }
 
+// ── Meld description helpers ──────────────────────────────────────────────────
+
+function describeMeld(cards: CardType[]): string {
+  if (isValidSet(cards)) {
+    const natural = cards.find(c => c.suit !== 'joker')
+    if (!natural) return 'Set'
+    const rank = natural.rank
+    const name: Record<number, string> = { 1: 'Aces', 11: 'Jacks', 12: 'Queens', 13: 'Kings' }
+    return `Set of ${name[rank] ?? `${rank}s`}`
+  }
+  const natural = cards.find(c => c.suit !== 'joker')
+  if (!natural) return 'Run'
+  const suitName: Record<string, string> = { hearts: 'Heart', diamonds: 'Diamond', clubs: 'Club', spades: 'Spade' }
+  return `${suitName[natural.suit] ?? ''} run`
+}
+
+function meldPointTotal(cards: CardType[]): number {
+  return cards.reduce((sum, c) => {
+    if (c.suit === 'joker') return sum + 50
+    if (c.rank === 1) return sum + 15
+    if (c.rank >= 10) return sum + 10
+    return sum + 5
+  }, 0)
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function MeldModal({
@@ -239,7 +264,13 @@ export default function MeldModal({
   const total = totalRequired(requirement)
   const allowedBonusTypes = getAllowedBonusTypes(requirement)
 
-  const [phase, setPhase] = useState<ModalPhase>('slots')
+  // Check if player can meet the requirement at all
+  const canLayDownAtAll = useMemo(() => aiFindBestMelds(hand, requirement) !== null, [hand, requirement])
+
+  const [phase, setPhase] = useState<ModalPhase>(() => canLayDownAtAll ? 'slots' : 'no-melds')
+
+  // For bonus-suggest: all melds (required + bonus) the AI can find from the confirmed groups' remaining cards
+  const [bonusSuggestedMeld, setBonusSuggestedMeld] = useState<CardType[] | null>(null)
   // Cards placed in each required slot (indices 0..total-1)
   const [slotCards, setSlotCards] = useState<CardType[][]>(() =>
     Array.from({ length: total }, () => [])
@@ -393,7 +424,17 @@ export default function MeldModal({
     if (sourcePhase === 'slots') {
       if (canBonus) {
         setConfirmedGroups(groups)
-        setPhase('bonus-prompt')
+        // Try to auto-suggest a bonus meld from remaining cards
+        const allMelds = aiFindAllMelds(hand, requirement)
+        const bonus = allMelds && allMelds.length > groups.length
+          ? allMelds[groups.length]
+          : null
+        if (bonus) {
+          setBonusSuggestedMeld(bonus)
+          setPhase('bonus-suggest')
+        } else {
+          setPhase('bonus-prompt')
+        }
       } else {
         onConfirm(groups, positions)
       }
@@ -462,6 +503,34 @@ export default function MeldModal({
       setSelectedHandCards([])
       setPhase('slots')
     }
+  }
+
+  // ─── Can't lay down yet screen ────────────────────────────────────────────
+  if (phase === 'no-melds') {
+    return (
+      <ModalPanel onClose={onClose}>
+        <Header title="Can't Lay Down Yet" onClose={onClose} />
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 16px', gap: 12 }}>
+          <p style={{ fontSize: 15, fontWeight: 700, color: '#e8d5a3', margin: 0, textAlign: 'center' }}>
+            Can't lay down yet
+          </p>
+          <p style={{ fontSize: 13, color: '#a8d0a8', margin: 0, textAlign: 'center' }}>
+            Need: {requirement.description}
+          </p>
+          <p style={{ fontSize: 11, color: '#6aad7a', margin: 0, textAlign: 'center' }}>
+            Keep drawing and building your hand.
+          </p>
+        </div>
+        <div style={{ padding: '8px 12px 12px', borderTop: '1px solid #1e4a2e', flexShrink: 0 }}>
+          <button
+            onClick={onClose}
+            style={{ ...primaryBtn(true), width: '100%' }}
+          >
+            Got it
+          </button>
+        </div>
+      </ModalPanel>
+    )
   }
 
   // ─── Joker placement screen ───────────────────────────────────────────────
@@ -551,6 +620,75 @@ export default function MeldModal({
 
         <div style={{ padding: '8px 12px 12px', borderTop: '1px solid #1e4a2e', flexShrink: 0 }}>
           <button onClick={handleJokerBack} style={secondaryBtn}>Back</button>
+        </div>
+      </ModalPanel>
+    )
+  }
+
+  // ─── Bonus auto-suggest screen ────────────────────────────────────────────
+  if (phase === 'bonus-suggest' && bonusSuggestedMeld) {
+    const usedAfterBonus = new Set([
+      ...confirmedGroups.flatMap(g => g.map(c => c.id)),
+      ...bonusSuggestedMeld.map(c => c.id),
+    ])
+    const afterBonus = hand.filter(c => !usedAfterBonus.has(c.id))
+
+    function confirmBonusMeld() {
+      const allGroups = [...confirmedGroups, bonusSuggestedMeld!]
+      startJokerProcessing(allGroups, 'bonus', jokerPositions, confirmedGroups.length)
+    }
+
+    function skipBonus() {
+      onConfirm(confirmedGroups, jokerPositions)
+    }
+
+    return (
+      <ModalPanel onClose={onClose} locked={mustLayDown}>
+        <Header
+          title="Bonus Meld Available!"
+          subtitle="You can lay down an extra meld"
+          onClose={onClose}
+          locked={mustLayDown}
+        />
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ background: '#1e4a2e', border: '1px solid #2d7a3a', borderRadius: 8, padding: '8px 10px' }}>
+            <p style={{ fontSize: 12, fontWeight: 600, color: '#6aad7a', margin: '0 0 2px' }}>Suggested bonus meld</p>
+            <p style={{ fontSize: 11, color: '#a8d0a8', margin: 0 }}>
+              {describeMeld(bonusSuggestedMeld)} — laying it down reduces your hand score.
+            </p>
+          </div>
+
+          <div>
+            <p style={{ fontSize: 10, color: '#6aad7a', margin: '0 0 6px', fontWeight: 600 }}>Bonus meld:</p>
+            <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+              {bonusSuggestedMeld.map(card => (
+                <CardComponent key={card.id} card={card} compact />
+              ))}
+            </div>
+          </div>
+
+          {afterBonus.length > 0 && (
+            <div>
+              <p style={{ fontSize: 10, color: '#a8d0a8', margin: '0 0 6px', fontWeight: 600 }}>
+                Remaining in hand ({meldPointTotal(afterBonus)} pts):
+              </p>
+              <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                {afterBonus.map(card => (
+                  <CardComponent key={card.id} card={card} compact />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: '8px 12px 12px', borderTop: '1px solid #1e4a2e', flexShrink: 0, display: 'flex', gap: 8 }}>
+          <button onClick={skipBonus} style={secondaryBtn}>
+            Skip
+          </button>
+          <button onClick={confirmBonusMeld} style={primaryBtn(true)}>
+            Add Bonus Meld
+          </button>
         </div>
       </ModalPanel>
     )

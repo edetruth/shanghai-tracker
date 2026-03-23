@@ -716,6 +716,37 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       } else {
         next.add(cardId)
         selectedCardOrderRef.current = [...selectedCardOrderRef.current, cardId]
+
+        // Post-lay-down: warn if the selected card has jokers on table but none are swappable with it
+        const player = getCurrentPlayer(gameStateRef.current)
+        if (
+          uiPhaseRef.current === 'action' &&
+          player.hasLaidDown &&
+          !player.isAI
+        ) {
+          const card = player.hand.find(c => c.id === cardId)
+          if (card && card.suit !== 'joker') {
+            const tablesMelds = gameStateRef.current.roundState.tablesMelds
+            const jokerRunsExist = tablesMelds.some(
+              meld => meld.type === 'run' && meld.jokerMappings.length > 0
+            )
+            if (jokerRunsExist) {
+              const hasSwapTarget = tablesMelds.some(
+                meld => meld.type === 'run' && findSwappableJoker(card, meld) !== null
+              )
+              if (!hasSwapTarget) {
+                setTimeout(() => {
+                  queueToast({
+                    message: 'No swappable jokers',
+                    subtext: 'None of the jokers on the table can be replaced by this card.',
+                    style: 'neutral',
+                    duration: 2500,
+                  })
+                }, 0)
+              }
+            }
+          }
+        }
       }
       return next
     })
@@ -2234,7 +2265,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     return currentPlayer.hand.find(c => c.id === cardId) ?? null
   })()
 
-  const buyLimitStr = gameState.buyLimit >= 999 ? '∞' : String(gameState.buyLimit)
   const isHumanDraw = uiPhase === 'draw' && !currentPlayer.isAI
 
   const feltColor = effectiveTension === 0
@@ -2447,11 +2477,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
                   const isBuyingNow = uiPhase === 'buying' && activeBuyer?.id === p.id
                   const isMe = p.id === displayPlayer.id
                   const isActiveTurn = p.id === currentPlayer.id
-                  const buysColor = p.buysRemaining === 0
-                    ? '#b83232'
-                    : p.buysRemaining <= 2
-                      ? '#c08040'
-                      : '#6aad7a'
                   const borderColor = isMe
                     ? '#e2b858'
                     : isBuyingNow
@@ -2501,9 +2526,11 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
                         {total} pts
                       </p>
                       <p key={p.hand.length} style={{ color: '#a8d0a8', fontSize: 10, animation: 'number-roll 300ms ease-out' }}>🃏 {p.hand.length}</p>
-                      <p style={{ color: buysColor, fontSize: 10, fontWeight: 600 }}>
-                        {p.buysRemaining}/{buyLimitStr} buys
-                      </p>
+                      {(uiPhase === 'buying' || p.buysRemaining === 0) && (
+                        <p style={{ color: p.buysRemaining === 0 ? '#f87171' : '#6aad7a', fontSize: 10, fontWeight: 600 }}>
+                          {p.buysRemaining}🛒
+                        </p>
+                      )}
                     </div>
                   )
                 })}
@@ -2594,6 +2621,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           onLayOff={handleInlineLayOff}
           onJokerSwap={handleJokerSwap}
           justLaidOffCardIds={justLaidOffCardIds}
+          roundNumber={rs.roundNumber}
+          requirement={rs.requirement}
+          cardsDealt={rs.cardsDealt}
         />
         </div>
       </div>

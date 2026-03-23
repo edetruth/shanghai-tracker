@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
-import type { Card, Meld } from '../../game/types'
+import type { Card, Meld, RoundRequirement } from '../../game/types'
 import { canLayOff, findSwappableJoker } from '../../game/meld-validator'
 
 interface Props {
@@ -10,6 +10,9 @@ interface Props {
   onLayOff?: (card: Card, meld: Meld) => void
   onJokerSwap?: (naturalCard: Card, meld: Meld) => void
   justLaidOffCardIds?: Set<string>
+  roundNumber?: number
+  requirement?: RoundRequirement
+  cardsDealt?: number
 }
 
 // ── Card overlap helper ───────────────────────────────────────────────────────
@@ -163,6 +166,29 @@ function MicroCard({ card, meld, highlight }: { card: Card; meld: Meld; highligh
   )
 }
 
+// ── FeltParticles — floating golden particles ─────────────────────────────────
+
+function FeltParticles({ active }: { active: boolean }) {
+  if (!active) return null
+  const particleCount = 12
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-hidden">
+      {Array.from({ length: particleCount }, (_, i) => (
+        <div
+          key={i}
+          className="absolute w-1 h-1 rounded-full bg-[#e2b858]"
+          style={{
+            left: `${10 + (i * 7.5) % 85}%`,
+            opacity: 0.15,
+            animation: `particle-float ${8 + i * 1.5}s ease-in-out infinite`,
+            animationDelay: `${i * 0.8}s`,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
 // ── Player group helpers ──────────────────────────────────────────────────────
 
 interface PlayerGroup {
@@ -204,7 +230,23 @@ export default function TableMelds({
   onLayOff,
   onJokerSwap,
   justLaidOffCardIds,
+  roundNumber,
+  requirement,
+  cardsDealt,
 }: Props) {
+  // ── Particles state ───────────────────────────────────────────────────────
+  const [particlesActive, setParticlesActive] = useState(true)
+
+  useEffect(() => {
+    if (melds.length > 0 && particlesActive) {
+      setParticlesActive(false)
+    }
+  }, [melds.length])
+
+  useEffect(() => {
+    setParticlesActive(true)
+  }, [roundNumber])
+
   // ── Staggered meld entrance animation ──────────────────────────────────
   const prevMeldIdsRef = useRef<Set<string>>(new Set())
   const [newMeldIds, setNewMeldIds] = useState<Set<string>>(new Set())
@@ -236,6 +278,7 @@ export default function TableMelds({
     }
     prevMeldIdsRef.current = currentIds
   }, [melds])
+
   const isLayOffMode = selectedCard !== null
 
   // Compute valid lay-off targets and joker swap targets
@@ -251,6 +294,18 @@ export default function TableMelds({
     )
   }, [selectedCard, melds, onJokerSwap])
 
+  // ── Meld count summary per player ────────────────────────────────────────
+  const playerMeldCounts = useMemo(() => {
+    const map = new Map<string, { name: string; count: number }>()
+    for (const meld of melds) {
+      if (!map.has(meld.ownerId)) {
+        map.set(meld.ownerId, { name: meld.ownerName, count: 0 })
+      }
+      map.get(meld.ownerId)!.count++
+    }
+    return [...map.values()]
+  }, [melds])
+
   // ── Empty state ──────────────────────────────────────────────────────────
   if (melds.length === 0) {
     return (
@@ -264,11 +319,31 @@ export default function TableMelds({
           alignItems: 'center',
           justifyContent: 'center',
           minHeight: 42,
+          position: 'relative',
+          overflow: 'hidden',
         }}
       >
-        <p style={{ color: '#3a5a3a', fontSize: 11, fontStyle: 'italic', margin: 0 }}>
-          No melds on the table yet
-        </p>
+        {/* Layer 1: Card felt pattern */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden select-none">
+          <div className="card-felt-pattern opacity-[0.03]" />
+        </div>
+
+        {/* Layer 3: Floating golden particles */}
+        <FeltParticles active={particlesActive && melds.length === 0} />
+
+        {/* Layer 2: Round story centerpiece */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
+          <span className="text-[100px] font-black text-[#2d5a3c] opacity-[0.08] leading-none">
+            {roundNumber}
+          </span>
+          <span className="text-xl font-light tracking-[0.2em] text-[#3d7a4c] opacity-[0.15] uppercase mt-2">
+            {requirement?.description ?? ''}
+          </span>
+          <div className="w-16 h-px bg-[#3d7a4c] opacity-[0.1] mt-3" />
+          <span className="text-xs text-[#3d7a4c] opacity-[0.12] mt-2 tracking-wider">
+            {cardsDealt} cards
+          </span>
+        </div>
       </div>
     )
   }
@@ -297,14 +372,33 @@ export default function TableMelds({
           display: 'flex',
           flexDirection: 'column',
           gap: 6,
+          position: 'relative',
+          overflow: 'hidden',
         }}
       >
+        {/* Layer 1: Card felt pattern — persists after melds placed */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden select-none">
+          <div className="card-felt-pattern opacity-[0.03]" />
+        </div>
+
+        {/* Meld count summary header */}
+        <div className="flex items-center gap-2 mb-2 px-1" style={{ position: 'relative', zIndex: 1 }}>
+          <span className="text-[10px] text-[#6aad7a] uppercase tracking-wider font-semibold">
+            Table · {melds.length} meld{melds.length !== 1 ? 's' : ''}
+          </span>
+          {playerMeldCounts.map(({ name, count }) => (
+            <span key={name} className="text-[9px] text-[#4a7a5a]">
+              {name}: {count}
+            </span>
+          ))}
+        </div>
+
         {groups.map((group, gi) => {
           const isCurrentPlayer = group.ownerId === currentPlayerId
           const isHuman = humanPlayerIds.has(group.ownerId)
 
           return (
-            <div key={group.ownerId}>
+            <div key={group.ownerId} style={{ position: 'relative', zIndex: 1 }}>
               {/* Player label */}
               <span
                 style={{

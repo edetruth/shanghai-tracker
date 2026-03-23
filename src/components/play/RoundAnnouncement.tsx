@@ -324,7 +324,7 @@ export default function RoundAnnouncement({
     const bg = getUrgencyBg(roundNumber)
     const isGoldenFlash = num === 1
     const pulseAnim = isLateRound ? 'heartbeat-pulse' : 'countdown-pulse'
-    const duration = isFinalRound ? '600ms' : '500ms'
+    const duration = isFinalRound ? '800ms' : '700ms'
 
     return (
       <div
