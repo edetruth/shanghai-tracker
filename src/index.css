@@ -395,6 +395,11 @@
   50% { opacity: 1; }
 }
 
+@keyframes draw-arrow-pulse {
+  0%, 100% { opacity: 0.3; transform: translateY(0); }
+  50% { opacity: 0.7; transform: translateY(-3px); }
+}
+
 /* ── Polish Batch 6: Game Over & Round Summary ──────────────────────────────── */
 
 .play-again-btn:active {

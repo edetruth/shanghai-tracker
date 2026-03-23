@@ -2712,6 +2712,14 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
             }}>
               {isHumanDraw ? 'TAP TO DRAW' : 'Draw'}
             </p>
+            {isHumanDraw && (
+              <div
+                className="flex justify-center"
+                style={{ marginBottom: 2, animation: 'draw-arrow-pulse 1.5s ease-in-out infinite' }}
+              >
+                <span style={{ color: '#6aad7a', fontSize: 10, opacity: 0.6 }}>▲</span>
+              </div>
+            )}
             {rs.drawPile.length > 0 ? (
               <div className="draw-pile-press" style={{
                 borderRadius: 6,
@@ -2761,7 +2769,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
                       : isHumanDraw
                         ? 'gbPulseGold 1.2s ease-in-out infinite'
                         : 'card-land 250ms ease-out',
-                  transform: 'scale(0.85)', transformOrigin: 'top center',
+                  transform: isHumanDraw ? 'scale(0.85) translateY(-2px)' : 'scale(0.85)',
+                  transformOrigin: 'top center',
+                  transition: 'transform 200ms ease',
                 }}>
                 <CardComponent
                   card={(isHumanBuyerTurn && buyingDiscard ? buyingDiscard : topDiscard)!}
