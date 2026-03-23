@@ -273,6 +273,11 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const handAreaRef = useRef<HTMLDivElement>(null)
   const discardPileRef = useRef<HTMLDivElement>(null)
   const [justLaidOffCardIds, setJustLaidOffCardIds] = useState<Set<string>>(new Set())
+  // Fix C: discard unwanted dim (all buyers passed)
+  const [discardUnwanted, setDiscardUnwanted] = useState(false)
+  // Fix D: joker swap meld flash
+  const [flashMeldId, setFlashMeldId] = useState<string | null>(null)
+  const [flashIsHeist, setFlashIsHeist] = useState(false)
 
   // ── Round-end transition states ───────────────────────────────────────────
   const [showDarkBeat, setShowDarkBeat] = useState(false)
@@ -1337,6 +1342,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     haptic('heavy')
     setGameState(prev => computeJokerSwap(prev, naturalCard, meld) ?? prev)
     clearSelection()
+    // Fix D: flash the meld that just had its joker swapped
+    setFlashMeldId(meld.id)
+    setFlashIsHeist(isFromOtherMeld)
+    setTimeout(() => { setFlashMeldId(null); setFlashIsHeist(false) }, 600)
   }
 
   // ── Inline lay-off (from TableMelds tap) ─────────────────────────────────
@@ -1647,7 +1656,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       if (nextStep < buyerOrder.length) {
         setBuyerStep(nextStep)
       } else {
-        // All buyers passed
+        // All buyers passed — Fix C: briefly dim the discard pile card
+        setDiscardUnwanted(true)
+        setTimeout(() => setDiscardUnwanted(false), 600)
         addBuyLog({
           turn: turnCountRef.current,
           round: gameState.currentRound,
@@ -2669,6 +2680,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           roundNumber={rs.roundNumber}
           requirement={rs.requirement}
           cardsDealt={rs.cardsDealt}
+          flashMeldId={flashMeldId}
+          flashIsHeist={flashIsHeist}
         />
         </div>
       </div>
@@ -2741,7 +2754,13 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
                 key={(isHumanBuyerTurn && buyingDiscard ? buyingDiscard.id : topDiscard?.id) ?? 'empty'}
                 style={{
                   borderRadius: 6,
-                  animation: isHumanBuyerTurn ? 'for-sale-pulse 1.5s ease-in-out infinite' : isHumanDraw ? 'gbPulseGold 1.2s ease-in-out infinite' : 'card-land 250ms ease-out',
+                  animation: discardUnwanted
+                    ? 'unwanted-dim 600ms ease-out both'
+                    : isHumanBuyerTurn
+                      ? 'for-sale-pulse 1.5s ease-in-out infinite'
+                      : isHumanDraw
+                        ? 'gbPulseGold 1.2s ease-in-out infinite'
+                        : 'card-land 250ms ease-out',
                   transform: 'scale(0.85)', transformOrigin: 'top center',
                 }}>
                 <CardComponent

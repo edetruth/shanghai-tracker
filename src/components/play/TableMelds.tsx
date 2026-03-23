@@ -13,6 +13,8 @@ interface Props {
   roundNumber?: number
   requirement?: RoundRequirement
   cardsDealt?: number
+  flashMeldId?: string | null
+  flashIsHeist?: boolean
 }
 
 // ── Card overlap helper ───────────────────────────────────────────────────────
@@ -233,6 +235,8 @@ export default function TableMelds({
   roundNumber,
   requirement,
   cardsDealt,
+  flashMeldId,
+  flashIsHeist,
 }: Props) {
   // ── Particles state ───────────────────────────────────────────────────────
   const [particlesActive, setParticlesActive] = useState(true)
@@ -444,6 +448,9 @@ export default function TableMelds({
                   const isNewMeld = newMeldIds.has(meld.id)
                   const isVisibleNew = visibleMeldIds.has(meld.id)
 
+                  // Fix D: joker swap flash
+                  const isFlashing = flashMeldId === meld.id
+
                   function handleTap() {
                     if (isLayOffValid && onLayOff && selectedCard) {
                       onLayOff(selectedCard, meld)
@@ -472,15 +479,17 @@ export default function TableMelds({
                         opacity: isNewMeld && !isVisibleNew ? 0 : isDimmed ? 0.35 : 1,
                         cursor: isInteractive ? 'pointer' : 'default',
                         transition: 'opacity 0.15s',
-                        animation: isLayOffValid
-                          ? 'tmPulse 1.4s ease-in-out infinite'
-                          : isSwapValid
-                            ? 'tmSwapPulse 1.4s ease-in-out infinite'
-                            : isNewMeld && isVisibleNew
-                              ? 'meld-slam 400ms ease-out both'
-                              : hasNewLayOff
-                                ? 'meld-expand 400ms ease-out'
-                                : 'none',
+                        animation: isFlashing
+                          ? (flashIsHeist ? 'heist-flash 600ms ease-out both' : 'border-flash 600ms ease-out both')
+                          : isLayOffValid
+                            ? 'tmPulse 1.4s ease-in-out infinite'
+                            : isSwapValid
+                              ? 'tmSwapPulse 1.4s ease-in-out infinite'
+                              : isNewMeld && isVisibleNew
+                                ? 'meld-slam 400ms ease-out both'
+                                : hasNewLayOff
+                                  ? 'meld-expand 400ms ease-out'
+                                  : 'none',
                       }}
                     >
                       {/* Tap hint label */}
@@ -497,23 +506,46 @@ export default function TableMelds({
 
                       {/* Cards row — overlap for long melds */}
                       <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', overflow: 'hidden' }}>
-                        {displayCards.map((card, i) => (
-                          <div
-                            key={card.id}
-                            className={justLaidOffCardIds?.has(card.id) ? 'animate-card-join' : ''}
-                            style={{
-                              marginLeft: i === 0 ? 0 : 3 - getMeldCardOverlap(displayCards.length),
-                              zIndex: i,
-                              flexShrink: 0,
-                            }}
-                          >
-                            <MicroCard
-                              card={card}
-                              meld={meld}
-                              highlight={swapJoker ? card.id === swapJoker.id : false}
-                            />
-                          </div>
-                        ))}
+                        {displayCards.map((card, i) => {
+                          const isJustLaidOff = justLaidOffCardIds?.has(card.id) ?? false
+                          const ownerName = meld.cardOwners?.[card.id]
+                          return (
+                            <div
+                              key={card.id}
+                              className={isJustLaidOff ? 'animate-card-join' : ''}
+                              style={{
+                                marginLeft: i === 0 ? 0 : 3 - getMeldCardOverlap(displayCards.length),
+                                zIndex: i,
+                                flexShrink: 0,
+                                position: 'relative',
+                                outline: isJustLaidOff ? '2px solid #e2b858' : undefined,
+                                outlineOffset: isJustLaidOff ? '1px' : undefined,
+                                boxShadow: isJustLaidOff ? '0 0 8px rgba(226,184,88,0.5)' : undefined,
+                                borderRadius: 5,
+                              }}
+                            >
+                              <MicroCard
+                                card={card}
+                                meld={meld}
+                                highlight={swapJoker ? card.id === swapJoker.id : false}
+                              />
+                              {ownerName && (
+                                <span
+                                  key={card.id + '-owner'}
+                                  className="absolute bottom-0 left-0 right-0 text-center leading-none pb-0.5"
+                                  style={{
+                                    fontSize: 7,
+                                    color: '#6aad7a',
+                                    animation: 'fade-out-delayed 2s ease forwards',
+                                    pointerEvents: 'none',
+                                  }}
+                                >
+                                  {ownerName}
+                                </span>
+                              )}
+                            </div>
+                          )
+                        })}
                       </div>
                     </div>
                   )
