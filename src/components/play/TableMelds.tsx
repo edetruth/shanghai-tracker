@@ -177,21 +177,29 @@ function MicroCard({ card, meld, highlight }: { card: Card; meld: Meld; highligh
 
 function FeltParticles({ active }: { active: boolean }) {
   if (!active) return null
-  const particleCount = 12
+  const particleCount = 18
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden">
-      {Array.from({ length: particleCount }, (_, i) => (
-        <div
-          key={i}
-          className="absolute w-1 h-1 rounded-full bg-[#e2b858]"
-          style={{
-            left: `${10 + (i * 7.5) % 85}%`,
-            opacity: 0.15,
-            animation: `particle-float ${8 + i * 1.5}s ease-in-out infinite`,
-            animationDelay: `${i * 0.8}s`,
-          }}
-        />
-      ))}
+      {Array.from({ length: particleCount }, (_, i) => {
+        const size = i % 3 === 0 ? 6 : i % 3 === 1 ? 4 : 3
+        return (
+          <div
+            key={i}
+            className="absolute rounded-full"
+            style={{
+              width: size,
+              height: size,
+              left: `${8 + (i * 5.3) % 84}%`,
+              background: i % 4 === 0
+                ? 'radial-gradient(circle, #e2b858 0%, rgba(226,184,88,0) 70%)'
+                : 'radial-gradient(circle, #a8d0a8 0%, rgba(168,208,168,0) 70%)',
+              opacity: i % 3 === 0 ? 0.6 : 0.35,
+              animation: `particle-float ${6 + i * 1.2}s ease-in-out infinite`,
+              animationDelay: `${i * 0.5}s`,
+            }}
+          />
+        )
+      })}
     </div>
   )
 }
@@ -325,38 +333,120 @@ export default function TableMelds({
       <div
         style={{
           width: '100%',
+          height: '100%',
+          minHeight: 120,
           backgroundColor: '#0f2218',
           borderRadius: 10,
           padding: 6,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          minHeight: 42,
           position: 'relative',
           overflow: 'hidden',
         }}
       >
+        {/* Radial glow behind centerpiece */}
+        <div
+          className="absolute pointer-events-none"
+          style={{
+            top: '50%', left: '50%',
+            width: '80%', height: '80%',
+            transform: 'translate(-50%, -50%)',
+            background: 'radial-gradient(ellipse at center, rgba(226,184,88,0.12) 0%, rgba(106,173,122,0.06) 40%, transparent 70%)',
+          }}
+        />
+
         {/* Layer 1: Card felt pattern */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden select-none">
-          <div className="card-felt-pattern opacity-[0.03]" />
+          <div className="card-felt-pattern opacity-[0.06]" />
         </div>
 
-        {/* Layer 3: Floating golden particles */}
+        {/* Floating golden particles */}
         <FeltParticles active={particlesActive && melds.length === 0} />
 
-        {/* Layer 2: Round story centerpiece */}
+        {/* Centerpiece */}
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
-          <span className="text-[100px] font-black text-[#2d5a3c] opacity-[0.08] leading-none">
-            {roundNumber}
-          </span>
-          <span className="text-xl font-light tracking-[0.2em] text-[#3d7a4c] opacity-[0.15] uppercase mt-2">
+          {/* Decorative suits row above */}
+          <div className="flex items-center gap-3 mb-2" style={{ opacity: 0.3 }}>
+            <span style={{ fontSize: 14, color: '#c0393b' }}>&#9829;</span>
+            <span style={{ fontSize: 14, color: '#2158b8' }}>&#9830;</span>
+            <span style={{ fontSize: 14, color: '#1a6b3a' }}>&#9827;</span>
+            <span style={{ fontSize: 14, color: '#3d2b8e' }}>&#9824;</span>
+          </div>
+
+          {/* Round number — big, gold-outlined */}
+          <div style={{ position: 'relative' }}>
+            <span
+              style={{
+                fontSize: 120,
+                fontWeight: 900,
+                lineHeight: 1,
+                color: 'transparent',
+                WebkitTextStroke: '2px rgba(226,184,88,0.5)',
+                filter: 'drop-shadow(0 0 20px rgba(226,184,88,0.15))',
+              }}
+            >
+              {roundNumber}
+            </span>
+            {/* Inner filled number at lower opacity for depth */}
+            <span
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 120,
+                fontWeight: 900,
+                lineHeight: 1,
+                color: 'rgba(226,184,88,0.08)',
+              }}
+            >
+              {roundNumber}
+            </span>
+          </div>
+
+          {/* Requirement label — gold, readable */}
+          <span
+            style={{
+              fontSize: 18,
+              fontWeight: 300,
+              letterSpacing: '0.25em',
+              color: '#e2b858',
+              opacity: 0.7,
+              textTransform: 'uppercase',
+              marginTop: 4,
+            }}
+          >
             {requirement?.description ?? ''}
           </span>
-          <div className="w-16 h-px bg-[#3d7a4c] opacity-[0.1] mt-3" />
-          <span className="text-xs text-[#3d7a4c] opacity-[0.12] mt-2 tracking-wider">
-            {cardsDealt} cards
+
+          {/* Gold decorative divider */}
+          <div className="flex items-center gap-2 mt-3">
+            <div style={{ width: 24, height: 1, background: 'linear-gradient(to right, transparent, rgba(226,184,88,0.5))' }} />
+            <span style={{ fontSize: 8, color: '#e2b858', opacity: 0.5 }}>&#9830;</span>
+            <div style={{ width: 24, height: 1, background: 'linear-gradient(to left, transparent, rgba(226,184,88,0.5))' }} />
+          </div>
+
+          {/* Cards dealt */}
+          <span
+            style={{
+              fontSize: 11,
+              color: '#a8d0a8',
+              opacity: 0.6,
+              marginTop: 8,
+              letterSpacing: '0.15em',
+            }}
+          >
+            {cardsDealt} cards dealt
           </span>
         </div>
+
+        {/* Corner suit decorations */}
+        <span className="absolute pointer-events-none select-none" style={{ top: 10, left: 12, fontSize: 18, color: '#c0393b', opacity: 0.15 }}>&#9829;</span>
+        <span className="absolute pointer-events-none select-none" style={{ top: 10, right: 12, fontSize: 18, color: '#2158b8', opacity: 0.15 }}>&#9830;</span>
+        <span className="absolute pointer-events-none select-none" style={{ bottom: 10, left: 12, fontSize: 18, color: '#1a6b3a', opacity: 0.15 }}>&#9827;</span>
+        <span className="absolute pointer-events-none select-none" style={{ bottom: 10, right: 12, fontSize: 18, color: '#3d2b8e', opacity: 0.15 }}>&#9824;</span>
       </div>
     )
   }

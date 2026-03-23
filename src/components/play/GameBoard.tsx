@@ -277,6 +277,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   // Fix D: joker swap meld flash
   const [flashMeldId, setFlashMeldId] = useState<string | null>(null)
   const [flashIsHeist, setFlashIsHeist] = useState(false)
+  // Joker swap "The Exchange" cinematic overlay
+  const [swapAnim, setSwapAnim] = useState<{ natural: CardType; joker: CardType; isHeist: boolean } | null>(null)
   const [raceMessage, setRaceMessage] = useState('')
 
   // ── Round-end transition states ───────────────────────────────────────────
@@ -1336,6 +1338,12 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       style: 'taunt', icon: '🃏', duration: 1500,
     })
     haptic('heavy')
+    // Capture the joker card before the state update removes it from the meld
+    const jokerCard = findSwappableJoker(naturalCard, meld)
+    if (jokerCard && !reduceAnimations) {
+      setSwapAnim({ natural: naturalCard, joker: jokerCard, isHeist: isFromOtherMeld })
+      setTimeout(() => setSwapAnim(null), 900)
+    }
     setGameState(prev => computeJokerSwap(prev, naturalCard, meld) ?? prev)
     clearSelection()
     // Fix D: flash the meld that just had its joker swapped
@@ -3301,6 +3309,41 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         </div>
       )}
 
+      {/* Joker swap "The Exchange" cinematic overlay */}
+      {swapAnim && (
+        <div className="fixed inset-0 z-[150] pointer-events-none flex items-center justify-center">
+          {/* Center burst glow */}
+          <div style={{
+            position: 'absolute', width: 96, height: 96, borderRadius: '50%',
+            background: swapAnim.isHeist
+              ? 'radial-gradient(circle, rgba(248,113,113,0.5) 0%, rgba(226,184,88,0.3) 50%, transparent 70%)'
+              : 'radial-gradient(circle, rgba(226,184,88,0.6) 0%, rgba(226,184,88,0.2) 50%, transparent 70%)',
+            animation: 'swap-burst 850ms ease-out forwards',
+          }} />
+
+          {/* Label */}
+          <div style={{
+            position: 'absolute', top: 'calc(50% + 56px)',
+            color: swapAnim.isHeist ? '#f87171' : '#e2b858',
+            fontSize: 13, fontWeight: 800, letterSpacing: '0.05em',
+            textShadow: '0 1px 6px rgba(0,0,0,0.8)',
+            animation: 'swap-label 850ms ease-out forwards',
+          }}>
+            {swapAnim.isHeist ? '⚡ THE HEIST' : '♻ JOKER FREE'}
+          </div>
+
+          {/* Natural card: enters bottom-right, exits top-left */}
+          <div style={{ position: 'absolute', animation: 'swap-natural 850ms ease-in-out forwards' }}>
+            <SwapCard card={swapAnim.natural} />
+          </div>
+
+          {/* Joker card: enters top-left, exits bottom-right */}
+          <div style={{ position: 'absolute', animation: 'swap-joker 850ms ease-in-out forwards' }}>
+            <SwapCard card={swapAnim.joker} />
+          </div>
+        </div>
+      )}
+
       {/* Flying card animation overlay */}
       {flyingCard && (
         <div
@@ -3326,6 +3369,43 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
             </div>
           ) : null}
         </div>
+      )}
+    </div>
+  )
+}
+
+// Large card face used in the joker swap cinematic overlay
+function SwapCard({ card }: { card: CardType }) {
+  const isJoker = card.suit === 'joker'
+  const rank = card.rank === 0 ? 'JKR' : card.rank === 1 ? 'A' : card.rank === 11 ? 'J' : card.rank === 12 ? 'Q' : card.rank === 13 ? 'K' : String(card.rank)
+  const symbol = card.suit === 'hearts' ? '♥' : card.suit === 'diamonds' ? '♦' : card.suit === 'clubs' ? '♣' : card.suit === 'spades' ? '♠' : ''
+  const bg = isJoker ? 'linear-gradient(135deg, #f5e6a3, #e2b858 50%, #c9952c)' :
+    card.suit === 'hearts' ? '#fff0f0' : card.suit === 'diamonds' ? '#f0f5ff' :
+    card.suit === 'clubs' ? '#e0f7e8' : '#eeecff'
+  const color = isJoker ? '#6b4c1e' : card.suit === 'hearts' ? '#c0393b' : card.suit === 'diamonds' ? '#2158b8' : card.suit === 'clubs' ? '#1a6b3a' : '#3d2b8e'
+  const border = isJoker ? '2px solid #c9952c' : '1.5px solid rgba(0,0,0,0.12)'
+
+  return (
+    <div style={{
+      width: 68, height: 100, borderRadius: 10,
+      background: bg, border,
+      boxShadow: isJoker
+        ? '0 4px 20px rgba(226,184,88,0.7), 0 2px 8px rgba(0,0,0,0.4)'
+        : '0 4px 20px rgba(0,0,0,0.35)',
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', justifyContent: 'center',
+      gap: 2,
+    }}>
+      {isJoker ? (
+        <>
+          <span style={{ fontSize: 28, lineHeight: 1 }}>👑</span>
+          <span style={{ fontSize: 9, fontWeight: 900, color, letterSpacing: '0.08em' }}>JOKER</span>
+        </>
+      ) : (
+        <>
+          <span style={{ fontSize: 26, fontWeight: 900, color, lineHeight: 1 }}>{rank}</span>
+          <span style={{ fontSize: 22, color, lineHeight: 1 }}>{symbol}</span>
+        </>
       )}
     </div>
   )

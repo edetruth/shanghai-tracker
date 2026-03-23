@@ -410,3 +410,38 @@
 .play-again-btn:active {
   transform: scale(0.98) !important;
 }
+
+/* ── Joker Swap "The Exchange" animation ────────────────────────────────────── */
+
+/* Natural card: enters from bottom-right, peaks at center, exits top-left */
+@keyframes swap-natural {
+  0%   { transform: translate(38vw, 28vh) scale(0.55); opacity: 0; }
+  18%  { opacity: 1; }
+  50%  { transform: translate(0, 0) scale(1.05); opacity: 1; }
+  82%  { opacity: 1; }
+  100% { transform: translate(-38vw, -28vh) scale(0.55); opacity: 0; }
+}
+
+/* Joker card: enters from top-left, peaks at center, exits bottom-right */
+@keyframes swap-joker {
+  0%   { transform: translate(-38vw, -28vh) scale(0.55); opacity: 0; }
+  18%  { opacity: 1; }
+  50%  { transform: translate(0, 0) scale(1.05); opacity: 1; }
+  82%  { opacity: 1; }
+  100% { transform: translate(38vw, 28vh) scale(0.55); opacity: 0; }
+}
+
+/* Center burst glow that peaks when the cards cross */
+@keyframes swap-burst {
+  0%   { transform: scale(0); opacity: 0; }
+  45%  { transform: scale(1); opacity: 1; }
+  55%  { transform: scale(1.15); opacity: 0.8; }
+  100% { transform: scale(2); opacity: 0; }
+}
+
+/* Label that fades in briefly under the burst */
+@keyframes swap-label {
+  0%, 15% { opacity: 0; transform: translateY(6px); }
+  30%, 70% { opacity: 1; transform: translateY(0); }
+  100%     { opacity: 0; transform: translateY(-4px); }
+}
