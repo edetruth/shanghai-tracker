@@ -89,6 +89,19 @@ export default function HandDisplay({
   const cardPositionsRef = useRef<Map<string, DOMRect>>(new Map())
   const handContainerRef = useRef<HTMLDivElement>(null)
 
+  // Track which card IDs were present when deal animation started, so newly drawn
+  // cards don't inherit the staggered card-deal-in animation (which causes a gap).
+  const dealCardIdsRef = useRef<Set<string>>(new Set())
+  const prevDealAnimation = useRef(false)
+  const dealAnimationOn = dealAnimation === true
+  if (dealAnimationOn && !prevDealAnimation.current) {
+    dealCardIdsRef.current = new Set(sorted.map(c => c.id))
+  }
+  if (!dealAnimationOn) {
+    dealCardIdsRef.current = new Set()
+  }
+  prevDealAnimation.current = dealAnimationOn
+
   const capturePositions = useCallback(() => {
     const container = handContainerRef.current
     if (!container) return
@@ -204,7 +217,7 @@ export default function HandDisplay({
                     left: `${positions[index]}px`,
                     zIndex: isSelected ? sorted.length + 10 : card.id === newCardId ? sorted.length + 5 : index + 1,
                     transition: isLeaving ? 'none' : 'left 300ms ease-out, transform 300ms ease-out',
-                    ...(dealAnimation && !isFlipping ? { animation: `card-deal-in 200ms ease-out ${index * 50}ms both` } : {}),
+                    ...(dealAnimation && !isFlipping && dealCardIdsRef.current.has(card.id) ? { animation: `card-deal-in 200ms ease-out ${index * 50}ms both` } : {}),
                   }}
                 >
                   {isFlipping ? (

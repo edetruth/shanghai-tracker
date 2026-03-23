@@ -244,9 +244,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const aiTurnsCouldGoDownRef = useRef<Map<string, number>>(new Map())
   // Panic mode: total turns elapsed per AI player per round (resets each round)
   const aiTurnsElapsedRef = useRef<Map<string, number>>(new Map())
-  // Last action indicator — briefly shows what the previous player did
-  const [lastAction, setLastAction] = useState<string | null>(null)
-  const lastActionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [yourTurnPulse, setYourTurnPulse] = useState(false)
 
   // ── Telemetry tracking refs ─────────────────────────────────────────────────
@@ -592,11 +589,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     map.get(playerId)![type].push(card)
   }
 
-  function showLastAction(msg: string) {
-    if (lastActionTimerRef.current) clearTimeout(lastActionTimerRef.current)
-    setLastAction(msg)
-    lastActionTimerRef.current = setTimeout(() => setLastAction(null), 2500)
-  }
 
   // ── Create game record on mount ───────────────────────────────────────────
   useEffect(() => {
@@ -761,36 +753,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         next.add(cardId)
         selectedCardOrderRef.current = [...selectedCardOrderRef.current, cardId]
 
-        // Post-lay-down: warn if the selected card has jokers on table but none are swappable with it
-        const player = getCurrentPlayer(gameStateRef.current)
-        if (
-          uiPhaseRef.current === 'action' &&
-          player.hasLaidDown &&
-          !player.isAI
-        ) {
-          const card = player.hand.find(c => c.id === cardId)
-          if (card && card.suit !== 'joker') {
-            const tablesMelds = gameStateRef.current.roundState.tablesMelds
-            const jokerRunsExist = tablesMelds.some(
-              meld => meld.type === 'run' && meld.jokerMappings.length > 0
-            )
-            if (jokerRunsExist) {
-              const hasSwapTarget = tablesMelds.some(
-                meld => meld.type === 'run' && findSwappableJoker(card, meld) !== null
-              )
-              if (!hasSwapTarget) {
-                setTimeout(() => {
-                  queueToast({
-                    message: 'No swappable jokers',
-                    subtext: 'None of the jokers on the table can be replaced by this card.',
-                    style: 'neutral',
-                    duration: 2500,
-                  })
-                }, 0)
-              }
-            }
-          }
-        }
       }
       return next
     })
@@ -2050,7 +2012,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           aiLayOffCountRef.current = 0
           setAiMessage(`${player.name} lays down`)
           setTimeout(() => setAiMessage(null), 1200)
-          showLastAction(`${player.name} lays down!`)
           handleMeldConfirm(melds, aiJokerPositions(melds))
           return
         }
@@ -2059,7 +2020,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       const card = aiChooseDiscardEasy(player.hand)
       setAiMessage(`${player.name} discards`)
       setTimeout(() => setAiMessage(null), 800)
-      showLastAction(`${player.name} discards`)
       handleDiscard(card.id)
       return
     }
@@ -2091,7 +2051,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           noProgressTurnsRef.current = 0
           setAiMessage(`${player.name} lays down!`)
           setTimeout(() => setAiMessage(null), 1500)
-          showLastAction(`${player.name} lays down!`)
           handleMeldConfirm(melds, aiJokerPositions(melds))
           return
         } else {
@@ -2127,7 +2086,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         if (layOff.card.suit !== 'joker') aiLayOffCountRef.current++
         setAiMessage(`${player.name} lays off`)
         setTimeout(() => setAiMessage(null), 1000)
-        showLastAction(`${player.name} lays off`)
         handleLayOff(layOff.card, layOff.meld, layOff.jokerPosition)
         return
       }
@@ -2162,7 +2120,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       }
       console.log(`[Buy] AI ${player.name} discarded [${card.rank === 0 ? 'Joker' : `${card.rank}${card.suit}`}]`)
       setTimeout(() => setAiMessage(null), 800)
-      showLastAction(`${player.name} discards`)
       handleDiscard(card.id)
     }
   }
@@ -2209,7 +2166,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           ? `${player.name} takes the discard`
           : `${player.name} draws from pile`)
         setTimeout(() => setAiMessage(null), 1000)
-        showLastAction(shouldTake ? `${player.name} took the discard` : `${player.name} drew from pile`)
 
         if (shouldTake) handleTakeDiscard()
         else handleDrawFromPile()
@@ -2269,7 +2225,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
       if (shouldBuy) {
         setAiMessage(`${currentBuyer.name} buys!`)
-        showLastAction(`${currentBuyer.name} buys!`)
       } else {
         setAiMessage(`${currentBuyer.name} passes`)
       }
@@ -2786,23 +2741,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         </span>
       </div>
 
-      {/* Last action indicator */}
-      {lastAction && (
-        <div style={{
-          height: 20, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: '#0f2218',
-        }}>
-          <span
-            key={lastAction}
-            style={{
-              fontSize: 10, color: '#8bc48b', fontStyle: 'italic',
-              animation: 'fade-in-out 2.5s ease both',
-            }}
-          >
-            {lastAction}
-          </span>
-        </div>
-      )}
 
       {/* ── ZONE 2: Scrollable middle — table melds + overlay toast ──── */}
       <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
