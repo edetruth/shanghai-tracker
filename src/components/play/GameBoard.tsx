@@ -574,6 +574,35 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     }
   }, [uiPhase, gameState.roundState.currentPlayerIndex]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Proactive reshuffle: if draw phase starts with an empty draw pile, reshuffle
+  // discards into a new draw pile BEFORE the player sees the board.
+  useEffect(() => {
+    if (uiPhase !== 'draw') return
+    const rs = gameState.roundState
+    if (rs.drawPile.length > 0) return
+
+    setGameState(prev => {
+      if (prev.roundState.drawPile.length > 0) return prev // already reshuffled
+      const discardPile = [...prev.roundState.discardPile]
+      const topDiscard = discardPile.pop()
+      let newDrawPile = shuffle([...discardPile])
+      // If both piles are nearly empty, add a fresh deck (GDD §9 fallback)
+      if (newDrawPile.length === 0) {
+        newDrawPile = shuffle(createDecks(1))
+      }
+      return {
+        ...prev,
+        roundState: {
+          ...prev.roundState,
+          drawPile: newDrawPile,
+          discardPile: topDiscard ? [topDiscard] : [],
+        },
+      }
+    })
+    setReshuffleMsg(true)
+    setTimeout(() => setReshuffleMsg(false), 2500)
+  }, [uiPhase, gameState.roundState.currentPlayerIndex]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Override: skip privacy screen for solo-human games
   // eslint-disable-next-line no-inner-declarations
   function nextPhaseForPlayer(player: Player): UIPhase {
@@ -807,6 +836,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       const top = discardPileSnapshot.pop()
       drawPileSnapshot = shuffle([...discardPileSnapshot])
       discardPileSnapshot = top ? [top] : []
+      // If both piles are nearly empty, add a fresh deck (GDD §9 fallback)
+      if (drawPileSnapshot.length === 0) {
+        drawPileSnapshot = shuffle(createDecks(1))
+      }
     }
     // Shift the drawn card from the snapshot (already includes any reshuffle applied above)
     const drawnCard = drawPileSnapshot.shift() ?? null
@@ -1635,10 +1668,23 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       const buyer = gameState.players[buyerIdx]
       if (!buyingDiscard || buyer.buysRemaining <= 0) return
 
-      const drawPile = [...gameState.roundState.drawPile]
+      let drawPile = [...gameState.roundState.drawPile]
+      let discardPile = gameState.roundState.discardPile.slice(0, -1)
+
+      // Reshuffle if draw pile is empty before taking penalty card
+      if (drawPile.length === 0) {
+        if (discardPile.length > 0) {
+          drawPile = shuffle([...discardPile])
+          discardPile = []
+        }
+        // If both piles are nearly empty, add a fresh deck (GDD §9 fallback)
+        if (drawPile.length === 0) {
+          drawPile = shuffle(createDecks(1))
+        }
+      }
+
       const penaltyCard = drawPile.shift()
       const newHand = [...buyer.hand, buyingDiscard, ...(penaltyCard ? [penaltyCard] : [])]
-      const discardPile = gameState.roundState.discardPile.slice(0, -1)
 
       // Flying card animation: buy (discard → hand, then penalty from draw pile → hand)
       animateBuy(buyingDiscard, !!buyer.isAI)
@@ -2844,14 +2890,17 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
               </div>
             ) : (
               <div
+                onClick={isHumanDraw ? handleDrawFromPile : undefined}
                 style={{
                   width: 35, height: 52, borderRadius: 6,
-                  border: '2px dashed #2d5a3a',
+                  border: `2px dashed ${isHumanDraw ? '#e2b858' : '#2d5a3a'}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: '#2d5a3a', fontSize: 9, textAlign: 'center',
+                  color: isHumanDraw ? '#e2b858' : '#2d5a3a', fontSize: 9, textAlign: 'center',
+                  cursor: isHumanDraw ? 'pointer' : 'default',
+                  animation: isHumanDraw ? 'gbPulseGreen 1.2s ease-in-out 0.3s infinite' : 'none',
                 }}
               >
-                Empty
+                {isHumanDraw ? 'Tap to\nReshuffle' : 'Empty'}
               </div>
             )}
             {rs.drawPile.length < 15 && (
