@@ -142,7 +142,7 @@ GameSetup (PlayerConfig[] configured)
 - **Extra melds rule** — `MeldModal` has a 3-phase flow: `required` → `bonus-prompt` → `bonus`. After the required melds are confirmed, `canFormAnyValidMeld` checks remaining cards; if a bonus meld is possible the player is prompted. AI uses `aiFindAllMelds` (finds required + all bonus melds greedily).
 - **Sort order in MeldModal** — `GameBoard` owns `handSort` state; passes it to `HandDisplay` (controlled) and passes `sortedCurrentHand` to `MeldModal` so both show cards in the same order.
 - **Undo discard** — 3s timer after human discard; buying window not started until timer expires or undo tapped.
-- **Draw pile reshuffle** — when empty, all discard cards except the top are shuffled into a new draw pile.
+- **Draw pile reshuffle** — proactive `useEffect` on draw phase start reshuffles discards (keeping top card) into a new draw pile before the player sees the board. Fallback reshuffle also exists in `handleDrawFromPile` and `handleBuyDecision` (penalty card). If both piles are empty, a fresh deck is added (GDD §9). UI shows clickable "Tap to Reshuffle" as a safety net if the pile is somehow still empty.
 
 ## Drilldown System
 
@@ -193,7 +193,7 @@ Warm cream theme (not dark table). Uses `safe-top` for header padding.
 - **Winner** = player with the lowest total score (`computeWinner()` in gameStore.ts).
 - **Dates** are stored as ISO strings; displayed with date-fns, no timezone conversion.
 - **Import** groups rows by date + notes to reconstruct individual games.
-- **Tests** use **Vitest** (`npx vitest run`). Test files live in `src/game/__tests__/` (runs, sets, layoff, jokerswap, meldbuilder, requirements, scoring, goingout, buying, ai, deck). 281 tests.
+- **Tests** use **Vitest** (`npx vitest run`). Test files live in `src/game/__tests__/` (runs, sets, layoff, jokerswap, meldbuilder, requirements, scoring, goingout, buying, ai, deck). 286 tests.
 - **`onPlayerClick`** is threaded from `App.tsx` → `StatsLeaderboard`, `GameSummary` to open `PlayerProfileModal`. Also passed into `DrilldownModal` so player names in drilldown views are tappable.
 - **`total_score`** is a generated column in Supabase — never insert or update it directly.
 - **`created_by`** column does not exist in the `games` table — do not reference it.

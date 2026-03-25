@@ -24,7 +24,7 @@ A mobile-first Progressive Web App (PWA) for playing and tracking Shanghai Rummy
 - **Tailwind CSS 3** — utility styling
 - **Supabase JS 2** — PostgreSQL backend, Realtime subscriptions
 - **Recharts** — score trend charts
-- **Vitest** — test runner (265 tests, 264 passing)
+- **Vitest** — test runner (286 tests, all passing)
 
 ---
 
@@ -98,7 +98,7 @@ src/
 │   ├── AnalyticsPage.tsx       # Telemetry dashboard — 4 tabs (Overview/AI Quality/Rounds/Decisions)
 │   └── [score tracker components]
 │
-├── game/__tests__/              # 238 tests across 14 files — all must pass
+├── game/__tests__/              # 286 tests across 14 files — all must pass
 │
 agents/                          # Agent CLAUDE.md files — read before each session
 ├── ORCHESTRATOR.md
@@ -226,12 +226,15 @@ This is where most bugs have been found. Understand it thoroughly.
    → If taken: no buying window opens, next player proceeds to action phase
    → If declined: freeOfferDeclined = true, player MUST tap draw pile manually
 3. After next player taps draw pile (handleDrawFromPile):
+   → If draw pile is empty: reshuffle discards (keep top card); add fresh deck if still empty
    → Check BOTH freeOfferDeclined state AND freeOfferDeclinedRef (React 18 timing)
    → If hasPendingBuy: call startBuyingWindowPostDraw() for remaining players
    → Buying window opens for all others in turn order
 4. Each player offered buy in turn order
    → Only one player can buy per discard
    → Buyer receives discard + 1 penalty card from draw pile
+   → If draw pile is empty when taking penalty card, reshuffle discards first
+   → If both piles empty, a fresh deck is added (GDD §9 fallback)
 5. After buying resolves: drew-player proceeds to action phase
 ```
 
@@ -309,7 +312,7 @@ Joker:    bg #fff8e0  text #8b6914
 
 The following was completed in the most recent engineering session:
 
-### Game Engine (238 tests passing)
+### Game Engine (286 tests passing)
 - Scoring fixed to GDD values (2-9=5pts, A=15pts, Joker=25pts)
 - `buyLimit` added to GameState — configurable at setup
 - All-joker sets and runs valid
@@ -404,7 +407,7 @@ Each task session should start by reading the appropriate agent file from `agent
 ```bash
 npm run dev              # Dev server at http://localhost:5173
 npm run build            # Production build
-npx vitest run           # Run all 265 tests
+npx vitest run           # Run all 286 tests
 npx tsc --noEmit         # TypeScript check (should be 0 errors)
 ```
 
@@ -433,7 +436,7 @@ Vercel auto-deploys on every git push to main. No manual deploy needed. Wait 2-3
 2. Read `Shanghai_GDD_v1.1.docx` — know the rules
 3. Read `Shanghai_UIUX_Spec_v1.0.docx` — know the visual contract
 4. Read `agents/ORCHESTRATOR.md` — understand the agent hierarchy
-5. Run `npx vitest run` — confirm 238 tests passing
+5. Run `npx vitest run` — confirm 286 tests passing
 6. Run `npx tsc --noEmit` — confirm 0 TypeScript errors
 7. Read the specific agent file for your task
 8. Make focused, targeted changes — one concern per session
@@ -509,6 +512,16 @@ All three tables are visualized in the Analytics Dashboard (AnalyticsPage.tsx).
 - Adds denial logic: takes if an opponent with ≤ 3 cards can lay it off onto their melds
 - Target take rate: ~20-25%
 - Wired in GameBoard.tsx AI draw useEffect with difficulty-based branching
+
+---
+
+## BUG 4 — tryFindRun Fails With Duplicate Ranks in Multi-Deck Games (FIXED)
+
+**Symptom:** In multi-deck games (5+ players, 2+ decks), `aiFindBestMelds` returns null even when valid runs exist. Player sees "Can't Lay Down Yet" despite having obvious natural runs. Manual meld builder works because the player picks specific cards.
+
+**Root cause:** `tryFindRun` in `ai.ts` used `sorted.slice(start, end)` to pick candidate cards — only contiguous subarrays of rank-sorted cards. With 2+ decks, a suit can have duplicate ranks (e.g., two 3♥). Sorted array becomes `[3, 3, 4, 5, 6]` and every contiguous slice of 4+ cards includes both copies of rank 3. `isValidRun` correctly rejects duplicate ranks, so no valid run is ever found.
+
+**Fix:** Added rank de-duplication before searching — keep one card per rank within each suit. 4-line change, no algorithm restructuring. 5 new tests added covering multi-deck duplicate scenarios.
 
 ---
 
