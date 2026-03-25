@@ -812,6 +812,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
   // ── Draw from pile (with reshuffle if empty) ──────────────────────────────
   function handleDrawFromPile() {
+    console.log('=== DRAW FROM PILE ===')
+    const _dbgPlayer = gameState.players[gameState.roundState.currentPlayerIndex]
+    console.log(`Player: ${_dbgPlayer.name}, hand before: ${_dbgPlayer.hand.length} cards`, _dbgPlayer.hand.map(c => `${c.rank}${c.suit}(${c.id})`))
     // Use BOTH the ref and the React state value for wasExplicitlyDeclined.
     // freeOfferDeclinedRef.current covers the AI stale-closure case.
     // freeOfferDeclined (state) covers the human case where the ref may not yet be
@@ -868,6 +871,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     }
 
     if (drawnCard) {
+      console.log(`Drew: ${drawnCard.rank}${drawnCard.suit} (${drawnCard.id}), hand after: ${_dbgPlayer.hand.length + 1} cards`)
       const isAI = !!gameState.players[gameState.roundState.currentPlayerIndex]?.isAI
       // Flying card animation: draw pile → hand
       animateDrawFromPile(isAI)
@@ -875,6 +879,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       const animDuration = reduceAnimations ? 0 : (isAI ? 200 : 500)
       setTimeout(() => {
         setNewCardIds(new Set([drawnCard.id]))
+        console.log(`[Draw] newCardIds set to: ${drawnCard.id}`)
         // Shimmer the drawn card briefly for the human drawing player
         if (!isAI) {
           setShimmerCardId(drawnCard.id)
@@ -919,6 +924,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   function handleTakeDiscard() {
     const card = gameState.roundState.discardPile[gameState.roundState.discardPile.length - 1]
     if (!card) return
+    const _dbgPlayer = gameState.players[gameState.roundState.currentPlayerIndex]
+    console.log('=== TAKE DISCARD ===')
+    console.log(`Player: ${_dbgPlayer.name}, taking: ${card.rank}${card.suit} (${card.id}), hand before: ${_dbgPlayer.hand.length} cards`)
 
     if (pendingBuyDiscardRef.current !== null) {
       const state = gameStateRef.current
