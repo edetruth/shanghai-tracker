@@ -1,4 +1,4 @@
-import { useMemo, useRef, useLayoutEffect, useCallback, useEffect } from 'react'
+import { useMemo, useRef, useLayoutEffect, useCallback } from 'react'
 import type { Card as CardType } from '../../game/types'
 import CardComponent from './Card'
 
@@ -148,71 +148,6 @@ export default function HandDisplay({
     onSortChange(mode)
   }, [capturePositions, onSortChange])
 
-  // ── Diagnostic logging: invisible card detection ──────────────────────────
-  useEffect(() => {
-    // Check for duplicate card IDs
-    const ids = sorted.map(c => c.id)
-    const duplicates = ids.filter((id, i) => ids.indexOf(id) !== i)
-    if (duplicates.length > 0) {
-      console.error('❌ DUPLICATE CARD IDS IN HAND:', duplicates,
-        sorted.filter(c => duplicates.includes(c.id)).map(c => `${c.rank}${c.suit}(${c.id})`))
-    }
-
-    // Check render keys
-    console.log(`[HandDisplay] ${sorted.length} cards, offset=${offset}px, containerWidth=${containerWidth}px`)
-
-    // Defer DOM check to next frame so React has committed
-    const raf = requestAnimationFrame(() => {
-      const container = handContainerRef.current
-      if (!container) return
-      sorted.forEach((card, i) => {
-        const el = container.querySelector(`[data-card-id="${card.id}"]`) as HTMLElement | null
-        if (!el) {
-          console.error(`❌ Card ${card.rank}${card.suit} (${card.id}) idx=${i} — NO DOM ELEMENT`)
-          return
-        }
-        const rect = el.getBoundingClientRect()
-        const styles = window.getComputedStyle(el)
-        const parentEl = el.closest('.absolute') as HTMLElement | null
-        const parentStyles = parentEl ? window.getComputedStyle(parentEl) : null
-        const parentRect = parentEl?.getBoundingClientRect()
-
-        const isInvisible =
-          styles.opacity === '0' ||
-          styles.visibility === 'hidden' ||
-          styles.display === 'none' ||
-          rect.width === 0 ||
-          rect.height === 0 ||
-          (parentStyles?.opacity === '0') ||
-          (parentStyles?.visibility === 'hidden') ||
-          (parentStyles?.display === 'none') ||
-          (parentRect && parentRect.width === 0) ||
-          (parentRect && parentRect.height === 0)
-
-        if (isInvisible) {
-          console.error(`❌ INVISIBLE CARD: ${card.rank}${card.suit} (${card.id}) idx=${i}`, {
-            cardOpacity: styles.opacity,
-            cardVisibility: styles.visibility,
-            cardDisplay: styles.display,
-            cardRect: { w: rect.width, h: rect.height, l: rect.left, t: rect.top },
-            cardTransform: styles.transform,
-            cardAnimation: styles.animation,
-            parentOpacity: parentStyles?.opacity,
-            parentDisplay: parentStyles?.display,
-            parentRect: parentRect ? { w: parentRect.width, h: parentRect.height, l: parentRect.left } : null,
-            parentAnimation: parentStyles?.animation,
-            position: `left: ${positions[i]}px`,
-            newCardId,
-            leavingCardId,
-            dealAnimation,
-            dealFlipPhase,
-          })
-        }
-      })
-    })
-    return () => cancelAnimationFrame(raf)
-  }, [sorted, positions, offset, containerWidth, newCardId, leavingCardId, dealAnimation, dealFlipPhase])
-  // ── End diagnostics ─────────────────────────────────────────────────────────
 
   return (
     <div>
