@@ -39,13 +39,19 @@ function tryFindRun(hand: Card[], allJokers: Card[], jokersUsed: number): Card[]
   const bySuit = groupBySuit(hand)
   const available = allJokers.slice(jokersUsed)
   for (const [, suitCards] of bySuit) {
-    const sorted = [...suitCards].sort((a, b) => a.rank - b.rank)
+    // De-duplicate by rank (multi-deck games can have 2+ cards of the same rank/suit).
+    // Keep one card per rank so slice-based search never hits duplicate-rank rejects.
+    const seen = new Set<number>()
+    const unique: Card[] = []
+    for (const card of [...suitCards].sort((a, b) => a.rank - b.rank)) {
+      if (!seen.has(card.rank)) { seen.add(card.rank); unique.push(card) }
+    }
     for (let jCount = 0; jCount <= available.length; jCount++) {
-      for (let start = 0; start < sorted.length; start++) {
+      for (let start = 0; start < unique.length; start++) {
         // Search from shortest (MIN_RUN_SIZE) upward — prefer minimal runs to conserve
         // jokers and cards for subsequent melds in multi-run rounds
-        for (let end = start + Math.max(MIN_RUN_SIZE - jCount, 1); end <= sorted.length; end++) {
-          const sub = sorted.slice(start, end)
+        for (let end = start + Math.max(MIN_RUN_SIZE - jCount, 1); end <= unique.length; end++) {
+          const sub = unique.slice(start, end)
           const testCards = [...sub, ...available.slice(0, jCount)]
           if (testCards.length >= MIN_RUN_SIZE && isValidRun(testCards)) return testCards
         }

@@ -59,6 +59,71 @@ describe('aiFindBestMelds — sets', () => {
   })
 })
 
+describe('aiFindBestMelds — runs (bug reproduction)', () => {
+  it('finds 2 natural runs in a large hand (18 cards, no jokers needed)', () => {
+    const hand = [
+      // Hearts: 2-3-4-5-6-7 is a run, 10-J are extras
+      c('hearts', 2), c('hearts', 3), c('hearts', 4), c('hearts', 5),
+      c('hearts', 6), c('hearts', 7), c('hearts', 10), c('hearts', 11),
+      // Diamonds
+      c('diamonds', 3), c('diamonds', 5), c('diamonds', 6),
+      // Clubs
+      c('clubs', 2), c('clubs', 6), c('clubs', 12),
+      // Spades: 9-10-J-Q is a run
+      c('spades', 9), c('spades', 10), c('spades', 11), c('spades', 12),
+    ]
+    const result = aiFindBestMelds(hand, req3)
+    expect(result).not.toBeNull()
+    expect(result).toHaveLength(2)
+  })
+
+  it('tryFindRun finds 9-10-J-Q of spades as a valid run', () => {
+    const hand = [
+      c('spades', 9), c('spades', 10), c('spades', 11), c('spades', 12),
+    ]
+    const result = aiFindBestMelds(hand, { sets: 0, runs: 1, description: '1 Run' })
+    expect(result).not.toBeNull()
+    expect(result).toHaveLength(1)
+    expect(result![0]).toHaveLength(4)
+  })
+
+  it('isValidRun accepts 9-10-J-Q of same suit', () => {
+    const cards = [c('spades', 9), c('spades', 10), c('spades', 11), c('spades', 12)]
+    expect(isValidRun(cards)).toBe(true)
+  })
+
+  it('finds run when suit has duplicate ranks (multi-deck)', () => {
+    // From 2 decks: two 3♥ and two 5♥ — but 3-4-5-6 is still a valid run
+    const hand = [
+      c('hearts', 3, 'h3-0'), c('hearts', 3, 'h3-1'),
+      c('hearts', 4, 'h4-0'),
+      c('hearts', 5, 'h5-0'), c('hearts', 5, 'h5-1'),
+      c('hearts', 6, 'h6-0'),
+    ]
+    const result = aiFindBestMelds(hand, { sets: 0, runs: 1, description: '1 Run' })
+    expect(result).not.toBeNull()
+    expect(result).toHaveLength(1)
+    expect(result![0]).toHaveLength(4)
+  })
+
+  it('finds 2 runs when suit has many duplicate ranks (multi-deck)', () => {
+    // Heavy duplicates: hearts has [3,3,4,4,5,5,6,7,10,J]
+    // Should find e.g. 3-4-5-6 and then 9♠-10♠-J♠-Q♠
+    const hand = [
+      c('hearts', 3, 'h3-0'), c('hearts', 3, 'h3-1'),
+      c('hearts', 4, 'h4-0'), c('hearts', 4, 'h4-1'),
+      c('hearts', 5, 'h5-0'), c('hearts', 5, 'h5-1'),
+      c('hearts', 6, 'h6-0'), c('hearts', 7, 'h7-0'),
+      c('hearts', 10, 'h10-0'), c('hearts', 11, 'hJ-0'),
+      c('spades', 9, 's9-0'), c('spades', 10, 's10-0'),
+      c('spades', 11, 'sJ-0'), c('spades', 12, 'sQ-0'),
+    ]
+    const result = aiFindBestMelds(hand, { sets: 0, runs: 2, description: '2 Runs' })
+    expect(result).not.toBeNull()
+    expect(result).toHaveLength(2)
+  })
+})
+
 describe('aiFindBestMelds — runs', () => {
   it('finds a natural run for Round 3 (2 runs)', () => {
     const hand = [
