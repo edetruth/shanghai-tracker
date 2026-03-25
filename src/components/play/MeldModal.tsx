@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { X } from 'lucide-react'
 import type { Card as CardType, RoundRequirement } from '../../game/types'
 import { isValidSet, isValidRun, getNextJokerOptions } from '../../game/meld-validator'
-import { canFormAnyValidMeld, aiFindBestMelds, aiFindAllMelds } from '../../game/ai'
+import { canFormAnyValidMeld, aiFindAllMelds } from '../../game/ai'
 import { cardPoints } from '../../game/rules'
 import CardComponent from './Card'
 
@@ -535,7 +535,7 @@ export default function MeldModal({
 
   // ─── Suggest screen ───────────────────────────────────────────────────────
   if (phase === 'suggest') {
-    const suggestedMelds = aiFindBestMelds(hand, requirement)
+    const suggestedMelds = aiFindAllMelds(hand, requirement)
 
     if (!suggestedMelds) {
       // Can't meet requirement — show the no-melds message inline
@@ -562,17 +562,25 @@ export default function MeldModal({
       )
     }
 
-    const suggestedMeldCardIds = new Set(suggestedMelds.flat().map(c => c.id))
-    const remainingCards = hand.filter(c => !suggestedMeldCardIds.has(c.id))
+    const requiredCount = requirement.sets + requirement.runs
+    const hasBonus = suggestedMelds.length > requiredCount
+
+    const allMeldCardIds = new Set(suggestedMelds.flat().map(c => c.id))
+    const remainingCards = hand.filter(c => !allMeldCardIds.has(c.id))
     const remainingPts = remainingCards.reduce((sum, c) => sum + cardPoints(c.rank), 0)
 
-    function handleConfirmSuggest() {
-      const jokerPos = computeJokerPositionsForMelds(suggestedMelds!)
-      // Check if any run has ambiguous jokers that need user placement
-      // We'll use the same startJokerProcessing path for correctness,
-      // but first set confirmedGroups to empty so resolveGroups works correctly
+    // Points saved by bonus melds
+    let pointsSaved = 0
+    if (hasBonus) {
+      const requiredOnlyIds = new Set(suggestedMelds.slice(0, requiredCount).flat().map(c => c.id))
+      const ptsWithoutBonus = hand.filter(c => !requiredOnlyIds.has(c.id)).reduce((sum, c) => sum + cardPoints(c.rank), 0)
+      pointsSaved = ptsWithoutBonus - remainingPts
+    }
+
+    function handleConfirmSuggest(melds: CardType[][]) {
+      const jokerPos = computeJokerPositionsForMelds(melds)
       setConfirmedGroups([])
-      onConfirm(suggestedMelds!, jokerPos)
+      onConfirm(melds, jokerPos)
     }
 
     return (
@@ -580,33 +588,42 @@ export default function MeldModal({
         {mustLayDown && <MustLayDownBanner />}
         <Header
           title="Ready to lay down!"
-          subtitle={`${suggestedMelds.length} meld${suggestedMelds.length !== 1 ? 's' : ''} found`}
+          subtitle={`${suggestedMelds.length} meld${suggestedMelds.length !== 1 ? 's' : ''} found${hasBonus ? ` (${suggestedMelds.length - requiredCount} bonus)` : ''}`}
           onClose={onClose}
           locked={mustLayDown}
         />
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {suggestedMelds.map((meld, i) => (
-            <div
-              key={i}
-              style={{
-                border: '1px solid #2d7a3a',
-                background: '#1e4a2e',
-                borderRadius: 8,
-                padding: '8px 10px',
-                marginBottom: 2,
-              }}
-            >
-              <p style={{ fontSize: 11, color: '#6aad7a', margin: '0 0 6px', fontWeight: 600 }}>
-                {describeMeld(meld)} ✓
-              </p>
-              <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                {meld.map(card => (
-                  <CardComponent key={card.id} card={card} compact />
-                ))}
+          {suggestedMelds.map((meld, i) => {
+            const isBonus = i >= requiredCount
+            return (
+              <div
+                key={i}
+                style={{
+                  border: isBonus ? '1px solid rgba(226, 184, 88, 0.4)' : '1px solid #2d7a3a',
+                  background: isBonus ? 'rgba(226, 184, 88, 0.06)' : '#1e4a2e',
+                  borderRadius: 8,
+                  padding: '8px 10px',
+                  marginBottom: 2,
+                }}
+              >
+                <p style={{ fontSize: 11, color: isBonus ? '#e2b858' : '#6aad7a', margin: '0 0 6px', fontWeight: 600 }}>
+                  {isBonus ? 'Bonus — ' : ''}{describeMeld(meld)} ✓
+                </p>
+                <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                  {meld.map(card => (
+                    <CardComponent key={card.id} card={card} compact />
+                  ))}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
+
+          {hasBonus && (
+            <p style={{ fontSize: 11, color: '#e2b858', margin: '0 0 2px', textAlign: 'center' }}>
+              Bonus melds save {pointsSaved} pts if someone goes out
+            </p>
+          )}
 
           {remainingCards.length > 0 && (
             <div
@@ -640,8 +657,13 @@ export default function MeldModal({
               Adjust
             </button>
           )}
-          <button onClick={handleConfirmSuggest} style={primaryBtn(true)}>
-            Confirm &amp; Lay Down
+          {hasBonus && (
+            <button onClick={() => handleConfirmSuggest(suggestedMelds.slice(0, requiredCount))} style={secondaryBtn}>
+              Required Only
+            </button>
+          )}
+          <button onClick={() => handleConfirmSuggest(suggestedMelds)} style={primaryBtn(true)}>
+            Confirm{hasBonus ? ' All' : ''} &amp; Lay Down
           </button>
         </div>
       </ModalPanel>
