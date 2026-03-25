@@ -25,7 +25,7 @@ import GameOver from './GameOver'
 import HandDisplay from './HandDisplay'
 import TableMelds from './TableMelds'
 import CardComponent from './Card'
-import BuyPrompt from './BuyPrompt'
+import BuyingCinematic, { type BuyingPhase } from './BuyingCinematic'
 import GameToast, { type QueuedToast } from './GameToast'
 import RoundAnnouncement, { type AnnouncementStage } from './RoundAnnouncement'
 
@@ -204,7 +204,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const [pendingBuyDiscard, setPendingBuyDiscard] = useState<CardType | null>(null)
   const [showPauseModal, setShowPauseModal] = useState(false)
   const [reshuffleMsg, setReshuffleMsg] = useState(false)
-  const [aiMessage, setAiMessage] = useState<string | null>(null)
   const [newCardIds, setNewCardIds] = useState<Set<string>>(new Set())
   const [leavingCardId, setLeavingCardId] = useState<string | null>(null)
   const [dealFlipPhase, setDealFlipPhase] = useState<'facedown' | 'flipping' | null>(null)
@@ -214,6 +213,11 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const [gameId, setGameId] = useState<string | null>(null)
   // True after player taps "Pass" on the free discard offer — hides banner until next offer
   const [freeOfferDeclined, setFreeOfferDeclined] = useState(false)
+  // Cinematic buying window state
+  const [buyingPhase, setBuyingPhase] = useState<BuyingPhase>('hidden')
+  const [buyingPassedPlayers, setBuyingPassedPlayers] = useState<string[]>([])
+  const [buyingSnatcherName, setBuyingSnatcherName] = useState<string | undefined>(undefined)
+  const buyingPhaseRef = useRef<BuyingPhase>('hidden')
   const [stripExpanded, setStripExpanded] = useState(false)
   const turnCountRef = useRef(0)
   const pendingSaveRef = useRef<number>(0)
@@ -235,6 +239,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const [swapSelectedMeldId, setSwapSelectedMeldId] = useState<string | null>(null)
   // Snapshot of game state BEFORE any pre-lay-down joker swaps — used to undo if player can't lay down after all swaps
   const preLayDownSwapBaseStateRef = useRef<GameState | null>(null)
+  // Going-out cinematic sequence
+  const [goingOutSequence, setGoingOutSequence] = useState<'idle' | 'flash' | 'announce'>('idle')
+  const [goOutPlayerName, setGoOutPlayerName] = useState('')
   // Stalemate tracking (turns without any meld)
   const noProgressTurnsRef = useRef(0)
   const drawPileDepletionsRef = useRef(0)
@@ -245,6 +252,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   // Panic mode: total turns elapsed per AI player per round (resets each round)
   const aiTurnsElapsedRef = useRef<Map<string, number>>(new Map())
   const [yourTurnPulse, setYourTurnPulse] = useState(false)
+  const [perfectDrawActive, setPerfectDrawActive] = useState(false)
+  const perfectDrawTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // ── Telemetry tracking refs ─────────────────────────────────────────────────
   const pendingDecisionsRef = useRef<AIDecision[]>([])
@@ -484,6 +493,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   useEffect(() => { buyerStepRef.current = buyerStep }, [buyerStep])
   useEffect(() => { pendingBuyDiscardRef.current = pendingBuyDiscard }, [pendingBuyDiscard])
   useEffect(() => { freeOfferDeclinedRef.current = freeOfferDeclined }, [freeOfferDeclined])
+  useEffect(() => { buyingPhaseRef.current = buyingPhase }, [buyingPhase])
 
   // ── Flying card animation helpers ─────────────────────────────────────────
   function getRefCenter(ref: React.RefObject<HTMLDivElement | null>): { x: number, y: number } | null {
@@ -641,9 +651,21 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     pendingSaveRef.current = events.length
   }
 
-  // Reset declined flag whenever a new free offer arrives
+  // Reset declined flag whenever a new free offer arrives + show cinematic for human
   useEffect(() => {
-    if (pendingBuyDiscard !== null) setFreeOfferDeclined(false)
+    if (pendingBuyDiscard !== null) {
+      setFreeOfferDeclined(false)
+      const state = gameStateRef.current
+      const nextPlayer = getCurrentPlayer(state)
+      if (!nextPlayer.isAI) {
+        setBuyingPassedPlayers([])
+        setBuyingSnatcherName(undefined)
+        setBuyingPhase('free-offer')
+      }
+    } else {
+      // Clear cinematic if pendingBuyDiscard is cleared (undo, etc.)
+      if (buyingPhaseRef.current === 'free-offer') setBuyingPhase('hidden')
+    }
   }, [pendingBuyDiscard])
 
   // Log free_offer whenever pendingBuyDiscard becomes non-null
@@ -810,6 +832,51 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     }
   }
 
+  // ── Cinematic buy/pass wrappers for human players ────────────────────────
+  function handleCinematicFreeOfferAccept() {
+    setBuyingPhase('hidden')
+    handleTakeDiscard()
+  }
+  function handleCinematicFreeOfferDecline() {
+    setBuyingPhase('hidden')
+    handleDeclineFreeOffer()
+  }
+  function handleCinematicBuy() {
+    const buyer = activeBuyerForCinematic()
+    setBuyingSnatcherName(buyer?.name)
+    setBuyingPhase('snatched')
+    setTimeout(() => {
+      setBuyingPhase('hidden')
+      handleBuyDecision(true)
+    }, 800)
+  }
+  function handleCinematicPass() {
+    setBuyingPhase('ai-deciding') // may transition to next human or unclaimed
+    handleBuyDecision(false)
+  }
+  function activeBuyerForCinematic() {
+    const idx = buyerOrder[buyerStep]
+    return idx !== undefined ? gameState.players[idx] : null
+  }
+
+  // ── Perfect Draw detection helper ────────────────────────────────────────
+  function triggerPerfectDraw() {
+    setPerfectDrawActive(true)
+    haptic('success')
+    if (perfectDrawTimerRef.current) clearTimeout(perfectDrawTimerRef.current)
+    perfectDrawTimerRef.current = setTimeout(() => setPerfectDrawActive(false), 5000)
+  }
+
+  function checkPerfectDraw(handBefore: CardType[], drawnCard: CardType, isAI: boolean) {
+    if (isAI) return
+    const requirement = gameState.roundState.requirement
+    const couldMeldBefore = aiFindBestMelds(handBefore, requirement) !== null
+    if (couldMeldBefore) return
+    const handAfter = [...handBefore, drawnCard]
+    const couldMeldAfter = aiFindBestMelds(handAfter, requirement) !== null
+    if (couldMeldAfter) triggerPerfectDraw()
+  }
+
   // ── Draw from pile (with reshuffle if empty) ──────────────────────────────
   function handleDrawFromPile() {
     // Use BOTH the ref and the React state value for wasExplicitlyDeclined.
@@ -865,6 +932,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         roundState: { ...gameState.roundState, drawPile: drawPileSnapshot, discardPile: discardPileSnapshot },
       }
       setGameState(updatedState)
+
+      // Perfect Draw detection: did this card unlock the round requirement?
+      const handBefore = gameState.players[gameState.roundState.currentPlayerIndex].hand
+      checkPerfectDraw(handBefore, drawnCard, !!gameState.players[gameState.roundState.currentPlayerIndex]?.isAI)
     }
 
     if (drawnCard) {
@@ -955,6 +1026,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       getTelemetryCounters(taker.id).freeTakes++
     }
 
+    // Perfect Draw detection: did taking this discard unlock the round requirement?
+    checkPerfectDraw(taker.hand, card, !!taker.isAI)
+
     setGameState(prev => {
       const discardPile = [...prev.roundState.discardPile]
       discardPile.pop()
@@ -1012,8 +1086,27 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         card: formatCard(discardCard),
         detail: `post-draw, ${order.length} buyer(s)`,
       })
-      setUiPhase('buying')
+      // Launch cinematic: reveal card, then open buying
+      setBuyingPassedPlayers([])
+      setBuyingSnatcherName(undefined)
+      setBuyingPhase('reveal')
+      setTimeout(() => {
+        setBuyingPhase(prev => prev === 'reveal' ? 'ai-deciding' : prev)
+        setUiPhase('buying')
+      }, 500)
     }
+  }
+
+  // ── Going-out cinematic ──────────────────────────────────────────────────
+  function triggerGoingOut(playerName: string, stateToEnd: GameState) {
+    setGoOutPlayerName(playerName)
+    setGoingOutSequence('flash')
+    haptic('success')
+    setTimeout(() => setGoingOutSequence('announce'), 400)
+    setTimeout(() => {
+      setGoingOutSequence('idle')
+      endRound(stateToEnd)
+    }, 2500)
   }
 
   // ── Score and end round ───────────────────────────────────────────────────
@@ -1096,8 +1189,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       setShowDarkBeat(false)
       setUiPhase('round-end')
     }, 500)
-    setAiMessage('Round ended — no one went out (stalemate)')
-    setTimeout(() => setAiMessage(null), 4000)
     flushTelemetry(buyLog) // fire-and-forget — telemetry must never block game flow
 
     // Telemetry: flush + save round stats for stalemate
@@ -1164,11 +1255,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       const msgs = ['First to the table!', 'Setting the pace!', 'Bold move.', `${player.name} leads the way!`]
       queueToast({ message: msgs[Math.floor(Math.random() * msgs.length)], style: 'celebration', icon: '💪', duration: 2000 })
     }
-    // Moment 2: going out via meld
-    if (wentOut) {
-      queueToast({ message: `${player.name} goes out!`, subtext: `Round ${prev.currentRound} complete`, style: 'drama', icon: '🎯', duration: 2500 })
-    }
-
     setGameState(updated)
     setShowMeldModal(false)
     setPreLayDownSwap(false)
@@ -1183,11 +1269,12 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       setBuyingDiscard(null)
       setFreeOfferDeclined(false)
       freeOfferDeclinedRef.current = false
+      setBuyingPhase('hidden')
       if (pendingUndo) {
         clearTimeout(pendingUndo.timerId)
         setPendingUndo(null)
       }
-      endRound(updated)
+      triggerGoingOut(player.name, updated)
     }
   }
 
@@ -1318,10 +1405,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
     // Moment 2: going out via lay-off
     if (wentOut) {
-      queueToast({ message: `${player.name} goes out!`, subtext: `Round ${prev.currentRound} complete`, style: 'drama', icon: '🎯', duration: 2500 })
-    }
-
-    if (wentOut) {
       addBuyLog({ round: prev.currentRound, turn: turnCountRef.current, event: 'went_out', playerName: player.name, card: '', detail: 'hand was empty' })
       setJokerPositionPrompt(null)
       // Round ends immediately — no buying window, no further actions
@@ -1331,11 +1414,12 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       setBuyingDiscard(null)
       setFreeOfferDeclined(false)
       freeOfferDeclinedRef.current = false
+      setBuyingPhase('hidden')
       if (pendingUndo) {
         clearTimeout(pendingUndo.timerId)
         setPendingUndo(null)
       }
-      endRound(updated)
+      triggerGoingOut(player.name, updated)
     }
   }
 
@@ -1772,7 +1856,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       if (nextStep < buyerOrder.length) {
         setBuyerStep(nextStep)
       } else {
-        // All buyers passed — Fix C: briefly dim the discard pile card
+        // All buyers passed — show unclaimed cinematic, then resume
         setDiscardUnwanted(true)
         setTimeout(() => setDiscardUnwanted(false), 600)
         addBuyLog({
@@ -1783,23 +1867,29 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           card: buyingDiscard ? formatCard(buyingDiscard) : '?',
           detail: 'no buyer',
         })
-        if (isPostDraw) {
-          buyingIsPostDrawRef.current = false
-          if (gameState.roundState.goOutPlayerId !== null) {
-            endRound(gameState)
+
+        // Show unclaimed cinematic for 900ms before resuming
+        setBuyingPhase('unclaimed')
+        setTimeout(() => {
+          setBuyingPhase('hidden')
+          if (isPostDraw) {
+            buyingIsPostDrawRef.current = false
+            if (gameStateRef.current.roundState.goOutPlayerId !== null) {
+              endRound(gameStateRef.current)
+            } else {
+              setUiPhase('action')
+            }
           } else {
-            setUiPhase('action')
+            const advanced = advancePlayer(gameStateRef.current)
+            if (gameStateRef.current.roundState.goOutPlayerId !== null) {
+              endRound(advanced)
+            } else {
+              const nextPlayer = advanced.players[advanced.roundState.currentPlayerIndex]
+              setGameState(advanced)
+              setUiPhase(nextPhaseForPlayer(nextPlayer))
+            }
           }
-        } else {
-          const advanced = advancePlayer(gameState)
-          if (gameState.roundState.goOutPlayerId !== null) {
-            endRound(advanced)
-          } else {
-            const nextPlayer = advanced.players[advanced.roundState.currentPlayerIndex]
-            setGameState(advanced)
-            setUiPhase(nextPhaseForPlayer(nextPlayer))
-          }
-        }
+        }, 900)
       }
     }
   }
@@ -2068,16 +2158,12 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         const melds = aiFindBestMelds(player.hand, requirement)
         if (melds && melds.length > 0) {
           aiLayOffCountRef.current = 0
-          setAiMessage(`${player.name} lays down`)
-          setTimeout(() => setAiMessage(null), 1200)
           handleMeldConfirm(melds, aiJokerPositions(melds))
           return
         }
       }
       aiLayOffCountRef.current = 0
       const card = aiChooseDiscardEasy(player.hand)
-      setAiMessage(`${player.name} discards`)
-      setTimeout(() => setAiMessage(null), 800)
       handleDiscard(card.id)
       return
     }
@@ -2090,8 +2176,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         if (config.jokerSwapStyle === 'random' && Math.random() < 0.5) {
           // skip
         } else {
-          setAiMessage(`${player.name} swaps a joker to lay down`)
-          setTimeout(() => setAiMessage(null), 1500)
           handleJokerSwap(swap.card, swap.meld)
           setAiActionTick(t => t + 1)
           return
@@ -2107,13 +2191,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           aiTurnsCouldGoDownRef.current.delete(player.id)
           aiLayOffCountRef.current = 0
           noProgressTurnsRef.current = 0
-          setAiMessage(`${player.name} lays down!`)
-          setTimeout(() => setAiMessage(null), 1500)
           handleMeldConfirm(melds, aiJokerPositions(melds))
           return
         } else {
-          setAiMessage(`${player.name} holds...`)
-          setTimeout(() => setAiMessage(null), 1000)
           // Fall through to discard
         }
       }
@@ -2126,8 +2206,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         if (config.jokerSwapStyle === 'random' && Math.random() < 0.5) {
           // skip
         } else {
-          setAiMessage(`${player.name} swaps a joker`)
-          setTimeout(() => setAiMessage(null), 1200)
           handleJokerSwap(swap.card, swap.meld)
           setAiActionTick(t => t + 1)
           return
@@ -2142,8 +2220,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       const layOff = aiFindLayOff(player.hand, tablesMelds)
       if (layOff) {
         if (layOff.card.suit !== 'joker') aiLayOffCountRef.current++
-        setAiMessage(`${player.name} lays off`)
-        setTimeout(() => setAiMessage(null), 1000)
         handleLayOff(layOff.card, layOff.meld, layOff.jokerPosition)
         return
       }
@@ -2159,11 +2235,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         const nonJokers = player.hand.filter(c => c.suit !== 'joker')
         const pool = nonJokers.length > 0 ? nonJokers : player.hand
         card = pool.reduce((worst, c) => cardPoints(c.rank) > cardPoints(worst.rank) ? c : worst)
-        setAiMessage(`${player.name} dumps a card`)
       } else if (config.discardStyle === 'opponent-aware') {
         card = aiChooseDiscardHard(player.hand, tablesMelds, opponentHistoryRef.current,
             state.players.filter(p => p.id !== player.id), requirement)
-        setAiMessage(`${player.name} discards`)
       } else if (config.discardStyle === 'run-aware' || config.discardStyle === 'highest-value') {
         card = aiChooseDiscard(player.hand, requirement, tablesMelds)
         // Lucky Lou: 15% chance to pick a random card instead
@@ -2171,13 +2245,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           const randomIdx = Math.floor(Math.random() * player.hand.length)
           card = player.hand[randomIdx]
         }
-        setAiMessage(`${player.name} discards`)
       } else {
         card = aiChooseDiscardEasy(player.hand)
-        setAiMessage(`${player.name} discards`)
       }
       console.log(`[Buy] AI ${player.name} discarded [${card.rank === 0 ? 'Joker' : `${card.rank}${card.suit}`}]`)
-      setTimeout(() => setAiMessage(null), 800)
       handleDiscard(card.id)
     }
   }
@@ -2220,11 +2291,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           }
         }
 
-        setAiMessage(shouldTake
-          ? `${player.name} takes the discard`
-          : `${player.name} draws from pile`)
-        setTimeout(() => setAiMessage(null), 1000)
-
         if (shouldTake) handleTakeDiscard()
         else handleDrawFromPile()
       } else if (uiPhaseRef.current === 'action') {
@@ -2240,12 +2306,14 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     if (uiPhase !== 'buying') return
     // BAIL if someone has gone out — round is over
     if (gameState.roundState.goOutPlayerId) return
+    // Wait for cinematic reveal to finish before AI decides
+    if (buyingPhase === 'reveal') return
     const buyerIdx = buyerOrder[buyerStep]
     if (buyerIdx === undefined) return
     const buyer = gameState.players[buyerIdx]
     if (!buyer?.isAI) return
 
-    const delay = getAIDelay(gameSpeed)
+    const delay = 300 // fast AI decisions during cinematic
     const timerId = setTimeout(() => {
       // Re-check goOutPlayerId inside the timeout
       if (gameStateRef.current.roundState.goOutPlayerId) return
@@ -2282,21 +2350,35 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       }
 
       if (shouldBuy) {
-        setAiMessage(`${currentBuyer.name} buys!`)
+        // AI buys — show snatched cinematic, then process
+        setBuyingSnatcherName(currentBuyer.name)
+        setBuyingPhase('snatched')
+        setTimeout(() => {
+          setBuyingPhase('hidden')
+          handleBuyDecision(true)
+        }, 800)
       } else {
-        setAiMessage(`${currentBuyer.name} passes`)
+        // AI passes silently — track for human display
+        setBuyingPassedPlayers(prev => [...prev, currentBuyer.name])
+        handleBuyDecision(false)
       }
-      setTimeout(() => setAiMessage(null), 800)
-      handleBuyDecision(shouldBuy)
-    }, Math.min(delay, 900))
+    }, delay)
 
     return () => clearTimeout(timerId)
-  }, [uiPhase, buyerStep, buyerOrder]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [uiPhase, buyerStep, buyerOrder, buyingPhase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Determine display for buying phase ────────────────────────────────────
   const buyerIdx = buyerOrder[buyerStep]
   const activeBuyer = buyerIdx !== undefined ? gameState.players[buyerIdx] : null
   const isHumanBuyerTurn = uiPhase === 'buying' && activeBuyer !== null && !activeBuyer.isAI
+
+  // Transition cinematic to human-turn when a human buyer is up
+  useEffect(() => {
+    if (isHumanBuyerTurn && buyingPhase === 'ai-deciding') {
+      setBuyingPhase('human-turn')
+    }
+  }, [isHumanBuyerTurn, buyingPhase])
+
   // During human buying: display buyer's hand; otherwise: display current player's hand
   const displayPlayer = isHumanBuyerTurn ? activeBuyer : currentPlayer
 
@@ -2311,6 +2393,45 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     }
     return null
   }, [currentPlayer.isAI, isHumanBuyerTurn, gameState.players, rs.currentPlayerIndex])
+
+  // ── "The Edge" — final card drama for human players close to going out ──
+  const isOnTheEdge = !currentPlayer.isAI && currentPlayer.hasLaidDown && currentPlayer.hand.length <= 2 && currentPlayer.hand.length > 0
+
+  // ── Buy-window hand highlights — show which cards relate to the offered discard ──
+  const buyRelevanceMap = useMemo(() => {
+    if (buyingPhase === 'hidden' || (!buyingDiscard && !pendingBuyDiscard)) return undefined
+    const disc = buyingPhase === 'free-offer' ? pendingBuyDiscard : buyingDiscard
+    if (!disc) return undefined
+    const hand = displayPlayer.hand
+    if (hand.length === 0) return undefined
+    const map = new Map<string, 'set-match' | 'run-neighbor' | 'dim'>()
+    let hasAny = false
+    for (const c of hand) {
+      if (c.suit === 'joker') {
+        map.set(c.id, 'set-match') // jokers are always relevant
+        hasAny = true
+      } else if (c.rank === disc.rank && disc.suit !== 'joker') {
+        map.set(c.id, 'set-match')
+        hasAny = true
+      } else if (c.suit === disc.suit && Math.abs(c.rank - disc.rank) <= 2) {
+        map.set(c.id, 'run-neighbor')
+        hasAny = true
+      } else {
+        map.set(c.id, 'dim')
+      }
+    }
+    // If nothing matches, don't dim everything — just return undefined (no highlights)
+    if (!hasAny) return undefined
+    return map
+  }, [buyingPhase, buyingDiscard, pendingBuyDiscard, displayPlayer.hand])
+
+  const buyMatchLabel = useMemo(() => {
+    if (!buyRelevanceMap) return null
+    const setMatches = [...buyRelevanceMap.values()].filter(v => v === 'set-match').length
+    const runNeighbors = [...buyRelevanceMap.values()].filter(v => v === 'run-neighbor').length
+    if (setMatches > 0 || runNeighbors > 0) return 'match'
+    return null
+  }, [buyRelevanceMap])
 
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER
@@ -2589,6 +2710,24 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       {/* Game-feel toast overlay */}
       <GameToast toast={activeToast} />
 
+      {/* Going-out cinematic overlay */}
+      {goingOutSequence !== 'idle' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+          {goingOutSequence === 'flash' && (
+            <div className="absolute inset-0 bg-white" style={{ animation: 'go-impact-flash 400ms ease-out forwards' }} />
+          )}
+          {goingOutSequence === 'announce' && (
+            <>
+              <div className="absolute inset-0 bg-black/40" style={{ animation: 'go-backdrop-fade 300ms ease-out forwards' }} />
+              <div className="z-10 text-center" style={{ animation: 'slam-in 400ms ease-out' }}>
+                <p className="text-4xl font-black text-[#e2b858] m-0" style={{ textShadow: '0 2px 16px rgba(226,184,88,0.5)' }}>{goOutPlayerName}</p>
+                <p className="text-xl font-bold text-white mt-2 m-0">GOES OUT!</p>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* ── ZONE 1: Fixed top — top bar + collapsible opponent strip ─── */}
       <div
         className="bg-[#0f2218]"
@@ -2803,20 +2942,14 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       {/* ── ZONE 2: Scrollable middle — table melds + overlay toast ──── */}
       <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
         {/* Toast overlay — floats over melds, no layout shift */}
-        {(reshuffleMsg || aiMessage) && (
+        {reshuffleMsg && (
           <div style={{
             position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
             display: 'flex', justifyContent: 'center', padding: '4px 16px',
-            background: reshuffleMsg
-              ? 'linear-gradient(180deg, #e2b858 0%, rgba(226,184,88,0) 100%)'
-              : 'linear-gradient(180deg, rgba(30,74,46,0.95) 0%, rgba(30,74,46,0) 100%)',
+            background: 'linear-gradient(180deg, #e2b858 0%, rgba(226,184,88,0) 100%)',
             pointerEvents: 'none',
           }}>
-            {reshuffleMsg ? (
-              <span className="text-xs font-medium text-[#2c1810]">Draw pile reshuffled from discards</span>
-            ) : (
-              <span className="text-xs text-[#a8d0a8] animate-pulse">{aiMessage}</span>
-            )}
+            <span className="text-xs font-medium text-[#2c1810]">Draw pile reshuffled from discards</span>
           </div>
         )}
         {/* Close race indicator — replaced by tension system overlays above */}
@@ -2976,46 +3109,41 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         className="bg-[#0f2218] px-3 pt-2"
         style={{ flexShrink: 0, paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
       >
-        {/* Buy prompt area — reserved height, fade in/out, no layout shift */}
-        <div style={{
-          minHeight: (pendingBuyDiscard && uiPhase === 'draw' && !currentPlayer.isAI && !freeOfferDeclined) ||
-                     (isHumanBuyerTurn && buyingDiscard && activeBuyer) ? undefined : 0,
-          transition: 'opacity 200ms ease',
-          opacity: (pendingBuyDiscard && uiPhase === 'draw' && !currentPlayer.isAI && !freeOfferDeclined) ||
-                   (isHumanBuyerTurn && buyingDiscard && activeBuyer) ? 1 : 0,
-          pointerEvents: (pendingBuyDiscard && uiPhase === 'draw' && !currentPlayer.isAI && !freeOfferDeclined) ||
-                         (isHumanBuyerTurn && buyingDiscard && activeBuyer) ? 'auto' : 'none',
-        }}>
-          {pendingBuyDiscard && uiPhase === 'draw' && !currentPlayer.isAI && !freeOfferDeclined && (
-            <BuyPrompt
-              card={pendingBuyDiscard}
-              isFree={true}
-              playerName={currentPlayer.name}
-              buysRemaining={currentPlayer.buysRemaining}
-              buyLimit={gameState.buyLimit}
-              onAccept={handleTakeDiscard}
-              onDecline={handleDeclineFreeOffer}
-            />
-          )}
-          {isHumanBuyerTurn && buyingDiscard && activeBuyer && (
-            <BuyPrompt
-              card={buyingDiscard}
-              isFree={false}
-              playerName={activeBuyer.name}
-              buysRemaining={activeBuyer.buysRemaining}
-              buyLimit={gameState.buyLimit}
-              onAccept={() => handleBuyDecision(true)}
-              onDecline={() => handleBuyDecision(false)}
-            />
-          )}
-        </div>
+        {/* Buy prompt area removed — replaced by BuyingCinematic overlay */}
+
+        {/* Buy-window match label */}
+        {buyRelevanceMap && buyingPhase !== 'hidden' && (
+          <p className="text-center text-xs font-semibold mb-1" style={{
+            color: buyMatchLabel === 'match' ? '#6aad7a' : '#8b7355',
+            margin: 0, paddingBottom: 4,
+          }}>
+            {buyMatchLabel === 'match' ? 'Fits your hand' : 'No match in hand'}
+          </p>
+        )}
+
+        {/* Perfect Draw: "Ready to lay down!" indicator */}
+        {perfectDrawActive && (
+          <p className="text-center text-xs font-semibold mb-1"
+             style={{ color: '#e2b858', animation: 'fade-in-out 3s ease both' }}>
+            Ready to lay down!
+          </p>
+        )}
 
         {/* Player hand — sort toggle + fan layout */}
         <div ref={handAreaRef} style={{
+          position: 'relative',
           border: yourTurnPulse ? '2px solid transparent' : '2px solid transparent',
           borderRadius: 8,
           animation: yourTurnPulse ? 'your-turn-pulse 1s ease-in-out 2' : 'none',
         }}>
+        {isOnTheEdge && (
+          <div className="absolute inset-0 pointer-events-none rounded-xl"
+            style={{
+              background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.15) 100%)',
+              zIndex: 50,
+            }}
+          />
+        )}
         {!displayPlayer.isAI ? (
           <HandDisplay
             cards={displayPlayer.hand}
@@ -3031,6 +3159,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
             dealAnimation={showDealAnimation}
             leavingCardId={leavingCardId}
             dealFlipPhase={dealFlipPhase}
+            edgeGlow={isOnTheEdge}
+            buyRelevanceMap={buyRelevanceMap}
           />
         ) : aiTurnHumanViewer ? (
           <HandDisplay
@@ -3044,20 +3174,17 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           />
         ) : null}
         </div>
+        {currentPlayer.hand.length === 1 && currentPlayer.hasLaidDown && !currentPlayer.isAI && (
+          <p className="text-center text-[10px] text-[#e2b858] font-semibold mt-1">
+            Final card — lay it off to go out
+          </p>
+        )}
 
         {/* Status slot — stable height, content fades */}
         <div style={{ minHeight: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {uiPhase === 'draw' && !currentPlayer.isAI ? (
             <p className="text-center text-xs text-[#6aad7a]" style={{ margin: 0 }}>
               Tap the draw pile or discard card
-            </p>
-          ) : (uiPhase === 'draw' || uiPhase === 'action') && currentPlayer.isAI && !aiMessage ? (
-            <p className="text-center text-xs text-[#6aad7a] animate-pulse" style={{ margin: 0 }}>
-              {currentPlayer.name} is playing...
-            </p>
-          ) : uiPhase === 'buying' && !isHumanBuyerTurn && activeBuyer?.isAI && !aiMessage ? (
-            <p className="text-center text-xs text-[#6aad7a] animate-pulse" style={{ margin: 0 }}>
-              {activeBuyer.name} deciding on buy...
             </p>
           ) : (
             <span>{'\u00A0'}</span>
@@ -3186,11 +3313,12 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
                       </button>
                     )}
                     <button
-                      onClick={() => setShowMeldModal(true)}
+                      onClick={() => { setPerfectDrawActive(false); setShowMeldModal(true) }}
                       style={{
                         flex: 1, minHeight: 38, borderRadius: 10, border: 'none',
                         background: '#e2b858', color: '#2c1810',
                         fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                        animation: perfectDrawActive ? 'ready-pulse 1.5s ease-in-out infinite' : 'none',
                       }}
                     >
                       Lay Down
@@ -3396,6 +3524,28 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           </div>
         </div>
       )}
+
+      {/* Cinematic buying window overlay */}
+      <BuyingCinematic
+        phase={buyingPhase}
+        card={buyingPhase === 'free-offer' ? pendingBuyDiscard : buyingDiscard}
+        isFreeOffer={buyingPhase === 'free-offer'}
+        buyerName={buyingSnatcherName}
+        passedPlayers={buyingPassedPlayers}
+        buysRemaining={
+          buyingPhase === 'free-offer'
+            ? currentPlayer.buysRemaining
+            : (activeBuyer?.buysRemaining ?? 0)
+        }
+        buyLimit={gameState.buyLimit}
+        cardLabel={
+          (buyingPhase === 'free-offer' ? pendingBuyDiscard : buyingDiscard)
+            ? formatCard((buyingPhase === 'free-offer' ? pendingBuyDiscard : buyingDiscard)!)
+            : ''
+        }
+        onBuy={buyingPhase === 'free-offer' ? handleCinematicFreeOfferAccept : handleCinematicBuy}
+        onPass={buyingPhase === 'free-offer' ? handleCinematicFreeOfferDecline : handleCinematicPass}
+      />
 
       {/* Flying card animation overlay */}
       {flyingCard && (

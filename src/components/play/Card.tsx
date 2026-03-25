@@ -14,6 +14,8 @@ interface Props {
   faceDown?: boolean
   shimmer?: boolean
   inMeld?: boolean
+  edgeGlow?: boolean
+  buyRelevance?: 'set-match' | 'run-neighbor' | 'dim' | null
   style?: React.CSSProperties
 }
 
@@ -52,7 +54,7 @@ function suitTextColor(suit: string): string {
   return '#3d2b8e' // spades
 }
 
-export default function Card({ card, selected, selectionIndex, onClick, compact, disabled, jokerLabel, isNew, faceDown, shimmer, inMeld, style }: Props) {
+export default function Card({ card, selected, selectionIndex, onClick, compact, disabled, jokerLabel, isNew, faceDown, shimmer, inMeld, edgeGlow, buyRelevance, style }: Props) {
   // Auto-clear NEW badge after 3 seconds
   const [showNew, setShowNew] = useState(isNew ?? false)
   useEffect(() => {
@@ -118,20 +120,34 @@ export default function Card({ card, selected, selectionIndex, onClick, compact,
     ? (selected ? '2px solid #e2b858' : '2px solid #c9952c')
     : (selected ? '2px solid #e2b858' : '1.5px solid rgba(255,255,255,0.2)')
 
-  const computedShadow = selected
+  const edgeShadow = edgeGlow ? '0 0 8px rgba(226,184,88,0.2)' : undefined
+  const buyGlow = buyRelevance === 'set-match'
+    ? '0 0 10px rgba(226,184,88,0.5), 0 0 3px rgba(226,184,88,0.3)'
+    : buyRelevance === 'run-neighbor'
+      ? '0 0 8px rgba(106,173,122,0.45), 0 0 3px rgba(106,173,122,0.25)'
+      : undefined
+  const baseShadow = selected
     ? (isJoker ? '0 0 8px rgba(226,184,88,0.3), 0 4px 12px rgba(0,0,0,0.3)' : '0 4px 12px rgba(0,0,0,0.3)')
     : (isJoker ? '0 0 8px rgba(226,184,88,0.3)' : undefined)
+  const shadowParts = [baseShadow, edgeShadow, buyGlow].filter(Boolean).join(', ')
+  const computedShadow = shadowParts || undefined
+
+  const buyBorder = buyRelevance === 'set-match'
+    ? '2px solid #e2b858'
+    : buyRelevance === 'run-neighbor'
+      ? '2px solid #6aad7a'
+      : undefined
 
   const cardStyle: React.CSSProperties = {
     background: isJoker
       ? 'linear-gradient(135deg, #f5e6a3, #e2b858 50%, #c9952c)'
       : bg,
     borderRadius: '6px',
-    border: jokerBorder,
+    border: buyBorder || jokerBorder,
     transform: selected ? 'translateY(-10px)' : undefined,
     boxShadow: computedShadow,
-    transition: 'transform 150ms ease-out, box-shadow 150ms ease-out, border-color 150ms ease-out',
-    opacity: disabled ? 0.25 : 1,
+    transition: 'transform 150ms ease-out, box-shadow 150ms ease-out, border-color 150ms ease-out, opacity 200ms ease',
+    opacity: buyRelevance === 'dim' ? 0.45 : disabled ? 0.25 : 1,
     pointerEvents: disabled ? 'none' : undefined,
     width: `${width}px`,
     height: `${height}px`,

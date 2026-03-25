@@ -18,6 +18,8 @@ interface Props {
   leavingCardId?: string | null
   dealFlipPhase?: 'facedown' | 'flipping' | null
   selectionOrder?: string[]
+  edgeGlow?: boolean
+  buyRelevanceMap?: Map<string, 'set-match' | 'run-neighbor' | 'dim'>
 }
 
 export const SUIT_ORDER: Record<string, number> = { hearts: 0, diamonds: 1, clubs: 2, spades: 3, joker: 4 }
@@ -45,6 +47,8 @@ export default function HandDisplay({
   leavingCardId,
   dealFlipPhase,
   selectionOrder,
+  edgeGlow,
+  buyRelevanceMap,
 }: Props) {
   const sorted = useMemo(() => {
     return [...cards].sort((a, b) => {
@@ -264,6 +268,8 @@ export default function HandDisplay({
                       onClick={disabled || isLeaving ? undefined : () => onToggle(card.id)}
                       disabled={disabled || isLeaving}
                       faceDown={showFaceDown}
+                      edgeGlow={edgeGlow}
+                      buyRelevance={buyRelevanceMap?.get(card.id)}
                     />
                   )}
                 </div>

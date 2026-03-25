@@ -284,8 +284,8 @@ export function aiShouldTakeDiscardHard(
   discardCard: Card,
   requirement: RoundRequirement,
   hasLaidDown: boolean,
-  tablesMelds: Meld[] = [],
-  opponents: Player[] = [],
+  _tablesMelds: Meld[] = [],
+  _opponents: Player[] = [],
 ): boolean {
   // 1. Always take jokers
   if (isJoker(discardCard)) return true
@@ -316,16 +316,7 @@ export function aiShouldTakeDiscardHard(
     }
   }
 
-  // 7. Denial take — take card to deny an opponent who is close to going out
-  if (opponents.length > 0 && tablesMelds.length > 0 && hand.length < 8 && cardPoints(discardCard.rank) <= 10) {
-    for (const opp of opponents) {
-      if (!opp.hasLaidDown || opp.hand.length > 3) continue
-      const oppMelds = tablesMelds.filter(m => m.ownerId === opp.id)
-      if (oppMelds.some(m => canLayOff(discardCard, m))) return true
-    }
-  }
-
-  // 8. Everything else → draw from pile (no 'near', no thin-evidence takes)
+  // 7. Everything else → draw from pile (no 'near', no thin-evidence takes)
   return false
 }
 
@@ -719,50 +710,121 @@ export function aiChooseDiscardHard(
 
 // Hard mode: selective buying — same 3+ card threshold as Hard take-discard for runs,
 // plus denial buying when an opponent is about to go out.
+// ── Cost/benefit buying for hard-tier AI ────────────────────────────────────
+
+function calculateBuyValue(hand: Card[], card: Card, requirement: RoundRequirement): number {
+  let value = 0
+
+  // Factor 1: Does this card enable going down? (highest value — 90 points)
+  const canMeldWithout = aiFindBestMelds(hand, requirement) !== null
+  const canMeldWith = aiFindBestMelds([...hand, card], requirement) !== null
+  if (!canMeldWithout && canMeldWith) value += 90
+
+  // Factor 2: How close am I to going down? (0-30 points)
+  if (!canMeldWithout) {
+    const progress = countPartialMelds(hand, requirement)
+    const total = requirement.sets + requirement.runs
+    value += Math.round((progress / Math.max(total, 1)) * 30)
+  }
+
+  // Factor 3: Does this card fit an existing strong group? (0-25 points)
+  const nonJokers = hand.filter(c => !isJoker(c))
+  const isPureRunRound = requirement.sets === 0 && requirement.runs > 0
+
+  // Set potential
+  if (!isPureRunRound) {
+    const sameRank = nonJokers.filter(c => c.rank === card.rank).length
+    if (sameRank >= 2) value += 25
+    else if (sameRank === 1) value += 8
+  }
+
+  // Run potential
+  if (requirement.runs > 0) {
+    const sameSuit = nonJokers.filter(c => c.suit === card.suit)
+    if (sameSuit.length >= 3) {
+      const contribution = getRunContribution(sameSuit, card.rank)
+      if (contribution === 'gap-fill') value += 25
+      else if (contribution === 'extension') value += 18
+      else if (contribution === 'near') value += 5
+    } else if (sameSuit.length >= 2) {
+      const contribution = getRunContribution(sameSuit, card.rank)
+      if (contribution === 'gap-fill') value += 15
+      else if (contribution === 'extension') value += 10
+    }
+  }
+
+  return value
+}
+
+function calculateBuyRisk(hand: Card[], players?: Player[]): number {
+  let risk = 0
+
+  // Factor 1: Hand size (0-40)
+  const sz = hand.length
+  if (sz >= 12) risk += 40
+  else if (sz >= 10) risk += 30
+  else if (sz >= 8) risk += 20
+  else risk += 10
+
+  // Factor 2: Opponent pressure (0-35)
+  if (players && players.length > 0) {
+    const laidDownCards = players.filter(p => p.hasLaidDown).map(p => p.hand.length)
+    const minOpp = laidDownCards.length > 0 ? Math.min(...laidDownCards) : 99
+    if (minOpp <= 2) risk += 35
+    else if (minOpp <= 4) risk += 25
+    else if (minOpp <= 6) risk += 15
+    else risk += 5
+    if (laidDownCards.length >= 3) risk += 10
+    else if (laidDownCards.length >= 2) risk += 5
+  } else {
+    risk += 5 // no opponent data — assume low pressure
+  }
+
+  // Factor 3: Base penalty cost
+  risk += 10
+
+  return risk
+}
+
+function countPartialMelds(hand: Card[], requirement: RoundRequirement): number {
+  const nonJokers = hand.filter(c => !isJoker(c))
+  const jokerCount = hand.filter(c => isJoker(c)).length
+  let count = 0
+
+  // Near-complete sets
+  const byRank = groupByRank(nonJokers)
+  for (const [, cards] of byRank) {
+    if (cards.length >= 3) count += 1
+    else if (cards.length >= 2) count += 0.5
+  }
+
+  // Near-complete runs
+  const bySuit = groupBySuit(nonJokers)
+  for (const [, cards] of bySuit) {
+    const window = findBestRunWindow(cards)
+    if (window.cards.length >= 4) count += 1
+    else if (window.cards.length >= 3) count += 0.7
+    else if (window.cards.length >= 2) count += 0.3
+  }
+
+  count += jokerCount * 0.4
+  return Math.min(count, requirement.sets + requirement.runs)
+}
+
 export function aiShouldBuyHard(
   hand: Card[],
   discardCard: Card,
   requirement: RoundRequirement,
   buysRemaining: number,
-  tablesMelds: Meld[] = [],
+  _tablesMelds: Meld[] = [],
   opponents: Player[] = [],
 ): boolean {
-  if (buysRemaining <= 2) return false
+  if (buysRemaining <= 0) return false
   if (isJoker(discardCard)) return true
 
-  // Enables the round requirement
-  const withCard = aiFindBestMelds([...hand, discardCard], requirement)
-  const without = aiFindBestMelds(hand, requirement)
-  if (withCard !== null && without === null) return true
-
-  // Completes a set (2+ same rank in hand) — skip in pure-run rounds
-  const isPureRunRound = requirement.sets === 0 && requirement.runs > 0
-  const sameRank = hand.filter(c => !isJoker(c) && c.rank === discardCard.rank).length
-  if (sameRank >= 2 && !isPureRunRound) return true
-
-  // Gap-fill or extension in a strong committed run (3+ cards in window)
-  if (requirement.runs >= 1) {
-    const sameSuit = hand.filter(c => !isJoker(c) && c.suit === discardCard.suit)
-    if (sameSuit.length >= 3) {
-      const window = findBestRunWindow(sameSuit)
-      if (window.cards.length >= 3) {
-        if (window.gaps.includes(discardCard.rank)) return true
-        if (discardCard.rank === window.minRank - 1 || discardCard.rank === window.maxRank + 1) return true
-      }
-    }
-  }
-
-  // Denial buy — opponent about to go out, card fits their meld, AI can afford it
-  if (opponents.length > 0 && tablesMelds.length > 0
-    && hand.length < 7 && cardPoints(discardCard.rank) <= 10 && buysRemaining >= 3) {
-    for (const opp of opponents) {
-      if (!opp.hasLaidDown || opp.hand.length > 2) continue
-      const oppMelds = tablesMelds.filter(m => m.ownerId === opp.id)
-      if (oppMelds.some(m => canLayOff(discardCard, m))) return true
-    }
-  }
-
-  return false
+  const value = calculateBuyValue(hand, discardCard, requirement)
+  const risk = calculateBuyRisk(hand, opponents)
+  return value > risk
 }
 
 // Hard AI going-down timing: should the AI lay down its melds now, or wait for a

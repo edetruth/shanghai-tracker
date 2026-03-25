@@ -407,10 +407,7 @@ export default function RoundAnnouncement({
     return (
       <div
         className="min-h-screen flex items-center justify-center"
-        style={{
-          backgroundColor: '#1a3a2a',
-          animation: 'round-number-in 200ms ease-out both',
-        }}
+        style={{ backgroundColor: '#1a3a2a' }}
         onClick={onSkip}
       />
     )

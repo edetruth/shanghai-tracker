@@ -432,7 +432,7 @@ describe('aiShouldTakeDiscardHard', () => {
     expect(aiShouldTakeDiscardHard(hand, c('hearts', 6), req1, false)).toBe(false)
   })
 
-  it('denial-takes a card that fits an opponent meld when opponent is close to going out', () => {
+  it('does NOT denial-take (denial logic removed) — evaluates purely on self-interest', () => {
     const hand = [
       c('hearts', 2), c('spades', 5), c('clubs', 10), c('diamonds', 3),
       c('spades', 12), c('clubs', 4), c('diamonds', 9),
@@ -443,7 +443,8 @@ describe('aiShouldTakeDiscardHard', () => {
       id: 'opp1', name: 'Opp', hand: [c('hearts', 11), c('spades', 3)], // 2 cards left
       melds: [oppMeld], hasLaidDown: true, buysRemaining: 3, roundScores: [],
     }
-    expect(aiShouldTakeDiscardHard(hand, c('hearts', 9), req1, false, [oppMeld], [opponent])).toBe(true)
+    // Card doesn't help the AI's hand → pass (denial removed)
+    expect(aiShouldTakeDiscardHard(hand, c('hearts', 9), req1, false, [oppMeld], [opponent])).toBe(false)
   })
 
   it('does NOT denial-take if opponent has many cards', () => {
@@ -559,7 +560,7 @@ describe('aiChooseDiscardHard — opponent awareness', () => {
 })
 
 describe('aiShouldBuyHard — Phase 2', () => {
-  it('denial-buys when opponent at 2 cards, has gone down, card fits their meld', () => {
+  it('does NOT denial-buy (denial removed) — uses cost/benefit evaluation', () => {
     const hand = [
       c('hearts', 2), c('spades', 5), c('clubs', 10), c('diamonds', 3), c('spades', 12),
     ]
@@ -568,7 +569,8 @@ describe('aiShouldBuyHard — Phase 2', () => {
       id: 'opp1', name: 'Opp', hand: [c('hearts', 11), c('spades', 3)], // 2 cards
       melds: [oppMeld], hasLaidDown: true, buysRemaining: 3, roundScores: [],
     }
-    expect(aiShouldBuyHard(hand, c('hearts', 9), req1, 4, [oppMeld], [opponent])).toBe(true)
+    // Card doesn't help the AI enough (low value) and opponent pressure is high (risk)
+    expect(aiShouldBuyHard(hand, c('hearts', 9), req1, 4, [oppMeld], [opponent])).toBe(false)
   })
 
   it('does NOT denial-buy if buysRemaining < 3', () => {

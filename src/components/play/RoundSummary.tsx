@@ -1,7 +1,9 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import type { Player, Card as CardType } from '../../game/types'
 import { ROUNDS, PLAYER_COLORS } from '../../lib/constants'
 import { TOTAL_ROUNDS } from '../../game/rules'
+import { haptic } from '../../lib/haptics'
+import CardComponent from './Card'
 
 interface RoundResult {
   playerId: string
@@ -35,6 +37,34 @@ function AnimatedNumber({ from, to, duration = 500 }: { from: number; to: number
   }, [from, to, duration])
 
   return <>{display}</>
+}
+
+// ── ShanghaiCountUp (ease-in: slow start, fast finish — points piling on) ──
+
+function ShanghaiCountUp({ to, delay, duration = 1000 }: { to: number; delay: number; duration?: number }) {
+  const [display, setDisplay] = useState(0)
+  const [started, setStarted] = useState(false)
+
+  useEffect(() => {
+    const t = setTimeout(() => setStarted(true), delay)
+    return () => clearTimeout(t)
+  }, [delay])
+
+  useEffect(() => {
+    if (!started || to === 0) { setDisplay(to); return }
+    const start = Date.now()
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - start
+      const progress = Math.min(elapsed / duration, 1)
+      // ease-in: progress * progress (slow start, fast finish)
+      const eased = progress * progress
+      setDisplay(Math.round(to * eased))
+      if (progress >= 1) clearInterval(interval)
+    }, 16)
+    return () => clearInterval(interval)
+  }, [started, to, duration])
+
+  return <>{started ? `+${display}` : '+0'}</>
 }
 
 // ── Card label helpers ────────────────────────────────────────────────────────
@@ -96,6 +126,78 @@ function RankBadge({ rank }: { rank: number }) {
       }}
     >
       {rank}
+    </div>
+  )
+}
+
+// ── ShanghaiExposure (Moment 2: badge slam → card fan-out → count-up) ───────
+// Renders the full shanghaied content area: badge (inline) + card fan + count-up
+
+function ShanghaiExposure({ player, score }: { player: Player; score: number }) {
+  const [phase, setPhase] = useState<'badge' | 'cards' | 'countup'>('badge')
+  const [revealedCards, setRevealedCards] = useState(0)
+  const hapticFired = useRef(false)
+
+  // Phase 1: Badge slam (0-300ms) — fire haptic on mount
+  useEffect(() => {
+    if (!hapticFired.current) {
+      hapticFired.current = true
+      haptic('error')
+    }
+  }, [])
+
+  // Phase 2: Card fan-out starts at 300ms
+  useEffect(() => {
+    const t = setTimeout(() => setPhase('cards'), 300)
+    return () => clearTimeout(t)
+  }, [])
+
+  // Stagger card reveals with 60ms between each
+  useEffect(() => {
+    if (phase !== 'cards') return
+    const cardCount = player.hand.length
+    if (cardCount === 0) { setPhase('countup'); return }
+    const timers: ReturnType<typeof setTimeout>[] = []
+    for (let i = 0; i < cardCount; i++) {
+      timers.push(setTimeout(() => {
+        setRevealedCards(i + 1)
+        if (i === cardCount - 1) {
+          timers.push(setTimeout(() => setPhase('countup'), 200))
+        }
+      }, i * 60))
+    }
+    return () => timers.forEach(clearTimeout)
+  }, [phase, player.hand.length])
+
+  // Only render the card fan-out + count-up (badge is rendered separately inline)
+  if (phase === 'badge' || player.hand.length === 0) return null
+
+  return (
+    <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {/* Cards fan out one at a time */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, perspective: '400px' }}>
+        {player.hand.slice(0, revealedCards).map((card: CardType, cardIdx: number) => (
+          <div
+            key={card.id}
+            style={{
+              animation: 'card-reveal 0.3s ease-out both',
+              animationDelay: `${cardIdx * 60}ms`,
+            }}
+          >
+            <CardComponent card={card} compact />
+          </div>
+        ))}
+      </div>
+
+      {/* Point count-up with ease-in curve */}
+      {phase === 'countup' && score > 0 && (
+        <div style={{
+          fontSize: 22, fontWeight: 800, color: '#b83232',
+          lineHeight: 1,
+        }}>
+          <ShanghaiCountUp to={score} delay={0} duration={1000} />
+        </div>
+      )}
     </div>
   )
 }
@@ -358,28 +460,31 @@ export default function RoundSummary({ players, roundResults, roundNum, onNext, 
                           fontSize: 9, fontWeight: 700, borderRadius: 4, padding: '1px 5px',
                           display: 'inline-block',
                         }}>
-                          Shanghaied!
+                          Shanghaied! 😬
                         </span>
                       )}
                     </div>
 
-                    {/* Card detail pills — for non-out players with remaining cards (spec §6) */}
-                    {!isOut && player.hand.length > 0 && (
+                    {/* Card detail pills — for non-out, non-shanghaied players with remaining cards */}
+                    {!isOut && !isShanghaied && player.hand.length > 0 && (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 4 }}>
-                        {player.hand.map((card: CardType, cardIdx: number) => (
+                        {player.hand.map((card: CardType) => (
                           <span
                             key={card.id}
                             style={{
                               background: '#1e4a2e', color: '#6aad7a',
                               fontSize: 8, fontWeight: 600, borderRadius: 3, padding: '1px 5px',
-                              animationDelay: `${cardIdx * 50}ms`,
-                              ...(isShanghaied ? { animation: 'slam-in 0.3s cubic-bezier(0.34,1.56,0.64,1) both' } : {}),
                             }}
                           >
                             {cardLabel(card)}
                           </span>
                         ))}
                       </div>
+                    )}
+
+                    {/* Shanghai card fan-out + count-up */}
+                    {isShanghaied && (
+                      <ShanghaiExposure player={player} score={result.score} />
                     )}
                   </div>
 

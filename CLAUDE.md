@@ -64,10 +64,12 @@ src/
         ├── GameBoard.tsx     # Main game board: hand, melds, piles, AI automation, pause
         ├── GameOver.tsx      # End-of-game results + auto-save badge
         ├── GameToast.tsx     # Queued toast overlay: 5 styles (celebration/pressure/neutral/drama/taunt)
-        ├── Card.tsx          # Card component: suit tints, haptic on tap, shimmer prop
+        ├── Card.tsx          # Card component: suit tints, haptic on tap, shimmer/edgeGlow/buyRelevance props
         ├── MeldModal.tsx     # Step-through meld builder: required melds → bonus-prompt → bonus phase
         ├── TableMelds.tsx    # Table meld display: overlap layout for long runs, data-meld-id for auto-scroll
-        └── HandDisplay.tsx   # Scrollable hand with controlled sort (Rank / Suit) + fade gradient
+        ├── HandDisplay.tsx   # Scrollable hand with controlled sort (Rank / Suit) + fade gradient
+        ├── BuyingCinematic.tsx # Full-screen cinematic buying window overlay (7 phases)
+        └── RoundAnnouncement.tsx # Round countdown + dealing interstitial
 
 supabase/
 ├── add_game_type.sql         # Migration: ALTER TABLE games ADD COLUMN game_type text DEFAULT 'manual'
@@ -127,10 +129,22 @@ GameSetup (PlayerConfig[] configured)
 - **`AIDifficulty`** — `'easy' | 'medium' | 'hard'` — exported from `src/game/types.ts`; passed from `GameSetup` → `PlayTab` → `GameBoard` prop (`aiDifficulty?: AIDifficulty`, default `'medium'`)
   - Easy: never buys/takes discard, discards highest-value card, lays down required melds only
   - Medium: commits to top-2 suits for runs, run-aware drawing/buying/discarding
-  - Hard: all Medium + joker swaps, unlimited lay-offs, very aggressive buying
+  - Hard: all Medium + joker swaps, unlimited lay-offs, cost/benefit buying (no fixed cap)
+- **AI personalities** — `PERSONALITIES` array in `src/game/types.ts`. Each has `PersonalityConfig` controlling: `takeStyle`, `buyStyle`, `discardStyle`, `goDownStyle`, `layOffStyle`, `jokerSwapStyle`, `panicThreshold`, etc.
+  - The Shark (`the-shark`): opponent-aware discarding, `goDownStyle: 'immediate'`, aggressive-denial take style
+  - The Mastermind (`the-mastermind`): hold-for-out strategy, `panicThreshold: 2`, opponent-aware discarding
+- **AI buying (hard-tier)** — `aiShouldBuyHard` uses cost/benefit evaluation: `calculateBuyValue` (0-90+: enables going down, set completion, run gap-fill, progress) vs `calculateBuyRisk` (0-85: hand size, opponent pressure, penalty cost). No fixed buy cap. Buys when value > risk.
+- **Denial logic removed** — `aiShouldTakeDiscardHard` evaluates purely on self-interest (no denial takes). Opponent-aware discarding (`aiChooseDiscardHard`) kept.
 - **AI automation** — two `useEffect` blocks in `GameBoard` watch `uiPhase` + `currentPlayer.isAI`. Uses `useRef` refs (`gameStateRef`, `uiPhaseRef`, `buyerOrderRef`, `buyerStepRef`, `pendingBuyDiscardRef`, `buyingIsPostDrawRef`) to read fresh state inside `setTimeout` callbacks without stale closures.
-- **Toast queue** — `toastQueueRef` + `queueToast()` + `showNextToast()` in `GameBoard`. `GameToast` renders from `activeToast` state. Fired at: going-down-first, going-out, joker swap ("The heist!"), consecutive-round-out streaks. CSS animations: `toast-enter`, `shimmer-sweep`, `slam-in`, `pulse-border-red` in `index.css`.
-- **Game feel moments** — Close race indicator ("🔥 Race to finish") appears in Zone 2 when 2+ players have laid down and hold ≤ 3 cards. `shimmerCardId` state triggers a gold shimmer sweep on the drawn card for human players. `RoundSummary` shows slam-in animation on Shanghaied badges and staggered card pill reveals; drama overlay fires for 1+ shanghaied (not just 2+).
+- **Toast queue** — `toastQueueRef` + `queueToast()` + `showNextToast()` in `GameBoard`. `GameToast` renders from `activeToast` state. Fired at: going-down-first, joker swap ("The heist!"), consecutive-round-out streaks. CSS animations: `toast-enter`, `shimmer-sweep`, `slam-in`, `pulse-border-red` in `index.css`.
+- **Cinematic game moments:**
+  - **Going Out** — 2.5s cinematic: white flash (400ms) → dimmed board + player name "GOES OUT!" slam-in (2s hold) → round summary. Replaces the old toast. `goingOutSequence` state machine: `'idle' | 'flash' | 'announce'`. `triggerGoingOut()` called from both meld-confirm and lay-off going-out paths.
+  - **Shanghai Exposure** (in `RoundSummary`) — Shanghaied badge slams in + `haptic('error')`, cards fan out one-by-one with 60ms stagger flip animation (`card-reveal` keyframe), score counts up from 0 with ease-in curve (`ShanghaiCountUp` component).
+  - **Perfect Draw** — After human draw, `checkPerfectDraw()` compares `aiFindBestMelds` before/after. If draw newly enables the requirement: `haptic('success')`, "Ready to lay down!" text (3s), Lay Down button pulses gold (`ready-pulse` animation, 5s auto-clear).
+  - **Final Card Drama** — When human has ≤2 cards + has laid down (`isOnTheEdge`): radial vignette spotlight on hand area, `edgeGlow` prop on cards (warm gold shadow), "Final card — lay it off to go out" label when exactly 1 card.
+- **Buying cinematic** — `BuyingCinematic.tsx` renders a full-screen overlay with 7 phases: `hidden`, `reveal` (card rises 450ms), `free-offer` (free take UI), `ai-deciding` (card floats, AI passes silently), `human-turn` (Buy/Pass buttons + who passed), `snatched` (burst animation 800ms), `unclaimed` (card sinks 900ms). Phase state machine: `buyingPhase`, `buyingPassedPlayers`, `buyingSnatcherName` in GameBoard. Replaces old `BuyPrompt` banner.
+- **Buy-window hand highlights** — `buyRelevanceMap` (useMemo) computes per-card relevance when buying: `'set-match'` (same rank → gold glow), `'run-neighbor'` (same suit ±2 rank → green glow), `'dim'` (50% opacity). Threaded via `HandDisplay` → `Card` `buyRelevance` prop. "Fits your hand" / "No match" label above hand.
+- **Game feel moments** — Close race indicator ("Race to finish") appears in Zone 2 when 2+ players have laid down and hold ≤ 3 cards. `shimmerCardId` state triggers a gold shimmer sweep on the drawn card for human players.
 - **Inline lay-off auto-scroll** — `zone2ScrollRef` on the Zone 2 scroll container. When `inlineSelectedCard` changes, a `useEffect` queries `[data-meld-id]` in the scroll container and smoothly scrolls to the first matching meld if it is off-screen.
 - **Game speed** — `gameSpeed: 'fast' | 'normal' | 'slow'` state in `GameBoard`; toggleable from pause menu. Controls AI action delays.
 - **Dark table** — GameBoard uses `bg-[#1a3a2a]` (dark green felt) for the game screen; all text/icons adjusted for dark background.
@@ -193,7 +207,7 @@ Warm cream theme (not dark table). Uses `safe-top` for header padding.
 - **Winner** = player with the lowest total score (`computeWinner()` in gameStore.ts).
 - **Dates** are stored as ISO strings; displayed with date-fns, no timezone conversion.
 - **Import** groups rows by date + notes to reconstruct individual games.
-- **Tests** use **Vitest** (`npx vitest run`). Test files live in `src/game/__tests__/` (runs, sets, layoff, jokerswap, meldbuilder, requirements, scoring, goingout, buying, ai, deck). 286 tests.
+- **Tests** use **Vitest** (`npx vitest run`). Test files live in `src/game/__tests__/`. 1430 tests.
 - **`onPlayerClick`** is threaded from `App.tsx` → `StatsLeaderboard`, `GameSummary` to open `PlayerProfileModal`. Also passed into `DrilldownModal` so player names in drilldown views are tappable.
 - **`total_score`** is a generated column in Supabase — never insert or update it directly.
 - **`created_by`** column does not exist in the `games` table — do not reference it.

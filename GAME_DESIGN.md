@@ -333,7 +333,7 @@ A working game engine with:
 - Round summary screen with scores; 7-round progression
 - Sort toggle: order hand by Rank or Suit
 - Colorblind-friendly suit tints: hearts `#fff5f5`, diamonds `#f5f8ff`, clubs `#f5fff7`, spades `#f8f8f8`
-- Draw pile auto-reshuffle when empty (all but top discard card)
+- Draw pile auto-reshuffle when empty (all but top discard card); proactive reshuffle at draw phase start so players never see "0 cards"; fresh deck fallback if both piles are empty (GDD §9)
 - Undo discard: 3-second toast window for human players
 - Pause modal: Resume or Abandon
 
@@ -348,14 +348,17 @@ A working game engine with:
 - `aiFindBestMelds` — finds optimal meld combination for the round requirement
 - `aiFindAllMelds` — finds required melds + greedily finds all additional valid melds (used for AI lay-down)
 - `canFormAnyValidMeld` — utility: returns true if any set or run is possible from given cards
-- `aiShouldTakeDiscard` — evaluates if top discard improves AI's hand
-- `aiChooseDiscard` / `aiChooseDiscardHard` — Medium/Hard discard strategies (Hard has stronger weighting against breaking pairs/runs)
-- `aiShouldBuy` / `aiShouldBuyHard` — Medium/Hard buy decisions (Hard buys on any pair, not just 2+)
+- `aiShouldTakeDiscard` / `aiShouldTakeDiscardHard` — evaluates if top discard improves AI's hand (self-interest only, no denial takes)
+- `aiChooseDiscard` / `aiChooseDiscardHard` — Medium/Hard discard strategies (Hard uses opponent-aware danger scoring)
+- `aiShouldBuy` / `aiShouldBuyHard` — Medium uses simple criteria; Hard uses cost/benefit evaluation (`calculateBuyValue` vs `calculateBuyRisk`, no fixed buy cap)
 - `aiFindLayOff` — extends existing table melds after laying down
 - `aiFindJokerSwap` — Hard AI only: finds jokers on the table the AI can reclaim by swapping in a natural card
 - Medium AI capped at 1 lay-off per turn to prevent dumping all same-rank cards onto one meld; Hard AI has no cap
+- **AI Personalities** (`PERSONALITIES` in `src/game/types.ts`): Rookie Riley, Steady Sam (easy), Lucky Lou, Patient Pat (medium), The Shark, The Mastermind (hard). Each has a `PersonalityConfig` controlling take/buy/discard/goDown/layOff/jokerSwap styles.
+  - The Shark: `goDownStyle: 'immediate'`, opponent-aware discarding, aggressive take
+  - The Mastermind: `goDownStyle: 'hold-for-out'`, `panicThreshold: 2`, opponent-aware discarding
 - Per-slot AI toggle in `GameSetup`: Human/Bot icon, auto-fills "AI {n}" name, at least 1 human enforced
-- **Difficulty selector** in `GameSetup` (shown when any AI player added): Easy (Coming Soon), Medium, Hard
+- **Difficulty selector** in `GameSetup` (shown when any AI player added): Easy, Medium, Hard
 - AI skips the privacy screen; turns automated with 700–1200ms delays via `useEffect` + `useRef` (fresh state)
 
 ### Phase 5: Polish ✅
@@ -372,12 +375,18 @@ A working game engine with:
 - **Meld builder sort order**: `MeldModal` receives the player's sorted hand so cards appear in the same Rank/Suit order as the hand display
 - **Discard selection reset**: selecting cards in `HandDisplay` is now cleared after every lay-off action; 1-card hand auto-activates the discard button
 - **AI difficulty selector**: Easy (Coming Soon), Medium, Hard — shown in `GameSetup` when any AI player is added
-- **Hard AI**: smarter discard (stronger pair/run weighting), more aggressive buying, joker-swap reclaim, unlimited lay-offs per turn
+- **Hard AI**: opponent-aware discard (danger scoring), cost/benefit buying (no fixed cap), joker-swap reclaim, unlimited lay-offs per turn
 - **Pause button**: enlarged to 44px touch target with gold background for visibility
 
+### Phase 7: Cinematic Game Moments ✅
+- **Cinematic buying window** (`BuyingCinematic.tsx`): full-screen overlay replaces old banner. Card rises to center, AI decides silently (passes hidden, buys = "Snatched!" burst), human gets large Buy/Pass buttons. Unclaimed card sinks back. Free-offer phase for next-in-turn player.
+- **Going-out cinematic**: 2.5s sequence — white flash → dimmed board + "GOES OUT!" slam-in → round summary
+- **Shanghai exposure** (in `RoundSummary`): badge slam + haptic, card fan-out with flip animation, score count-up with ease-in curve
+- **Perfect draw detection**: detects when a draw newly enables the round requirement → shimmer + "Ready to lay down!" + Lay Down button gold pulse
+- **Final card drama**: vignette spotlight on hand, warm glow on remaining cards, "Final card" label when 1 card left
+- **Buy-window hand highlights**: cards relevant to the offered discard glow gold (set match) or green (run neighbor), others dim to 50%
+
 ### Remaining / Future
-- Card animations (deal, draw, discard, meld)
 - Sound effects
 - Online multiplayer for digital play mode (hidden hands per device, real-time game state sync)
-- Easy AI difficulty
 - Shanghai event leaderboard (requires `shanghai_events` table — migration included, tracking not yet wired to play mode)

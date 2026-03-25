@@ -156,7 +156,7 @@ export const PERSONALITIES: PersonalityConfig[] = [
     takeStyle: 'aggressive-denial',
     buyStyle: 'denial',
     discardStyle: 'opponent-aware',
-    goDownStyle: 'strategic',
+    goDownStyle: 'immediate',
     layOffStyle: 'unlimited',
     jokerSwapStyle: 'optimal',
     denialEnabled: true,
@@ -182,7 +182,7 @@ export const PERSONALITIES: PersonalityConfig[] = [
     opponentAwareness: true,
     randomFactor: 0,
     buySelfLimit: 5,
-    panicThreshold: 5,
+    panicThreshold: 2,
     denialOpponentCardThreshold: 4,
   },
 ]

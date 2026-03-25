@@ -78,10 +78,10 @@ describe('aiShouldBuyHard', () => {
     expect(aiShouldBuyHard(hand, discard, req3, 5)).toBe(true)
   })
 
-  it('does not buy when 3+ buys already used (buysRemaining <= 2)', () => {
+  it('does not buy when buysRemaining is 0', () => {
     const hand = [c('hearts', 9), c('clubs', 3), c('diamonds', 7)]
     const discard = c('spades', 9)
-    expect(aiShouldBuyHard(hand, discard, req1, 2)).toBe(false)
+    expect(aiShouldBuyHard(hand, discard, req1, 0)).toBe(false)
   })
 })
 
