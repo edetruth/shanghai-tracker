@@ -388,15 +388,20 @@ export function aiChooseDiscard(hand: Card[], requirement?: RoundRequirement, ta
     ? (nonJokers.length > 0 ? nonJokers : hand)
     : hand
 
-  const isPureRunRound = requirement ? (requirement.sets === 0 && requirement.runs > 0) : false
+  const hasRunReq = requirement ? requirement.runs > 0 : false
 
-  // In pure-run rounds, use run-aware discard: dump non-committed suit cards and rank clusters
-  if (isPureRunRound && requirement) {
+  // In rounds with run requirements, use run-aware discard: dump non-committed suit cards
+  if (hasRunReq && requirement) {
     const commitN = Math.min(requirement.runs + 1, 3)
     const committedSuits = getCommittedSuits(hand, commitN)
 
     function runUtility(card: Card): number {
       if (isJoker(card)) return 10000
+      // In mixed rounds, also protect set partners
+      if (requirement!.sets > 0) {
+        const sameRank = hand.filter(c => !isJoker(c) && c.rank === card.rank && c.id !== card.id).length
+        if (sameRank >= 2) return 80 // protect potential set of 3+
+      }
       if (!committedSuits.has(card.suit)) return -cardPoints(card.rank) // dump non-committed
       const sameSuit = hand.filter(c => !isJoker(c) && c.suit === card.suit && c.id !== card.id)
       const contribution = getRunContribution(sameSuit, card.rank)
@@ -655,15 +660,20 @@ export function aiChooseDiscardHard(
     ? (nonJokerHand.length > 0 ? nonJokerHand : hand)
     : hand
 
-  const isPureRunRound = requirement ? (requirement.sets === 0 && requirement.runs > 0) : false
+  const hasRunReq = requirement ? requirement.runs > 0 : false
 
-  // In pure-run rounds, use run-focused utility that ignores same-rank value
-  if (isPureRunRound && requirement) {
+  // In rounds with run requirements, use run-focused utility with suit commitment
+  if (hasRunReq && requirement) {
     const commitN = Math.min(requirement.runs + 1, 3)
     const committedSuits = getCommittedSuits(hand, commitN)
 
     function runUtility(card: Card): number {
       if (isJoker(card)) return 10000
+      // In mixed rounds, also protect set partners
+      if (requirement!.sets > 0) {
+        const sameRank = hand.filter(c => !isJoker(c) && c.rank === card.rank && c.id !== card.id).length
+        if (sameRank >= 2) return 80 // protect potential set of 3+
+      }
       if (!committedSuits.has(card.suit)) return -cardPoints(card.rank) // dump non-committed
       const sameSuit = hand.filter(c => !isJoker(c) && c.suit === card.suit && c.id !== card.id)
       const contribution = getRunContribution(sameSuit, card.rank)

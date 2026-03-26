@@ -545,7 +545,7 @@ export default function RoundSummary({ players, roundResults, roundNum, onNext, 
           </span>
           {nextRoundInfo && (
             <span style={{ display: 'block', fontSize: 11, opacity: 0.7, marginTop: 2 }}>
-              {nextRoundInfo.name} \u00b7 {nextRoundInfo.cards} cards
+              {nextRoundInfo.name} · {nextRoundInfo.cards} cards
             </span>
           )}
         </button>
