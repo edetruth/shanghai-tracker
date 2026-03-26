@@ -36,39 +36,9 @@ function tryFindSet(hand: Card[], allJokers: Card[], jokersUsed: number): Card[]
 }
 
 function tryFindRun(hand: Card[], allJokers: Card[], jokersUsed: number): Card[] | null {
-  const results = findAllRuns(hand, allJokers, jokersUsed)
-  return results.length > 0 ? results[0] : null
-}
-
-// Return ALL valid sets that can be formed from the hand + available jokers.
-// Each set uses the minimum size (MIN_SET_SIZE) to conserve cards.
-function findAllSets(hand: Card[], allJokers: Card[], jokersUsed: number): Card[][] {
-  const byRank = groupByRank(hand)
-  const available = allJokers.slice(jokersUsed)
-  const results: Card[][] = []
-  for (const [, cards] of byRank) {
-    if (cards.length >= MIN_SET_SIZE) {
-      results.push(cards.slice(0, MIN_SET_SIZE))
-    } else {
-      const needed = MIN_SET_SIZE - cards.length
-      if (needed <= available.length) {
-        results.push([...cards, ...available.slice(0, needed)])
-      }
-    }
-  }
-  return results
-}
-
-// Return ALL valid runs that can be formed from the hand + available jokers.
-// Sorted shortest-first (prefer minimal runs to conserve cards for other melds).
-// De-duplicates by rank within each suit (multi-deck support).
-function findAllRuns(hand: Card[], allJokers: Card[], jokersUsed: number): Card[][] {
   const bySuit = groupBySuit(hand)
   const available = allJokers.slice(jokersUsed)
-  const results: Card[][] = []
-  const seenKeys = new Set<string>()
   for (const [, suitCards] of bySuit) {
-    // De-duplicate by rank (multi-deck games can have 2+ cards of the same rank/suit).
     const seen = new Set<number>()
     const unique: Card[] = []
     for (const card of [...suitCards].sort((a, b) => a.rank - b.rank)) {
@@ -79,20 +49,12 @@ function findAllRuns(hand: Card[], allJokers: Card[], jokersUsed: number): Card[
         for (let end = start + Math.max(MIN_RUN_SIZE - jCount, 1); end <= unique.length; end++) {
           const sub = unique.slice(start, end)
           const testCards = [...sub, ...available.slice(0, jCount)]
-          if (testCards.length >= MIN_RUN_SIZE && isValidRun(testCards)) {
-            const key = testCards.map(c => c.id).sort().join(',')
-            if (!seenKeys.has(key)) {
-              seenKeys.add(key)
-              results.push(testCards)
-            }
-          }
+          if (testCards.length >= MIN_RUN_SIZE && isValidRun(testCards)) return testCards
         }
       }
     }
   }
-  // Shortest first so backtracking tries minimal runs before longer ones
-  results.sort((a, b) => a.length - b.length)
-  return results
+  return null
 }
 
 // Score a suit by its run-building potential (higher = better)
@@ -217,32 +179,26 @@ function tryMeldOrder(
 ): Card[][] | null {
   const jokers = hand.filter(isJoker)
   const naturals = hand.filter(c => !isJoker(c))
+  const melds: Card[][] = []
+  const usedIds = new Set<string>()
+  let jokersUsed = 0
 
   const steps: Array<'set' | 'run'> = order === 'sets-first'
     ? [...Array(requirement.sets).fill('set'), ...Array(requirement.runs).fill('run')]
     : [...Array(requirement.runs).fill('run'), ...Array(requirement.sets).fill('set')]
 
-  function backtrack(stepIdx: number, usedIds: Set<string>, jokersUsed: number): Card[][] | null {
-    if (stepIdx === steps.length) return []
-
-    const step = steps[stepIdx]
+  for (const step of steps) {
     const remaining = naturals.filter(c => !usedIds.has(c.id))
-    const candidates = step === 'set'
-      ? findAllSets(remaining, jokers, jokersUsed)
-      : findAllRuns(remaining, jokers, jokersUsed)
-
-    for (const candidate of candidates) {
-      const newUsedIds = new Set(usedIds)
-      candidate.forEach(c => newUsedIds.add(c.id))
-      const newJokersUsed = jokersUsed + candidate.filter(isJoker).length
-
-      const rest = backtrack(stepIdx + 1, newUsedIds, newJokersUsed)
-      if (rest !== null) return [candidate, ...rest]
-    }
-    return null
+    const meld = step === 'set'
+      ? tryFindSet(remaining, jokers, jokersUsed)
+      : tryFindRun(remaining, jokers, jokersUsed)
+    if (!meld) return null
+    meld.forEach(c => usedIds.add(c.id))
+    jokersUsed += meld.filter(isJoker).length
+    melds.push(meld)
   }
 
-  return backtrack(0, new Set(), 0)
+  return melds
 }
 
 // Should AI take the top discard card? (Medium/Hard)
@@ -286,12 +242,12 @@ export function aiShouldTakeDiscard(
 
   if (hasRunReq && committedSuits.has(discardCard.suit)) {
     const sameSuit = hand.filter(c => !isJoker(c) && c.suit === discardCard.suit)
-    // Take only if card directly advances the committed run window (gap-fill or extension).
-    // 'near' (±2 of window edge) is speculative future-build, not "directly fits" — Medium
-    // must stay conservative per GDD Section 11.
     if (sameSuit.length >= 1) {
       const contribution = getRunContribution(sameSuit, discardCard.rank)
+      // Take gap-fills and extensions always; take 'near' when 2+ same-suit already held
+      // (free take is cheaper than buying, so be at least as aggressive as buy logic)
       if (contribution === 'gap-fill' || contribution === 'extension') return true
+      if (contribution === 'near' && sameSuit.length >= 2) return true
     }
   }
 
@@ -345,20 +301,22 @@ export function aiShouldTakeDiscardHard(
   const sameRank = hand.filter(c => !isJoker(c) && c.rank === discardCard.rank).length
   if (sameRank >= 2 && !isPureRunRound) return true
 
-  // 5 & 6. Gap-fill or extension in a STRONG committed run (3+ cards in the window)
+  // 5 & 6. Run contribution in a committed suit
   const hasRunReq = requirement.runs >= 1
   if (hasRunReq) {
-    const sameSuit = hand.filter(c => !isJoker(c) && c.suit === discardCard.suit)
-    if (sameSuit.length >= 3) {
-      const window = findBestRunWindow(sameSuit)
-      if (window.cards.length >= 3) {
-        if (window.gaps.includes(discardCard.rank)) return true  // gap-fill
-        if (discardCard.rank === window.minRank - 1 || discardCard.rank === window.maxRank + 1) return true  // extension
+    const commitN = Math.min(requirement.runs + 1, 3)
+    const committedSuits = getCommittedSuits(hand, commitN)
+    if (committedSuits.has(discardCard.suit)) {
+      const sameSuit = hand.filter(c => !isJoker(c) && c.suit === discardCard.suit)
+      if (sameSuit.length >= 1) {
+        const contribution = getRunContribution(sameSuit, discardCard.rank)
+        if (contribution === 'gap-fill' || contribution === 'extension') return true
+        if (contribution === 'near' && sameSuit.length >= 2) return true
       }
     }
   }
 
-  // 7. Everything else → draw from pile (no 'near', no thin-evidence takes)
+  // 7. Everything else → draw from pile
   return false
 }
 

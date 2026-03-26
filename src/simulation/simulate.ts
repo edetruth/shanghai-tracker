@@ -11,7 +11,7 @@ import { buildMeld, isValidSet, findSwappableJoker, simulateLayOff, canGoOutViaC
 import { scoreRound, calculateHandScore } from '../game/scoring'
 import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, MAX_BUYS } from '../game/rules'
 import {
-  aiFindBestMelds, aiFindAllMelds, aiShouldTakeDiscard, aiShouldTakeDiscardEasy,
+  aiFindBestMelds, aiFindAllMelds, aiShouldTakeDiscard, aiShouldTakeDiscardHard, aiShouldTakeDiscardEasy,
   aiChooseDiscard, aiChooseDiscardHard, aiChooseDiscardEasy,
   aiShouldBuy, aiShouldBuyEasy, aiShouldBuyHard,
   aiFindLayOff, aiFindJokerSwap, aiFindPreLayDownJokerSwap,
@@ -483,7 +483,7 @@ function simExecuteAIAction(
   // Discard
   if (player.hand.length > 0) {
     const card = isHard
-      ? aiChooseDiscardHard(player.hand, tablesMelds)
+      ? aiChooseDiscardHard(player.hand, tablesMelds, undefined, state.players.filter(p => p.id !== player.id), requirement)
       : aiChooseDiscard(player.hand, requirement, tablesMelds)
     const result = simDiscard(state, card.id)
     if (!result) {
@@ -554,7 +554,9 @@ export function simulateRound(gameState: GameState, difficulty: AIDifficulty): {
     const shouldTake = topDiscard !== null && (
       difficulty === 'easy'
         ? aiShouldTakeDiscardEasy(player.hand, topDiscard, state.roundState.requirement)
-        : aiShouldTakeDiscard(player.hand, topDiscard, state.roundState.requirement, player.hasLaidDown)
+        : difficulty === 'hard'
+          ? aiShouldTakeDiscardHard(player.hand, topDiscard, state.roundState.requirement, player.hasLaidDown, state.roundState.tablesMelds, state.players.filter(p => p.id !== player.id))
+          : aiShouldTakeDiscard(player.hand, topDiscard, state.roundState.requirement, player.hasLaidDown)
     )
 
     if (shouldTake) {
