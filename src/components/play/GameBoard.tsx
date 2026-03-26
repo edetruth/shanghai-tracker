@@ -2655,15 +2655,15 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
   const isHumanDraw = uiPhase === 'draw' && !currentPlayer.isAI
 
-  // Round-based felt colors: cool dark green → warm deep green across 7 rounds
+  // Round-based felt colors: each round has a distinct rich dark tone
   const ROUND_FELT: Record<number, string> = {
-    1: '#1a3a2a', // cool emerald
-    2: '#1b3a2d', // slightly teal
-    3: '#1c3828', // forest
-    4: '#1e3626', // deep forest
-    5: '#203424', // warm olive-green
-    6: '#223222', // dark sage
-    7: '#243020', // warm dark green
+    1: '#1a3a2a', // classic emerald green
+    2: '#1a2f3a', // deep teal
+    3: '#2a1a3a', // dark plum
+    4: '#1a3a30', // rich forest
+    5: '#3a1a24', // deep burgundy
+    6: '#1a2a3a', // dark navy
+    7: '#2e2a1a', // warm charcoal-gold
   }
   const baseFelt = ROUND_FELT[gameState.currentRound] ?? '#1a3a2a'
 
