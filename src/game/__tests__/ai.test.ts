@@ -167,6 +167,91 @@ describe('aiFindBestMelds — mixed (Round 2: 1 set + 1 run)', () => {
   })
 })
 
+const req6 = ROUND_REQUIREMENTS[5] // 1 set + 2 runs
+const req7 = ROUND_REQUIREMENTS[6] // 3 runs
+
+describe('aiFindBestMelds — ace-high run backtracking', () => {
+  it('finds J-Q-K-A ace-high run when alternate set exists (Round 2)', () => {
+    const hand = [
+      c('hearts', 1),   c('hearts', 11),  c('hearts', 12), c('hearts', 13),
+      c('diamonds', 1), c('clubs', 1),
+      c('diamonds', 7), c('clubs', 7), c('spades', 7),
+      c('spades', 4),
+    ]
+    const result = aiFindBestMelds(hand, req2)
+    expect(result).not.toBeNull()
+    const hasAceHighRun = result!.some(meld =>
+      meld.some(c => c.rank === 1 && c.suit === 'hearts') && meld.some(c => c.rank === 13)
+    )
+    expect(hasAceHighRun).toBe(true)
+  })
+
+  it('finds both same-suit runs when low run and ace-high run coexist (Round 3)', () => {
+    const hand = [
+      c('hearts', 1),  c('hearts', 3),  c('hearts', 4),
+      c('hearts', 5),  c('hearts', 6),  c('hearts', 11),
+      c('hearts', 12), c('hearts', 13),
+      c('spades', 9),  c('clubs', 2),
+    ]
+    const result = aiFindBestMelds(hand, req3)
+    expect(result).not.toBeNull()
+    expect(result).toHaveLength(2)
+    const hasAceHigh = result!.some(meld =>
+      meld.some(c => c.rank === 1) && meld.some(c => c.rank === 13)
+    )
+    expect(hasAceHigh).toBe(true)
+  })
+
+  it('finds non-overlapping same-suit runs: 4-7 + J-Q-K-A (Round 3)', () => {
+    const hand = [
+      c('hearts', 1),  c('hearts', 4),  c('hearts', 5),
+      c('hearts', 6),  c('hearts', 7),  c('hearts', 11),
+      c('hearts', 12), c('hearts', 13),
+      c('spades', 9),  c('clubs', 2),
+    ]
+    const result = aiFindBestMelds(hand, req3)
+    expect(result).not.toBeNull()
+    const hasAceHigh = result!.some(meld =>
+      meld.some(c => c.rank === 1) && meld.some(c => c.rank === 13)
+    )
+    expect(hasAceHigh).toBe(true)
+  })
+
+  it('finds ace-high run in Round 6 (1 set + 2 runs)', () => {
+    const hand = [
+      c('hearts', 1),   c('hearts', 11), c('hearts', 12), c('hearts', 13),
+      c('diamonds', 3), c('diamonds', 4), c('diamonds', 5), c('diamonds', 6),
+      c('clubs', 7),    c('spades', 7),  c('diamonds', 7),
+      c('spades', 2),
+    ]
+    const result = aiFindBestMelds(hand, req6)
+    expect(result).not.toBeNull()
+    expect(result).toHaveLength(3)
+  })
+
+  it('finds ace-high run in Round 7 (3 runs)', () => {
+    const hand = [
+      c('hearts', 1),   c('hearts', 11), c('hearts', 12), c('hearts', 13),
+      c('diamonds', 3), c('diamonds', 4), c('diamonds', 5), c('diamonds', 6),
+      c('clubs', 7),    c('clubs', 8),   c('clubs', 9),   c('clubs', 10),
+    ]
+    const result = aiFindBestMelds(hand, req7)
+    expect(result).not.toBeNull()
+    expect(result).toHaveLength(3)
+  })
+
+  it('returns null when ace is genuinely contested (no valid combo exists)', () => {
+    // A♥ needed for both ace-low run and ace-high run, only 7 hearts total
+    const hand = [
+      c('hearts', 1),  c('hearts', 2),  c('hearts', 3),
+      c('hearts', 4),  c('hearts', 11), c('hearts', 12),
+      c('hearts', 13), c('spades', 9),  c('clubs', 2), c('diamonds', 7),
+    ]
+    const result = aiFindBestMelds(hand, req3)
+    expect(result).toBeNull()
+  })
+})
+
 describe('aiFindAllMelds', () => {
   it('finds required melds plus an extra set on a sets-only round', () => {
     const hand = [

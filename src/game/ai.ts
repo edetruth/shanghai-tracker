@@ -36,11 +36,39 @@ function tryFindSet(hand: Card[], allJokers: Card[], jokersUsed: number): Card[]
 }
 
 function tryFindRun(hand: Card[], allJokers: Card[], jokersUsed: number): Card[] | null {
+  const results = findAllRuns(hand, allJokers, jokersUsed)
+  return results.length > 0 ? results[0] : null
+}
+
+// Return ALL valid sets that can be formed from the hand + available jokers.
+// Each set uses the minimum size (MIN_SET_SIZE) to conserve cards.
+function findAllSets(hand: Card[], allJokers: Card[], jokersUsed: number): Card[][] {
+  const byRank = groupByRank(hand)
+  const available = allJokers.slice(jokersUsed)
+  const results: Card[][] = []
+  for (const [, cards] of byRank) {
+    if (cards.length >= MIN_SET_SIZE) {
+      results.push(cards.slice(0, MIN_SET_SIZE))
+    } else {
+      const needed = MIN_SET_SIZE - cards.length
+      if (needed <= available.length) {
+        results.push([...cards, ...available.slice(0, needed)])
+      }
+    }
+  }
+  return results
+}
+
+// Return ALL valid runs that can be formed from the hand + available jokers.
+// Sorted shortest-first (prefer minimal runs to conserve cards for other melds).
+// De-duplicates by rank within each suit (multi-deck support).
+function findAllRuns(hand: Card[], allJokers: Card[], jokersUsed: number): Card[][] {
   const bySuit = groupBySuit(hand)
   const available = allJokers.slice(jokersUsed)
+  const results: Card[][] = []
+  const seenKeys = new Set<string>()
   for (const [, suitCards] of bySuit) {
     // De-duplicate by rank (multi-deck games can have 2+ cards of the same rank/suit).
-    // Keep one card per rank so slice-based search never hits duplicate-rank rejects.
     const seen = new Set<number>()
     const unique: Card[] = []
     for (const card of [...suitCards].sort((a, b) => a.rank - b.rank)) {
@@ -48,17 +76,23 @@ function tryFindRun(hand: Card[], allJokers: Card[], jokersUsed: number): Card[]
     }
     for (let jCount = 0; jCount <= available.length; jCount++) {
       for (let start = 0; start < unique.length; start++) {
-        // Search from shortest (MIN_RUN_SIZE) upward — prefer minimal runs to conserve
-        // jokers and cards for subsequent melds in multi-run rounds
         for (let end = start + Math.max(MIN_RUN_SIZE - jCount, 1); end <= unique.length; end++) {
           const sub = unique.slice(start, end)
           const testCards = [...sub, ...available.slice(0, jCount)]
-          if (testCards.length >= MIN_RUN_SIZE && isValidRun(testCards)) return testCards
+          if (testCards.length >= MIN_RUN_SIZE && isValidRun(testCards)) {
+            const key = testCards.map(c => c.id).sort().join(',')
+            if (!seenKeys.has(key)) {
+              seenKeys.add(key)
+              results.push(testCards)
+            }
+          }
         }
       }
     }
   }
-  return null
+  // Shortest first so backtracking tries minimal runs before longer ones
+  results.sort((a, b) => a.length - b.length)
+  return results
 }
 
 // Score a suit by its run-building potential (higher = better)
@@ -164,9 +198,11 @@ function getRunContribution(sameSuitCards: Card[], rank: number): 'gap-fill' | '
 }
 
 // Try to find meld groups satisfying the round requirement.
-// For mixed rounds (sets + runs), tries sets-first then runs-first and returns whichever works.
-// This matters when the only joker can satisfy either the set OR the run but not both —
-// the greedy ordering determines which gets it.
+// Uses backtracking: for each required meld slot, generates all candidates and tries each one.
+// If a choice causes a later slot to fail, it backtracks and tries the next candidate.
+// This prevents the greedy "lowest-rank-first" bias from missing ace-high runs or
+// alternative sets when cards are contested between melds.
+// For mixed rounds, tries sets-first then runs-first ordering.
 export function aiFindBestMelds(hand: Card[], requirement: RoundRequirement): Card[][] | null {
   return tryMeldOrder(hand, requirement, 'sets-first')
     ?? (requirement.sets > 0 && requirement.runs > 0
@@ -181,26 +217,32 @@ function tryMeldOrder(
 ): Card[][] | null {
   const jokers = hand.filter(isJoker)
   const naturals = hand.filter(c => !isJoker(c))
-  const melds: Card[][] = []
-  const usedIds = new Set<string>()
-  let jokersUsed = 0
 
   const steps: Array<'set' | 'run'> = order === 'sets-first'
     ? [...Array(requirement.sets).fill('set'), ...Array(requirement.runs).fill('run')]
     : [...Array(requirement.runs).fill('run'), ...Array(requirement.sets).fill('set')]
 
-  for (const step of steps) {
+  function backtrack(stepIdx: number, usedIds: Set<string>, jokersUsed: number): Card[][] | null {
+    if (stepIdx === steps.length) return []
+
+    const step = steps[stepIdx]
     const remaining = naturals.filter(c => !usedIds.has(c.id))
-    const meld = step === 'set'
-      ? tryFindSet(remaining, jokers, jokersUsed)
-      : tryFindRun(remaining, jokers, jokersUsed)
-    if (!meld) return null
-    meld.forEach(c => usedIds.add(c.id))
-    jokersUsed += meld.filter(isJoker).length
-    melds.push(meld)
+    const candidates = step === 'set'
+      ? findAllSets(remaining, jokers, jokersUsed)
+      : findAllRuns(remaining, jokers, jokersUsed)
+
+    for (const candidate of candidates) {
+      const newUsedIds = new Set(usedIds)
+      candidate.forEach(c => newUsedIds.add(c.id))
+      const newJokersUsed = jokersUsed + candidate.filter(isJoker).length
+
+      const rest = backtrack(stepIdx + 1, newUsedIds, newJokersUsed)
+      if (rest !== null) return [candidate, ...rest]
+    }
+    return null
   }
 
-  return melds
+  return backtrack(0, new Set(), 0)
 }
 
 // Should AI take the top discard card? (Medium/Hard)

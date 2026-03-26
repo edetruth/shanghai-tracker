@@ -65,10 +65,10 @@ src/
         ├── GameOver.tsx      # End-of-game results + auto-save badge
         ├── GameToast.tsx     # Queued toast overlay: 5 styles (celebration/pressure/neutral/drama/taunt)
         ├── Card.tsx          # Card component: suit tints, haptic on tap, shimmer/edgeGlow/buyRelevance props
-        ├── MeldModal.tsx     # Step-through meld builder: required melds → bonus-prompt → bonus phase
+        ├── MeldBuilder.tsx   # Inline meld-building mode: staging area + card selection + suggestion auto-fill + bonus overlays
         ├── TableMelds.tsx    # Table meld display: overlap layout for long runs, data-meld-id for auto-scroll
-        ├── HandDisplay.tsx   # Scrollable hand with controlled sort (Rank / Suit) + fade gradient
-        ├── BuyingCinematic.tsx # Full-screen cinematic buying window overlay (7 phases)
+        ├── HandDisplay.tsx   # Scrollable hand with controlled sort (Rank / Suit), compact mode for buy, ghostedIds for meld-building
+        ├── BuyingCinematic.tsx # Buying window: BuyingCinematic (overlay) + BuyBottomSheet (inline bottom sheet)
         └── RoundAnnouncement.tsx # Round countdown + dealing interstitial
 
 supabase/
@@ -142,8 +142,8 @@ GameSetup (PlayerConfig[] configured)
   - **Shanghai Exposure** (in `RoundSummary`) — Shanghaied badge slams in + `haptic('error')`, cards fan out one-by-one with 60ms stagger flip animation (`card-reveal` keyframe), score counts up from 0 with ease-in curve (`ShanghaiCountUp` component).
   - **Perfect Draw** — After human draw, `checkPerfectDraw()` compares `aiFindBestMelds` before/after. If draw newly enables the requirement: `haptic('success')`, "Ready to lay down!" text (3s), Lay Down button pulses gold (`ready-pulse` animation, 5s auto-clear).
   - **Final Card Drama** — When human has ≤2 cards + has laid down (`isOnTheEdge`): radial vignette spotlight on hand area, `edgeGlow` prop on cards (warm gold shadow), "Final card — lay it off to go out" label when exactly 1 card.
-- **Buying cinematic** — `BuyingCinematic.tsx` renders a full-screen overlay with 7 phases: `hidden`, `reveal` (card rises 450ms), `free-offer` (free take UI), `ai-deciding` (card floats, AI passes silently), `human-turn` (Buy/Pass buttons + who passed), `snatched` (burst animation 800ms), `unclaimed` (card sinks 900ms). Phase state machine: `buyingPhase`, `buyingPassedPlayers`, `buyingSnatcherName` in GameBoard. Replaces old `BuyPrompt` banner.
-- **Buy-window hand highlights** — `buyRelevanceMap` (useMemo) computes per-card relevance when buying: `'set-match'` (same rank → gold glow), `'run-neighbor'` (same suit ±2 rank → green glow), `'dim'` (50% opacity). Threaded via `HandDisplay` → `Card` `buyRelevance` prop. "Fits your hand" / "No match" label above hand.
+- **Buying cinematic** — `BuyingCinematic.tsx` exports two components: `BuyingCinematic` (full-screen overlay for non-human phases) and `BuyBottomSheet` (inline bottom-sheet for human buy decisions). 7 phases: `hidden`, `reveal` (card rises 450ms), `free-offer` (free take UI), `ai-deciding` (card floats, AI passes silently), `human-turn` (bottom sheet with card + Buy/Pass buttons, no overlay), `snatched` (burst animation 800ms), `unclaimed` (card sinks 900ms). During `human-turn`: ZONE 3 (draw/discard piles) hides, hand compresses to compact mode (`HandDisplay` `compact` prop), TableMelds dims to 75% opacity, and `BuyBottomSheet` slides up from below (`bc-sheet-up` animation) with safe-area padding. Phase state machine: `buyingPhase`, `buyingPassedPlayers`, `buyingSnatcherName` in GameBoard.
+- **Buy-window hand highlights** — `buyRelevanceMap` (useMemo) computes per-card relevance when buying: `'set-match'` (same rank → gold glow), `'run-neighbor'` (same suit ±2 rank → green glow), `'dim'` (50% opacity). Threaded via `HandDisplay` → `Card` `buyRelevance` prop. "Fits your hand" / "No match" label above hand. Hand remains fully visible and interactive during buy (sort toggle functional).
 - **Game feel moments** — Close race indicator ("Race to finish") appears in Zone 2 when 2+ players have laid down and hold ≤ 3 cards. `shimmerCardId` state triggers a gold shimmer sweep on the drawn card for human players.
 - **Inline lay-off auto-scroll** — `zone2ScrollRef` on the Zone 2 scroll container. When `inlineSelectedCard` changes, a `useEffect` queries `[data-meld-id]` in the scroll container and smoothly scrolls to the first matching meld if it is off-screen.
 - **Game speed** — `gameSpeed: 'fast' | 'normal' | 'slow'` state in `GameBoard`; toggleable from pause menu. Controls AI action delays.
@@ -153,8 +153,9 @@ GameSetup (PlayerConfig[] configured)
 - **`nextPhaseForPlayer(player)`** — returns `'draw'` for AI (skips privacy screen), `'privacy'` for humans.
 - **`aiLayOffDoneRef`** — ref in `GameBoard`; Medium AI is capped at 1 lay-off per turn before being forced to discard, **except** when `player.hand.length === 1` — the final going-out lay-off is always allowed. Hard AI has no cap.
 - **`aiActionTick`** — state counter bumped after Hard AI joker swaps (hand length unchanged, so this re-triggers the AI action effect).
-- **Extra melds rule** — `MeldModal` has a 3-phase flow: `required` → `bonus-prompt` → `bonus`. After the required melds are confirmed, `canFormAnyValidMeld` checks remaining cards; if a bonus meld is possible the player is prompted. AI uses `aiFindAllMelds` (finds required + all bonus melds greedily).
-- **Sort order in MeldModal** — `GameBoard` owns `handSort` state; passes it to `HandDisplay` (controlled) and passes `sortedCurrentHand` to `MeldModal` so both show cards in the same order.
+- **Inline meld-building** — `MeldBuilder.tsx` replaces the old fullscreen `MeldModal` overlay. When the player taps "Lay Down," GameBoard enters meld-building mode: zone 2 (table melds) dims to 50% opacity, zone 3 (draw/discard piles) hides, and `MeldBuilder` renders inline between zone 2 and zone 4 with a `meld-staging-in` slide animation. The player taps cards from their hand (routed via `MeldBuilderHandle.handleCardTap` ref) to assign them to meld slots. Assigned cards appear ghosted (25% opacity) in the hand via `HandDisplay` `ghostedIds` prop. A subtle "Auto-fill" suggestion banner appears when `aiFindAllMelds` detects valid melds. Joker placement, bonus-suggest, and bonus-prompt remain as overlay sub-flows within MeldBuilder.
+- **Extra melds rule** — `MeldBuilder` supports bonus phase: after required melds are confirmed, `canFormAnyValidMeld` checks remaining cards; if a bonus meld is possible the player is prompted via overlay. AI uses `aiFindAllMelds` (finds required + all bonus melds greedily).
+- **Sort order in meld-building** — `GameBoard` owns `handSort` state; passes it to `HandDisplay` (controlled) and passes `sortedCurrentHand` to `MeldBuilder` so both show cards in the same order.
 - **Undo discard** — 3s timer after human discard; buying window not started until timer expires or undo tapped.
 - **Draw pile reshuffle** — proactive `useEffect` on draw phase start reshuffles discards (keeping top card) into a new draw pile before the player sees the board. Fallback reshuffle also exists in `handleDrawFromPile` and `handleBuyDecision` (penalty card). If both piles are empty, a fresh deck is added (GDD §9). UI shows clickable "Tap to Reshuffle" as a safety net if the pile is somehow still empty.
 

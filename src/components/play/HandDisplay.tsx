@@ -20,6 +20,9 @@ interface Props {
   selectionOrder?: string[]
   edgeGlow?: boolean
   buyRelevanceMap?: Map<string, 'set-match' | 'run-neighbor' | 'dim'>
+  compact?: boolean
+  /** Card IDs that are assigned to meld slots — render at reduced opacity */
+  ghostedIds?: Set<string>
 }
 
 export const SUIT_ORDER: Record<string, number> = { hearts: 0, diamonds: 1, clubs: 2, spades: 3, joker: 4 }
@@ -49,6 +52,8 @@ export default function HandDisplay({
   selectionOrder,
   edgeGlow,
   buyRelevanceMap,
+  compact,
+  ghostedIds,
 }: Props) {
   const sorted = useMemo(() => {
     return [...cards].sort((a, b) => {
@@ -87,7 +92,8 @@ export default function HandDisplay({
 
   const containerWidth = sorted.length > 0 ? (positions[positions.length - 1] ?? 0) + 41 : 41
   // 61px card height + 10px selected lift + 4px new badge headroom
-  const containerHeight = 75
+  const containerHeight = compact ? 60 : 75
+  const compactScale = compact ? 0.78 : 1
 
   // FLIP sort animation refs
   const cardPositionsRef = useRef<Map<string, DOMRect>>(new Map())
@@ -201,7 +207,14 @@ export default function HandDisplay({
       ) : (
         <div
           className="relative overflow-x-auto pb-2"
-          style={{ height: `${containerHeight}px`, display: 'flex', justifyContent: sorted.length <= 3 ? 'center' : 'flex-start' }}
+          style={{
+            height: `${containerHeight}px`,
+            display: 'flex',
+            justifyContent: sorted.length <= 3 ? 'center' : 'flex-start',
+            transform: compactScale < 1 ? `scale(${compactScale})` : undefined,
+            transformOrigin: 'top center',
+            transition: 'transform 300ms ease-out, height 300ms ease-out',
+          }}
         >
           <div
             ref={handContainerRef}
@@ -210,6 +223,7 @@ export default function HandDisplay({
           >
             {sorted.map((card, index) => {
               const isSelected = selectedIds.has(card.id)
+              const isGhosted = ghostedIds?.has(card.id) ?? false
               const isLeaving = card.id === leavingCardId
               const showFaceDown = dealFlipPhase === 'facedown'
               const isFlipping = dealFlipPhase === 'flipping'
@@ -221,7 +235,8 @@ export default function HandDisplay({
                   style={{
                     left: `${positions[index]}px`,
                     zIndex: isSelected ? sorted.length + 10 : card.id === newCardId ? sorted.length + 5 : index + 1,
-                    transition: isLeaving ? 'none' : 'left 300ms ease-out, transform 300ms ease-out',
+                    transition: isLeaving ? 'none' : 'left 300ms ease-out, transform 300ms ease-out, opacity 200ms ease',
+                    opacity: isGhosted ? 0.25 : 1,
                     ...(dealAnimation && !isFlipping && dealCardIdsRef.current.has(card.id) ? { animation: `card-deal-in 200ms ease-out ${index * 50}ms both` } : {}),
                   }}
                 >

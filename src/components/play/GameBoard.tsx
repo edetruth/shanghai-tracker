@@ -18,14 +18,14 @@ import {
 import { SUIT_ORDER } from './HandDisplay'
 import { haptic } from '../../lib/haptics'
 import PrivacyScreen from './PrivacyScreen'
-import MeldModal from './MeldModal'
-// LayOffModal removed — lay-offs now happen inline via TableMelds
+import MeldBuilder, { type MeldBuilderHandle } from './MeldBuilder'
+// MeldModal replaced by inline MeldBuilder; LayOffModal removed — lay-offs happen inline via TableMelds
 import RoundSummary from './RoundSummary'
 import GameOver from './GameOver'
 import HandDisplay from './HandDisplay'
 import TableMelds from './TableMelds'
 import CardComponent from './Card'
-import BuyingCinematic, { type BuyingPhase } from './BuyingCinematic'
+import BuyingCinematic, { BuyBottomSheet, FreeTakeBottomSheet, type BuyingPhase } from './BuyingCinematic'
 import GameToast, { type QueuedToast } from './GameToast'
 import RoundAnnouncement, { type AnnouncementStage } from './RoundAnnouncement'
 
@@ -67,6 +67,20 @@ interface BuyLogEntry {
 }
 
 // ── Pure helpers ──────────────────────────────────────────────────────────────
+
+/** Shift a hex color slightly warmer/lighter by tension level (0-3) */
+function adjustFelt(hex: string, tension: number): string {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  // Each tension level adds a small warm shift: +red, -blue, slight green adjust
+  const shift = tension * 2
+  return '#' + [
+    Math.min(255, r + shift + 1).toString(16).padStart(2, '0'),
+    Math.min(255, g - shift + 1).toString(16).padStart(2, '0'),
+    Math.max(0, b - shift).toString(16).padStart(2, '0'),
+  ].join('')
+}
 
 function initGame(configs: PlayerConfig[], buyLimit = 5): GameState {
   const deckCount = configs.length <= 4 ? 2 : 3
@@ -195,6 +209,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const selectedCardOrderRef = useRef<string[]>([])
   const [handSort, setHandSort] = useState<'rank' | 'suit'>('rank')
   const [showMeldModal, setShowMeldModal] = useState(false)
+  const [meldAssignedIds, setMeldAssignedIds] = useState<Set<string>>(new Set())
+  const meldBuilderRef = useRef<MeldBuilderHandle>(null)
   const [jokerPositionPrompt, setJokerPositionPrompt] = useState<{ card: CardType; meld: Meld } | null>(null)
   const [buyerOrder, setBuyerOrder] = useState<number[]>([])
   const [buyerStep, setBuyerStep] = useState(0)
@@ -783,6 +799,14 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
   // ── Toggle card selection ─────────────────────────────────────────────────
   function toggleCard(cardId: string) {
+    // If in meld-building mode, route taps to MeldBuilder
+    if (showMeldModal && meldBuilderRef.current) {
+      const card = currentPlayer.hand.find(c => c.id === cardId)
+      if (card && !meldAssignedIds.has(card.id)) {
+        meldBuilderRef.current.handleCardTap(card)
+      }
+      return
+    }
     // If in swap mode with a meld already selected, tapping a hand card executes the swap
     if (swapMode && swapSelectedMeldId && preSwapMeldId) {
       const card = gameStateRef.current.players[gameStateRef.current.roundState.currentPlayerIndex].hand.find(c => c.id === cardId)
@@ -1257,6 +1281,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     }
     setGameState(updated)
     setShowMeldModal(false)
+    setMeldAssignedIds(new Set())
     setPreLayDownSwap(false)
     clearSelection() // always reset selection after meld
     haptic(wentOut ? 'success' : 'heavy')
@@ -2630,13 +2655,26 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
   const isHumanDraw = uiPhase === 'draw' && !currentPlayer.isAI
 
+  // Round-based felt colors: cool dark green → warm deep green across 7 rounds
+  const ROUND_FELT: Record<number, string> = {
+    1: '#1a3a2a', // cool emerald
+    2: '#1b3a2d', // slightly teal
+    3: '#1c3828', // forest
+    4: '#1e3626', // deep forest
+    5: '#203424', // warm olive-green
+    6: '#223222', // dark sage
+    7: '#243020', // warm dark green
+  }
+  const baseFelt = ROUND_FELT[gameState.currentRound] ?? '#1a3a2a'
+
+  // Tension shifts: lighten/warm the base slightly at higher tension
   const feltColor = effectiveTension === 0
-    ? '#1a3a2a'
+    ? baseFelt
     : effectiveTension === 1
-    ? '#1d3a29'
+    ? adjustFelt(baseFelt, 1)
     : effectiveTension === 2
-    ? '#213828'
-    : '#243727'
+    ? adjustFelt(baseFelt, 2)
+    : adjustFelt(baseFelt, 3)
 
   return (
     <div
@@ -2940,7 +2978,11 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
 
       {/* ── ZONE 2: Scrollable middle — table melds + overlay toast ──── */}
-      <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+      <div style={{
+        flex: 1, minHeight: 0, position: 'relative',
+        opacity: buyingPhase === 'human-turn' || buyingPhase === 'free-offer' || showMeldModal ? 0.5 : 1,
+        transition: 'opacity 300ms ease',
+      }}>
         {/* Toast overlay — floats over melds, no layout shift */}
         {reshuffleMsg && (
           <div style={{
@@ -2979,8 +3021,11 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         </div>
       </div>
 
-      {/* ── ZONE 3: Piles strip — hidden during AI turns in solo-human games ── */}
+      {/* ── ZONE 3: Piles strip — hidden during AI turns, buy bottom sheet, meld-building ── */}
       {(uiPhase === 'draw' || uiPhase === 'buying') &&
+       buyingPhase !== 'human-turn' &&
+       buyingPhase !== 'free-offer' &&
+       !showMeldModal &&
        (!soloHuman || !currentPlayer.isAI || isHumanBuyerTurn) && (
         <div
           style={{
@@ -3104,10 +3149,29 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         </div>
       )}
 
-      {/* ── ZONE 4: Fixed bottom — buy prompt + hand + actions ──────────── */}
+      {/* ── Inline meld-building staging area ──────────────────────── */}
+      {showMeldModal && (
+        <MeldBuilder
+          ref={meldBuilderRef}
+          hand={sortedCurrentHand}
+          requirement={rs.requirement}
+          onConfirm={handleMeldConfirm}
+          onClose={() => { if (!preLayDownSwap) { setShowMeldModal(false); setMeldAssignedIds(new Set()) } }}
+          mustLayDown={preLayDownSwap}
+          sortMode={handSort}
+          onSortChange={setHandSort}
+          onAssignedIdsChange={setMeldAssignedIds}
+        />
+      )}
+
+      {/* ── ZONE 4: Fixed bottom — hand + actions ──────────── */}
       <div
         className="bg-[#0f2218] px-3 pt-2"
-        style={{ flexShrink: 0, paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
+        style={{
+          flexShrink: 0,
+          paddingBottom: (buyingPhase === 'human-turn' || buyingPhase === 'free-offer') ? '8px' : 'max(12px, env(safe-area-inset-bottom))',
+          transition: 'padding-bottom 300ms ease',
+        }}
       >
         {/* Buy prompt area removed — replaced by BuyingCinematic overlay */}
 
@@ -3161,6 +3225,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
             dealFlipPhase={dealFlipPhase}
             edgeGlow={isOnTheEdge}
             buyRelevanceMap={buyRelevanceMap}
+            compact={buyingPhase === 'human-turn' || buyingPhase === 'free-offer'}
+            ghostedIds={showMeldModal ? meldAssignedIds : undefined}
           />
         ) : aiTurnHumanViewer ? (
           <HandDisplay
@@ -3237,8 +3303,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           </div>
         )}
 
-        {/* Action buttons */}
-        {uiPhase === 'action' && !currentPlayer.isAI && !pendingUndo && !jokerPositionPrompt && (
+        {/* Action buttons — hidden during meld-building mode */}
+        {uiPhase === 'action' && !currentPlayer.isAI && !pendingUndo && !jokerPositionPrompt && !showMeldModal && (
           <div className="space-y-2 mt-2">
             {!currentPlayer.hasLaidDown && (
               <p style={{
@@ -3404,18 +3470,32 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
       </div>
 
-      {/* Modals — logic unchanged */}
-      {showMeldModal && (
-        <MeldModal
-          hand={sortedCurrentHand}
-          requirement={rs.requirement}
-          onConfirm={handleMeldConfirm}
-          onClose={() => { if (!preLayDownSwap) setShowMeldModal(false) }}
-          mustLayDown={preLayDownSwap}
-          sortMode={handSort}
-          onSortChange={setHandSort}
+      {/* ── Free take bottom sheet — inline, not overlay ──────────────── */}
+      {buyingPhase === 'free-offer' && pendingBuyDiscard && (
+        <FreeTakeBottomSheet
+          card={pendingBuyDiscard}
+          cardLabel={formatCard(pendingBuyDiscard)}
+          onTake={handleCinematicFreeOfferAccept}
+          onPass={handleCinematicFreeOfferDecline}
         />
       )}
+
+      {/* ── Buy bottom sheet — inline, not overlay ──────────────────────── */}
+      {buyingPhase === 'human-turn' && buyingDiscard && (
+        <BuyBottomSheet
+          card={buyingDiscard}
+          buysRemaining={activeBuyer?.buysRemaining ?? 0}
+          buyLimit={gameState.buyLimit}
+          cardLabel={formatCard(buyingDiscard)}
+          canBuy={activeBuyer ? activeBuyer.buysRemaining > 0 : false}
+          onBuy={handleCinematicBuy}
+          onPass={handleCinematicPass}
+        />
+      )}
+
+      {/* Modals — logic unchanged */}
+      {/* MeldBuilder overlay sub-flows (joker placement, bonus suggest/prompt) render here */}
+      {/* The inline staging area is rendered between ZONE 3 and ZONE 4 */}
 
       {/* Pause modal */}
       {showPauseModal && (

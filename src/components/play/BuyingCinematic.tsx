@@ -23,27 +23,193 @@ interface Props {
   onPass: () => void
 }
 
-export default function BuyingCinematic({
-  phase,
+/**
+ * Bottom-sheet component rendered inline for phase === 'human-turn'.
+ * NOT a fixed overlay — sits at the bottom of the GameBoard flex column.
+ */
+export function BuyBottomSheet({
   card,
-  isFreeOffer,
-  buyerName,
-  passedPlayers,
   buysRemaining,
   buyLimit,
   cardLabel,
+  canBuy,
   onBuy,
   onPass,
-}: Props) {
-  if (phase === 'hidden' || !card) return null
-
+}: {
+  card: CardType
+  buysRemaining: number
+  buyLimit: number
+  cardLabel: string
+  canBuy: boolean
+  onBuy: () => void
+  onPass: () => void
+}) {
   const buyLimitStr = buyLimit >= 999 ? '\u221e' : String(buyLimit)
-  const canBuy = isFreeOffer || buysRemaining > 0
+
+  return (
+    <div
+      style={{
+        flexShrink: 0,
+        background: '#0a1a10',
+        borderTop: '1px solid #2d5a3a',
+        padding: '14px 20px',
+        paddingBottom: 'max(14px, env(safe-area-inset-bottom))',
+        animation: 'bc-sheet-up 300ms ease-out both',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        {/* Offered card */}
+        <div style={{
+          flexShrink: 0,
+          transform: 'scale(1.3)',
+          transformOrigin: 'center',
+          animation: 'bc-sheet-card-float 2.5s ease-in-out infinite',
+        }}>
+          <CardComponent card={card} />
+        </div>
+
+        {/* Text + buttons */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ color: '#ffffff', fontSize: 18, fontWeight: 700, margin: 0 }}>
+            Buy {cardLabel}?
+          </p>
+          <p style={{ color: '#a8d0a8', fontSize: 13, margin: '4px 0 0' }}>
+            {canBuy
+              ? `${buysRemaining}/${buyLimitStr} buys left`
+              : 'No buys remaining'}
+          </p>
+
+          <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
+            <button
+              onClick={onPass}
+              className="px-8 py-3.5 rounded-xl font-bold text-lg transition-transform active:scale-95"
+              style={{
+                background: '#1e4a2e',
+                color: '#a8d0a8',
+                border: '1px solid #3d7a4c',
+                minWidth: 90,
+              }}
+            >
+              Pass
+            </button>
+            <button
+              onClick={onBuy}
+              disabled={!canBuy}
+              className="px-8 py-3.5 rounded-xl font-bold text-lg transition-transform active:scale-95"
+              style={{
+                background: canBuy ? '#e2b858' : '#4a4a3a',
+                color: canBuy ? '#2c1810' : '#888',
+                border: 'none',
+                minWidth: 90,
+                opacity: canBuy ? 1 : 0.5,
+                boxShadow: canBuy ? '0 4px 20px rgba(226,184,88,0.3)' : 'none',
+              }}
+            >
+              Buy it
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Bottom-sheet for free-take offer (Rule 9A: next player gets the discard for free).
+ * Same inline layout as BuyBottomSheet — hand stays visible above.
+ */
+export function FreeTakeBottomSheet({
+  card,
+  cardLabel,
+  onTake,
+  onPass,
+}: {
+  card: CardType
+  cardLabel: string
+  onTake: () => void
+  onPass: () => void
+}) {
+  return (
+    <div
+      style={{
+        flexShrink: 0,
+        background: '#0a1a10',
+        borderTop: '1px solid #2d5a3a',
+        padding: '14px 20px',
+        paddingBottom: 'max(14px, env(safe-area-inset-bottom))',
+        animation: 'bc-sheet-up 300ms ease-out both',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        {/* Offered card */}
+        <div style={{
+          flexShrink: 0,
+          transform: 'scale(1.3)',
+          transformOrigin: 'center',
+          animation: 'bc-sheet-card-float 2.5s ease-in-out infinite',
+        }}>
+          <CardComponent card={card} />
+        </div>
+
+        {/* Text + buttons */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ color: '#ffffff', fontSize: 18, fontWeight: 700, margin: 0 }}>
+            Take {cardLabel}?
+          </p>
+          <p style={{ color: '#6aad7a', fontSize: 13, margin: '4px 0 0' }}>
+            Free — counts as your draw
+          </p>
+
+          <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
+            <button
+              onClick={onPass}
+              className="px-8 py-3.5 rounded-xl font-bold text-lg transition-transform active:scale-95"
+              style={{
+                background: '#1e4a2e',
+                color: '#a8d0a8',
+                border: '1px solid #3d7a4c',
+                minWidth: 90,
+              }}
+            >
+              Pass
+            </button>
+            <button
+              onClick={onTake}
+              className="px-8 py-3.5 rounded-xl font-bold text-lg transition-transform active:scale-95"
+              style={{
+                background: '#6aad7a',
+                color: '#0f2218',
+                border: 'none',
+                minWidth: 90,
+                boxShadow: '0 4px 20px rgba(106,173,122,0.3)',
+              }}
+            >
+              Take it
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Full-screen overlay for non-interactive phases (reveal, ai-deciding, snatched, unclaimed).
+ * human-turn → BuyBottomSheet, free-offer → FreeTakeBottomSheet (both inline in GameBoard).
+ */
+export default function BuyingCinematic({
+  phase,
+  card,
+  buyerName,
+  cardLabel,
+}: Props) {
+  // human-turn → BuyBottomSheet, free-offer → FreeTakeBottomSheet (both inline in GameBoard)
+  if (phase === 'hidden' || phase === 'human-turn' || phase === 'free-offer' || !card) return null
 
   return (
     <div
       className="fixed inset-0 z-40 flex flex-col items-center justify-center"
-      style={{ pointerEvents: phase === 'human-turn' || phase === 'free-offer' ? 'auto' : 'none' }}
+      style={{ pointerEvents: 'none' }}
     >
       {/* Dim background */}
       <div
@@ -59,7 +225,7 @@ export default function BuyingCinematic({
         className="relative z-50"
         style={{
           animation:
-            phase === 'reveal' || phase === 'free-offer'
+            phase === 'reveal'
               ? 'bc-card-rise 450ms cubic-bezier(0.22, 1, 0.36, 1) forwards'
               : phase === 'snatched'
                 ? 'bc-snatch-fly 500ms cubic-bezier(0.55, 0, 1, 0.45) forwards'
@@ -110,102 +276,7 @@ export default function BuyingCinematic({
         </div>
       )}
 
-      {/* Free offer UI */}
-      {phase === 'free-offer' && (
-        <div
-          className="relative z-50 mt-5 text-center"
-          style={{ animation: 'bc-fade-in 300ms ease-out 250ms both' }}
-        >
-          <p className="text-lg font-bold text-[#6aad7a] m-0" style={{ textShadow: '0 1px 8px rgba(106,173,122,0.3)' }}>
-            Free take?
-          </p>
-          <p className="text-sm text-[#a8d0a8] mt-1 m-0">
-            No buy cost — counts as your draw
-          </p>
-
-          <div className="flex gap-4 justify-center mt-5">
-            <button
-              onClick={onPass}
-              className="px-8 py-3.5 rounded-xl font-bold text-lg transition-transform active:scale-95"
-              style={{
-                background: '#1e4a2e',
-                color: '#a8d0a8',
-                border: '1px solid #3d7a4c',
-                minWidth: 100,
-              }}
-            >
-              Pass
-            </button>
-            <button
-              onClick={onBuy}
-              className="px-8 py-3.5 rounded-xl font-bold text-lg transition-transform active:scale-95"
-              style={{
-                background: '#6aad7a',
-                color: '#0f2218',
-                border: 'none',
-                minWidth: 100,
-                boxShadow: '0 4px 20px rgba(106,173,122,0.3)',
-              }}
-            >
-              Take it
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Human buying turn UI */}
-      {phase === 'human-turn' && (
-        <div
-          className="relative z-50 mt-5 text-center"
-          style={{ animation: 'bc-fade-in 250ms ease-out both' }}
-        >
-          {/* Who passed */}
-          {passedPlayers.length > 0 && (
-            <p className="text-xs text-[#6aad7a] mb-3 m-0">
-              {passedPlayers.join(', ')} passed
-            </p>
-          )}
-
-          <p className="text-xl font-bold text-white m-0">
-            Buy {cardLabel}?
-          </p>
-          <p className="text-sm text-[#a8d0a8] mt-1 m-0">
-            {canBuy
-              ? `You get ${cardLabel} + 1 penalty card \u00b7 ${buysRemaining}/${buyLimitStr} buys left`
-              : 'No buys remaining'}
-          </p>
-
-          <div className="flex gap-4 justify-center mt-5">
-            <button
-              onClick={onPass}
-              className="px-8 py-3.5 rounded-xl font-bold text-lg transition-transform active:scale-95"
-              style={{
-                background: '#1e4a2e',
-                color: '#a8d0a8',
-                border: '1px solid #3d7a4c',
-                minWidth: 100,
-              }}
-            >
-              Pass
-            </button>
-            <button
-              onClick={onBuy}
-              disabled={!canBuy}
-              className="px-8 py-3.5 rounded-xl font-bold text-lg transition-transform active:scale-95"
-              style={{
-                background: canBuy ? '#e2b858' : '#4a4a3a',
-                color: canBuy ? '#2c1810' : '#888',
-                border: 'none',
-                minWidth: 100,
-                opacity: canBuy ? 1 : 0.5,
-                boxShadow: canBuy ? '0 4px 20px rgba(226,184,88,0.3)' : 'none',
-              }}
-            >
-              Buy it
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Free offer UI moved to FreeTakeBottomSheet (inline in GameBoard) */}
     </div>
   )
 }
