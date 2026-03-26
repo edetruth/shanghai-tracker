@@ -179,26 +179,107 @@ function tryMeldOrder(
 ): Card[][] | null {
   const jokers = hand.filter(isJoker)
   const naturals = hand.filter(c => !isJoker(c))
-  const melds: Card[][] = []
-  const usedIds = new Set<string>()
-  let jokersUsed = 0
 
   const steps: Array<'set' | 'run'> = order === 'sets-first'
     ? [...Array(requirement.sets).fill('set'), ...Array(requirement.runs).fill('run')]
     : [...Array(requirement.runs).fill('run'), ...Array(requirement.sets).fill('set')]
+
+  // Fast path: greedy (take first valid meld per step)
+  const melds: Card[][] = []
+  const usedIds = new Set<string>()
+  let jokersUsed = 0
+  let greedyFailed = false
 
   for (const step of steps) {
     const remaining = naturals.filter(c => !usedIds.has(c.id))
     const meld = step === 'set'
       ? tryFindSet(remaining, jokers, jokersUsed)
       : tryFindRun(remaining, jokers, jokersUsed)
-    if (!meld) return null
+    if (!meld) { greedyFailed = true; break }
     meld.forEach(c => usedIds.add(c.id))
     jokersUsed += meld.filter(isJoker).length
     melds.push(meld)
   }
 
-  return melds
+  if (!greedyFailed) return melds
+
+  // Fallback: bounded backtracking — try top 5 candidates per step
+  return tryMeldOrderBacktrack(naturals, jokers, steps)
+}
+
+/** Bounded backtracking: generates limited candidates per step to avoid explosion */
+function tryMeldOrderBacktrack(
+  naturals: Card[],
+  jokers: Card[],
+  steps: Array<'set' | 'run'>,
+): Card[][] | null {
+  const MAX_CANDIDATES = 5
+
+  function findCandidates(remaining: Card[], type: 'set' | 'run', jUsed: number): Card[][] {
+    const bySuit = groupBySuit(remaining)
+    const byRank = groupByRank(remaining)
+    const available = jokers.slice(jUsed)
+    const results: Card[][] = []
+    const seenKeys = new Set<string>()
+
+    if (type === 'set') {
+      for (const [, cards] of byRank) {
+        if (cards.length >= MIN_SET_SIZE) {
+          results.push(cards.slice(0, MIN_SET_SIZE))
+        } else {
+          const needed = MIN_SET_SIZE - cards.length
+          if (needed <= available.length) {
+            results.push([...cards, ...available.slice(0, needed)])
+          }
+        }
+        if (results.length >= MAX_CANDIDATES) break
+      }
+    } else {
+      for (const [, suitCards] of bySuit) {
+        const seen = new Set<number>()
+        const unique: Card[] = []
+        for (const card of [...suitCards].sort((a, b) => a.rank - b.rank)) {
+          if (!seen.has(card.rank)) { seen.add(card.rank); unique.push(card) }
+        }
+        for (let jCount = 0; jCount <= available.length; jCount++) {
+          for (let start = 0; start < unique.length; start++) {
+            for (let end = start + Math.max(MIN_RUN_SIZE - jCount, 1); end <= unique.length; end++) {
+              const sub = unique.slice(start, end)
+              const testCards = [...sub, ...available.slice(0, jCount)]
+              if (testCards.length >= MIN_RUN_SIZE && isValidRun(testCards)) {
+                const key = testCards.map(c => c.id).sort().join(',')
+                if (!seenKeys.has(key)) {
+                  seenKeys.add(key)
+                  results.push(testCards)
+                  if (results.length >= MAX_CANDIDATES) return results
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    // Shortest first — prefer minimal melds to conserve cards
+    results.sort((a, b) => a.length - b.length)
+    return results
+  }
+
+  function backtrack(stepIdx: number, usedIds: Set<string>, jUsed: number): Card[][] | null {
+    if (stepIdx === steps.length) return []
+    const remaining = naturals.filter(c => !usedIds.has(c.id))
+    const candidates = findCandidates(remaining, steps[stepIdx], jUsed)
+
+    for (const candidate of candidates) {
+      const newUsed = new Set(usedIds)
+      candidate.forEach(c => newUsed.add(c.id))
+      const newJUsed = jUsed + candidate.filter(isJoker).length
+      const rest = backtrack(stepIdx + 1, newUsed, newJUsed)
+      if (rest !== null) return [candidate, ...rest]
+    }
+    return null
+  }
+
+  return backtrack(0, new Set(), 0)
 }
 
 // Should AI take the top discard card? (Medium/Hard)
@@ -237,17 +318,15 @@ export function aiShouldTakeDiscard(
   // For rounds with run requirements, commit to enough suits to cover ALL runs needed.
   // Round 7 (3 runs) must consider 3+ suits, not just 2.
   const hasRunReq = requirement.runs >= 1
-  const commitN = hasRunReq ? Math.min(requirement.runs + 1, 3) : 2
+  const commitN = hasRunReq ? Math.min(requirement.runs + 1, 2) : 2
   const committedSuits = getCommittedSuits(hand, commitN)
 
   if (hasRunReq && committedSuits.has(discardCard.suit)) {
     const sameSuit = hand.filter(c => !isJoker(c) && c.suit === discardCard.suit)
     if (sameSuit.length >= 1) {
       const contribution = getRunContribution(sameSuit, discardCard.rank)
-      // Take gap-fills and extensions always; take 'near' when 2+ same-suit already held
-      // (free take is cheaper than buying, so be at least as aggressive as buy logic)
-      if (contribution === 'gap-fill' || contribution === 'extension') return true
-      if (contribution === 'near' && sameSuit.length >= 2) return true
+      // Free take has no penalty — accept gap-fill, extension, and near contributions
+      if (contribution === 'gap-fill' || contribution === 'extension' || contribution === 'near') return true
     }
   }
 
@@ -304,7 +383,7 @@ export function aiShouldTakeDiscardHard(
   // 5 & 6. Run contribution in a committed suit
   const hasRunReq = requirement.runs >= 1
   if (hasRunReq) {
-    const commitN = Math.min(requirement.runs + 1, 3)
+    const commitN = Math.min(requirement.runs + 1, 2)
     const committedSuits = getCommittedSuits(hand, commitN)
     if (committedSuits.has(discardCard.suit)) {
       const sameSuit = hand.filter(c => !isJoker(c) && c.suit === discardCard.suit)
@@ -350,7 +429,7 @@ export function aiChooseDiscard(hand: Card[], requirement?: RoundRequirement, ta
 
   // In rounds with run requirements, use run-aware discard: dump non-committed suit cards
   if (hasRunReq && requirement) {
-    const commitN = Math.min(requirement.runs + 1, 3)
+    const commitN = Math.min(requirement.runs + 1, 2)
     const committedSuits = getCommittedSuits(hand, commitN)
 
     function runUtility(card: Card): number {
@@ -410,7 +489,7 @@ export function aiShouldBuy(
 
   // For rounds with run requirements, buy based on how precisely the card advances the run
   if (requirement.runs >= 1) {
-    const commitN = Math.min(requirement.runs + 1, 3)
+    const commitN = Math.min(requirement.runs + 1, 2)
     const committedSuits = getCommittedSuits(hand, commitN)
     if (committedSuits.has(discardCard.suit)) {
       const sameSuit = hand.filter(c => !isJoker(c) && c.suit === discardCard.suit)
@@ -622,7 +701,7 @@ export function aiChooseDiscardHard(
 
   // In rounds with run requirements, use run-focused utility with suit commitment
   if (hasRunReq && requirement) {
-    const commitN = Math.min(requirement.runs + 1, 3)
+    const commitN = Math.min(requirement.runs + 1, 2)
     const committedSuits = getCommittedSuits(hand, commitN)
 
     function runUtility(card: Card): number {
@@ -766,13 +845,15 @@ function calculateBuyValue(hand: Card[], card: Card, requirement: RoundRequireme
   return value
 }
 
-function calculateBuyRisk(hand: Card[], players?: Player[]): number {
+function calculateBuyRisk(hand: Card[], players?: Player[], requirement?: RoundRequirement): number {
   let risk = 0
 
   // Factor 1: Hand size (0-40)
+  // Run rounds deal more cards (12) and need more cards to form runs — discount the penalty
+  const runDiscount = requirement && requirement.runs >= 2 ? 15 : 0
   const sz = hand.length
-  if (sz >= 12) risk += 40
-  else if (sz >= 10) risk += 30
+  if (sz >= 12) risk += 40 - runDiscount
+  else if (sz >= 10) risk += 30 - runDiscount
   else if (sz >= 8) risk += 20
   else risk += 10
 
@@ -833,7 +914,7 @@ export function aiShouldBuyHard(
   if (isJoker(discardCard)) return true
 
   const value = calculateBuyValue(hand, discardCard, requirement)
-  const risk = calculateBuyRisk(hand, opponents)
+  const risk = calculateBuyRisk(hand, opponents, requirement)
   return value > risk
 }
 

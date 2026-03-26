@@ -457,14 +457,14 @@ describe('aiShouldTakeDiscardHard', () => {
     expect(aiShouldTakeDiscardHard(hand, c('hearts', 6), req3, false)).toBe(true)
   })
 
-  it('rejects gap-fill when only 1-2 cards in run window', () => {
-    // Only 2 hearts: 5, 7 (gap at 6) — not enough evidence for Hard
+  it('takes gap-fill in committed suit even with 1-2 cards', () => {
+    // 2 hearts: 5, 7 (gap at 6) — hearts is committed, gap-fill is valuable
     const hand = [
       c('hearts', 5), c('hearts', 7),
       c('spades', 2), c('clubs', 10), c('diamonds', 3),
       c('spades', 12), c('clubs', 4), c('diamonds', 9), c('spades', 6), c('clubs', 8),
     ]
-    expect(aiShouldTakeDiscardHard(hand, c('hearts', 6), req3, false)).toBe(false)
+    expect(aiShouldTakeDiscardHard(hand, c('hearts', 6), req3, false)).toBe(true)
   })
 
   it('takes direct extension when 3+ cards in run window', () => {
@@ -477,14 +477,14 @@ describe('aiShouldTakeDiscardHard', () => {
     expect(aiShouldTakeDiscardHard(hand, c('hearts', 8), req3, false)).toBe(true)
   })
 
-  it('rejects extension when only 1-2 cards in run window', () => {
-    // Only 2 hearts: 6, 7 — not enough for Hard to take 8♥
+  it('takes extension in committed suit even with 1-2 cards', () => {
+    // 2 hearts: 6, 7 — hearts is committed, extension 8♥ builds toward run
     const hand = [
       c('hearts', 6), c('hearts', 7),
       c('spades', 2), c('clubs', 10), c('diamonds', 3),
       c('spades', 12), c('clubs', 4), c('diamonds', 9), c('spades', 6), c('clubs', 8),
     ]
-    expect(aiShouldTakeDiscardHard(hand, c('hearts', 8), req3, false)).toBe(false)
+    expect(aiShouldTakeDiscardHard(hand, c('hearts', 8), req3, false)).toBe(true)
   })
 
   it('rejects near cards entirely (no near condition for Hard)', () => {
@@ -497,14 +497,15 @@ describe('aiShouldTakeDiscardHard', () => {
     expect(aiShouldTakeDiscardHard(hand, c('hearts', 10), req3, false)).toBe(false)
   })
 
-  it('rejects card from non-committed suit even if rank matches something', () => {
-    // Hearts is the committed suit, but discard is clubs — reject
+  it('takes card in secondary committed suit when it extends a run', () => {
+    // Hearts is primary committed suit; clubs/diamonds are secondary candidates
+    // 5♣ extends from 4♣ — take it if clubs is committed
     const hand = [
       c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8),
       c('spades', 2), c('clubs', 10), c('diamonds', 3),
       c('spades', 12), c('clubs', 4), c('diamonds', 9),
     ]
-    expect(aiShouldTakeDiscardHard(hand, c('clubs', 5), req3, false)).toBe(false)
+    expect(aiShouldTakeDiscardHard(hand, c('clubs', 5), req3, false)).toBe(true)
   })
 
   it('rejects marginal cards on set-only rounds (no run requirement)', () => {
