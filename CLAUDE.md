@@ -38,8 +38,9 @@ src/
 │   ├── round-manager.ts     # Round setup and progression
 │   ├── game-manager.ts      # Full game flow across 7 rounds
 │   ├── rules.ts             # Point values, round requirement constants
-│   └── ai.ts                # Medium + Hard AI: aiFindBestMelds, aiFindAllMelds, canFormAnyValidMeld,
-│                            #   aiShouldTakeDiscard, aiChooseDiscard, aiChooseDiscardHard,
+│   └── ai.ts                # Medium + Hard AI: aiFindBestMelds (greedy + bounded backtrack fallback),
+│                            #   aiFindAllMelds, canFormAnyValidMeld, getCommittedSuits, getRunContribution,
+│                            #   aiShouldTakeDiscard, aiShouldTakeDiscardHard, aiChooseDiscard, aiChooseDiscardHard,
 │                            #   aiShouldBuy, aiShouldBuyHard, aiFindLayOff, aiFindJokerSwap
 ├── hooks/
 │   └── useRealtimeScores.ts # Supabase Realtime subscriptions for score tracker multiplayer
@@ -133,8 +134,9 @@ GameSetup (PlayerConfig[] configured)
 - **AI personalities** — `PERSONALITIES` array in `src/game/types.ts`. Each has `PersonalityConfig` controlling: `takeStyle`, `buyStyle`, `discardStyle`, `goDownStyle`, `layOffStyle`, `jokerSwapStyle`, `panicThreshold`, etc.
   - The Shark (`the-shark`): opponent-aware discarding, `goDownStyle: 'immediate'`, aggressive-denial take style
   - The Mastermind (`the-mastermind`): hold-for-out strategy, `panicThreshold: 2`, opponent-aware discarding
-- **AI buying (hard-tier)** — `aiShouldBuyHard` uses cost/benefit evaluation: `calculateBuyValue` (0-90+: enables going down, set completion, run gap-fill, progress) vs `calculateBuyRisk` (0-85: hand size, opponent pressure, penalty cost). No fixed buy cap. Buys when value > risk.
-- **Denial logic removed** — `aiShouldTakeDiscardHard` evaluates purely on self-interest (no denial takes). Opponent-aware discarding (`aiChooseDiscardHard`) kept.
+- **AI buying (hard-tier)** — `aiShouldBuyHard` uses cost/benefit evaluation: `calculateBuyValue` (0-90+: enables going down, set completion, run gap-fill, progress) vs `calculateBuyRisk` (0-85: hand size, opponent pressure, penalty cost, run-round discount of 15 for 2+ runs). No fixed buy cap. Buys when value > risk.
+- **AI run strategy** — Suit commitment capped at `commitN = min(runs+1, 2)` — always focus on top 2 suits regardless of how many runs are needed. Prevents over-commitment in R7 (3 runs). Run-aware discard activates for ALL rounds with runs (not just pure-run rounds); in mixed rounds, set partners (3+ same rank) are also protected. `aiShouldTakeDiscard` (medium) accepts `near` cards with 1+ same-suit for free takes. `aiShouldTakeDiscardHard` uses committed suits with gap-fill/extension + near with 2+.
+- **Bounded backtracking** — `aiFindBestMelds` uses greedy `tryFindRun`/`tryFindSet` as fast path; if greedy fails, falls back to `tryMeldOrderBacktrack` which generates top-5 candidates per step via bounded backtracking. Prevents joker contention failures in multi-run rounds without the explosion of full exhaustive search.
 - **AI automation** — two `useEffect` blocks in `GameBoard` watch `uiPhase` + `currentPlayer.isAI`. Uses `useRef` refs (`gameStateRef`, `uiPhaseRef`, `buyerOrderRef`, `buyerStepRef`, `pendingBuyDiscardRef`, `buyingIsPostDrawRef`) to read fresh state inside `setTimeout` callbacks without stale closures.
 - **Toast queue** — `toastQueueRef` + `queueToast()` + `showNextToast()` in `GameBoard`. `GameToast` renders from `activeToast` state. Fired at: going-down-first, joker swap ("The heist!"), consecutive-round-out streaks. CSS animations: `toast-enter`, `shimmer-sweep`, `slam-in`, `pulse-border-red` in `index.css`.
 - **Cinematic game moments:**
@@ -147,7 +149,7 @@ GameSetup (PlayerConfig[] configured)
 - **Game feel moments** — Close race indicator ("Race to finish") appears in Zone 2 when 2+ players have laid down and hold ≤ 3 cards. `shimmerCardId` state triggers a gold shimmer sweep on the drawn card for human players.
 - **Inline lay-off auto-scroll** — `zone2ScrollRef` on the Zone 2 scroll container. When `inlineSelectedCard` changes, a `useEffect` queries `[data-meld-id]` in the scroll container and smoothly scrolls to the first matching meld if it is off-screen.
 - **Game speed** — `gameSpeed: 'fast' | 'normal' | 'slow'` state in `GameBoard`; toggleable from pause menu. Controls AI action delays.
-- **Dark table** — GameBoard uses `bg-[#1a3a2a]` (dark green felt) for the game screen; all text/icons adjusted for dark background.
+- **Dark table** — GameBoard uses round-based felt colors: R1 emerald `#1a3a2a`, R2 deep teal `#1a2f3a`, R3 dark plum `#2a1a3a`, R4 rich forest `#1a3a30`, R5 deep burgundy `#3a1a24`, R6 dark navy `#1a2a3a`, R7 warm charcoal `#2e2a1a`. Tension system (`adjustFelt`) shifts warmer on top. 3s CSS transition between rounds. All text/icons adjusted for dark backgrounds.
 - **Fan hand layout** — `HandDisplay` uses absolute positioning with overlap offset computed by hand size. All cards visible without scrolling. Selected cards lift via Card's `-translate-y-3`.
 - **Rule 9A** — After any non-going-out discard, game advances to next player for a free draw decision. If they draw from pile, `startBuyingWindowPostDraw()` opens buying for remaining players. `buyingIsPostDrawRef` tracks this mode; after buying resolves the drew-player goes to action phase directly.
 - **`nextPhaseForPlayer(player)`** — returns `'draw'` for AI (skips privacy screen), `'privacy'` for humans.
@@ -208,7 +210,7 @@ Warm cream theme (not dark table). Uses `safe-top` for header padding.
 - **Winner** = player with the lowest total score (`computeWinner()` in gameStore.ts).
 - **Dates** are stored as ISO strings; displayed with date-fns, no timezone conversion.
 - **Import** groups rows by date + notes to reconstruct individual games.
-- **Tests** use **Vitest** (`npx vitest run`). Test files live in `src/game/__tests__/`. 1430 tests.
+- **Tests** use **Vitest** (`npx vitest run`). Test files live in `src/game/__tests__/`. 1436 tests. Simulation benchmarks in `src/simulation/run.test.ts` (5 configs: baseline, large-group, easy, hard, run-rounds).
 - **`onPlayerClick`** is threaded from `App.tsx` → `StatsLeaderboard`, `GameSummary` to open `PlayerProfileModal`. Also passed into `DrilldownModal` so player names in drilldown views are tappable.
 - **`total_score`** is a generated column in Supabase — never insert or update it directly.
 - **`created_by`** column does not exist in the `games` table — do not reference it.
