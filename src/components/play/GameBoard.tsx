@@ -2331,8 +2331,11 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     if (uiPhase !== 'buying') return
     // BAIL if someone has gone out — round is over
     if (gameState.roundState.goOutPlayerId) return
-    // Wait for cinematic reveal to finish before AI decides
-    if (buyingPhase === 'reveal') return
+    // Only process AI decisions during the ai-deciding phase.
+    // Bail during reveal (card rising), snatched (buy animation), unclaimed (sinking),
+    // human-turn, free-offer — prevents re-entrant duplicate timers that cause
+    // double handleBuyDecision calls and skip the drawing player's action phase.
+    if (buyingPhase !== 'ai-deciding') return
     const buyerIdx = buyerOrder[buyerStep]
     if (buyerIdx === undefined) return
     const buyer = gameState.players[buyerIdx]
