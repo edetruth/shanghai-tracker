@@ -11,7 +11,7 @@ import { buildMeld, isValidSet, findSwappableJoker, simulateLayOff, canGoOutViaC
 import { scoreRound, calculateHandScore } from '../game/scoring'
 import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, MAX_BUYS } from '../game/rules'
 import {
-  aiFindBestMelds, aiFindAllMelds, aiShouldTakeDiscard, aiShouldTakeDiscardHard, aiShouldTakeDiscardEasy,
+  aiFindBestMelds, aiShouldTakeDiscard, aiShouldTakeDiscardHard, aiShouldTakeDiscardEasy,
   aiChooseDiscard, aiChooseDiscardHard, aiChooseDiscardEasy,
   aiShouldBuy, aiShouldBuyEasy, aiShouldBuyHard,
   aiFindLayOff, aiFindJokerSwap, aiFindPreLayDownJokerSwap,
@@ -439,9 +439,9 @@ function simExecuteAIAction(
     }
   }
 
-  // Medium/Hard: lay down including bonus melds
+  // Medium/Hard: lay down (required melds only)
   if (!player.hasLaidDown) {
-    const melds = aiFindAllMelds(player.hand, requirement)
+    const melds = aiFindBestMelds(player.hand, requirement)
     if (melds && melds.length > 0) {
       const newState = simMeld(state, melds)
       return { state: newState, action: 'meld', meldsCount: melds.length }

@@ -276,10 +276,7 @@ Room code bar and Join Game enabled (see Phase G above).
 - Melds displayed via `TableMelds` always show the logical ascending sequence.
 - Extra jokers extend the run at the high end (not low end as before).
 
-**Extra melds must match round type** (`MeldModal.tsx`, `ai.ts`)
-- `getAllowedBonusTypes(requirement)` returns `'set' | 'run' | 'both'` based on the round.
-- `validateBonus` and `canFormAnyValidMeld` enforce the type restriction.
-- `aiFindAllMelds` only adds extra melds of allowed types.
+**Extra/bonus melds removed** — players (human and AI) now only lay down the required melds for each round. No bonus meld phases, overlays, or prompts. AI uses `aiFindBestMelds` (required melds only).
 
 **Improved AI run strategy** (`ai.ts`)
 - `scoreSuitForRun` scores each suit by consecutive sequence length + density.
@@ -292,7 +289,7 @@ Room code bar and Join Game enabled (see Phase G above).
 - `aiChooseDiscardEasy`: discards highest-value non-joker card.
 - `aiShouldTakeDiscardEasy()`: always returns false (never takes discard).
 - `aiShouldBuyEasy()`: always returns false (never buys).
-- Lays down required melds only (no bonus melds, no lay-offs).
+- Lays down required melds only (no lay-offs).
 - GameSetup shows Easy as a selectable option (not "Soon").
 
 **Dark game table background** (`GameBoard.tsx`)

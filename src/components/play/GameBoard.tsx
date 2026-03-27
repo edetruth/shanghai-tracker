@@ -9,7 +9,7 @@ import { createDecks, shuffle, dealHands } from '../../game/deck'
 import { buildMeld, isValidSet, canLayOff, findSwappableJoker, getNextJokerOptions, isLegalDiscard, evaluateLayOffReversal } from '../../game/meld-validator'
 import { scoreRound } from '../../game/scoring'
 import {
-  aiFindBestMelds, aiFindAllMelds, aiShouldTakeDiscard, aiShouldTakeDiscardHard, aiShouldTakeDiscardEasy,
+  aiFindBestMelds, aiShouldTakeDiscard, aiShouldTakeDiscardHard, aiShouldTakeDiscardEasy,
   aiChooseDiscard, aiChooseDiscardHard, aiChooseDiscardEasy,
   aiShouldBuy, aiShouldBuyEasy, aiShouldBuyHard,
   aiFindLayOff, aiFindJokerSwap, aiFindPreLayDownJokerSwap,
@@ -1264,9 +1264,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     // Telemetry: record going down
     recordDecision(player, 'go_down', 'went_down', null, `${newMelds.length} melds`)
     const tc = getTelemetryCounters(player.id)
-    const reqCount = rs.requirement.sets + rs.requirement.runs
     tc.meldsLaidDown += newMelds.length
-    tc.bonusMelds += Math.max(0, newMelds.length - reqCount)
     tc.handSizeWentDown = player.hand.length
     turnWentDownRef.current.set(player.id, playerTurnCountsRef.current.get(player.id) ?? 0)
 
@@ -1596,59 +1594,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     lastDiscarderIdxRef.current = playerIdx
 
     const newHand = player.hand.filter(c => c.id !== cardId)
-
-    // Scenario B: player went down with bonus melds and their last card can't be laid off.
-    // Roll back only the bonus melds (required melds stay on the table), then auto-discard
-    // the least useful card from the reconstituted hand.
-    if (!isLegalDiscard(player.hand, cardId) && player.hasLaidDown) {
-      const req = rs.requirement
-      let setCount = 0
-      let runCount = 0
-      const bonusMelds: Meld[] = []
-      for (const meld of player.melds) {
-        if (meld.type === 'set' && setCount < req.sets) { setCount++ }
-        else if (meld.type === 'run' && runCount < req.runs) { runCount++ }
-        else { bonusMelds.push(meld) }
-      }
-      if (bonusMelds.length > 0) {
-        const bonusMeldIds = new Set(bonusMelds.map(m => m.id))
-        const bonusCards = bonusMelds.flatMap(m => m.cards)
-        const newTablesMelds = rs.tablesMelds.filter(m => !bonusMeldIds.has(m.id))
-        const newPlayerMelds = player.melds.filter(m => !bonusMeldIds.has(m.id))
-        const reconstitutedHand = [...player.hand, ...bonusCards]
-        const discardCard = aiChooseDiscard(reconstitutedHand, rs.requirement, newTablesMelds)
-        const finalHand = reconstitutedHand.filter(c => c.id !== discardCard.id)
-        const newDiscardPile = [...rs.discardPile, discardCard]
-        const playersB = gameState.players.map((p, i) =>
-          i === playerIdx ? { ...p, hand: finalHand, melds: newPlayerMelds } : p
-        )
-        const afterRollback: GameState = {
-          ...gameState,
-          players: playersB,
-          roundState: { ...rs, tablesMelds: newTablesMelds, discardPile: newDiscardPile },
-        }
-        addBuyLog({ round: gameState.currentRound, turn: turnCountRef.current, event: 'scenario_b', playerName: player.name, card: '', detail: 'bonus meld reversed' })
-        getTelemetryCounters(player.id).scenarioB++
-        setGameState(afterRollback)
-        clearSelection()
-        haptic('heavy')
-        const advanced = advancePlayer(afterRollback)
-        const nextPlayer = advanced.players[advanced.roundState.currentPlayerIndex]
-        turnCountRef.current += 1
-        addBuyLog({
-          turn: turnCountRef.current,
-          round: gameState.currentRound,
-          event: 'discard',
-          playerName: player.name,
-          card: formatCard(discardCard),
-          detail: 'auto (bonus meld rollback)',
-        })
-        setPendingBuyDiscard(discardCard)
-        setGameState(advanced)
-        setUiPhase(nextPhaseForPlayer(nextPlayer))
-        return
-      }
-    }
 
     // Rule: cannot go out by discarding — universal (applies whether or not the player has laid down)
     if (!isLegalDiscard(player.hand, cardId) && !player.isAI) {
@@ -2208,9 +2153,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       }
     }
 
-    // ── Try to lay down including bonus melds ──
+    // ── Try to lay down (required melds only) ──
     if (!player.hasLaidDown) {
-      const melds = aiFindAllMelds(player.hand, requirement)
+      const melds = aiFindBestMelds(player.hand, requirement)
       if (melds && melds.length > 0) {
         if (shouldGoDownNow(melds)) {
           aiTurnsCouldGoDownRef.current.delete(player.id)
@@ -3497,7 +3442,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       )}
 
       {/* Modals — logic unchanged */}
-      {/* MeldBuilder overlay sub-flows (joker placement, bonus suggest/prompt) render here */}
+      {/* MeldBuilder overlay sub-flows (joker placement) render here */}
       {/* The inline staging area is rendered between ZONE 3 and ZONE 4 */}
 
       {/* Pause modal */}

@@ -39,7 +39,7 @@ src/
 │   ├── game-manager.ts      # Full game flow across 7 rounds
 │   ├── rules.ts             # Point values, round requirement constants
 │   └── ai.ts                # Medium + Hard AI: aiFindBestMelds (greedy + bounded backtrack fallback),
-│                            #   aiFindAllMelds, canFormAnyValidMeld, getCommittedSuits, getRunContribution,
+│                            #   getCommittedSuits, getRunContribution,
 │                            #   aiShouldTakeDiscard, aiShouldTakeDiscardHard, aiChooseDiscard, aiChooseDiscardHard,
 │                            #   aiShouldBuy, aiShouldBuyHard, aiFindLayOff, aiFindJokerSwap
 ├── hooks/
@@ -66,7 +66,7 @@ src/
         ├── GameOver.tsx      # End-of-game results + auto-save badge
         ├── GameToast.tsx     # Queued toast overlay: 5 styles (celebration/pressure/neutral/drama/taunt)
         ├── Card.tsx          # Card component: suit tints, haptic on tap, shimmer/edgeGlow/buyRelevance props
-        ├── MeldBuilder.tsx   # Inline meld-building mode: staging area + card selection + suggestion auto-fill + bonus overlays
+        ├── MeldBuilder.tsx   # Inline meld-building mode: staging area + card selection + suggestion auto-fill
         ├── TableMelds.tsx    # Table meld display: overlap layout for long runs, data-meld-id for auto-scroll
         ├── HandDisplay.tsx   # Scrollable hand with controlled sort (Rank / Suit), compact mode for buy, ghostedIds for meld-building
         ├── BuyingCinematic.tsx # Buying window: BuyingCinematic (overlay) + BuyBottomSheet (inline bottom sheet)
@@ -155,8 +155,7 @@ GameSetup (PlayerConfig[] configured)
 - **`nextPhaseForPlayer(player)`** — returns `'draw'` for AI (skips privacy screen), `'privacy'` for humans.
 - **`aiLayOffDoneRef`** — ref in `GameBoard`; Medium AI is capped at 1 lay-off per turn before being forced to discard, **except** when `player.hand.length === 1` — the final going-out lay-off is always allowed. Hard AI has no cap.
 - **`aiActionTick`** — state counter bumped after Hard AI joker swaps (hand length unchanged, so this re-triggers the AI action effect).
-- **Inline meld-building** — `MeldBuilder.tsx` replaces the old fullscreen `MeldModal` overlay. When the player taps "Lay Down," GameBoard enters meld-building mode: zone 2 (table melds) dims to 50% opacity, zone 3 (draw/discard piles) hides, and `MeldBuilder` renders inline between zone 2 and zone 4 with a `meld-staging-in` slide animation. The player taps cards from their hand (routed via `MeldBuilderHandle.handleCardTap` ref) to assign them to meld slots. Assigned cards appear ghosted (25% opacity) in the hand via `HandDisplay` `ghostedIds` prop. A subtle "Auto-fill" suggestion banner appears when `aiFindAllMelds` detects valid melds. Joker placement, bonus-suggest, and bonus-prompt remain as overlay sub-flows within MeldBuilder.
-- **Extra melds rule** — `MeldBuilder` supports bonus phase: after required melds are confirmed, `canFormAnyValidMeld` checks remaining cards; if a bonus meld is possible the player is prompted via overlay. AI uses `aiFindAllMelds` (finds required + all bonus melds greedily).
+- **Inline meld-building** — `MeldBuilder.tsx` replaces the old fullscreen `MeldModal` overlay. When the player taps "Lay Down," GameBoard enters meld-building mode: zone 2 (table melds) dims to 50% opacity, zone 3 (draw/discard piles) hides, and `MeldBuilder` renders inline between zone 2 and zone 4 with a `meld-staging-in` slide animation. The player taps cards from their hand (routed via `MeldBuilderHandle.handleCardTap` ref) to assign them to meld slots. Assigned cards appear ghosted (25% opacity) in the hand via `HandDisplay` `ghostedIds` prop. A subtle "Auto-fill" suggestion banner appears when `aiFindBestMelds` detects valid melds. Joker placement remains as an overlay sub-flow within MeldBuilder. Only required melds are laid down (no bonus/extra melds).
 - **Sort order in meld-building** — `GameBoard` owns `handSort` state; passes it to `HandDisplay` (controlled) and passes `sortedCurrentHand` to `MeldBuilder` so both show cards in the same order.
 - **Undo discard** — 3s timer after human discard; buying window not started until timer expires or undo tapped.
 - **Draw pile reshuffle** — proactive `useEffect` on draw phase start reshuffles discards (keeping top card) into a new draw pile before the player sees the board. Fallback reshuffle also exists in `handleDrawFromPile` and `handleBuyDecision` (penalty card). If both piles are empty, a fresh deck is added (GDD §9). UI shows clickable "Tap to Reshuffle" as a safety net if the pile is somehow still empty.
@@ -192,7 +191,7 @@ Warm cream theme (not dark table). Uses `safe-top` for header padding.
 - A score of 0 for a round = "Out!" (went out first)
 - Round requirements defined in `src/lib/constants.ts` (`ROUNDS` array)
 - 5 buys per player **per round** (resets to 5 at the start of each new round)
-- Players **must** meet the minimum round requirement to lay down, but **may** lay down additional valid melds beyond the requirement — extra melds must match the **round type** (sets-only round = extra sets only; runs-only round = extra runs only; mixed round = either)
+- Players **must** meet the minimum round requirement to lay down — only the required melds are laid down (no extra/bonus melds beyond the requirement)
 - Aces can be used **ace-low** (A-2-3-4) or **ace-high** (...Q-K-A) in runs; lay-off at either end of a run is allowed
 - **Going out** is ONLY possible by melding or laying off ALL remaining cards — discarding your last card does NOT end the round. Going out is checked after meld/lay-off, never after discard. A player with 1 card they can't lay off is "stuck" — they draw on their next turn and try again.
 - **Joker swaps are from RUNS only** — jokers in sets cannot be swapped (their suit is ambiguous). Only jokers in runs have a fixed identity (position-based) and can be replaced by the natural card they represent. `findSwappableJoker` enforces this.

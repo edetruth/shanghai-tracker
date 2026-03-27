@@ -47,7 +47,7 @@ Each component is responsible for a single screen or panel. They receive data an
 | `play/GameBoard` | Main game board: hand display, discard pile, meld table, AI turn automation; owns `handSort` state passed to `HandDisplay` and `MeldModal` |
 | `play/GameOver` | Final results for digital game + auto-save to Supabase with status badge |
 | `play/Card` | Individual playing card with suit color tints and haptic feedback |
-| `play/MeldModal` | Step-through meld builder: required phase → bonus-prompt → bonus phase; uses `canFormAnyValidMeld` to gate the bonus prompt |
+| `play/MeldModal` | Legacy meld builder (replaced by inline `MeldBuilder`) |
 | `play/HandDisplay` | Scrollable hand fan with controlled sort (Rank / Suit props from `GameBoard`) and fade gradient |
 
 ### 2. App Orchestration — `src/App.tsx`
@@ -77,7 +77,7 @@ Self-contained card game logic for the digital play mode. Nothing in this layer 
 | `round-manager.ts` | Round setup, deal, end-of-round scoring |
 | `game-manager.ts` | Full game flow across 7 rounds |
 | `rules.ts` | Point values, round requirements |
-| `ai.ts` | Medium + Hard AI: `aiFindBestMelds`, `aiFindAllMelds`, `canFormAnyValidMeld`, `aiShouldTakeDiscard`, `aiChooseDiscard`, `aiChooseDiscardHard`, `aiShouldBuy`, `aiShouldBuyHard`, `aiFindLayOff`, `aiFindJokerSwap` |
+| `ai.ts` | Medium + Hard AI: `aiFindBestMelds`, `aiShouldTakeDiscard`, `aiChooseDiscard`, `aiChooseDiscardHard`, `aiShouldBuy`, `aiShouldBuyHard`, `aiFindLayOff`, `aiFindJokerSwap` |
 
 ### 4. Data Access Layer — `src/lib/gameStore.ts`
 

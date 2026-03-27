@@ -15,13 +15,10 @@ Run through these tests before deploying. Check each item manually in the app us
 
 ---
 
-## 2. Laying Down & Extra Melds
+## 2. Laying Down
 
-- [ ] After laying down required melds, the bonus prompt appears if additional valid melds can be formed
-- [ ] Extra melds on a sets-only round: only sets accepted (trying to add a run should not pass)
-- [ ] Extra melds on a runs-only round: only runs accepted
-- [ ] Mixed round: either sets or runs accepted as extra melds
-- [ ] Player can tap Cancel at the bonus-meld prompt and lay down only required melds
+- [ ] Only the required melds for the round can be laid down (no extra/bonus melds)
+- [ ] Auto-fill places sets into set slots and runs into run slots (correct ordering)
 
 ---
 
@@ -104,8 +101,8 @@ Run through these tests before deploying. Check each item manually in the app us
 ## 10. AI Behavior
 
 - [ ] Easy AI: never buys, takes discard rarely, lays down required melds only, discards highest card
-- [ ] Medium AI: buys when beneficial, lays down required + bonus melds, 1 lay-off max per turn (exception: always lays off when 1 card remains to go out)
-- [ ] Hard AI: aggressive buying, lays down all possible melds, unlimited lay-offs, does joker swaps
+- [ ] Medium AI: buys when beneficial, lays down required melds only, 1 lay-off max per turn (exception: always lays off when 1 card remains to go out)
+- [ ] Hard AI: aggressive buying, lays down required melds only, unlimited lay-offs, does joker swaps
 - [ ] AI messages ("Alice lays down!", "Bob discards", etc.) appear and clear after ~1 second
 - [ ] AI handles Round 3 (2 Runs) correctly — lays down 2 runs, not sets
 
