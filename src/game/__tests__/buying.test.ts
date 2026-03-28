@@ -66,10 +66,12 @@ describe('aiShouldBuyHard', () => {
     expect(aiShouldBuyHard(hand, discard, req1, 5)).toBe(true)
   })
 
-  it('does NOT buy on a single pair (sameRank === 1)', () => {
+  it('buys on a pair when hand is small and risk is low', () => {
+    // New evaluation system: forming a pair from nothing is a significant improvement
+    // on a set round with a small hand (low risk)
     const hand = [c('hearts', 9), c('clubs', 3), c('diamonds', 7)]
-    const discard = c('spades', 9) // only pairs with one 9
-    expect(aiShouldBuyHard(hand, discard, req1, 5)).toBe(false)
+    const discard = c('spades', 9) // pairs with hearts 9
+    expect(aiShouldBuyHard(hand, discard, req1, 5)).toBe(true)
   })
 
   it('buys if discard is close to same-suit cards', () => {

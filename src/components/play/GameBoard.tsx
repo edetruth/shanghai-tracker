@@ -3,17 +3,16 @@ import { createPlayedGame, saveGameEvents, saveAIDecisions, backfillDecisionOutc
 import type { AIDecision, PlayerRoundStats, PlayerGameStats } from '../../game/types'
 import { Pause } from 'lucide-react'
 import type { GameState, Player, Card as CardType, Meld, PlayerConfig, AIDifficulty, AIPersonality, PersonalityConfig, OpponentHistory } from '../../game/types'
-import { PERSONALITIES, personalityToLegacyDifficulty } from '../../game/types'
+import { PERSONALITIES } from '../../game/types'
 import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, MAX_BUYS, cardPoints } from '../../game/rules'
 import { createDecks, shuffle, dealHands } from '../../game/deck'
 import { buildMeld, isValidSet, canLayOff, findSwappableJoker, getNextJokerOptions, isLegalDiscard, evaluateLayOffReversal } from '../../game/meld-validator'
 import { scoreRound } from '../../game/scoring'
 import {
-  aiFindBestMelds, aiShouldTakeDiscard, aiShouldTakeDiscardHard, aiShouldTakeDiscardEasy,
-  aiChooseDiscard, aiChooseDiscardHard, aiChooseDiscardEasy,
-  aiShouldBuy, aiShouldBuyEasy, aiShouldBuyHard,
+  aiFindBestMelds, aiShouldTakeDiscard, aiChooseDiscard, aiShouldBuy,
   aiFindLayOff, aiFindJokerSwap, aiFindPreLayDownJokerSwap,
-  aiShouldGoDownHard
+  aiShouldGoDownHard, getAIEvalConfig,
+  type AIEvalConfig,
 } from '../../game/ai'
 import { SUIT_ORDER } from './HandDisplay'
 import { haptic } from '../../lib/haptics'
@@ -190,9 +189,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const personalityConfig: PersonalityConfig | null = aiPersonality
     ? (PERSONALITIES.find(p => p.id === aiPersonality) ?? PERSONALITIES[0])
     : null
-  const aiDifficulty: AIDifficulty = personalityConfig
-    ? personalityToLegacyDifficulty(personalityConfig.id)
-    : aiDifficultyProp
+  const aiDifficulty: AIDifficulty = aiDifficultyProp
 
   // Helper to get the active personality config (falls back to a config derived from legacy difficulty)
   function getPersonalityConfig(): PersonalityConfig {
@@ -201,6 +198,12 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     if (aiDifficultyProp === 'easy') return PERSONALITIES.find(p => p.id === 'rookie-riley')!
     if (aiDifficultyProp === 'hard') return PERSONALITIES.find(p => p.id === 'the-shark')!
     return PERSONALITIES.find(p => p.id === 'steady-sam')!
+  }
+
+  // Get the AI evaluation config for the current personality
+  function getEvalConfig(): AIEvalConfig {
+    const cfg = getPersonalityConfig()
+    return getAIEvalConfig(cfg.id)
   }
 
   const [gameState, setGameState] = useState<GameState>(() => initGame(initialPlayers, buyLimit))
@@ -2133,7 +2136,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         }
       }
       aiLayOffCountRef.current = 0
-      const card = aiChooseDiscardEasy(player.hand)
+      const card = aiChooseDiscard(player.hand, requirement, getEvalConfig(), tablesMelds)
       handleDiscard(card.id)
       return
     }
@@ -2205,18 +2208,14 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         const nonJokers = player.hand.filter(c => c.suit !== 'joker')
         const pool = nonJokers.length > 0 ? nonJokers : player.hand
         card = pool.reduce((worst, c) => cardPoints(c.rank) > cardPoints(worst.rank) ? c : worst)
-      } else if (config.discardStyle === 'opponent-aware') {
-        card = aiChooseDiscardHard(player.hand, tablesMelds, opponentHistoryRef.current,
-            state.players.filter(p => p.id !== player.id), requirement)
-      } else if (config.discardStyle === 'run-aware' || config.discardStyle === 'highest-value') {
-        card = aiChooseDiscard(player.hand, requirement, tablesMelds)
+      } else {
+        const evalCfg = getEvalConfig()
+        card = aiChooseDiscard(player.hand, requirement, evalCfg, tablesMelds)
         // Lucky Lou: 15% chance to pick a random card instead
         if (config.randomFactor > 0 && Math.random() < 0.15 && player.hand.length > 1) {
           const randomIdx = Math.floor(Math.random() * player.hand.length)
           card = player.hand[randomIdx]
         }
-      } else {
-        card = aiChooseDiscardEasy(player.hand)
       }
       console.log(`[Buy] AI ${player.name} discarded [${card.rank === 0 ? 'Joker' : `${card.rank}${card.suit}`}]`)
       handleDiscard(card.id)
@@ -2241,19 +2240,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         const top = state.roundState.discardPile[state.roundState.discardPile.length - 1] ?? null
 
         const cfg = getPersonalityConfig()
+        const evalCfg = getEvalConfig()
         let shouldTake = false
         if (top !== null) {
-          if (cfg.takeStyle === 'basic') {
-            shouldTake = aiShouldTakeDiscardEasy(player.hand, top, state.roundState.requirement)
-          } else if (cfg.takeStyle === 'aggressive-denial') {
-            shouldTake = aiShouldTakeDiscardHard(player.hand, top, state.roundState.requirement, player.hasLaidDown,
-                state.roundState.tablesMelds, state.players.filter(p => p.id !== player.id))
-          } else if (cfg.takeStyle === 'selective') {
-            // Selective: use medium logic but with stricter criteria
-            shouldTake = aiShouldTakeDiscard(player.hand, top, state.roundState.requirement, player.hasLaidDown, 'hard', state.roundState.tablesMelds)
-          } else {
-            shouldTake = aiShouldTakeDiscard(player.hand, top, state.roundState.requirement, player.hasLaidDown, aiDifficulty, state.roundState.tablesMelds)
-          }
+          shouldTake = aiShouldTakeDiscard(player.hand, top, state.roundState.requirement, player.hasLaidDown, evalCfg)
           // Lucky Lou random factor: 20% chance to take any discard, 10% chance to decline a good one
           if (cfg.randomFactor > 0) {
             if (!shouldTake && Math.random() < 0.2) shouldTake = true
@@ -2299,6 +2289,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         return
       }
       const buyConfig = getPersonalityConfig()
+      const buyEvalCfg = getEvalConfig()
       // Enforce personality buy self limit
       const personalityBuysUsed = (state.buyLimit >= 999 ? 999 : state.buyLimit) - currentBuyer.buysRemaining
       const atPersonalityLimit = buyConfig.buySelfLimit > 0 && personalityBuysUsed >= buyConfig.buySelfLimit
@@ -2306,20 +2297,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       let shouldBuy = false
       if (atPersonalityLimit || buyConfig.buyStyle === 'never') {
         shouldBuy = false
-      } else if (buyConfig.buyStyle === 'denial' || buyConfig.buyStyle === 'heavy-denial') {
-        shouldBuy = aiShouldBuyHard(currentBuyer.hand, disc, req, currentBuyer.buysRemaining,
-            state.roundState.tablesMelds, state.players.filter(p => p.id !== currentBuyer.id))
-      } else if (buyConfig.buyStyle === 'conservative') {
-        shouldBuy = aiShouldBuy(currentBuyer.hand, disc, req, currentBuyer.buysRemaining, state.buyLimit)
-      } else if (buyConfig.buyStyle === 'aggressive') {
-        // Aggressive: use medium logic but always buy if it fits a meld
-        shouldBuy = aiShouldBuy(currentBuyer.hand, disc, req, currentBuyer.buysRemaining, state.buyLimit)
-        if (!shouldBuy) {
-          shouldBuy = aiShouldBuyHard(currentBuyer.hand, disc, req, currentBuyer.buysRemaining,
-              state.roundState.tablesMelds, state.players.filter(p => p.id !== currentBuyer.id))
-        }
       } else {
-        shouldBuy = aiShouldBuyEasy(currentBuyer.hand, disc, req, currentBuyer.buysRemaining)
+        const opponents = state.players.filter(p => p.id !== currentBuyer.id)
+          .map(p => ({ hand: { length: p.hand.length }, hasLaidDown: p.hasLaidDown }))
+        shouldBuy = aiShouldBuy(currentBuyer.hand, disc, req, currentBuyer.buysRemaining, buyEvalCfg, opponents)
       }
 
       if (shouldBuy) {

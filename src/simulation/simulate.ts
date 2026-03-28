@@ -11,10 +11,9 @@ import { buildMeld, isValidSet, findSwappableJoker, simulateLayOff, canGoOutViaC
 import { scoreRound, calculateHandScore } from '../game/scoring'
 import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, MAX_BUYS } from '../game/rules'
 import {
-  aiFindBestMelds, aiShouldTakeDiscard, aiShouldTakeDiscardHard, aiShouldTakeDiscardEasy,
-  aiChooseDiscard, aiChooseDiscardHard, aiChooseDiscardEasy,
-  aiShouldBuy, aiShouldBuyEasy, aiShouldBuyHard,
+  aiFindBestMelds, aiShouldTakeDiscard, aiChooseDiscard, aiShouldBuy,
   aiFindLayOff, aiFindJokerSwap, aiFindPreLayDownJokerSwap,
+  getAIEvalConfig, type AIEvalConfig,
 } from '../game/ai'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -26,6 +25,12 @@ export interface SimConfig {
   logLevel: 'summary' | 'detailed' | 'verbose'
   outputFile?: string
   onlyRounds?: number[]  // if set, only simulate specific round numbers
+}
+
+function difficultyToEvalConfig(difficulty: AIDifficulty): AIEvalConfig {
+  if (difficulty === 'easy') return getAIEvalConfig('rookie-riley')
+  if (difficulty === 'hard') return getAIEvalConfig('the-shark')
+  return getAIEvalConfig('steady-sam')
 }
 
 export interface PlayerRoundStats {
@@ -355,12 +360,10 @@ function simProcessBuying(
     buyStats[buyer.id] = buyStats[buyer.id] ?? { offered: 0, bought: 0 }
     buyStats[buyer.id].offered++
 
-    const shouldBuy =
-      difficulty === 'easy'
-        ? aiShouldBuyEasy(buyer.hand, discardCard, current.roundState.requirement, buyer.buysRemaining)
-        : difficulty === 'hard'
-          ? aiShouldBuyHard(buyer.hand, discardCard, current.roundState.requirement, buyer.buysRemaining)
-          : aiShouldBuy(buyer.hand, discardCard, current.roundState.requirement)
+    const evalCfg = difficultyToEvalConfig(difficulty)
+    const opponents = current.players.filter((_, i) => i !== buyerIdx)
+      .map(p => ({ hand: { length: p.hand.length }, hasLaidDown: p.hasLaidDown }))
+    const shouldBuy = aiShouldBuy(buyer.hand, discardCard, current.roundState.requirement, buyer.buysRemaining, evalCfg, opponents)
 
     if (shouldBuy) {
       buyStats[buyer.id].bought++
@@ -420,7 +423,8 @@ function simExecuteAIAction(
         }
       }
     }
-    const card = aiChooseDiscardEasy(player.hand)
+    const easyEvalCfg = difficultyToEvalConfig('easy')
+    const card = aiChooseDiscard(player.hand, requirement, easyEvalCfg)
     const result = simDiscard(state, card.id)
     if (!result) return { state, action: 'stuck' }
     return { state: result.state, action: 'discard' }
@@ -482,9 +486,8 @@ function simExecuteAIAction(
 
   // Discard
   if (player.hand.length > 0) {
-    const card = isHard
-      ? aiChooseDiscardHard(player.hand, tablesMelds, undefined, state.players.filter(p => p.id !== player.id), requirement)
-      : aiChooseDiscard(player.hand, requirement, tablesMelds)
+    const discardEvalCfg = difficultyToEvalConfig(difficulty)
+    const card = aiChooseDiscard(player.hand, requirement, discardEvalCfg, tablesMelds)
     const result = simDiscard(state, card.id)
     if (!result) {
       // Stuck with 1 card that can't be discarded
@@ -551,13 +554,9 @@ export function simulateRound(gameState: GameState, difficulty: AIDifficulty): {
 
     // ── DRAW PHASE ──────────────────────────────────────────────────────────
     const topDiscard = state.roundState.discardPile[state.roundState.discardPile.length - 1] ?? null
-    const shouldTake = topDiscard !== null && (
-      difficulty === 'easy'
-        ? aiShouldTakeDiscardEasy(player.hand, topDiscard, state.roundState.requirement)
-        : difficulty === 'hard'
-          ? aiShouldTakeDiscardHard(player.hand, topDiscard, state.roundState.requirement, player.hasLaidDown, state.roundState.tablesMelds, state.players.filter(p => p.id !== player.id))
-          : aiShouldTakeDiscard(player.hand, topDiscard, state.roundState.requirement, player.hasLaidDown)
-    )
+    const takeEvalCfg = difficultyToEvalConfig(difficulty)
+    const shouldTake = topDiscard !== null &&
+      aiShouldTakeDiscard(player.hand, topDiscard, state.roundState.requirement, player.hasLaidDown, takeEvalCfg)
 
     if (shouldTake) {
       statsMap[pid].drewFromDiscard++

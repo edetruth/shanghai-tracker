@@ -2,11 +2,12 @@ import { describe, it, expect } from 'vitest'
 import {
   aiFindBestMelds, aiFindAllMelds, canFormAnyValidMeld,
   aiChooseDiscard, aiChooseDiscardEasy, aiChooseDiscardHard,
-  aiShouldTakeDiscardHard, aiShouldBuyHard,
+  aiShouldTakeDiscard, aiShouldTakeDiscardHard, aiShouldBuy, aiShouldBuyHard,
   aiFindJokerSwap, aiFindPreLayDownJokerSwap,
   aiShouldGoDownHard,
+  evaluateHand, getAIEvalConfig,
 } from '../ai'
-import type { Player, OpponentHistory } from '../types'
+import type { Player } from '../types'
 import { isValidSet, isValidRun } from '../meld-validator'
 import { c, joker, makeMeld } from './helpers'
 import { ROUND_REQUIREMENTS } from '../rules'
@@ -15,6 +16,9 @@ const req1 = ROUND_REQUIREMENTS[0] // 2 sets
 const req2 = ROUND_REQUIREMENTS[1] // 1 set + 1 run
 const req3 = ROUND_REQUIREMENTS[2] // 2 runs
 const req4 = ROUND_REQUIREMENTS[3] // 3 sets
+
+const sharkConfig = getAIEvalConfig('the-shark')
+const rookieConfig = getAIEvalConfig('rookie-riley')
 
 describe('aiFindBestMelds — sets', () => {
   it('finds 2 natural sets for Round 1', () => {
@@ -317,7 +321,7 @@ describe('canFormAnyValidMeld', () => {
 describe('aiChooseDiscard', () => {
   it('never discards a joker when other cards exist', () => {
     const hand = [joker(), c('hearts', 5), c('spades', 2)]
-    expect(aiChooseDiscard(hand).suit).not.toBe('joker')
+    expect(aiChooseDiscard(hand, req1).suit).not.toBe('joker')
   })
 
   it('discards the least useful card', () => {
@@ -487,14 +491,14 @@ describe('aiShouldTakeDiscardHard', () => {
     expect(aiShouldTakeDiscardHard(hand, c('hearts', 8), req3, false)).toBe(true)
   })
 
-  it('rejects near cards entirely (no near condition for Hard)', () => {
-    // 3 hearts: 5, 6, 7 — window spans 5-7; 10♥ is 'near' but not gap-fill/extension
+  it('rejects distant cards that don\'t improve hand score', () => {
+    // 3 hearts: 5, 6, 7 — window spans 5-7; 13♦ is isolated and doesn't help
     const hand = [
       c('hearts', 5), c('hearts', 6), c('hearts', 7),
       c('spades', 2), c('clubs', 10), c('diamonds', 3),
       c('spades', 12), c('clubs', 4), c('diamonds', 9), c('spades', 11),
     ]
-    expect(aiShouldTakeDiscardHard(hand, c('hearts', 10), req3, false)).toBe(false)
+    expect(aiShouldTakeDiscardHard(hand, c('diamonds', 13), req3, false)).toBe(false)
   })
 
   it('takes card in secondary committed suit when it extends a run', () => {
@@ -508,140 +512,75 @@ describe('aiShouldTakeDiscardHard', () => {
     expect(aiShouldTakeDiscardHard(hand, c('clubs', 5), req3, false)).toBe(true)
   })
 
-  it('rejects marginal cards on set-only rounds (no run requirement)', () => {
-    // Round 1 (2 sets) — no run checks apply; card doesn't complete a set or enable melds
+  it('rejects cards that worsen hand on set-only rounds', () => {
+    // Round 1 (2 sets) — already have strong pairs; adding an isolated high card hurts
     const hand = [
-      c('hearts', 5), c('diamonds', 8), c('clubs', 11),
-      c('spades', 2), c('hearts', 10), c('diamonds', 3),
-      c('spades', 12), c('clubs', 4), c('diamonds', 9), c('spades', 6),
+      c('hearts', 7), c('diamonds', 7), c('clubs', 7),  // complete set
+      c('hearts', 9), c('diamonds', 9),                   // pair
+      c('spades', 2), c('clubs', 10), c('diamonds', 3), c('spades', 6), c('hearts', 4),
     ]
-    expect(aiShouldTakeDiscardHard(hand, c('hearts', 6), req1, false)).toBe(false)
+    // 13♣ is isolated King — doesn't pair, doesn't improve evaluation enough
+    expect(aiShouldTakeDiscardHard(hand, c('clubs', 13), req1, false)).toBe(false)
   })
 
-  it('does NOT denial-take (denial logic removed) — evaluates purely on self-interest', () => {
+  it('evaluates purely on self-interest (no denial)', () => {
+    // Hand full of scattered cards — isolated K♦ doesn't improve evaluation
     const hand = [
       c('hearts', 2), c('spades', 5), c('clubs', 10), c('diamonds', 3),
       c('spades', 12), c('clubs', 4), c('diamonds', 9),
     ]
-    // Opponent has a hearts run 5-6-7-8; discard is hearts 9 (extends it)
-    const oppMeld = { ...makeMeld([c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8)], 'run'), ownerId: 'opp1' }
-    const opponent: Player = {
-      id: 'opp1', name: 'Opp', hand: [c('hearts', 11), c('spades', 3)], // 2 cards left
-      melds: [oppMeld], hasLaidDown: true, buysRemaining: 3, roundScores: [],
-    }
-    // Card doesn't help the AI's hand → pass (denial removed)
-    expect(aiShouldTakeDiscardHard(hand, c('hearts', 9), req1, false, [oppMeld], [opponent])).toBe(false)
+    // Card doesn't form pairs or runs with existing hand → pass
+    expect(aiShouldTakeDiscardHard(hand, c('diamonds', 13), req1, false)).toBe(false)
   })
 
-  it('does NOT denial-take if opponent has many cards', () => {
+  it('rejects card that adds dead weight on large hands', () => {
+    // 12-card hand with existing potential — adding another isolated card is net negative
     const hand = [
-      c('hearts', 2), c('spades', 5), c('clubs', 10), c('diamonds', 3),
-      c('spades', 12), c('clubs', 4), c('diamonds', 9),
+      c('hearts', 7), c('diamonds', 7), c('clubs', 7),  // complete set
+      c('hearts', 9), c('diamonds', 9), c('clubs', 9),  // complete set
+      c('spades', 2), c('clubs', 10), c('diamonds', 3),
+      c('spades', 12), c('clubs', 4), c('hearts', 13),
     ]
-    const oppMeld = { ...makeMeld([c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8)], 'run'), ownerId: 'opp1' }
-    const opponent: Player = {
-      id: 'opp1', name: 'Opp',
-      hand: [c('hearts', 11), c('spades', 3), c('clubs', 2), c('diamonds', 8), c('spades', 7)], // 5 cards
-      melds: [oppMeld], hasLaidDown: true, buysRemaining: 3, roundScores: [],
-    }
-    expect(aiShouldTakeDiscardHard(hand, c('hearts', 9), req1, false, [oppMeld], [opponent])).toBe(false)
+    // Isolated 11♠ doesn't improve a hand that can already go down
+    expect(aiShouldTakeDiscardHard(hand, c('spades', 11), req1, false)).toBe(false)
   })
 
-  it('does NOT denial-take if AI hand is already 8+ cards', () => {
+  it('takes card that forms a pair on set rounds', () => {
     const hand = [
-      c('hearts', 2), c('spades', 5), c('clubs', 10), c('diamonds', 3),
-      c('spades', 12), c('clubs', 4), c('diamonds', 9), c('hearts', 13),
-    ] // 8 cards
-    const oppMeld = { ...makeMeld([c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8)], 'run'), ownerId: 'opp1' }
-    const opponent: Player = {
-      id: 'opp1', name: 'Opp', hand: [c('hearts', 11)], melds: [oppMeld],
-      hasLaidDown: true, buysRemaining: 3, roundScores: [],
-    }
-    expect(aiShouldTakeDiscardHard(hand, c('hearts', 9), req1, false, [oppMeld], [opponent])).toBe(false)
-  })
-
-  it('does NOT denial-take a high-point card (ace)', () => {
-    const hand = [
-      c('hearts', 2), c('spades', 5), c('clubs', 10), c('diamonds', 3),
-      c('spades', 12), c('clubs', 4), c('diamonds', 9),
+      c('hearts', 9), c('spades', 5), c('clubs', 10), c('diamonds', 3),
+      c('spades', 12), c('clubs', 4), c('diamonds', 7),
     ]
-    // Opponent has spades run 2-3-4-5; ace of spades can lay off at low end (rank 1)
-    const oppMeld = { ...makeMeld([c('spades', 2), c('spades', 3), c('spades', 4), c('spades', 5)], 'run'), ownerId: 'opp1' }
-    const opponent: Player = {
-      id: 'opp1', name: 'Opp', hand: [c('clubs', 8)], melds: [oppMeld],
-      hasLaidDown: true, buysRemaining: 3, roundScores: [],
-    }
-    // Ace (rank 1) = 15 points > 10 threshold → don't denial-take even though it fits the meld
-    expect(aiShouldTakeDiscardHard(hand, c('spades', 1), req1, false, [oppMeld], [opponent])).toBe(false)
-  })
-
-  it('with no opponent data, behaves like Phase 1', () => {
-    const hand = [
-      c('hearts', 2), c('spades', 5), c('clubs', 10), c('diamonds', 3),
-      c('spades', 12), c('clubs', 4), c('diamonds', 9),
-    ]
-    // No tablesMelds or opponents → denial check skipped → same as Phase 1 (false)
-    expect(aiShouldTakeDiscardHard(hand, c('hearts', 9), req1, false)).toBe(false)
+    // 9♦ pairs with hearts 9 → improvement (pair = +12 vs isolated penalty)
+    expect(aiShouldTakeDiscardHard(hand, c('diamonds', 9), req1, false)).toBe(true)
   })
 })
 
-describe('aiChooseDiscardHard — opponent awareness', () => {
-  it('avoids discarding a card that lays off onto opponent table run', () => {
-    // Hand has two equally useless cards: 9♥ (dangerous) and 2♣ (safe)
-    const oppMeld = { ...makeMeld([c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8)], 'run'), ownerId: 'opp1' }
-    const opponent: Player = {
-      id: 'opp1', name: 'Opp', hand: [c('spades', 3)], melds: [oppMeld],
-      hasLaidDown: true, buysRemaining: 3, roundScores: [],
-    }
-    // Both 9♥ and 2♣ are isolated — similar utility. But 9♥ lays off on opponent's run.
-    const hand = [c('hearts', 9), c('clubs', 2)]
-    const discard = aiChooseDiscardHard(hand, [oppMeld], undefined, [opponent])
-    expect(discard.suit).toBe('clubs') // safer discard
-  })
-
-  it('avoids discarding a suit opponents have been picking up', () => {
-    const history = new Map<string, OpponentHistory>()
-    history.set('opp1', {
-      picked: [c('hearts', 5), c('hearts', 8)], // picked 2 hearts
-      discarded: [],
-    })
-    // Both isolated; hearts 3 is dangerous because opponent collects hearts
-    const hand = [c('hearts', 3), c('clubs', 4)]
-    const discard = aiChooseDiscardHard(hand, [], history)
-    expect(discard.suit).toBe('clubs')
-  })
-
-  it('between two useless cards, discards the safer one', () => {
-    const history = new Map<string, OpponentHistory>()
-    history.set('opp1', {
-      picked: [c('diamonds', 7)], // picked 1 diamond (rank 7)
-      discarded: [c('spades', 9)], // discarded a spade — probably not building spades
-    })
-    // Both cards isolated, same point value. diamonds 7 is rank-matched (danger +40, suit +20)
-    // spades 5 has safety discount (opponent discarded a spade, -15)
-    const hand = [c('diamonds', 7), c('spades', 5)]
-    const discard = aiChooseDiscardHard(hand, [], history)
-    expect(discard.suit).toBe('spades')
-  })
-
-  it('still discards a dangerous card if it is the only non-useful card', () => {
-    const history = new Map<string, OpponentHistory>()
-    history.set('opp1', {
-      picked: [c('hearts', 5), c('hearts', 8), c('hearts', 3)], // clearly collecting hearts
-      discarded: [],
-    })
-    // hand: pair of 7s (high utility) + 9♥ (dangerous via history but only discard option)
-    // Self-interest (pair utility = 120) wins over danger (suit danger = 50 * 0.5 = 25)
+describe('aiChooseDiscard — evaluation-based', () => {
+  it('discards isolated card over pair member', () => {
+    // pair of 7s (high utility) + 9♥ (isolated)
     const hand = [c('clubs', 7), c('diamonds', 7), c('hearts', 9)]
-    const discard = aiChooseDiscardHard(hand, [], history)
-    expect(discard.rank).toBe(9) // must discard the only non-pair card
+    const discard = aiChooseDiscard(hand, req1)
+    expect(discard.rank).toBe(9) // isolated card, lowest evaluation impact
   })
 
-  it('with no opponent data, behaves like base aiChooseDiscardHard', () => {
-    // No history, no opponents — just utility-based
+  it('discards highest-point isolated card', () => {
+    // All isolated — should discard highest point value
+    const hand = [c('hearts', 7), c('diamonds', 2), c('clubs', 13)]
+    const discard = aiChooseDiscard(hand, req1)
+    expect(discard.rank).toBe(13) // King = 10pts, highest isolated penalty
+  })
+
+  it('protects run windows in run rounds', () => {
+    // 3-card run window in hearts vs isolated spades card
+    const hand = [c('hearts', 5), c('hearts', 6), c('hearts', 7), c('spades', 13)]
+    const discard = aiChooseDiscard(hand, req3)
+    expect(discard.suit).toBe('spades') // protect the run window
+  })
+
+  it('protects pairs on set rounds', () => {
     const hand = [c('hearts', 7), c('diamonds', 7), c('clubs', 2)]
-    const discard = aiChooseDiscardHard(hand)
-    expect(discard.rank).toBe(2) // isolated, lowest utility
+    const discard = aiChooseDiscard(hand, req1)
+    expect(discard.rank).toBe(2) // isolated, lowest evaluation
   })
 })
 
@@ -691,12 +630,13 @@ describe('aiShouldBuyHard — Phase 2', () => {
     expect(aiShouldBuyHard(hand, c('clubs', 7), req1, 4)).toBe(true)
   })
 
-  it('no longer buys on single-card pairs', () => {
-    // Only 1 card of rank 5 in hand — sameRank < 2 → no buy
+  it('buys pairs when hand is small and improvement is clear', () => {
+    // Evaluation system: forming a pair from nothing significantly improves hand score
+    // on set rounds with small hands (low risk)
     const hand = [
       c('hearts', 5), c('spades', 3), c('clubs', 10), c('diamonds', 2),
     ]
-    expect(aiShouldBuyHard(hand, c('clubs', 5), req1, 4)).toBe(false)
+    expect(aiShouldBuyHard(hand, c('clubs', 5), req1, 4)).toBe(true)
   })
 })
 
@@ -816,5 +756,127 @@ describe('aiShouldGoDownHard', () => {
       makePlayer({ id: 'p1', name: 'Opp', hand: Array(10).fill(c('clubs', 2)) }),
     ]
     expect(aiShouldGoDownHard(hand, twoSets, req1, [], players, 0, 0)).toBe(true)
+  })
+})
+
+// ── Hand Evaluation System ──────────────────────────────────────────────────
+
+describe('evaluateHand', () => {
+  it('scores a hand that can go down highest (200 - remaining pts)', () => {
+    const hand = [
+      c('hearts', 7), c('diamonds', 7), c('clubs', 7),  // complete set
+      c('spades', 5), c('spades', 6), c('spades', 7), c('spades', 8),  // complete run
+      c('hearts', 2), c('diamonds', 10),  // leftovers
+    ]
+    const score = evaluateHand(hand, req2)
+    expect(score).toBeGreaterThan(150)  // can go down = 200 - remaining points
+  })
+
+  it('scores a hand with strong potential higher than a weak hand', () => {
+    const strong = [
+      c('hearts', 5), c('hearts', 6), c('hearts', 7),  // 3-card run window
+      c('spades', 9), c('spades', 10), c('spades', 11),  // another 3-card window
+      c('diamonds', 3), c('clubs', 8),
+    ]
+    const weak = [
+      c('hearts', 2), c('diamonds', 7), c('clubs', 10), c('spades', 4),
+      c('hearts', 9), c('diamonds', 3), c('clubs', 13), c('spades', 11),
+    ]
+    expect(evaluateHand(strong, req3)).toBeGreaterThan(evaluateHand(weak, req3))
+  })
+
+  it('jokers significantly increase score', () => {
+    const withoutJoker = [
+      c('hearts', 5), c('hearts', 6),  // 2-card window
+      c('spades', 9), c('spades', 10),  // 2-card window
+    ]
+    const withJoker = [...withoutJoker, joker()]
+    expect(evaluateHand(withJoker, req3)).toBeGreaterThan(evaluateHand(withoutJoker, req3) + 10)
+  })
+
+  it('isolated high cards reduce score', () => {
+    const withKing = [c('hearts', 2), c('hearts', 3), c('hearts', 4), c('spades', 13)]
+    const withTwo = [c('hearts', 2), c('hearts', 3), c('hearts', 4), c('spades', 2)]
+    expect(evaluateHand(withTwo, req3)).toBeGreaterThan(evaluateHand(withKing, req3))
+  })
+
+  it('complete sets score higher than pairs', () => {
+    const tripleSet = [c('hearts', 7), c('diamonds', 7), c('clubs', 7), c('spades', 2)]
+    const pair = [c('hearts', 7), c('diamonds', 7), c('clubs', 3), c('spades', 2)]
+    expect(evaluateHand(tripleSet, req1)).toBeGreaterThan(evaluateHand(pair, req1))
+  })
+
+  it('run rounds weight run potential more heavily', () => {
+    // Hand with strong run potential but no set potential
+    const runHand = [
+      c('hearts', 5), c('hearts', 6), c('hearts', 7),
+      c('spades', 2), c('clubs', 10),
+    ]
+    // On run round vs set round
+    const runScore = evaluateHand(runHand, req3) // 2 runs
+    const setScore = evaluateHand(runHand, req1) // 2 sets
+    expect(runScore).toBeGreaterThan(setScore)
+  })
+})
+
+describe('AI decisions with hand evaluation', () => {
+  it('takes discard that completes a run', () => {
+    const hand = [c('hearts', 5), c('hearts', 6), c('hearts', 8), c('spades', 3)]
+    const card = c('hearts', 7)  // fills the gap!
+    expect(aiShouldTakeDiscard(hand, card, req3, false)).toBe(true)
+  })
+
+  it('does not take discard that adds nothing', () => {
+    const hand = [c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8)]
+    const card = c('diamonds', 13)  // isolated King, different suit
+    expect(aiShouldTakeDiscard(hand, card, req3, false)).toBe(false)
+  })
+
+  it('discards the card that hurts least', () => {
+    const hand = [
+      c('hearts', 5), c('hearts', 6), c('hearts', 7),  // run window — protect
+      c('spades', 13),  // isolated King — discard this
+    ]
+    const discard = aiChooseDiscard(hand, req3)
+    expect(discard.rank).toBe(13)
+    expect(discard.suit).toBe('spades')
+  })
+
+  it('buys card that enables going down when risk is low', () => {
+    const hand = [
+      c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8),  // complete run
+      c('spades', 9), c('spades', 10), c('spades', 11),  // 3-card window, need 1 more
+      c('diamonds', 3),
+    ]
+    const card = c('spades', 12)  // completes second run
+    expect(aiShouldBuy(hand, card, req3, 5)).toBe(true)
+  })
+
+  it('does not buy when hand is huge and opponents are close', () => {
+    const hand = Array.from({ length: 14 }, (_, i) => c('hearts', (i % 13) + 1))
+    const card = c('spades', 5)
+    const players = [{ hand: { length: 2 }, hasLaidDown: true }]
+    expect(aiShouldBuy(hand, card, req3, 5, sharkConfig, players)).toBe(false)
+  })
+})
+
+describe('AI does not get Shanghaied with 2 jokers', () => {
+  it('evaluation sees high potential in 2-joker run-round hand', () => {
+    const hand = [
+      joker(), joker(),
+      c('spades', 3), c('diamonds', 3),
+      c('hearts', 9), c('hearts', 10),
+      c('clubs', 5), c('clubs', 7),
+      c('diamonds', 8), c('spades', 11),
+    ]
+    const score = evaluateHand(hand, req3)
+    // With 2 jokers and multiple run fragments, this hand has significant potential
+    expect(score).toBeGreaterThan(30)
+  })
+
+  it('protects jokers by never discarding them', () => {
+    const hand = [joker(), joker(), c('hearts', 2), c('spades', 13)]
+    const discard = aiChooseDiscard(hand, req3)
+    expect(discard.suit).not.toBe('joker')
   })
 })
