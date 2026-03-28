@@ -1,4 +1,4 @@
-import type { AIPersonality, Card, Meld, Player, RoundRequirement } from './types'
+import type { AIPersonality, Card, Meld, OpponentHistory, Player, RoundRequirement } from './types'
 import { isValidRun, canLayOff, simulateLayOff, findSwappableJoker, canGoOutViaChainLayOff } from './meld-validator'
 import { cardPoints, MIN_SET_SIZE, MIN_RUN_SIZE } from './rules'
 
@@ -113,15 +113,18 @@ export interface AIEvalConfig {
   buyRiskTolerance: number // added to improvement when comparing vs risk (positive = more willing)
   discardNoise: number     // random noise added to discard evaluation (0 = optimal)
   goDownStyle: 'immediate' | 'strategic'
+  opponentAware: boolean   // whether to factor opponent danger into discards
+  denialTake: boolean      // whether to take cards purely to deny opponents
+  dangerWeight: number     // 0-1: how much opponent danger influences discard choice (0 = ignore)
 }
 
 const AI_EVAL_CONFIGS: Record<AIPersonality, AIEvalConfig> = {
-  'rookie-riley':    { takeThreshold: 8,  buyRiskTolerance: -10, discardNoise: 15, goDownStyle: 'immediate' },
-  'steady-sam':      { takeThreshold: 5,  buyRiskTolerance: -5,  discardNoise: 8,  goDownStyle: 'immediate' },
-  'lucky-lou':       { takeThreshold: 3,  buyRiskTolerance: 5,   discardNoise: 20, goDownStyle: 'immediate' },
-  'patient-pat':     { takeThreshold: 4,  buyRiskTolerance: 0,   discardNoise: 3,  goDownStyle: 'immediate' },
-  'the-shark':       { takeThreshold: 3,  buyRiskTolerance: 0,   discardNoise: 0,  goDownStyle: 'immediate' },
-  'the-mastermind':  { takeThreshold: 2,  buyRiskTolerance: 5,   discardNoise: 0,  goDownStyle: 'strategic' },
+  'rookie-riley':    { takeThreshold: 8,  buyRiskTolerance: -10, discardNoise: 15, goDownStyle: 'immediate', opponentAware: false, denialTake: false, dangerWeight: 0 },
+  'steady-sam':      { takeThreshold: 5,  buyRiskTolerance: -5,  discardNoise: 8,  goDownStyle: 'immediate', opponentAware: false, denialTake: false, dangerWeight: 0 },
+  'lucky-lou':       { takeThreshold: 3,  buyRiskTolerance: 5,   discardNoise: 20, goDownStyle: 'immediate', opponentAware: false, denialTake: false, dangerWeight: 0 },
+  'patient-pat':     { takeThreshold: 4,  buyRiskTolerance: 0,   discardNoise: 3,  goDownStyle: 'immediate', opponentAware: false, denialTake: false, dangerWeight: 0 },
+  'the-shark':       { takeThreshold: 3,  buyRiskTolerance: 0,   discardNoise: 0,  goDownStyle: 'immediate', opponentAware: true,  denialTake: true,  dangerWeight: 0.5 },
+  'the-mastermind':  { takeThreshold: 2,  buyRiskTolerance: 5,   discardNoise: 0,  goDownStyle: 'strategic', opponentAware: true,  denialTake: true,  dangerWeight: 0.6 },
 }
 
 export function getAIEvalConfig(personality: AIPersonality): AIEvalConfig {
@@ -131,6 +134,52 @@ export function getAIEvalConfig(personality: AIPersonality): AIEvalConfig {
 // Default config for medium difficulty (used when no personality specified)
 const DEFAULT_EVAL_CONFIG: AIEvalConfig = {
   takeThreshold: 4, buyRiskTolerance: 0, discardNoise: 3, goDownStyle: 'immediate',
+  opponentAware: false, denialTake: false, dangerWeight: 0,
+}
+
+// ── Opponent Danger Scoring ───────────────────────────────────────────────────
+
+/**
+ * Score how "dangerous" a card is to discard — i.e. how much it helps opponents.
+ * Higher = more dangerous to discard (keep it / find something safer).
+ * Returns 0 when no opponent data is available.
+ */
+function cardDanger(
+  card: Card,
+  tablesMelds: Meld[],
+  opponents?: Player[],
+  opponentHistory?: Map<string, OpponentHistory>,
+): number {
+  if (isJoker(card)) return 0
+  let d = 0
+
+  // Check 1: card lays off onto an opponent's existing table meld
+  if (opponents) {
+    for (const opp of opponents) {
+      if (!opp.hasLaidDown) continue
+      const oppMelds = tablesMelds.filter(m => m.ownerId === opp.id)
+      if (oppMelds.some(m => canLayOff(card, m))) d += 100
+    }
+  }
+
+  // Checks from opponent history
+  if (opponentHistory) {
+    for (const [, hist] of opponentHistory) {
+      // Check 2: suit collecting — opponent picked up 2+ of this suit
+      const suitPicked = hist.picked.filter(c => c.suit === card.suit).length
+      if (suitPicked >= 2) d += 50
+      else if (suitPicked === 1) d += 20
+
+      // Check 3: rank collecting — opponent picked up this rank
+      if (hist.picked.some(c => c.rank === card.rank)) d += 40
+
+      // Check 4: opponent discarded same suit/rank → safer to discard
+      if (hist.discarded.some(c => c.suit === card.suit)) d -= 15
+      if (hist.discarded.some(c => c.rank === card.rank)) d -= 10
+    }
+  }
+
+  return d
 }
 
 // ── Hand Evaluation System ────────────────────────────────────────────────────
@@ -470,6 +519,8 @@ export function aiShouldTakeDiscard(
   requirement: RoundRequirement,
   hasLaidDown: boolean,
   config: AIEvalConfig = DEFAULT_EVAL_CONFIG,
+  tablesMelds: Meld[] = [],
+  opponents: Player[] = [],
 ): boolean {
   // Always take jokers
   if (isJoker(discardCard)) return true
@@ -487,7 +538,23 @@ export function aiShouldTakeDiscard(
 
   // Threshold scales with hand size — larger hands are riskier to add to
   const sizeAdjust = hand.length >= 12 ? 3 : hand.length >= 10 ? 1 : 0
-  return improvement >= config.takeThreshold + sizeAdjust
+  if (improvement >= config.takeThreshold + sizeAdjust) return true
+
+  // Denial take: take the card to prevent an opponent from getting it,
+  // even if it doesn't help our hand. Only for opponent-aware personalities.
+  if (config.denialTake && tablesMelds.length > 0 && hand.length < 12) {
+    // Card extends a long run (4+) owned by an opponent with few cards left
+    for (const opp of opponents) {
+      if (!opp.hasLaidDown || opp.hand.length > 4) continue
+      const oppMelds = tablesMelds.filter(m => m.ownerId === opp.id)
+      if (oppMelds.some(m => m.type === 'run' && m.cards.length >= 4 && canLayOff(discardCard, m))) {
+        // Only denial-take low-point cards (don't bloat hand with Aces/Kings)
+        if (cardPoints(discardCard.rank) <= 10) return true
+      }
+    }
+  }
+
+  return false
 }
 
 /**
@@ -558,13 +625,19 @@ export function aiShouldBuy(
  * Choose best card to discard.
  * For each non-joker card: evaluate hand score without it.
  * Discard the card whose removal hurts least (or helps most).
- * Noise parameter makes weaker AIs occasionally discard good cards.
+ *
+ * Opponent-aware personalities also factor in "danger" — how much a discard
+ * helps opponents (lays off on their melds, feeds their collection).
+ * Self-interest (evaluation) is primary; danger is a secondary tiebreaker
+ * weighted by config.dangerWeight.
  */
 export function aiChooseDiscard(
   hand: Card[],
   requirement: RoundRequirement,
   config: AIEvalConfig = DEFAULT_EVAL_CONFIG,
-  _tablesMelds: Meld[] = [],
+  tablesMelds: Meld[] = [],
+  opponents?: Player[],
+  opponentHistory?: Map<string, OpponentHistory>,
 ): Card {
   if (hand.length === 0) throw new Error('Empty hand')
 
@@ -573,6 +646,7 @@ export function aiChooseDiscard(
   if (nonJokers.length === 0) return hand[0]
 
   const canMeldFull = aiFindBestMelds(hand, requirement) !== null
+  const useOpponentAwareness = config.opponentAware && config.dangerWeight > 0
 
   let bestDiscard = nonJokers[0]
   let bestScore = -Infinity
@@ -580,6 +654,18 @@ export function aiChooseDiscard(
   for (const card of nonJokers) {
     const without = hand.filter(c => c.id !== card.id)
     let score = evaluateHandFast(without, requirement, canMeldFull)
+
+    // Opponent danger: penalize discarding cards that help opponents.
+    // We SUBTRACT danger from the "keep score" — a dangerous card is less desirable
+    // to keep, but we're scoring "hand quality without this card", so a dangerous
+    // card to discard gets a BONUS (we want to NOT discard it → lower its without-score).
+    // Actually: we want to discard the card with the HIGHEST without-score.
+    // A dangerous card should have a LOWER without-score so we DON'T pick it.
+    // → Add danger as a penalty to the without-score.
+    if (useOpponentAwareness) {
+      const danger = cardDanger(card, tablesMelds, opponents, opponentHistory)
+      score -= danger * config.dangerWeight
+    }
 
     // Add random noise for weaker personalities
     if (config.discardNoise > 0) {
@@ -608,10 +694,10 @@ export function aiShouldTakeDiscardHard(
   discardCard: Card,
   requirement: RoundRequirement,
   hasLaidDown: boolean,
-  _tablesMelds: Meld[] = [],
-  _opponents: Player[] = [],
+  tablesMelds: Meld[] = [],
+  opponents: Player[] = [],
 ): boolean {
-  return aiShouldTakeDiscard(hand, discardCard, requirement, hasLaidDown, AI_EVAL_CONFIGS['the-shark'])
+  return aiShouldTakeDiscard(hand, discardCard, requirement, hasLaidDown, AI_EVAL_CONFIGS['the-shark'], tablesMelds, opponents)
 }
 
 /** @deprecated Use aiChooseDiscard with config */
@@ -641,15 +727,12 @@ export function aiChooseDiscardEasy(hand: Card[]): Card {
 export function aiChooseDiscardHard(
   hand: Card[],
   tablesMelds: Meld[] = [],
-  _opponentHistory?: Map<string, unknown>,
-  _opponents?: Player[],
+  opponentHistory?: Map<string, OpponentHistory>,
+  opponents?: Player[],
   requirement?: RoundRequirement,
 ): Card {
-  if (!requirement) {
-    // Fallback: use default requirement (shouldn't happen in practice)
-    return aiChooseDiscard(hand, { sets: 1, runs: 1, description: '1 Set + 1 Run' }, AI_EVAL_CONFIGS['the-shark'], tablesMelds)
-  }
-  return aiChooseDiscard(hand, requirement, AI_EVAL_CONFIGS['the-shark'], tablesMelds)
+  const req = requirement ?? { sets: 1, runs: 1, description: '1 Set + 1 Run' }
+  return aiChooseDiscard(hand, req, AI_EVAL_CONFIGS['the-shark'], tablesMelds, opponents, opponentHistory)
 }
 
 /** @deprecated Use aiShouldBuy with config */

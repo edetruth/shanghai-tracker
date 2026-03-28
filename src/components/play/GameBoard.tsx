@@ -2210,7 +2210,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         card = pool.reduce((worst, c) => cardPoints(c.rank) > cardPoints(worst.rank) ? c : worst)
       } else {
         const evalCfg = getEvalConfig()
-        card = aiChooseDiscard(player.hand, requirement, evalCfg, tablesMelds)
+        card = aiChooseDiscard(player.hand, requirement, evalCfg, tablesMelds,
+            state.players.filter(p => p.id !== player.id), opponentHistoryRef.current)
         // Lucky Lou: 15% chance to pick a random card instead
         if (config.randomFactor > 0 && Math.random() < 0.15 && player.hand.length > 1) {
           const randomIdx = Math.floor(Math.random() * player.hand.length)
@@ -2243,7 +2244,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         const evalCfg = getEvalConfig()
         let shouldTake = false
         if (top !== null) {
-          shouldTake = aiShouldTakeDiscard(player.hand, top, state.roundState.requirement, player.hasLaidDown, evalCfg)
+          shouldTake = aiShouldTakeDiscard(player.hand, top, state.roundState.requirement, player.hasLaidDown, evalCfg,
+              state.roundState.tablesMelds, state.players.filter(p => p.id !== player.id))
           // Lucky Lou random factor: 20% chance to take any discard, 10% chance to decline a good one
           if (cfg.randomFactor > 0) {
             if (!shouldTake && Math.random() < 0.2) shouldTake = true

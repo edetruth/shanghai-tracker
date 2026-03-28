@@ -7,7 +7,7 @@ import {
   aiShouldGoDownHard,
   evaluateHand, getAIEvalConfig,
 } from '../ai'
-import type { Player } from '../types'
+import type { Player, OpponentHistory } from '../types'
 import { isValidSet, isValidRun } from '../meld-validator'
 import { c, joker, makeMeld } from './helpers'
 import { ROUND_REQUIREMENTS } from '../rules'
@@ -581,6 +581,118 @@ describe('aiChooseDiscard — evaluation-based', () => {
     const hand = [c('hearts', 7), c('diamonds', 7), c('clubs', 2)]
     const discard = aiChooseDiscard(hand, req1)
     expect(discard.rank).toBe(2) // isolated, lowest evaluation
+  })
+})
+
+describe('aiChooseDiscard — opponent awareness', () => {
+  it('avoids discarding a card that lays off onto opponent table run', () => {
+    const oppMeld = { ...makeMeld([c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8)], 'run'), ownerId: 'opp1' }
+    const opponent: Player = {
+      id: 'opp1', name: 'Opp', hand: [c('spades', 3)], melds: [oppMeld],
+      hasLaidDown: true, buysRemaining: 3, roundScores: [],
+    }
+    // Both 9♥ and 2♣ are isolated — similar evaluation. But 9♥ lays off on opponent's run.
+    const hand = [c('hearts', 9), c('clubs', 2)]
+    const discard = aiChooseDiscard(hand, req1, sharkConfig, [oppMeld], [opponent])
+    expect(discard.suit).toBe('clubs') // safer discard
+  })
+
+  it('avoids discarding a suit opponents have been picking up', () => {
+    const history = new Map<string, OpponentHistory>()
+    history.set('opp1', {
+      picked: [c('hearts', 5), c('hearts', 8)], // picked 2 hearts
+      discarded: [],
+    })
+    const hand = [c('hearts', 3), c('clubs', 4)]
+    const discard = aiChooseDiscard(hand, req1, sharkConfig, [], undefined, history)
+    expect(discard.suit).toBe('clubs')
+  })
+
+  it('still discards a dangerous card if it is the only non-useful card', () => {
+    const history = new Map<string, OpponentHistory>()
+    history.set('opp1', {
+      picked: [c('hearts', 5), c('hearts', 8), c('hearts', 3)],
+      discarded: [],
+    })
+    // Pair of 7s (high utility) + 9♥ (dangerous but only discard option)
+    const hand = [c('clubs', 7), c('diamonds', 7), c('hearts', 9)]
+    const discard = aiChooseDiscard(hand, req1, sharkConfig, [], undefined, history)
+    expect(discard.rank).toBe(9) // must discard the only non-pair card
+  })
+
+  it('non-aware personality ignores opponent data and discards normally', () => {
+    const oppMeld = { ...makeMeld([c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8)], 'run'), ownerId: 'opp1' }
+    const opponent: Player = {
+      id: 'opp1', name: 'Opp', hand: [c('spades', 3)], melds: [oppMeld],
+      hasLaidDown: true, buysRemaining: 3, roundScores: [],
+    }
+    // Two equal-point cards (both 5pts). 4♥ extends opponent's run, 4♣ doesn't.
+    // Shark would avoid discarding 4♥ (danger), but Rookie ignores danger.
+    const hand = [c('hearts', 4), c('clubs', 4)]
+    const rookieDiscard = aiChooseDiscard(hand, req1, rookieConfig, [oppMeld], [opponent])
+    const sharkDiscard = aiChooseDiscard(hand, req1, sharkConfig, [oppMeld], [opponent])
+    // Shark avoids hearts (dangerous) → discards clubs
+    expect(sharkDiscard.suit).toBe('clubs')
+    // Rookie ignores danger — may discard either (evaluation sees them as equal)
+    expect(rookieDiscard).toBeDefined() // just verifies it doesn't crash
+  })
+})
+
+describe('aiShouldTakeDiscard — denial', () => {
+  it('denial-takes a card that extends an opponent run when opponent is close to going out', () => {
+    const hand = [
+      c('hearts', 2), c('spades', 5), c('clubs', 10), c('diamonds', 3),
+      c('spades', 12), c('clubs', 4), c('diamonds', 9),
+    ]
+    const oppMeld = { ...makeMeld([c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8)], 'run'), ownerId: 'opp1' }
+    const opponent: Player = {
+      id: 'opp1', name: 'Opp', hand: [c('hearts', 11), c('spades', 3)], // 2 cards — close!
+      melds: [oppMeld], hasLaidDown: true, buysRemaining: 3, roundScores: [],
+    }
+    // 9♥ extends opponent's run and opponent has only 2 cards. Shark should denial-take.
+    expect(aiShouldTakeDiscard(hand, c('hearts', 9), req1, false, sharkConfig, [oppMeld], [opponent])).toBe(true)
+  })
+
+  it('does NOT denial-take high-point cards (aces)', () => {
+    const hand = [
+      c('hearts', 2), c('spades', 5), c('clubs', 10), c('diamonds', 3),
+      c('spades', 12), c('clubs', 4), c('diamonds', 9),
+    ]
+    const oppMeld = { ...makeMeld([c('spades', 2), c('spades', 3), c('spades', 4), c('spades', 5)], 'run'), ownerId: 'opp1' }
+    const opponent: Player = {
+      id: 'opp1', name: 'Opp', hand: [c('clubs', 8)], melds: [oppMeld],
+      hasLaidDown: true, buysRemaining: 3, roundScores: [],
+    }
+    // Ace = 15 points > 10 threshold — don't denial-take
+    expect(aiShouldTakeDiscard(hand, c('spades', 1), req1, false, sharkConfig, [oppMeld], [opponent])).toBe(false)
+  })
+
+  it('does NOT denial-take when opponent has many cards (5+)', () => {
+    // Denial only fires when opponent has ≤ 4 cards and is close to going out
+    const hand = [
+      c('hearts', 2), c('spades', 5), c('clubs', 10), c('diamonds', 3),
+    ]
+    const oppMeld = { ...makeMeld([c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8)], 'run'), ownerId: 'opp1' }
+    const opponent: Player = {
+      id: 'opp1', name: 'Opp',
+      hand: [c('hearts', 11), c('spades', 3), c('clubs', 2), c('diamonds', 8), c('spades', 7)], // 5 cards — not close
+      melds: [oppMeld], hasLaidDown: true, buysRemaining: 3, roundScores: [],
+    }
+    // 9♥ extends run but opponent has 5 cards — denial guard won't fire
+    expect(aiShouldTakeDiscard(hand, c('hearts', 9), req1, false, sharkConfig, [oppMeld], [opponent])).toBe(false)
+  })
+
+  it('non-denial personality does NOT denial-take', () => {
+    const hand = [
+      c('hearts', 2), c('spades', 5), c('clubs', 10), c('diamonds', 3),
+    ]
+    const oppMeld = { ...makeMeld([c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8)], 'run'), ownerId: 'opp1' }
+    const opponent: Player = {
+      id: 'opp1', name: 'Opp', hand: [c('hearts', 11)], melds: [oppMeld],
+      hasLaidDown: true, buysRemaining: 3, roundScores: [],
+    }
+    // Rookie has denialTake: false
+    expect(aiShouldTakeDiscard(hand, c('hearts', 9), req1, false, rookieConfig, [oppMeld], [opponent])).toBe(false)
   })
 })
 
