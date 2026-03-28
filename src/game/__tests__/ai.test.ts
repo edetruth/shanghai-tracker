@@ -566,7 +566,7 @@ describe('aiChooseDiscard — evaluation-based', () => {
   it('discards highest-point isolated card', () => {
     // All isolated — should discard highest point value
     const hand = [c('hearts', 7), c('diamonds', 2), c('clubs', 13)]
-    const discard = aiChooseDiscard(hand, req1)
+    const discard = aiChooseDiscard(hand, req1, sharkConfig) // zero noise for determinism
     expect(discard.rank).toBe(13) // King = 10pts, highest isolated penalty
   })
 

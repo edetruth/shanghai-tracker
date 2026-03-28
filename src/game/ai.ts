@@ -119,12 +119,12 @@ export interface AIEvalConfig {
 }
 
 const AI_EVAL_CONFIGS: Record<AIPersonality, AIEvalConfig> = {
-  'rookie-riley':    { takeThreshold: 8,  buyRiskTolerance: -10, discardNoise: 15, goDownStyle: 'immediate', opponentAware: false, denialTake: false, dangerWeight: 0 },
+  'rookie-riley':    { takeThreshold: 8,  buyRiskTolerance: -15, discardNoise: 15, goDownStyle: 'immediate', opponentAware: false, denialTake: false, dangerWeight: 0 },
   'steady-sam':      { takeThreshold: 5,  buyRiskTolerance: -5,  discardNoise: 8,  goDownStyle: 'immediate', opponentAware: false, denialTake: false, dangerWeight: 0 },
-  'lucky-lou':       { takeThreshold: 3,  buyRiskTolerance: 5,   discardNoise: 20, goDownStyle: 'immediate', opponentAware: false, denialTake: false, dangerWeight: 0 },
+  'lucky-lou':       { takeThreshold: 3,  buyRiskTolerance: 10,  discardNoise: 20, goDownStyle: 'immediate', opponentAware: false, denialTake: false, dangerWeight: 0 },
   'patient-pat':     { takeThreshold: 4,  buyRiskTolerance: 0,   discardNoise: 3,  goDownStyle: 'immediate', opponentAware: false, denialTake: false, dangerWeight: 0 },
-  'the-shark':       { takeThreshold: 3,  buyRiskTolerance: 0,   discardNoise: 0,  goDownStyle: 'immediate', opponentAware: true,  denialTake: true,  dangerWeight: 0.5 },
-  'the-mastermind':  { takeThreshold: 2,  buyRiskTolerance: 5,   discardNoise: 0,  goDownStyle: 'strategic', opponentAware: true,  denialTake: true,  dangerWeight: 0.6 },
+  'the-shark':       { takeThreshold: 3,  buyRiskTolerance: 5,   discardNoise: 0,  goDownStyle: 'immediate', opponentAware: true,  denialTake: true,  dangerWeight: 0.5 },
+  'the-mastermind':  { takeThreshold: 2,  buyRiskTolerance: 10,  discardNoise: 0,  goDownStyle: 'strategic', opponentAware: true,  denialTake: true,  dangerWeight: 0.6 },
 }
 
 export function getAIEvalConfig(personality: AIPersonality): AIEvalConfig {
@@ -208,15 +208,17 @@ export function evaluateHand(hand: Card[], requirement: RoundRequirement): numbe
   for (const [, cards] of byRank) {
     const count = cards.length
     if (count >= 3) {
-      score += 30  // complete natural set
+      score += 40  // complete natural set
     } else if (count === 2) {
-      score += 12  // pair — one card or joker away from a set
+      score += 15  // pair — one card or joker away from a set
     } else if (count === 1 && jokerCount >= 2) {
-      score += 3   // single with 2 jokers could make a set (weak)
+      score += 4   // single with 2 jokers could make a set (weak)
     }
   }
 
   // === RUN POTENTIAL ===
+  // Runs are harder to form (need 4+ cards in sequence) so score them higher
+  // to make the AI aggressively pursue run-building cards
   const bySuit = groupBySuit(nonJokers)
   let jokersBudgeted = 0  // track jokers "used" across run evaluations to avoid double-counting
 
@@ -229,26 +231,30 @@ export function evaluateHand(hand: Card[], requirement: RoundRequirement): numbe
     const effectiveLength = windowSize + fillableGaps
 
     if (effectiveLength >= 4) {
-      score += 35  // complete run (with or without joker fills)
+      score += 45  // complete run (with or without joker fills)
+      // Bonus for longer runs — each card beyond 4 is extra safety
+      score += (effectiveLength - 4) * 5
       jokersBudgeted += fillableGaps
     } else if (effectiveLength >= 3) {
-      score += 20  // nearly complete run (one more card or joker needed)
+      score += 25  // nearly complete run (one more card or joker needed)
       jokersBudgeted += fillableGaps
     } else if (windowSize >= 2) {
-      score += 8   // 2-card foundation
+      score += 10  // 2-card foundation
     } else if (cards.length >= 2) {
-      score += 3   // scattered same-suit cards
+      score += 4   // scattered same-suit cards
     }
   }
 
   // === JOKER VALUE ===
+  // Jokers are extremely flexible — they complete any meld type
   for (let j = 0; j < jokerCount; j++) {
-    if (j === 0) score += 15
-    else if (j === 1) score += 10
-    else score += 5
+    if (j === 0) score += 20
+    else if (j === 1) score += 15
+    else score += 8
   }
 
   // === ROUND TYPE WEIGHTING ===
+  // Bonus for having progress that matches the round's requirements
   const totalRequired = requirement.sets + requirement.runs || 1
   const runWeight = requirement.runs / totalRequired
   const setWeight = requirement.sets / totalRequired
@@ -264,8 +270,8 @@ export function evaluateHand(hand: Card[], requirement: RoundRequirement): numbe
     if (cards.length >= 2) setReady++
   }
 
-  score += runReady * 10 * runWeight
-  score += setReady * 10 * setWeight
+  score += runReady * 15 * runWeight
+  score += setReady * 15 * setWeight
 
   // === PENALTY: ISOLATED HIGH CARDS ===
   const usefulIds = new Set<string>()
@@ -315,9 +321,9 @@ export function evaluateHandFast(hand: Card[], requirement: RoundRequirement, ca
   const byRank = groupByRank(nonJokers)
   for (const [, cards] of byRank) {
     const count = cards.length
-    if (count >= 3) score += 30
-    else if (count === 2) score += 12
-    else if (count === 1 && jokerCount >= 2) score += 3
+    if (count >= 3) score += 40
+    else if (count === 2) score += 15
+    else if (count === 1 && jokerCount >= 2) score += 4
   }
 
   const bySuit = groupBySuit(nonJokers)
@@ -332,20 +338,20 @@ export function evaluateHandFast(hand: Card[], requirement: RoundRequirement, ca
     const effectiveLength = windowSize + fillableGaps
 
     if (effectiveLength >= 4) {
-      score += 35; jokersBudgeted += fillableGaps
+      score += 45 + (effectiveLength - 4) * 5; jokersBudgeted += fillableGaps
     } else if (effectiveLength >= 3) {
-      score += 20; jokersBudgeted += fillableGaps
+      score += 25; jokersBudgeted += fillableGaps
     } else if (windowSize >= 2) {
-      score += 8
+      score += 10
     } else if (cards.length >= 2) {
-      score += 3
+      score += 4
     }
   }
 
   for (let j = 0; j < jokerCount; j++) {
-    if (j === 0) score += 15
-    else if (j === 1) score += 10
-    else score += 5
+    if (j === 0) score += 20
+    else if (j === 1) score += 15
+    else score += 8
   }
 
   const totalRequired = requirement.sets + requirement.runs || 1
@@ -362,8 +368,8 @@ export function evaluateHandFast(hand: Card[], requirement: RoundRequirement, ca
     if (cards.length >= 2) setReady++
   }
 
-  score += runReady * 10 * runWeight
-  score += setReady * 10 * setWeight
+  score += runReady * 15 * runWeight
+  score += setReady * 15 * setWeight
 
   const usefulIds = new Set<string>()
   for (const [, cards] of byRank) {
@@ -589,13 +595,13 @@ export function aiShouldBuy(
   // === RISK: what's the downside of buying? ===
   let risk = 0
 
-  // Hand size risk
+  // Hand size risk — scaled to not block useful buys on normal-sized hands
   const effectiveHandSize = hand.length + 1  // +1 for penalty card
-  if (effectiveHandSize >= 15) risk += 45
-  else if (effectiveHandSize >= 13) risk += 35
-  else if (effectiveHandSize >= 11) risk += 25
-  else if (effectiveHandSize >= 9) risk += 15
-  else risk += 8
+  if (effectiveHandSize >= 16) risk += 40
+  else if (effectiveHandSize >= 14) risk += 30
+  else if (effectiveHandSize >= 12) risk += 20
+  else if (effectiveHandSize >= 10) risk += 10
+  else risk += 5
 
   // Opponent pressure
   if (players) {
