@@ -573,7 +573,11 @@ export function simulateRound(gameState: GameState, difficulty: AIDifficulty): {
 
       // Rule 9A: open buying window for other players
       if (discardForBuying) {
+        const totalBoughtBefore = Object.values(buyStats).reduce((s, b) => s + b.bought, 0)
         state = simProcessBuying(state, playerIdx, discardForBuying, true, difficulty, buyStats)
+        const totalBoughtAfter = Object.values(buyStats).reduce((s, b) => s + b.bought, 0)
+        // Buying is progress — someone acquired a card they wanted
+        if (totalBoughtAfter > totalBoughtBefore) noProgressTurns = Math.max(0, noProgressTurns - 2)
         // Update stats from buyStats
         playerIds.forEach(id => {
           if (buyStats[id]) {

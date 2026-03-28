@@ -298,6 +298,22 @@ export function evaluateHand(hand: Card[], requirement: RoundRequirement): numbe
   score += runReady * 15 * runWeight
   score += setReady * 15 * setWeight
 
+  // === MULTI-RUN COVERAGE BONUS ===
+  // For rounds needing 2+ runs, having progress across DISTINCT suits is critical.
+  // 3 suits with 2-card windows beats 1 suit with 6 cards, because you need 3 separate runs.
+  if (requirement.runs >= 2) {
+    const suitsWithProgress = [...bySuit.values()].filter(cards => {
+      const w = findBestRunWindow(cards)
+      return w.cards.length >= 2
+    }).length
+    // Bonus scales with how many runs we need vs how many suits we're building
+    const coverage = Math.min(suitsWithProgress, requirement.runs)
+    score += coverage * 12  // each covered suit is worth 12 points
+    // Penalty if we don't have enough suits started for the required runs
+    const deficit = requirement.runs - suitsWithProgress
+    if (deficit > 0) score -= deficit * 8
+  }
+
   // === PENALTY: ISOLATED HIGH CARDS ===
   const usefulIds = new Set<string>()
   for (const [, cards] of byRank) {
@@ -396,6 +412,18 @@ export function evaluateHandFast(hand: Card[], requirement: RoundRequirement, ca
   score += runReady * 15 * runWeight
   score += setReady * 15 * setWeight
 
+  // Multi-run coverage bonus (same as evaluateHand)
+  if (requirement.runs >= 2) {
+    const suitsWithProgress = [...bySuit.values()].filter(cards => {
+      const w = findBestRunWindow(cards)
+      return w.cards.length >= 2
+    }).length
+    const coverage = Math.min(suitsWithProgress, requirement.runs)
+    score += coverage * 12
+    const deficit = requirement.runs - suitsWithProgress
+    if (deficit > 0) score -= deficit * 8
+  }
+
   const usefulIds = new Set<string>()
   for (const [, cards] of byRank) {
     if (cards.length >= 2) cards.forEach(c => usefulIds.add(c.id))
@@ -422,10 +450,105 @@ export function evaluateHandFast(hand: Card[], requirement: RoundRequirement, ca
 // Uses backtracking: for each required meld slot, generates all candidates and tries each one.
 // For mixed rounds, tries sets-first then runs-first ordering.
 export function aiFindBestMelds(hand: Card[], requirement: RoundRequirement): Card[][] | null {
-  return tryMeldOrder(hand, requirement, 'sets-first')
+  // Standard approach: greedy + backtracking
+  const result = tryMeldOrder(hand, requirement, 'sets-first')
     ?? (requirement.sets > 0 && requirement.runs > 0
         ? tryMeldOrder(hand, requirement, 'runs-first')
         : null)
+  if (result) return result
+
+  // For run-heavy rounds (2+ runs), try suit-permutation greedy search.
+  // The standard greedy iterates suits in arbitrary Map order — if the first suit
+  // chosen blocks later runs, we miss valid partitions. Try all suit orderings.
+  if (requirement.runs >= 2) {
+    const suitResult = trySuitPermutationMelds(hand, requirement)
+    if (suitResult) return suitResult
+  }
+
+  return null
+}
+
+/**
+ * For run-heavy rounds: try assigning specific suits to each run slot.
+ * Generates all permutations of available suits and attempts greedy run-finding
+ * from each assigned suit. This catches cases where the default suit iteration
+ * order picks a suboptimal first run.
+ */
+function trySuitPermutationMelds(hand: Card[], requirement: RoundRequirement): Card[][] | null {
+  const jokers = hand.filter(isJoker)
+  const naturals = hand.filter(c => !isJoker(c))
+  const bySuit = groupBySuit(naturals)
+  const suits = [...bySuit.keys()]
+
+  // Generate suit orderings to try (permutations of length = runs needed)
+  const perms = permutations(suits, requirement.runs)
+
+  for (const suitOrder of perms) {
+    const melds: Card[][] = []
+    const usedIds = new Set<string>()
+    let jokersUsed = 0
+    let failed = false
+
+    // First: find runs from assigned suits
+    for (const suit of suitOrder) {
+      const suitCards = (bySuit.get(suit) ?? []).filter(c => !usedIds.has(c.id))
+      const available = jokers.slice(jokersUsed)
+      const run = tryFindRunFromCards(suitCards, available)
+      if (!run) { failed = true; break }
+      run.forEach(c => usedIds.add(c.id))
+      jokersUsed += run.filter(isJoker).length
+      melds.push(run)
+    }
+    if (failed) continue
+
+    // Then: find any required sets from remaining cards
+    for (let s = 0; s < requirement.sets; s++) {
+      const remaining = naturals.filter(c => !usedIds.has(c.id))
+      const set = tryFindSet(remaining, jokers, jokersUsed)
+      if (!set) { failed = true; break }
+      set.forEach(c => usedIds.add(c.id))
+      jokersUsed += set.filter(isJoker).length
+      melds.push(set)
+    }
+    if (failed) continue
+
+    return melds
+  }
+  return null
+}
+
+/** Find a valid run from specific same-suit cards + available jokers */
+function tryFindRunFromCards(suitCards: Card[], availableJokers: Card[]): Card[] | null {
+  if (suitCards.length === 0 && availableJokers.length < MIN_RUN_SIZE) return null
+  const seen = new Set<number>()
+  const unique: Card[] = []
+  for (const card of [...suitCards].sort((a, b) => a.rank - b.rank)) {
+    if (!seen.has(card.rank)) { seen.add(card.rank); unique.push(card) }
+  }
+  // Try with fewest jokers first to conserve them for other runs
+  for (let jCount = 0; jCount <= availableJokers.length; jCount++) {
+    for (let start = 0; start < unique.length; start++) {
+      for (let end = start + Math.max(MIN_RUN_SIZE - jCount, 1); end <= unique.length; end++) {
+        const sub = unique.slice(start, end)
+        const testCards = [...sub, ...availableJokers.slice(0, jCount)]
+        if (testCards.length >= MIN_RUN_SIZE && isValidRun(testCards)) return testCards
+      }
+    }
+  }
+  return null
+}
+
+/** Generate all permutations of `items` of length `k` */
+function permutations<T>(items: T[], k: number): T[][] {
+  if (k === 0) return [[]]
+  const result: T[][] = []
+  for (let i = 0; i < items.length; i++) {
+    const rest = [...items.slice(0, i), ...items.slice(i + 1)]
+    for (const perm of permutations(rest, k - 1)) {
+      result.push([items[i], ...perm])
+    }
+  }
+  return result
 }
 
 function tryMeldOrder(
