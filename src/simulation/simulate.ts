@@ -238,8 +238,13 @@ function simMeld(state: GameState, meldGroups: Card[][]): GameState {
   const player = state.players[playerIdx]
   let counter = state.roundState.meldIdCounter
   const meldedIds = new Set(meldGroups.flatMap(g => g.map(c => c.id)))
+  const requirement = state.roundState.requirement
   const newMelds: Meld[] = meldGroups.map(cards => {
-    const type = isValidSet(cards) ? 'set' : 'run'
+    // Respect round type: runs-only rounds must classify as run, sets-only as set
+    let type: 'set' | 'run'
+    if (requirement.sets === 0) type = 'run'
+    else if (requirement.runs === 0) type = 'set'
+    else type = isValidSet(cards) ? 'set' : 'run'
     const meldId = `meld-${counter++}`
     return buildMeld(cards, type, player.id, player.name, meldId)
   })

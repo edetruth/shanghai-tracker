@@ -331,7 +331,11 @@ const MeldBuilder = forwardRef<MeldBuilderHandle, Props>(function MeldBuilder({
     const sets: CardType[][] = []
     const runs: CardType[][] = []
     for (const meld of required) {
-      if (isValidSet(meld)) sets.push(meld)
+      // Respect round type: on runs-only rounds never classify as set, even if
+      // the cards pass isValidSet (e.g. [5♥, Joker, Joker, Joker] is both valid)
+      if (requirement.sets === 0) runs.push(meld)
+      else if (requirement.runs === 0) sets.push(meld)
+      else if (isValidSet(meld)) sets.push(meld)
       else runs.push(meld)
     }
     const ordered = [...sets, ...runs]

@@ -1238,8 +1238,15 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     const player = prev.players[playerIdx]
 
     const meldedIds = new Set(meldGroups.flatMap(g => g.map(c => c.id)))
+    const requirement = prev.roundState.requirement
     const newMelds: Meld[] = meldGroups.map(cards => {
-      const type = isValidSet(cards) ? 'set' : 'run'
+      // Respect round type: on run-only rounds, never classify as set (and vice versa).
+      // A meld like [5♥, Joker, Joker, Joker] passes both isValidSet and isValidRun —
+      // without this guard it would become a set on a run-only round, allowing illegal lay-offs.
+      let type: 'set' | 'run'
+      if (requirement.sets === 0) type = 'run'        // runs-only round: must be a run
+      else if (requirement.runs === 0) type = 'set'   // sets-only round: must be a set
+      else type = isValidSet(cards) ? 'set' : 'run'   // mixed round: prefer set classification
       const meldId = `meld-${counter++}`
       return buildMeld(cards, type, player.id, player.name, meldId, jokerPositions)
     })
