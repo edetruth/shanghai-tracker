@@ -38,10 +38,11 @@ src/
 │   ├── round-manager.ts     # Round setup and progression
 │   ├── game-manager.ts      # Full game flow across 7 rounds
 │   ├── rules.ts             # Point values, round requirement constants
-│   └── ai.ts                # Medium + Hard AI: aiFindBestMelds (greedy + bounded backtrack fallback),
-│                            #   getCommittedSuits, getRunContribution,
-│                            #   aiShouldTakeDiscard, aiShouldTakeDiscardHard, aiChooseDiscard, aiChooseDiscardHard,
-│                            #   aiShouldBuy, aiShouldBuyHard, aiFindLayOff, aiFindJokerSwap
+│   └── ai.ts                # AI engine: evaluateHand (holistic hand scoring 0-200+),
+│                            #   AIEvalConfig per personality, aiShouldTakeDiscard, aiChooseDiscard,
+│                            #   aiShouldBuy (all evaluation-based), aiFindBestMelds (greedy +
+│                            #   bounded backtrack + suit-permutation search), cardDanger (opponent
+│                            #   awareness), aiFindLayOff, aiFindJokerSwap, aiFindPreLayDownJokerSwap
 ├── hooks/
 │   └── useRealtimeScores.ts # Supabase Realtime subscriptions for score tracker multiplayer
 └── components/
@@ -128,15 +129,25 @@ GameSetup (PlayerConfig[] configured)
 
 - **`PlayerConfig`** — `{ name: string; isAI: boolean }` — in `src/game/types.ts`
 - **`AIDifficulty`** — `'easy' | 'medium' | 'hard'` — exported from `src/game/types.ts`; passed from `GameSetup` → `PlayTab` → `GameBoard` prop (`aiDifficulty?: AIDifficulty`, default `'medium'`)
-  - Easy: never buys/takes discard, discards highest-value card, lays down required melds only
-  - Medium: commits to top-2 suits for runs, run-aware drawing/buying/discarding
-  - Hard: all Medium + joker swaps, unlimited lay-offs, cost/benefit buying (no fixed cap)
-- **AI personalities** — `PERSONALITIES` array in `src/game/types.ts`. Each has `PersonalityConfig` controlling: `takeStyle`, `buyStyle`, `discardStyle`, `goDownStyle`, `layOffStyle`, `jokerSwapStyle`, `panicThreshold`, etc.
-  - The Shark (`the-shark`): opponent-aware discarding, `goDownStyle: 'immediate'`, aggressive-denial take style
-  - The Mastermind (`the-mastermind`): hold-for-out strategy, `panicThreshold: 2`, opponent-aware discarding
-- **AI buying (hard-tier)** — `aiShouldBuyHard` uses cost/benefit evaluation: `calculateBuyValue` (0-90+: enables going down, set completion, run gap-fill, progress) vs `calculateBuyRisk` (0-85: hand size, opponent pressure, penalty cost, run-round discount of 15 for 2+ runs). No fixed buy cap. Buys when value > risk.
-- **AI run strategy** — Suit commitment capped at `commitN = min(runs+1, 2)` — always focus on top 2 suits regardless of how many runs are needed. Prevents over-commitment in R7 (3 runs). Run-aware discard activates for ALL rounds with runs (not just pure-run rounds); in mixed rounds, set partners (3+ same rank) are also protected. `aiShouldTakeDiscard` (medium) accepts `near` cards with 1+ same-suit for free takes. `aiShouldTakeDiscardHard` uses committed suits with gap-fill/extension + near with 2+.
-- **Bounded backtracking** — `aiFindBestMelds` uses greedy `tryFindRun`/`tryFindSet` as fast path; if greedy fails, falls back to `tryMeldOrderBacktrack` which generates top-5 candidates per step via bounded backtracking. Prevents joker contention failures in multi-run rounds without the explosion of full exhaustive search.
+- **AI hand evaluation system** — All AI decisions use `evaluateHand(hand, requirement) → number` (0 = nothing useful, 200+ = can go down). Scores complete melds, partial melds (pairs, run windows), joker potential, round-type matching, multi-run suit coverage, and isolated card penalties. Every decision (take discard, buy, discard) compares hand score before/after to determine the best action.
+- **`AIEvalConfig`** — Per-personality config controlling: `takeThreshold` (min improvement to take), `buyRiskTolerance` (adjustment to buy threshold), `discardNoise` (random variance for weaker AIs), `goDownStyle`, `opponentAware`, `denialTake`, `dangerWeight`. Stored in `AI_EVAL_CONFIGS` record keyed by `AIPersonality`.
+- **Difficulty differentiation** — All personalities use the SAME evaluation functions with different config thresholds:
+  - Rookie Riley: high take threshold (8), negative buy tolerance (-15), high discard noise (15), no opponent awareness
+  - Steady Sam: moderate thresholds, slight noise (8)
+  - Lucky Lou: low thresholds, high noise (20), aggressive buying (+10 tolerance)
+  - Patient Pat: balanced thresholds, minimal noise (3)
+  - The Shark: lowest thresholds, zero noise, opponent-aware discards (dangerWeight 0.5), denial takes
+  - The Mastermind: aggressive buying (+10), zero noise, highest opponent awareness (dangerWeight 0.6), strategic go-down timing
+- **AI personalities** — `PERSONALITIES` array in `src/game/types.ts`. Each has `PersonalityConfig` controlling: `takeStyle`, `buyStyle`, `discardStyle`, `goDownStyle`, `layOffStyle`, `jokerSwapStyle`, `panicThreshold`, etc. GameBoard uses `getPersonalityConfig()` to get the personality and `getEvalConfig()` to get the `AIEvalConfig`.
+- **Opponent awareness** — `cardDanger(card, tablesMelds, opponents, opponentHistory)` scores how much a discard helps opponents: lay-off onto their melds (+100), suit they're collecting (+50), rank they picked (+40), discounted for suits they've discarded (-15). Shark/Mastermind blend danger into discard ranking via `dangerWeight`. Denial takes: Shark/Mastermind grab cards that extend an opponent's 4+ run when opponent has ≤4 cards, but only low-point cards (≤10) and only when AI hand < 12.
+- **AI buying** — `aiShouldBuy` uses evaluation improvement vs risk: hand-size risk (5-40 based on effective hand size), opponent pressure (0-50 based on opponents' card count and laid-down status), penalty card cost (+5). `buyRiskTolerance` adjusts the threshold per personality. Special case: always buy if card enables going down (score jumps to 150+), unless opponent is about to win.
+- **Meld finding** — `aiFindBestMelds` uses three strategies in order:
+  1. **Greedy** — `tryFindRun`/`tryFindSet` for each step, fast path
+  2. **Bounded backtracking** — `tryMeldOrderBacktrack` generates candidates per step (5 for sets, 10 for 2-run, 15 for 3-run rounds). Candidates sorted by length then joker count (fewest jokers first to conserve for later runs).
+  3. **Suit-permutation search** — For 2+ run requirements, `trySuitPermutationMelds` tries all permutations of suit assignments (P(4,3)=24 for R7). Each suit is assigned a run slot and `tryFindRunFromCards` finds the best run using fewest jokers first.
+- **`evaluateHandFast`** — Optimized variant that skips the expensive `aiFindBestMelds` call for discard evaluation loops (called once per card in hand).
+- **Multi-run coverage** — `evaluateHand` adds a coverage bonus for having run progress across distinct suits (coverage × 12 pts) and penalizes deficit (suits needed - suits started) × 8 pts. Critical for R7 where 3 separate suits must each form a run.
+- **Ace-high awareness** — `findBestRunWindow` checks both ace-low (A-2-3) and ace-high (Q-K-A) configurations to correctly evaluate run potential like J-Q-K-A.
 - **AI automation** — two `useEffect` blocks in `GameBoard` watch `uiPhase` + `currentPlayer.isAI`. Uses `useRef` refs (`gameStateRef`, `uiPhaseRef`, `buyerOrderRef`, `buyerStepRef`, `pendingBuyDiscardRef`, `buyingIsPostDrawRef`) to read fresh state inside `setTimeout` callbacks without stale closures.
 - **Toast queue** — `toastQueueRef` + `queueToast()` + `showNextToast()` in `GameBoard`. `GameToast` renders from `activeToast` state. Fired at: going-down-first, joker swap ("The heist!"), consecutive-round-out streaks. CSS animations: `toast-enter`, `shimmer-sweep`, `slam-in`, `pulse-border-red` in `index.css`.
 - **Cinematic game moments:**
@@ -209,7 +220,7 @@ Warm cream theme (not dark table). Uses `safe-top` for header padding.
 - **Winner** = player with the lowest total score (`computeWinner()` in gameStore.ts).
 - **Dates** are stored as ISO strings; displayed with date-fns, no timezone conversion.
 - **Import** groups rows by date + notes to reconstruct individual games.
-- **Tests** use **Vitest** (`npx vitest run`). Test files live in `src/game/__tests__/`. 1436 tests. Simulation benchmarks in `src/simulation/run.test.ts` (5 configs: baseline, large-group, easy, hard, run-rounds).
+- **Tests** use **Vitest** (`npx vitest run`). Test files live in `src/game/__tests__/`. 1454 tests. Simulation benchmarks in `src/simulation/run.test.ts` (5 configs: baseline, large-group, easy, hard, run-rounds).
 - **`onPlayerClick`** is threaded from `App.tsx` → `StatsLeaderboard`, `GameSummary` to open `PlayerProfileModal`. Also passed into `DrilldownModal` so player names in drilldown views are tappable.
 - **`total_score`** is a generated column in Supabase — never insert or update it directly.
 - **`created_by`** column does not exist in the `games` table — do not reference it.
