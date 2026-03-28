@@ -654,16 +654,17 @@ describe('aiShouldTakeDiscard — denial', () => {
   })
 
   it('does NOT denial-take high-point cards (aces)', () => {
+    // Hand has NO spade cards to form runs with, so self-interest won't want the ace either
     const hand = [
-      c('hearts', 2), c('spades', 5), c('clubs', 10), c('diamonds', 3),
-      c('spades', 12), c('clubs', 4), c('diamonds', 9),
+      c('hearts', 2), c('hearts', 5), c('clubs', 10), c('diamonds', 3),
+      c('hearts', 12), c('clubs', 4), c('diamonds', 9),
     ]
     const oppMeld = { ...makeMeld([c('spades', 2), c('spades', 3), c('spades', 4), c('spades', 5)], 'run'), ownerId: 'opp1' }
     const opponent: Player = {
       id: 'opp1', name: 'Opp', hand: [c('clubs', 8)], melds: [oppMeld],
       hasLaidDown: true, buysRemaining: 3, roundScores: [],
     }
-    // Ace = 15 points > 10 threshold — don't denial-take
+    // Ace = 15 points > 10 threshold — don't denial-take even though it extends opponent's run
     expect(aiShouldTakeDiscard(hand, c('spades', 1), req1, false, sharkConfig, [oppMeld], [opponent])).toBe(false)
   })
 

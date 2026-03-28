@@ -76,29 +76,54 @@ function findBestRunWindow(suitCards: Card[]): RunWindow {
   const sorted = [...suitCards].sort((a, b) => a.rank - b.rank)
   if (sorted.length === 1) return { cards: sorted, gaps: [], minRank: sorted[0].rank, maxRank: sorted[0].rank }
 
+  // Try both ace-low (rank 1) and ace-high (rank 14) configurations
+  const configs: Card[][] = [sorted]
+  if (sorted.some(c => c.rank === 1)) {
+    // Create an ace-high variant: treat ace as rank 14
+    const aceHighSorted = [...suitCards]
+      .sort((a, b) => {
+        const ra = a.rank === 1 ? 14 : a.rank
+        const rb = b.rank === 1 ? 14 : b.rank
+        return ra - rb
+      })
+    configs.push(aceHighSorted)
+  }
+
   let bestCards: Card[] = [sorted[0]]
   let bestScore = 1
 
-  for (let start = 0; start < sorted.length; start++) {
-    const current: Card[] = [sorted[start]]
-    for (let end = start + 1; end < sorted.length; end++) {
-      if (sorted[end].rank - sorted[end - 1].rank <= 2) {
-        current.push(sorted[end])
-      } else {
-        break
+  for (const config of configs) {
+    const isAceHigh = config !== sorted
+    for (let start = 0; start < config.length; start++) {
+      const current: Card[] = [config[start]]
+      for (let end = start + 1; end < config.length; end++) {
+        const prevRank = isAceHigh && config[end - 1].rank === 1 ? 14 : config[end - 1].rank
+        const curRank = isAceHigh && config[end].rank === 1 ? 14 : config[end].rank
+        if (curRank - prevRank <= 2 && curRank - prevRank > 0) {
+          current.push(config[end])
+        } else {
+          break
+        }
       }
-    }
-    const gapCount = (current[current.length - 1].rank - current[0].rank + 1) - current.length
-    const score = current.length * 2 - gapCount
-    if (score > bestScore || (score === bestScore && current.length > bestCards.length)) {
-      bestCards = current
-      bestScore = score
+      const firstRank = isAceHigh && current[0].rank === 1 ? 14 : current[0].rank
+      const lastRank = isAceHigh && current[current.length - 1].rank === 1 ? 14 : current[current.length - 1].rank
+      const gapCount = (lastRank - firstRank + 1) - current.length
+      const score = current.length * 2 - gapCount
+      if (score > bestScore || (score === bestScore && current.length > bestCards.length)) {
+        bestCards = current
+        bestScore = score
+      }
     }
   }
 
-  const minRank = bestCards[0].rank
-  const maxRank = bestCards[bestCards.length - 1].rank
-  const rankSet = new Set(bestCards.map(c => c.rank))
+  // Compute gaps using actual ranks (handle ace-high)
+  const hasAce = bestCards.some(c => c.rank === 1)
+  const highCards = bestCards.some(c => c.rank >= 10)
+  const useAceHigh = hasAce && highCards
+  const ranks = bestCards.map(c => useAceHigh && c.rank === 1 ? 14 : c.rank).sort((a, b) => a - b)
+  const minRank = ranks[0]
+  const maxRank = ranks[ranks.length - 1]
+  const rankSet = new Set(ranks)
   const gaps: number[] = []
   for (let r = minRank + 1; r < maxRank; r++) {
     if (!rankSet.has(r)) gaps.push(r)
@@ -444,7 +469,10 @@ function tryMeldOrderBacktrack(
   jokers: Card[],
   steps: Array<'set' | 'run'>,
 ): Card[][] | null {
-  const MAX_CANDIDATES = 5
+  // More candidates for run-heavy rounds — the combinatorial space is larger
+  // and greedy choices fail more often when 3 runs must share 12 cards exactly
+  const runCount = steps.filter(s => s === 'run').length
+  const MAX_CANDIDATES = runCount >= 3 ? 15 : runCount >= 2 ? 10 : 5
 
   function findCandidates(remaining: Card[], type: 'set' | 'run', jUsed: number): Card[][] {
     const bySuit = groupBySuit(remaining)
@@ -490,7 +518,12 @@ function tryMeldOrderBacktrack(
         }
       }
     }
-    results.sort((a, b) => a.length - b.length)
+    // Sort: shortest first (conserve cards), then fewest jokers (conserve jokers for later runs)
+    results.sort((a, b) => {
+      const lenDiff = a.length - b.length
+      if (lenDiff !== 0) return lenDiff
+      return a.filter(isJoker).length - b.filter(isJoker).length
+    })
     return results
   }
 

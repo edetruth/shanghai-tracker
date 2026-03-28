@@ -612,6 +612,7 @@ export function simulateRound(gameState: GameState, difficulty: AIDifficulty): {
           statsMap[pid].meldsLaidDown += actionResult.meldsCount ?? 0
           if (statsMap[pid].turnLaidDown === 0) statsMap[pid].turnLaidDown = turnCount
           layOffCount = 0  // reset after melding
+          noProgressTurns = 0  // melding is significant progress
           break
 
         case 'layoff':
@@ -639,7 +640,10 @@ export function simulateRound(gameState: GameState, difficulty: AIDifficulty): {
     }
 
     // ── STALEMATE CHECK ────────────────────────────────────────────────────
-    if (drawPileDepletions >= 2 && noProgressTurns > state.players.length * 8) {
+    // Scale stalemate tolerance by round complexity: run-heavy rounds need more time
+    const req = state.roundState.requirement
+    const complexityMultiplier = req.runs >= 3 ? 20 : req.runs >= 2 ? 15 : req.sets >= 3 ? 12 : 8
+    if (drawPileDepletions >= 2 && noProgressTurns > state.players.length * complexityMultiplier) {
       stalemate = true
       break mainLoop
     }
