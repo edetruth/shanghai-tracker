@@ -677,14 +677,18 @@ export default function GameSetup({ onStart, onCreateOnline, onBack }: Props) {
             {onCreateOnline && !tournamentMode && (
               <button
                 onClick={() => {
-                  if (!playerCount || !allNamed) return
-                  const hostPlayer = players.find(p => !p.isAI)
-                  if (!hostPlayer) return
+                  if (!playerCount) return
+                  const hostName = players.find(p => !p.isAI)?.name?.trim() || players[0]?.name?.trim()
+                  if (!hostName) return
                   onCreateOnline(
-                    players.map(p => ({ name: p.name.trim(), isAI: p.isAI })),
+                    // Only count matters for online — lobby handles player/AI assignment
+                    Array.from({ length: playerCount }, (_, i) => ({
+                      name: i === 0 ? hostName : `Player ${i + 1}`,
+                      isAI: false,
+                    })),
                     selectedPersonality,
                     buyLimit,
-                    hostPlayer.name.trim(),
+                    hostName,
                   )
                 }}
                 style={{

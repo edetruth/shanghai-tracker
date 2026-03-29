@@ -268,11 +268,7 @@ export default function PlayTab({ onBack }: Props) {
       playerCount: players.length,
       buyLimit: limit,
       aiPersonality: personality,
-      seats: players.map((p, i) => ({
-        seatIndex: i,
-        isAI: p.isAI,
-        personality: p.isAI ? personality : undefined,
-      })),
+      seats: [],  // No pre-assigned seats — lobby handles player/AI assignment
     }
     setOnlineConfig(config)
     setView('lobby-host')

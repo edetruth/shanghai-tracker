@@ -10,7 +10,7 @@ import CardComponent from './Card'
 import MeldBuilder from './MeldBuilder'
 import type { MeldBuilderHandle } from './MeldBuilder'
 import { haptic } from '../../lib/haptics'
-import { ROUND_REQUIREMENTS } from '../../game/rules'
+import { ROUND_REQUIREMENTS, cardPoints } from '../../game/rules'
 
 interface Props {
   roomCode: string
@@ -107,6 +107,9 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
     buyingState.buyingPhase === 'human-turn'
   const hasFreeOffer = view?.pendingFreeOffer && isMyTurn && uiPhase === 'draw'
 
+  // Hand points calculation
+  const handPoints = useMemo(() => myHand.reduce((sum, c) => sum + cardPoints(c.rank), 0), [myHand])
+
   // Close meld builder if we leave the action phase or it's no longer our turn
   useEffect(() => {
     if (showMeldBuilder && (!isMyTurn || uiPhase !== 'action')) {
@@ -118,6 +121,12 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
   // Round felt color
   const feltColors = ['#1a3a2a', '#1a2f3a', '#2a1a3a', '#1a3a30', '#3a1a24', '#1a2a3a', '#2e2a1a']
   const feltBg = feltColors[(currentRound - 1) % feltColors.length]
+
+  // Determine if in buying phase for pile labels
+  const isBuyingPhase = buyingState && buyingState.buyingPhase !== 'hidden'
+
+  // "Final card" edge state
+  const isOnTheEdge = view?.myHasLaidDown && myHand.length <= 2 && myHand.length > 0
 
   // All players for scoreboard
   const allPlayers = useMemo(() => {
@@ -325,6 +334,14 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
   // ── Main game board ───────────────────────────────────────────────────────
   const currentPlayerName = allPlayers.find(p => p.seatIndex === view.currentPlayerIndex)?.name ?? '...'
 
+  // Draw/discard pile active state
+  const drawActive = isMyTurn && uiPhase === 'draw'
+  const discardActive = isMyTurn && uiPhase === 'draw' && !!discardTop
+
+  // Pile label text
+  const drawLabel = drawActive ? 'DRAW' : ''
+  const discardLabel = isBuyingPhase ? 'FOR SALE' : (discardActive ? 'TAKE' : '')
+
   return (
     <div style={{
       minHeight: '100dvh',
@@ -361,26 +378,59 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
         background: '#0f2218',
         paddingTop: 'env(safe-area-inset-top, 44px)',
         padding: '8px 12px',
-        display: 'flex',
+        display: 'grid',
+        gridTemplateColumns: '36px 1fr 36px',
         alignItems: 'center',
-        justifyContent: 'space-between',
         flexShrink: 0,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button
-            onClick={() => setShowPause(true)}
-            style={{
-              background: 'transparent', border: 'none',
-              color: '#6aad7a', cursor: 'pointer', padding: 4,
-            }}
-          >
-            <Pause size={16} />
-          </button>
-          <span style={{ color: '#a8d0a8', fontSize: 11 }}>
-            R{currentRound} — {requirement.description}
+        {/* Left: Pause button */}
+        <button
+          onClick={() => setShowPause(true)}
+          style={{
+            background: 'transparent', border: 'none',
+            color: '#6aad7a', cursor: 'pointer', padding: 4,
+            justifySelf: 'start',
+          }}
+        >
+          <Pause size={16} />
+        </button>
+
+        {/* Center: Round badge + requirement badge */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 6,
+          flexWrap: 'wrap',
+        }}>
+          <span style={{
+            background: '#0f2218',
+            border: '1px solid #2d5a3a',
+            borderRadius: 20,
+            padding: '4px 10px',
+            color: '#a8d0a8',
+            fontSize: 11,
+            fontWeight: 600,
+            whiteSpace: 'nowrap',
+          }}>
+            R{currentRound}/7
+          </span>
+          <span style={{
+            background: '#0f2218',
+            border: '1px solid #8b6914',
+            borderRadius: 20,
+            padding: '4px 10px',
+            color: '#e2b858',
+            fontSize: 11,
+            fontWeight: 600,
+            whiteSpace: 'nowrap',
+          }}>
+            {requirement.description}
           </span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+
+        {/* Right: Wifi icon */}
+        <div style={{ justifySelf: 'end', display: 'flex', alignItems: 'center' }}>
           {isConnected ? <Wifi size={12} style={{ color: '#6aad7a' }} /> : <WifiOff size={12} style={{ color: '#e07a5f' }} />}
         </div>
       </div>
@@ -458,38 +508,85 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
       <div style={{ flex: '0 0 auto', overflowX: 'auto', padding: '8px 12px' }}>
         {/* Opponent cards strip — tap to toggle scoreboard */}
         <div
-          style={{ display: 'flex', gap: 8, marginBottom: 8, cursor: 'pointer' }}
+          style={{ display: 'flex', gap: 6, marginBottom: 8, cursor: 'pointer' }}
           onClick={() => { setShowScoreboard(prev => !prev); haptic('tap') }}
         >
-          {allPlayers.map(p => (
-            <div
-              key={p.seatIndex}
-              style={{
-                background: p.seatIndex === view.currentPlayerIndex ? '#1e4a2e' : '#0f2218',
-                border: p.seatIndex === view.currentPlayerIndex ? '1px solid #e2b858' : '1px solid #2d5a3a',
-                borderRadius: 8,
-                padding: '6px 10px',
-                minWidth: 70,
-                textAlign: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <div style={{
-                color: p.seatIndex === view.myPlayerIndex ? '#e2b858' : '#a8d0a8',
-                fontSize: 10,
-                fontWeight: 600,
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                maxWidth: 80,
-              }}>
-                {p.name}{p.seatIndex === view.myPlayerIndex ? ' (you)' : ''}
+          {allPlayers.map(p => {
+            const isCurrentTurn = p.seatIndex === view.currentPlayerIndex
+            const isMe = p.seatIndex === view.myPlayerIndex
+            const playerScore = scores[p.seatIndex]
+            const totalScore = playerScore ? playerScore.roundScores.reduce((sum, n) => sum + n, 0) : 0
+            return (
+              <div
+                key={p.seatIndex}
+                style={{
+                  background: isCurrentTurn ? '#1e4a2e' : '#0f2218',
+                  border: isCurrentTurn ? '2px solid #e2b858' : '1px solid #2d5a3a',
+                  borderRadius: 8,
+                  padding: '5px 8px',
+                  minWidth: 64,
+                  textAlign: 'center',
+                  flexShrink: 0,
+                  position: 'relative',
+                }}
+              >
+                {/* Current turn gold dot */}
+                {isCurrentTurn && (
+                  <div style={{
+                    position: 'absolute',
+                    top: -3,
+                    right: -3,
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: '#e2b858',
+                    boxShadow: '0 0 4px rgba(226,184,88,0.6)',
+                  }} />
+                )}
+                <div style={{
+                  color: isMe ? '#e2b858' : '#a8d0a8',
+                  fontSize: 10,
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  maxWidth: 72,
+                }}>
+                  {p.name}{isMe ? ' (you)' : ''}{p.isAI ? ' \uD83E\uDD16' : ''}
+                </div>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 4,
+                  marginTop: 2,
+                }}>
+                  <span style={{ color: '#6aad7a', fontSize: 9, fontWeight: 600 }}>
+                    {p.handSize}
+                  </span>
+                  {p.hasLaidDown && (
+                    <span style={{
+                      color: '#2d7a3a',
+                      fontSize: 8,
+                      fontWeight: 700,
+                      background: 'rgba(45,122,58,0.15)',
+                      borderRadius: 3,
+                      padding: '0 3px',
+                    }}>
+                      DOWN
+                    </span>
+                  )}
+                </div>
+                <div style={{
+                  color: '#8b7355',
+                  fontSize: 8,
+                  marginTop: 1,
+                }}>
+                  {totalScore} pts
+                </div>
               </div>
-              <div style={{ color: '#3a5a3a', fontSize: 9, marginTop: 2 }}>
-                {p.handSize} cards{p.hasLaidDown ? ' · Down' : ''}
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         {/* Table melds */}
@@ -511,64 +608,112 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
       {!showMeldBuilder && (
         <div style={{
           display: 'flex',
-          alignItems: 'center',
+          alignItems: 'flex-end',
           justifyContent: 'center',
-          gap: 20,
+          gap: 32,
           padding: '8px 12px',
           flexShrink: 0,
+          background: '#162e22',
+          borderRadius: 10,
+          margin: '0 12px',
         }}>
-          {/* Draw pile */}
-          <button
-            onClick={() => isMyTurn && uiPhase === 'draw' && send({ type: 'draw_pile' })}
-            disabled={!isMyTurn || uiPhase !== 'draw'}
-            style={{
-              width: 60, height: 84,
-              borderRadius: 8,
-              background: '#7a1a2e',
-              border: isMyTurn && uiPhase === 'draw' ? '2px solid #e2b858' : '2px solid #4a1a2e',
-              cursor: isMyTurn && uiPhase === 'draw' ? 'pointer' : 'default',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#a8d0a8',
-              fontSize: 10,
-              opacity: isMyTurn && uiPhase === 'draw' ? 1 : 0.5,
-            }}
-          >
-            {view.drawPileSize}
-          </button>
+          {/* Draw pile with label */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+            {drawLabel && (
+              <span style={{
+                color: '#e2b858',
+                fontSize: 9,
+                fontWeight: 700,
+                letterSpacing: 1,
+                textTransform: 'uppercase',
+              }}>
+                {drawLabel}
+              </span>
+            )}
+            {!drawLabel && <div style={{ height: 13 }} />}
+            <button
+              onClick={() => drawActive && send({ type: 'draw_pile' })}
+              disabled={!drawActive}
+              style={{
+                width: 64, height: 88,
+                borderRadius: 8,
+                background: '#7a1a2e',
+                border: drawActive ? '2px solid #e2b858' : '2px solid #4a1a2e',
+                cursor: drawActive ? 'pointer' : 'default',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 4,
+                opacity: drawActive ? 1 : 0.5,
+                position: 'relative',
+                overflow: 'hidden',
+                animation: drawActive ? 'ready-pulse 2s ease-in-out infinite' : undefined,
+                boxShadow: drawActive ? '0 0 12px rgba(226,184,88,0.3)' : 'none',
+              }}
+            >
+              {/* Card back pattern lines */}
+              <div style={{
+                position: 'absolute',
+                inset: 4,
+                borderRadius: 4,
+                border: '1px solid rgba(255,255,255,0.1)',
+              }} />
+              <div style={{
+                position: 'absolute',
+                inset: 8,
+                borderRadius: 2,
+                border: '1px solid rgba(255,255,255,0.06)',
+              }} />
+              <span style={{ color: '#e8c0c8', fontSize: 12, fontWeight: 700, zIndex: 1 }}>
+                {view.drawPileSize}
+              </span>
+            </button>
+          </div>
 
-          {/* Discard pile */}
-          <button
-            onClick={() => {
-              if (isMyTurn && uiPhase === 'draw' && discardTop) {
-                if (hasFreeOffer) {
-                  send({ type: 'take_discard' })
-                } else {
+          {/* Discard pile with label */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+            {discardLabel && (
+              <span style={{
+                color: isBuyingPhase ? '#e07a5f' : '#e2b858',
+                fontSize: 9,
+                fontWeight: 700,
+                letterSpacing: 1,
+                textTransform: 'uppercase',
+              }}>
+                {discardLabel}
+              </span>
+            )}
+            {!discardLabel && <div style={{ height: 13 }} />}
+            <button
+              onClick={() => {
+                if (discardActive && discardTop) {
                   send({ type: 'take_discard' })
                 }
-              }
-            }}
-            disabled={!isMyTurn || uiPhase !== 'draw' || !discardTop}
-            style={{
-              width: 60, height: 84,
-              borderRadius: 8,
-              background: discardTop ? '#ffffff' : '#1e4a2e',
-              border: isMyTurn && uiPhase === 'draw' && discardTop ? '2px solid #e2b858' : '2px solid #2d5a3a',
-              cursor: isMyTurn && uiPhase === 'draw' && discardTop ? 'pointer' : 'default',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              opacity: isMyTurn && uiPhase === 'draw' && discardTop ? 1 : 0.6,
-              padding: 2,
-            }}
-          >
-            {discardTop ? (
-              <CardComponent card={discardTop} />
-            ) : (
-              <span style={{ color: '#3a5a3a', fontSize: 9 }}>Empty</span>
-            )}
-          </button>
+              }}
+              disabled={!discardActive || !discardTop}
+              style={{
+                width: 64, height: 88,
+                borderRadius: 8,
+                background: discardTop ? '#ffffff' : '#1e4a2e',
+                border: discardActive && discardTop ? '2px solid #e2b858' : '2px solid #2d5a3a',
+                cursor: discardActive && discardTop ? 'pointer' : 'default',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: discardActive && discardTop ? 1 : 0.6,
+                padding: 2,
+                animation: discardActive && discardTop ? 'ready-pulse 2s ease-in-out infinite' : undefined,
+                boxShadow: discardActive && discardTop ? '0 0 12px rgba(226,184,88,0.3)' : 'none',
+              }}
+            >
+              {discardTop ? (
+                <CardComponent card={discardTop} />
+              ) : (
+                <span style={{ color: '#3a5a3a', fontSize: 9 }}>Empty</span>
+              )}
+            </button>
+          </div>
         </div>
       )}
 
@@ -677,20 +822,77 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
         </div>
       )}
 
-      {/* Turn indicator */}
+      {/* ── Turn indicator ─────────────────────────────────────────────── */}
+      {isMyTurn && uiPhase !== 'round-end' && uiPhase !== 'game-over' && uiPhase !== 'round-start' && (
+        <div style={{
+          margin: '4px 12px',
+          padding: '8px 14px',
+          borderRadius: 10,
+          background: 'rgba(42,53,34,0.85)',
+          border: '2px solid #e2b858',
+          textAlign: 'center',
+          animation: 'ready-pulse 2s ease-in-out infinite',
+        }}>
+          <span style={{
+            color: '#e2b858',
+            fontSize: 14,
+            fontWeight: 800,
+            letterSpacing: 1,
+          }}>
+            YOUR TURN
+          </span>
+        </div>
+      )}
       {!isMyTurn && uiPhase !== 'round-end' && uiPhase !== 'game-over' && uiPhase !== 'round-start' && (
         <div style={{
+          margin: '4px 12px',
+          padding: '6px 14px',
+          borderRadius: 10,
+          background: 'rgba(15,34,24,0.6)',
+          border: '1px solid #2d5a3a',
           textAlign: 'center',
-          padding: '8px 0',
-          color: '#6aad7a',
-          fontSize: 12,
         }}>
-          {currentPlayerName}'s turn...
+          <span style={{ color: '#a8d0a8', fontSize: 12 }}>
+            Waiting for <span style={{ color: '#e2b858', fontWeight: 700 }}>{currentPlayerName}</span>...
+          </span>
         </div>
       )}
 
       {/* ── Zone 4: Hand ────────────────────────────────────────────────── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '0 8px' }}>
+        {/* Hand info label */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '2px 0 4px',
+          gap: 6,
+        }}>
+          {isOnTheEdge && myHand.length === 1 ? (
+            <span style={{
+              color: '#e2b858',
+              fontSize: 11,
+              fontWeight: 700,
+            }}>
+              Final card — lay it off to go out!
+            </span>
+          ) : isOnTheEdge ? (
+            <span style={{
+              color: '#e2b858',
+              fontSize: 11,
+              fontWeight: 600,
+            }}>
+              {myHand.length} cards · {handPoints} pts — almost there!
+            </span>
+          ) : (
+            <span style={{
+              color: '#6aad7a',
+              fontSize: 11,
+            }}>
+              {myHand.length} cards · {handPoints} pts
+            </span>
+          )}
+        </div>
         <HandDisplay
           cards={myHand}
           selectedIds={selectedCardIds}
