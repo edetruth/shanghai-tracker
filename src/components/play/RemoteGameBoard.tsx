@@ -24,7 +24,12 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
   const [handSort, setHandSort] = useState<'rank' | 'suit'>('rank')
   const [showMeldBuilder, setShowMeldBuilder] = useState(false)
   const [showPause, setShowPause] = useState(false)
+  const [showScoreboard, setShowScoreboard] = useState(false)
   const [ghostedIds, setGhostedIds] = useState<Set<string>>(new Set())
+  const [activeToast, setActiveToast] = useState<{ message: string; style: string; icon?: string } | null>(null)
+  const [lastEvent, setLastEvent] = useState<string | null>(null)
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const eventTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const meldBuilderRef = useRef<MeldBuilderHandle | null>(null)
   const viewRef = useRef(view)
   viewRef.current = view
@@ -47,6 +52,16 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
     return unsub
   }, [channel, mySeatIndex, onMessage])
 
+  // Notify host when we reconnect so they re-broadcast state
+  const wasConnectedRef = useRef(false)
+  useEffect(() => {
+    if (isConnected && !wasConnectedRef.current && view !== null && channel) {
+      // Transition from disconnected → connected while we already had a view = reconnection
+      channel.send({ type: 'broadcast', event: 'player_reconnected', payload: { seatIndex: mySeatIndex } })
+    }
+    wasConnectedRef.current = isConnected
+  }, [isConnected, channel, mySeatIndex, view])
+
   // Listen for action rejections
   useEffect(() => {
     if (!channel) return
@@ -56,6 +71,21 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
       }
     })
   }, [channel, mySeatIndex, onMessage])
+
+  // Process incoming toast/event notifications from host
+  useEffect(() => {
+    if (!view) return
+    if (view.toast) {
+      setActiveToast(view.toast)
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
+      toastTimerRef.current = setTimeout(() => setActiveToast(null), 3000)
+    }
+    if (view.lastEvent) {
+      setLastEvent(view.lastEvent)
+      if (eventTimerRef.current) clearTimeout(eventTimerRef.current)
+      eventTimerRef.current = setTimeout(() => setLastEvent(null), 4000)
+    }
+  }, [view?.toast?.message, view?.lastEvent]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function send(action: PlayerAction) {
     if (!channel) return
@@ -355,10 +385,82 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
         </div>
       </div>
 
+      {/* ── Event notifications ───────────────────────────────────────── */}
+      {activeToast && (
+        <div style={{
+          margin: '4px 12px',
+          padding: '8px 14px',
+          borderRadius: 10,
+          background: activeToast.style === 'celebration' ? 'rgba(45,122,58,0.85)'
+            : activeToast.style === 'taunt' ? 'rgba(142,68,173,0.85)'
+            : activeToast.style === 'pressure' ? 'rgba(184,50,50,0.85)'
+            : activeToast.style === 'drama' ? 'rgba(226,184,88,0.85)'
+            : 'rgba(42,53,34,0.85)',
+          color: '#ffffff',
+          fontSize: 13,
+          fontWeight: 700,
+          textAlign: 'center',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 6,
+          animation: 'fade-in 0.2s ease-out',
+        }}>
+          {activeToast.icon && <span>{activeToast.icon}</span>}
+          {activeToast.message}
+        </div>
+      )}
+      {lastEvent && !activeToast && (
+        <div style={{
+          margin: '2px 12px',
+          padding: '4px 12px',
+          borderRadius: 8,
+          background: 'rgba(15,34,24,0.7)',
+          color: '#a8d0a8',
+          fontSize: 11,
+          textAlign: 'center',
+        }}>
+          {lastEvent}
+        </div>
+      )}
+      {view.raceMessage && (
+        <div style={{
+          margin: '2px 12px',
+          padding: '4px 12px',
+          borderRadius: 20,
+          background: 'rgba(42,53,34,0.85)',
+          border: '1px solid rgba(226,184,88,0.2)',
+          color: '#e2b858',
+          fontSize: 11,
+          fontWeight: 700,
+          textAlign: 'center',
+        }}>
+          {view.raceMessage}
+        </div>
+      )}
+      {view.streakInfo && view.streakInfo.streak >= 2 && (
+        <div style={{
+          margin: '2px 12px',
+          padding: '4px 12px',
+          borderRadius: 8,
+          background: 'rgba(226,140,50,0.15)',
+          border: '1px solid rgba(226,140,50,0.3)',
+          color: '#e2b858',
+          fontSize: 11,
+          fontWeight: 600,
+          textAlign: 'center',
+        }}>
+          {'\uD83D\uDD25'} {view.streakInfo.playerName} on fire! {view.streakInfo.streak} in a row
+        </div>
+      )}
+
       {/* ── Zone 2: Opponent strip + table melds ────────────────────────── */}
       <div style={{ flex: '0 0 auto', overflowX: 'auto', padding: '8px 12px' }}>
-        {/* Opponent cards strip */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+        {/* Opponent cards strip — tap to toggle scoreboard */}
+        <div
+          style={{ display: 'flex', gap: 8, marginBottom: 8, cursor: 'pointer' }}
+          onClick={() => { setShowScoreboard(prev => !prev); haptic('tap') }}
+        >
           {allPlayers.map(p => (
             <div
               key={p.seatIndex}
@@ -672,6 +774,107 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
           </>
         )}
       </div>
+
+      {/* Scoreboard overlay */}
+      {showScoreboard && (
+        <>
+          {/* Backdrop */}
+          <div
+            onClick={() => setShowScoreboard(false)}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 49,
+              background: 'rgba(0,0,0,0.5)',
+            }}
+          />
+          {/* Bottom sheet */}
+          <div style={{
+            position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50,
+            background: '#0f2218',
+            borderTopLeftRadius: 16,
+            borderTopRightRadius: 16,
+            paddingBottom: 'max(16px, env(safe-area-inset-bottom))',
+            animation: 'meld-staging-in 0.25s ease-out',
+            maxHeight: '70dvh',
+            overflowY: 'auto',
+          }}>
+            {/* Handle bar */}
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}>
+              <div style={{ width: 36, height: 4, borderRadius: 2, background: '#2d5a3a' }} />
+            </div>
+            <h3 style={{ color: '#e2b858', fontSize: 15, fontWeight: 700, textAlign: 'center', marginBottom: 12 }}>
+              Scoreboard
+            </h3>
+            {/* Score table */}
+            <div style={{ overflowX: 'auto', padding: '0 12px 12px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: 'left', color: '#6aad7a', fontWeight: 600, padding: '4px 8px', borderBottom: '1px solid #2d5a3a', whiteSpace: 'nowrap' }}>Player</th>
+                    {[1,2,3,4,5,6,7].map(r => (
+                      <th key={r} style={{
+                        textAlign: 'center', color: r <= currentRound ? '#6aad7a' : '#2d5a3a',
+                        fontWeight: 600, padding: '4px 6px', borderBottom: '1px solid #2d5a3a',
+                        minWidth: 28,
+                      }}>R{r}</th>
+                    ))}
+                    <th style={{ textAlign: 'right', color: '#e2b858', fontWeight: 700, padding: '4px 8px', borderBottom: '1px solid #2d5a3a' }}>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...scores]
+                    .map((s, originalIdx) => ({ ...s, originalIdx }))
+                    .sort((a, b) => {
+                      const totalA = a.roundScores.reduce((sum, n) => sum + n, 0)
+                      const totalB = b.roundScores.reduce((sum, n) => sum + n, 0)
+                      return totalA - totalB
+                    })
+                    .map(s => {
+                      const total = s.roundScores.reduce((sum, n) => sum + n, 0)
+                      const isMe = s.originalIdx === view.myPlayerIndex
+                      return (
+                        <tr key={s.name}>
+                          <td style={{
+                            padding: '6px 8px',
+                            color: isMe ? '#e2b858' : '#a8d0a8',
+                            fontWeight: isMe ? 700 : 400,
+                            whiteSpace: 'nowrap',
+                            borderBottom: '1px solid #1a3a2a',
+                          }}>
+                            {s.name}{isMe ? ' (you)' : ''}
+                          </td>
+                          {[0,1,2,3,4,5,6].map(ri => {
+                            const played = ri < s.roundScores.length
+                            const val = played ? s.roundScores[ri] : null
+                            return (
+                              <td key={ri} style={{
+                                textAlign: 'center',
+                                padding: '6px 4px',
+                                color: val === null ? '#2d5a3a' : val === 0 ? '#6aad7a' : '#a8d0a8',
+                                fontWeight: val === 0 ? 700 : 400,
+                                borderBottom: '1px solid #1a3a2a',
+                              }}>
+                                {val === null ? '-' : val}
+                              </td>
+                            )
+                          })}
+                          <td style={{
+                            textAlign: 'right',
+                            padding: '6px 8px',
+                            color: isMe ? '#e2b858' : '#ffffff',
+                            fontWeight: 700,
+                            borderBottom: '1px solid #1a3a2a',
+                          }}>
+                            {total}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Pause modal */}
       {showPause && (

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { createPlayedGame, saveGameEvents, saveAIDecisions, backfillDecisionOutcomes, savePlayerRoundStats, savePlayerGameStats } from '../../lib/gameStore'
+import { createPlayedGame, saveGameEvents, saveAIDecisions, backfillDecisionOutcomes, savePlayerRoundStats, savePlayerGameStats, saveGameStateSnapshot } from '../../lib/gameStore'
 import type { AIDecision, PlayerRoundStats, PlayerGameStats } from '../../game/types'
-import { Pause } from 'lucide-react'
+import { Pause, Wifi } from 'lucide-react'
 import type { GameState, Player, Card as CardType, Meld, PlayerConfig, AIDifficulty, AIPersonality, PersonalityConfig, OpponentHistory } from '../../game/types'
 import { PERSONALITIES } from '../../game/types'
 import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, MAX_BUYS, cardPoints } from '../../game/rules'
@@ -316,6 +316,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   // Joker swap "The Exchange" cinematic overlay
   const [swapAnim, setSwapAnim] = useState<{ natural: CardType; joker: CardType; isHeist: boolean } | null>(null)
   const [raceMessage, setRaceMessage] = useState('')
+
+  // ── Remote event notifications (host → remote players) ────────────────────
+  const [remoteEvent, setRemoteEvent] = useState<string | null>(null)
+  const [remoteToast, setRemoteToast] = useState<{ message: string; style: string; icon?: string } | null>(null)
 
   // ── Round-end transition states ───────────────────────────────────────────
   const [showDarkBeat, setShowDarkBeat] = useState(false)
@@ -658,6 +662,14 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   // Broadcast sanitized state to all remote players after every relevant change
   useEffect(() => {
     if (mode !== 'host' || !mpChannel.isConnected) return
+    // Build streak info from streaksRef
+    let streakInfo: { playerName: string; streak: number } | null = null
+    for (const [pid, streak] of streaksRef.current.entries()) {
+      if (streak >= 2) {
+        const p = gameState.players.find(pl => pl.id === pid)
+        if (p) streakInfo = { playerName: p.name, streak }
+      }
+    }
     for (const remoteSeat of remoteSeatIndices) {
       const view = sanitizeGameViewForPlayer({
         gameState,
@@ -677,10 +689,17 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         goingOutSequence,
         announcementStage,
         gameOver: gameState.gameOver,
+        toast: remoteToast,
+        lastEvent: remoteEvent ?? undefined,
+        raceMessage: raceMessage || undefined,
+        streakInfo,
       })
       mpChannel.broadcast('game_state', { targetSeatIndex: remoteSeat, view })
     }
-  }, [mode, mpChannel.isConnected, gameState, uiPhase, buyingPhase, buyerStep, buyingPassedPlayers, buyingSnatcherName, roundResults, goingOutSequence, announcementStage]) // eslint-disable-line react-hooks/exhaustive-deps
+    // Clear ephemeral events after broadcasting so they are not re-sent
+    if (remoteEvent) setTimeout(() => setRemoteEvent(null), 100)
+    if (remoteToast) setTimeout(() => setRemoteToast(null), 100)
+  }, [mode, mpChannel.isConnected, gameState, uiPhase, buyingPhase, buyerStep, buyingPassedPlayers, buyingSnatcherName, roundResults, goingOutSequence, announcementStage, remoteEvent, remoteToast, raceMessage]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Receive and dispatch remote player actions
   useEffect(() => {
@@ -705,6 +724,57 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       if (!result.ok) {
         mpChannel.broadcast('action_rejected', { seatIndex: payload.seatIndex, reason: result.error ?? 'Invalid action' })
       }
+    })
+  }, [mode, mpChannel.onMessage]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Host: persist game state snapshot periodically + on key transitions ────
+  const snapshotTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  useEffect(() => {
+    if (mode !== 'host' || !roomCode) return
+
+    // Save immediately on round-end or game-over
+    if (uiPhase === 'round-end' || uiPhase === 'game-over') {
+      saveGameStateSnapshot(roomCode, { gameState: gameStateRef.current, uiPhase, currentRound: gameStateRef.current.currentRound })
+    }
+
+    // Periodic 10-second snapshot
+    if (snapshotTimerRef.current) clearInterval(snapshotTimerRef.current)
+    snapshotTimerRef.current = setInterval(() => {
+      saveGameStateSnapshot(roomCode!, { gameState: gameStateRef.current, uiPhase: uiPhaseRef.current, currentRound: gameStateRef.current.currentRound })
+    }, 10_000)
+
+    return () => {
+      if (snapshotTimerRef.current) clearInterval(snapshotTimerRef.current)
+    }
+  }, [mode, roomCode, uiPhase]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Host: handle remote player reconnections ──────────────────────────────
+  useEffect(() => {
+    if (mode !== 'host') return
+    return mpChannel.onMessage('player_reconnected', (payload: { seatIndex: number }) => {
+      const remoteSeat = payload.seatIndex
+      if (!remoteSeatIndices.includes(remoteSeat)) return
+      // Re-broadcast current state to the reconnected player
+      const view = sanitizeGameViewForPlayer({
+        gameState: gameStateRef.current,
+        uiPhase: uiPhaseRef.current,
+        targetSeatIndex: remoteSeat,
+        buyingState: buyingPhaseRef.current !== 'hidden' ? {
+          buyingDiscard: buyingDiscard,
+          buyerOrder: buyerOrderRef.current,
+          buyerStep: buyerStepRef.current,
+          buyingPhase: buyingPhaseRef.current,
+          passedPlayers: buyingPassedPlayers,
+          snatcherName: buyingSnatcherName,
+        } : null,
+        pendingFreeOffer: pendingBuyDiscardRef.current,
+        roundResults: roundResults as any,
+        goingOutPlayerName: goOutPlayerName,
+        goingOutSequence,
+        announcementStage,
+        gameOver: gameStateRef.current.gameOver,
+      })
+      mpChannel.broadcast('game_state', { targetSeatIndex: remoteSeat, view })
     })
   }, [mode, mpChannel.onMessage]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1375,6 +1445,11 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       const msgs = ['First to the table!', 'Setting the pace!', 'Bold move.', `${player.name} leads the way!`]
       queueToast({ message: msgs[Math.floor(Math.random() * msgs.length)], style: 'celebration', icon: '💪', duration: 2000 })
     }
+    // Broadcast event to remote players
+    setRemoteEvent(`${player.name} went down!`)
+    if (isFirstDown && !wentOut) {
+      setRemoteToast({ message: `${player.name} leads the way!`, style: 'celebration', icon: '💪' })
+    }
     setGameState(updated)
     setShowMeldModal(false)
     setMeldAssignedIds(new Set())
@@ -1579,6 +1654,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       style: 'taunt', icon: '🃏', duration: 1500,
     })
     haptic('heavy')
+    // Broadcast event to remote players
+    setRemoteEvent(`${swapPlayer.name} swapped a joker!`)
+    setRemoteToast({ message: isFromOtherMeld ? 'The heist!' : 'Joker reclaimed!', style: 'taunt', icon: '🃏' })
     // Capture the joker card before the state update removes it from the meld
     const jokerCard = findSwappableJoker(naturalCard, meld)
     if (jokerCard && !reduceAnimations) {
@@ -1878,6 +1956,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         card: buyingDiscard ? formatCard(buyingDiscard) : '?',
         detail: `buys after: ${buyer.buysRemaining - 1}/${gameState.buyLimit >= 999 ? '∞' : gameState.buyLimit}`,
       })
+
+      // Broadcast event to remote players
+      setRemoteEvent(`${buyer.name} bought ${buyingDiscard ? formatCard(buyingDiscard) : 'a card'}!`)
 
       if (isPostDraw) {
         // Post-draw buy: current player (who drew from pile) still acts after this
@@ -2835,6 +2916,16 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
             <Pause size={18} />
           </button>
         </div>
+
+        {/* Host multiplayer connection indicator */}
+        {mode === 'host' && remoteSeatIndices.length > 0 && (
+          <div className="flex items-center justify-center gap-1 px-3 py-1" style={{ borderBottom: '1px solid #2d5a3a' }}>
+            <Wifi size={12} style={{ color: mpChannel.isConnected ? '#6aad7a' : '#e07a5f' }} />
+            <span style={{ fontSize: 10, color: '#6aad7a' }}>
+              {mpChannel.connectedPlayerCount}/{remoteSeatIndices.length + 1} players connected
+            </span>
+          </div>
+        )}
 
         {/* Compressed opponent strip — single-line ticker, tap to expand */}
         <div

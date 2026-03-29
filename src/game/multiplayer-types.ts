@@ -111,6 +111,12 @@ export interface RemoteGameView {
   // Game over
   gameOver: boolean
   winner?: string
+
+  // Event notifications for remote players
+  toast?: { message: string; style: 'celebration' | 'pressure' | 'neutral' | 'drama' | 'taunt'; icon?: string }
+  lastEvent?: string  // e.g. "Sam bought 7♥", "Pat went down!", "Lou swapped a joker!"
+  raceMessage?: string  // "Race to finish!" tension message
+  streakInfo?: { playerName: string; streak: number }
 }
 
 // Remote UI phases mirror host UIPhase, but no 'privacy' (remote players are on separate devices)

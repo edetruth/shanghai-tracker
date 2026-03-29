@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { ChevronLeft, Copy, Check, Users, Wifi, Bot, X } from 'lucide-react'
+import { ChevronLeft, Copy, Check, Users, Wifi, Bot, X, Share2 } from 'lucide-react'
 import { useGameLobby } from '../../hooks/useGameLobby'
-import { createGameRoom, joinGameRoom, addAIToRoom, removeAIFromRoom, updateRoomStatus } from '../../lib/gameStore'
+import { createGameRoom, joinGameRoom, addAIToRoom, removeAIFromRoom, removePlayerFromRoom, updateRoomStatus } from '../../lib/gameStore'
 import { haptic } from '../../lib/haptics'
 import type { GameRoomConfig, GameRoomPlayer } from '../../game/multiplayer-types'
 import type { AIPersonality } from '../../game/types'
@@ -72,6 +72,20 @@ export default function Lobby(props: Props) {
     setCopied(true)
     haptic('tap')
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  function handleShareCode() {
+    if (!roomCode || !navigator.share) return
+    navigator.share({
+      title: 'Join my Shanghai game!',
+      text: `Join my Shanghai Rummy game! Room code: ${roomCode}`,
+    }).catch(() => {})
+    haptic('tap')
+  }
+
+  async function handleKickPlayer(playerName: string) {
+    if (!roomCode) return
+    await removePlayerFromRoom(roomCode, playerName)
   }
 
   async function handleJoin() {
@@ -312,26 +326,85 @@ export default function Lobby(props: Props) {
           </p>
         </div>
         {roomCode && (
-          <button
-            onClick={handleCopyCode}
-            style={{
-              background: '#1e4a2e',
-              border: '1px solid #2d5a3a',
-              borderRadius: 8,
-              padding: '8px 12px',
-              color: copied ? '#6aad7a' : '#a8d0a8',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 12,
-            }}
-          >
-            {copied ? <Check size={14} /> : <Copy size={14} />}
-            {copied ? 'Copied' : 'Copy'}
-          </button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              onClick={handleCopyCode}
+              style={{
+                background: '#1e4a2e',
+                border: '1px solid #2d5a3a',
+                borderRadius: 8,
+                padding: '8px 12px',
+                color: copied ? '#6aad7a' : '#a8d0a8',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                fontSize: 12,
+              }}
+            >
+              {copied ? <Check size={14} /> : <Copy size={14} />}
+              {copied ? 'Copied' : 'Copy'}
+            </button>
+            {typeof navigator !== 'undefined' && !!navigator.share && (
+              <button
+                onClick={handleShareCode}
+                style={{
+                  background: '#1e4a2e',
+                  border: '1px solid #2d5a3a',
+                  borderRadius: 8,
+                  padding: '8px 12px',
+                  color: '#a8d0a8',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  fontSize: 12,
+                }}
+              >
+                <Share2 size={14} />
+                Share
+              </button>
+            )}
+          </div>
         )}
       </div>
+
+      {/* Config summary chips */}
+      {(() => {
+        const cfg = hostConfig ?? room?.game_config ?? null
+        if (!cfg) return null
+        const buyLabel = cfg.buyLimit === 0 ? 'Buying disabled'
+          : cfg.buyLimit === -1 ? '\u221E buys/round'
+          : `${cfg.buyLimit} buys/round`
+        const chipStyle = {
+          background: '#0f2218',
+          border: '1px solid #2d5a3a',
+          color: '#6aad7a',
+          borderRadius: 16,
+          padding: '4px 10px',
+          fontSize: 11,
+          fontWeight: 500 as const,
+          whiteSpace: 'nowrap' as const,
+        }
+        const hasAI = players.some(p => p.is_ai)
+        const aiPersonalityName = cfg.aiPersonality
+          ? PERSONALITIES.find(p => p.id === cfg.aiPersonality)?.name
+          : null
+        return (
+          <div style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 6,
+            margin: '10px 16px 0',
+          }}>
+            <span style={chipStyle}>{cfg.playerCount} players</span>
+            <span style={chipStyle}>{buyLabel}</span>
+            {hasAI && aiPersonalityName && (
+              <span style={chipStyle}>AI: {aiPersonalityName}</span>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Player list */}
       <div style={{ flex: 1, padding: '16px', overflowY: 'auto' }}>
@@ -391,6 +464,21 @@ export default function Lobby(props: Props) {
                   {mode === 'host' && player.is_ai && (
                     <button
                       onClick={() => handleRemoveAI(i)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#6aad7a',
+                        cursor: 'pointer',
+                        padding: 4,
+                      }}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                  {/* Kick human player button (host only, non-host players) */}
+                  {mode === 'host' && !player.is_ai && !player.is_host && (
+                    <button
+                      onClick={() => handleKickPlayer(player.player_name)}
                       style={{
                         background: 'transparent',
                         border: 'none',

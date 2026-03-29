@@ -32,6 +32,7 @@ export function useMultiplayerChannel(roomCode: string | null) {
       'game_start',
       'player_joined',
       'player_left',
+      'player_reconnected',
       'heartbeat',
     ] as const
 

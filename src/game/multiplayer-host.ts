@@ -31,6 +31,10 @@ interface SanitizeParams {
   announcementStage: AnnouncementStage | null
   gameOver: boolean
   winner?: string
+  toast?: { message: string; style: string; icon?: string } | null
+  lastEvent?: string
+  raceMessage?: string
+  streakInfo?: { playerName: string; streak: number } | null
 }
 
 export function sanitizeGameViewForPlayer(params: SanitizeParams): RemoteGameView {
@@ -39,6 +43,7 @@ export function sanitizeGameViewForPlayer(params: SanitizeParams): RemoteGameVie
     buyingState, pendingFreeOffer, roundResults,
     goingOutPlayerName, goingOutSequence, announcementStage,
     gameOver, winner,
+    toast, lastEvent, raceMessage, streakInfo,
   } = params
 
   const rs = gameState.roundState
@@ -134,6 +139,10 @@ export function sanitizeGameViewForPlayer(params: SanitizeParams): RemoteGameVie
     announcementStage,
     gameOver,
     winner,
+    ...(toast ? { toast: toast as RemoteGameView['toast'] } : {}),
+    ...(lastEvent ? { lastEvent } : {}),
+    ...(raceMessage ? { raceMessage } : {}),
+    ...(streakInfo ? { streakInfo } : {}),
   }
 }
 

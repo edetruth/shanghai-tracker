@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Progressive Web App (PWA) for playing and tracking Shanghai Rummy card games. Mobile-first, warm cream light theme, with a full digital card game (pass-and-play + AI), real-time score tracker multiplayer, and historical stats.
+Progressive Web App (PWA) for playing and tracking Shanghai Rummy card games. Mobile-first, warm cream light theme, with a full digital card game (pass-and-play, AI, and online multiplayer), real-time score tracker multiplayer, and historical stats.
 
 ## Tech Stack
 
@@ -43,6 +43,12 @@ src/
 │                            #   aiShouldBuy (all evaluation-based), aiFindBestMelds (greedy +
 │                            #   bounded backtrack + suit-permutation search), cardDanger (opponent
 │                            #   awareness), aiFindLayOff, aiFindJokerSwap, aiFindPreLayDownJokerSwap
+├── multiplayer/               # Online multiplayer system
+│   ├── multiplayer-types.ts   # RemoteGameView, PlayerAction, RoomState, BroadcastPayload types
+│   ├── multiplayer-host.ts    # Host-side logic: state broadcasting, action validation, mapActionToHandler
+│   ├── multiplayer-client.ts  # Client-side logic: action sending, state receiving
+│   ├── useMultiplayerChannel.ts # Supabase Realtime Broadcast hook (host + client)
+│   └── useGameLobby.ts       # Lobby state management: join/leave, ready-up, AI slot control
 ├── hooks/
 │   └── useRealtimeScores.ts # Supabase Realtime subscriptions for score tracker multiplayer
 └── components/
@@ -71,7 +77,9 @@ src/
         ├── TableMelds.tsx    # Table meld display: overlap layout for long runs, data-meld-id for auto-scroll
         ├── HandDisplay.tsx   # Scrollable hand with controlled sort (Rank / Suit), compact mode for buy, ghostedIds for meld-building
         ├── BuyingCinematic.tsx # Buying window: BuyingCinematic (overlay) + BuyBottomSheet (inline bottom sheet)
-        └── RoundAnnouncement.tsx # Round countdown + dealing interstitial
+        ├── RoundAnnouncement.tsx # Round countdown + dealing interstitial
+        ├── Lobby.tsx            # Pre-game lobby: player list, ready-up, AI slots, start game
+        └── RemoteGameBoard.tsx  # Remote player view: receives RemoteGameView, sends PlayerAction
 
 supabase/
 ├── add_game_type.sql         # Migration: ALTER TABLE games ADD COLUMN game_type text DEFAULT 'manual'
@@ -97,7 +105,7 @@ npm run lint      # ESLint check
 
 ## Database (Supabase)
 
-Seven tables — no row-level security (public anon key access):
+Nine tables — no row-level security (public anon key access):
 
 | Table | Key columns |
 |-------|-------------|
@@ -108,10 +116,14 @@ Seven tables — no row-level security (public anon key access):
 | `ai_decisions` | `id`, `game_id`, `round_number`, `turn_number`, `player_name`, `decision_type`, `decision_result`, ... (telemetry) |
 | `player_round_stats` | `id`, `game_id`, `round_number`, `player_name`, `round_score`, `went_out`, `went_down`, ... (per-round summary) |
 | `player_game_stats` | `id`, `game_id`, `player_name`, `total_score`, `final_rank`, `won`, ... (per-game summary) |
+| `game_rooms` | `id`, `room_code`, `host_player_id`, `status`, `game_id`, `created_at` |
+| `game_room_players` | `id`, `room_id`, `player_name`, `is_ai`, `is_ready`, `is_connected`, `seat_index` |
 
 All DB access goes through `src/lib/gameStore.ts`. Never call Supabase directly from components.
 
 Key functions: `getPlayers`, `upsertPlayer`, `createGame(playerIds, date, gameType?)`, `getGame`, `getCompletedGames`, `updateRoundScore`, `saveAllRoundScores`, `completeGame`, `deleteGame`, `updateGame`, `importGame`, `savePlayedGame(players, date, gameType)`, `saveShanghaiEvents(gameId, roundNumber, playerIds)`, `computeWinner`, `generateRoomCode`.
+
+Multiplayer functions: `createGameRoom`, `joinGameRoom`, `getGameRoom`, `getGameRoomPlayers`, `updateRoomStatus`, `removePlayerFromRoom`, `addAIToRoom`, `removeAIFromRoom`, `saveGameStateSnapshot`, `updatePlayerConnection`.
 
 Telemetry functions (fire-and-forget, never break gameplay): `saveAIDecisions`, `backfillDecisionOutcomes`, `savePlayerRoundStats`, `savePlayerGameStats`.
 
@@ -171,6 +183,48 @@ GameSetup (PlayerConfig[] configured)
 - **Undo discard** — 3s timer after human discard; buying window not started until timer expires or undo tapped.
 - **Draw pile reshuffle** — proactive `useEffect` on draw phase start reshuffles discards (keeping top card) into a new draw pile before the player sees the board. Fallback reshuffle also exists in `handleDrawFromPile` and `handleBuyDecision` (penalty card). If both piles are empty, a fresh deck is added (GDD §9). UI shows clickable "Tap to Reshuffle" as a safety net if the pile is somehow still empty.
 
+## Online Multiplayer
+
+Online multiplayer uses a host-authoritative architecture over Supabase Realtime Broadcast. The host runs the full game engine; remote players receive sanitized views and send actions.
+
+**Flow:**
+```
+GameSetup (host creates room)
+  → Lobby (players join via SHNG-XXXX room code, ready-up)
+    → GameBoard (host, mode='host') / RemoteGameBoard (remote players)
+      → GameOver
+```
+
+**Key files:**
+- `src/multiplayer/multiplayer-types.ts` — `RemoteGameView`, `PlayerAction`, `RoomState`, `BroadcastPayload` types
+- `src/multiplayer/multiplayer-host.ts` — host-side state broadcasting, action validation, `mapActionToHandler`
+- `src/multiplayer/multiplayer-client.ts` — client-side action sending, state receiving
+- `src/multiplayer/useMultiplayerChannel.ts` — Supabase Realtime Broadcast hook (host + client)
+- `src/multiplayer/useGameLobby.ts` — lobby state management: join/leave, ready-up, AI slot control
+- `src/components/play/Lobby.tsx` — pre-game lobby UI: player list, ready-up, AI slots, start game
+- `src/components/play/RemoteGameBoard.tsx` — remote player view: renders from `RemoteGameView`, sends `PlayerAction`
+
+**Database tables:**
+
+| Table | Key columns |
+|-------|-------------|
+| `game_rooms` | `id`, `room_code`, `host_player_id`, `status`, `game_id`, `created_at` |
+| `game_room_players` | `id`, `room_id`, `player_name`, `is_ai`, `is_ready`, `is_connected`, `seat_index` |
+
+**gameStore functions:** `createGameRoom`, `joinGameRoom`, `getGameRoom`, `getGameRoomPlayers`, `updateRoomStatus`, `removePlayerFromRoom`, `addAIToRoom`, `removeAIFromRoom`, `saveGameStateSnapshot`, `updatePlayerConnection`.
+
+**State sync:** The host broadcasts a `RemoteGameView` per remote player on every state change. Each view contains only that player's hand (hand privacy enforced server-side). Public state (table melds, discard pile, scores, current turn) is shared with all.
+
+**Actions:** Remote players send `PlayerAction` messages (draw, discard, meld, lay-off, buy/pass) via Broadcast. The host validates each action through `mapActionToHandler`, which maps action types to the corresponding game engine handlers.
+
+**Buying window:** Remote players get a 15-second timeout to respond to buy opportunities. If no response, the host auto-passes on their behalf.
+
+**GameBoard `mode` prop:** `'local'` (default, pass-and-play) or `'host'` (online multiplayer). In host mode, GameBoard skips privacy screens for remote humans, runs AI only on the host, and broadcasts state after every mutation.
+
+**`game_type`:** Online multiplayer games are saved with `game_type: 'online'`.
+
+**Room codes:** Same `SHNG-XXXX` format as score tracker rooms (`generateRoomCode()` in gameStore).
+
 ## Drilldown System
 
 Every stat number in `StatsLeaderboard` and `PlayerProfileModal` is tappable. Tapping opens a `DrilldownModal` (z-60, above PlayerProfileModal at z-50).
@@ -225,7 +279,11 @@ Warm cream theme (not dark table). Uses `safe-top` for header padding.
 - **`total_score`** is a generated column in Supabase — never insert or update it directly.
 - **`created_by`** column does not exist in the `games` table — do not reference it.
 - **Score entry** only saves rounds 0..currentRound to avoid zero-filling future rounds on realtime sync.
-- **`game_type`** values: `'manual'` (score tracker), `'pass-and-play'` (play mode, all human), `'ai'` (play mode with AI). Legacy rows may be `null`.
+- **`game_type`** values: `'manual'` (score tracker), `'pass-and-play'` (play mode, all human), `'ai'` (play mode with AI), `'online'` (online multiplayer). Legacy rows may be `null`.
+- **`mode` prop on GameBoard** — `'local'` (pass-and-play, default) or `'host'` (online multiplayer). Drives privacy screen skipping, state broadcasting, and remote action handling.
+- **Remote players** never see other players' hands — hand privacy enforced via per-player `RemoteGameView`.
+- **AI runs on host only** — remote clients never execute AI logic.
+- **Privacy screens** are skipped for remote humans in host mode (each player has their own device).
 - **`saveShanghaiEvents()`** silently no-ops if the `shanghai_events` table doesn't exist.
 - **`haptic(type)`** — call with `'tap' | 'success' | 'error' | 'heavy'`; silent no-op on iOS/desktop.
 
