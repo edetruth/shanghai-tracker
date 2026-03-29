@@ -23,15 +23,28 @@ export function useMultiplayerChannel(roomCode: string | null) {
       },
     })
 
-    // Register broadcast listener for all events
-    channel.on('broadcast', { event: '*' }, ({ event, payload }) => {
-      const handlers = handlersRef.current.get(event)
-      if (handlers) {
-        for (const handler of handlers) {
-          handler(payload)
+    // Register broadcast listeners for each known event type
+    // Supabase Realtime Broadcast does NOT support wildcard event: '*'
+    const KNOWN_EVENTS = [
+      'game_state',
+      'player_action',
+      'action_rejected',
+      'game_start',
+      'player_joined',
+      'player_left',
+      'heartbeat',
+    ] as const
+
+    for (const eventName of KNOWN_EVENTS) {
+      channel.on('broadcast', { event: eventName }, ({ payload }) => {
+        const handlers = handlersRef.current.get(eventName)
+        if (handlers) {
+          for (const handler of handlers) {
+            handler(payload)
+          }
         }
-      }
-    })
+      })
+    }
 
     // Track presence for connection count
     channel.on('presence', { event: 'sync' }, () => {

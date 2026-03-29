@@ -7,6 +7,8 @@ import type { Card as CardType, Meld } from '../../game/types'
 import HandDisplay from './HandDisplay'
 import TableMelds from './TableMelds'
 import CardComponent from './Card'
+import MeldBuilder from './MeldBuilder'
+import type { MeldBuilderHandle } from './MeldBuilder'
 import { haptic } from '../../lib/haptics'
 import { ROUND_REQUIREMENTS } from '../../game/rules'
 
@@ -22,7 +24,8 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
   const [handSort, setHandSort] = useState<'rank' | 'suit'>('rank')
   const [showMeldBuilder, setShowMeldBuilder] = useState(false)
   const [showPause, setShowPause] = useState(false)
-  const meldBuilderRef = useRef<{ handleCardTap: (card: CardType) => void } | null>(null)
+  const [ghostedIds, setGhostedIds] = useState<Set<string>>(new Set())
+  const meldBuilderRef = useRef<MeldBuilderHandle | null>(null)
   const viewRef = useRef(view)
   viewRef.current = view
 
@@ -73,6 +76,14 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
     buyingState.buyerOrder[buyingState.buyerStep] === view?.myPlayerIndex &&
     buyingState.buyingPhase === 'human-turn'
   const hasFreeOffer = view?.pendingFreeOffer && isMyTurn && uiPhase === 'draw'
+
+  // Close meld builder if we leave the action phase or it's no longer our turn
+  useEffect(() => {
+    if (showMeldBuilder && (!isMyTurn || uiPhase !== 'action')) {
+      setShowMeldBuilder(false)
+      setGhostedIds(new Set())
+    }
+  }, [showMeldBuilder, isMyTurn, uiPhase])
 
   // Round felt color
   const feltColors = ['#1a3a2a', '#1a2f3a', '#2a1a3a', '#1a3a30', '#3a1a24', '#1a2a3a', '#2e2a1a']
@@ -459,6 +470,34 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
         </div>
       )}
 
+      {/* ── Meld Builder ──────────────────────────────────────────────── */}
+      {showMeldBuilder && (
+        <div style={{ padding: '0 8px', animation: 'meld-staging-in 0.25s ease-out' }}>
+          <MeldBuilder
+            ref={meldBuilderRef}
+            hand={myHand}
+            requirement={requirement}
+            onConfirm={(meldGroups, jokerPositions) => {
+              const meldCardIds = meldGroups.map(group => group.map(c => c.id))
+              const jp: Record<string, number> = {}
+              jokerPositions.forEach((rank, jokerId) => { jp[jokerId] = rank })
+              send({
+                type: 'meld_confirm',
+                meldCardIds,
+                jokerPositions: Object.keys(jp).length > 0 ? jp : undefined,
+              })
+              setShowMeldBuilder(false)
+              setGhostedIds(new Set())
+            }}
+            onClose={() => {
+              setShowMeldBuilder(false)
+              setGhostedIds(new Set())
+            }}
+            onAssignedIdsChange={(ids) => setGhostedIds(ids)}
+          />
+        </div>
+      )}
+
       {/* Free offer banner */}
       {hasFreeOffer && view.pendingFreeOffer && (
         <div style={{
@@ -553,6 +592,7 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
         <HandDisplay
           cards={myHand}
           selectedIds={selectedCardIds}
+          ghostedIds={showMeldBuilder ? ghostedIds : undefined}
           onToggle={(cardId: string) => {
             if (!isMyTurn) return
             if (uiPhase === 'action') {
@@ -582,7 +622,7 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
         gap: 8,
         flexShrink: 0,
       }}>
-        {isMyTurn && uiPhase === 'action' && (
+        {isMyTurn && uiPhase === 'action' && !showMeldBuilder && (
           <>
             {/* Lay Down button */}
             {!view.myHasLaidDown && (

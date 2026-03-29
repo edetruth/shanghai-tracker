@@ -742,7 +742,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   useEffect(() => {
     const date = new Date().toISOString().split('T')[0]
     const playerNames = initialPlayers.map(p => p.name)
-    const gameType = initialPlayers.some(p => p.isAI) ? 'ai' : 'pass-and-play'
+    const gameType = mode === 'host' ? 'online' : initialPlayers.some(p => p.isAI) ? 'ai' : 'pass-and-play'
     const effectiveBuyLimit = buyLimit === -1 ? 999 : buyLimit
     createPlayedGame(playerNames, date, gameType, effectiveBuyLimit)
       .then(id => setGameId(id))
@@ -1983,7 +1983,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     resetRoundTelemetry()
     const date = new Date().toISOString().split('T')[0]
     const playerNames = initialPlayers.map(p => p.name)
-    const gameType = initialPlayers.some(p => p.isAI) ? 'ai' : 'pass-and-play'
+    const gameType = mode === 'host' ? 'online' : initialPlayers.some(p => p.isAI) ? 'ai' : 'pass-and-play'
     const effectiveBuyLimit = buyLimit === -1 ? 999 : buyLimit
     try {
       const id = await createPlayedGame(playerNames, date, gameType, effectiveBuyLimit)

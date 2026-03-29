@@ -76,16 +76,30 @@ export default function Lobby(props: Props) {
 
   async function handleJoin() {
     const code = `SHNG-${joinInput.toUpperCase().replace(/[^A-Z0-9]/g, '')}`
-    if (joinInput.length < 4 || !playerName.trim()) return
+    const trimmedName = playerName.trim()
+    if (joinInput.length < 4 || !trimmedName) return
+
+    // Check for duplicate name before hitting the DB constraint
+    if (players.some(p => p.player_name.toLowerCase() === trimmedName.toLowerCase())) {
+      setError(`"${trimmedName}" is already taken in this room. Choose a different name.`)
+      return
+    }
+
     setJoining(true)
     setError(null)
     try {
-      const { room: r, seatIndex } = await joinGameRoom(code, playerName.trim())
+      const { room: r, seatIndex } = await joinGameRoom(code, trimmedName)
       setRoomCode(r.room_code)
       setMySeatIndex(seatIndex)
       haptic('success')
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not join room')
+      const msg = e instanceof Error ? e.message : 'Could not join room'
+      // Catch the DB unique constraint as a fallback
+      if (msg.includes('duplicate') || msg.includes('unique') || msg.includes('already exists')) {
+        setError(`"${trimmedName}" is already taken in this room. Choose a different name.`)
+      } else {
+        setError(msg)
+      }
     } finally {
       setJoining(false)
     }

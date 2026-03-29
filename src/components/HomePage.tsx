@@ -12,7 +12,7 @@ const CARDS = [
     id: 'play' as Section,
     Icon: Gamepad2,
     title: 'Play Game',
-    sub: 'Play against AI or friends',
+    sub: 'Local, AI, or online',
   },
   {
     id: 'scoretracker' as Section,
