@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   aiFindBestMelds, aiFindAllMelds, canFormAnyValidMeld,
-  aiChooseDiscard, aiChooseDiscardEasy, aiChooseDiscardHard,
+  aiChooseDiscard, aiChooseDiscardEasy,
   aiShouldTakeDiscard, aiShouldTakeDiscardHard, aiShouldBuy, aiShouldBuyHard,
   aiFindJokerSwap, aiFindPreLayDownJokerSwap,
   aiShouldGoDownHard,

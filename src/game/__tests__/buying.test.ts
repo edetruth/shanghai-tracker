@@ -29,7 +29,7 @@ describe('aiShouldBuyEasy', () => {
 describe('aiShouldBuy (medium)', () => {
   it('always buys a joker', () => {
     const hand = [c('hearts', 5), c('diamonds', 5), c('clubs', 3)]
-    expect(aiShouldBuy(hand, joker(), req1)).toBe(true)
+    expect(aiShouldBuy(hand, joker(), req1, 5)).toBe(true)
   })
 
   it('buys if discard completes a required meld combination', () => {
@@ -40,7 +40,7 @@ describe('aiShouldBuy (medium)', () => {
       c('clubs', 3),
     ]
     const discard = c('spades', 9)
-    expect(aiShouldBuy(hand, discard, req1)).toBe(true)
+    expect(aiShouldBuy(hand, discard, req1, 5)).toBe(true)
   })
 
   it('does not buy if hand already can form required melds', () => {
@@ -50,7 +50,7 @@ describe('aiShouldBuy (medium)', () => {
       c('hearts', 8), c('diamonds', 8), c('clubs', 8),
     ]
     const discard = c('spades', 2)
-    expect(aiShouldBuy(hand, discard, req1)).toBe(false)
+    expect(aiShouldBuy(hand, discard, req1, 5)).toBe(false)
   })
 })
 
