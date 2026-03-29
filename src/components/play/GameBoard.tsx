@@ -27,6 +27,9 @@ import CardComponent from './Card'
 import BuyingCinematic, { BuyBottomSheet, FreeTakeBottomSheet, type BuyingPhase } from './BuyingCinematic'
 import GameToast, { type QueuedToast } from './GameToast'
 import RoundAnnouncement, { type AnnouncementStage } from './RoundAnnouncement'
+import { useMultiplayerChannel } from '../../hooks/useMultiplayerChannel'
+import { sanitizeGameViewForPlayer, mapActionToHandler } from '../../game/multiplayer-host'
+import type { PlayerAction } from '../../game/multiplayer-types'
 
 interface Props {
   initialPlayers: PlayerConfig[]
@@ -36,6 +39,11 @@ interface Props {
   onExit: () => void
   onGameComplete?: (players: Player[]) => void
   tournamentGameNumber?: number
+  // Online multiplayer
+  mode?: 'local' | 'host'
+  roomCode?: string
+  hostSeatIndex?: number
+  remoteSeatIndices?: number[]
 }
 
 type UIPhase =
@@ -184,7 +192,7 @@ function getAIDelay(speed: GameSpeed): number {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyProp = 'medium', aiPersonality, buyLimit = 5, onExit, onGameComplete, tournamentGameNumber }: Props) {
+export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyProp = 'medium', aiPersonality, buyLimit = 5, onExit, onGameComplete, tournamentGameNumber, mode = 'local', roomCode, hostSeatIndex = 0, remoteSeatIndices = [] }: Props) {
   // Resolve personality config — if personality is set, use it; otherwise fall back to legacy difficulty
   const personalityConfig: PersonalityConfig | null = aiPersonality
     ? (PERSONALITIES.find(p => p.id === aiPersonality) ?? PERSONALITIES[0])
@@ -636,8 +644,88 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   // eslint-disable-next-line no-inner-declarations
   function nextPhaseForPlayer(player: Player): UIPhase {
     if (player.isAI) return 'draw'
+    // In host mode, remote human players don't need privacy screens
+    if (mode === 'host') {
+      const playerIdx = gameState.players.findIndex(p => p.id === player.id)
+      if (playerIdx !== hostSeatIndex) return 'draw'
+    }
     return soloHuman ? 'draw' : 'privacy'
   }
+
+  // ── Online multiplayer: host broadcast + action receiver ─────────────────
+  const mpChannel = useMultiplayerChannel(mode === 'host' ? roomCode ?? null : null)
+
+  // Broadcast sanitized state to all remote players after every relevant change
+  useEffect(() => {
+    if (mode !== 'host' || !mpChannel.isConnected) return
+    for (const remoteSeat of remoteSeatIndices) {
+      const view = sanitizeGameViewForPlayer({
+        gameState,
+        uiPhase,
+        targetSeatIndex: remoteSeat,
+        buyingState: buyingPhase !== 'hidden' ? {
+          buyingDiscard: buyingDiscard,
+          buyerOrder,
+          buyerStep,
+          buyingPhase,
+          passedPlayers: buyingPassedPlayers,
+          snatcherName: buyingSnatcherName,
+        } : null,
+        pendingFreeOffer: pendingBuyDiscard,
+        roundResults: roundResults as any,
+        goingOutPlayerName: goOutPlayerName,
+        goingOutSequence,
+        announcementStage,
+        gameOver: gameState.gameOver,
+      })
+      mpChannel.broadcast('game_state', { targetSeatIndex: remoteSeat, view })
+    }
+  }, [mode, mpChannel.isConnected, gameState, uiPhase, buyingPhase, buyerStep, buyingPassedPlayers, buyingSnatcherName, roundResults, goingOutSequence, announcementStage]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Receive and dispatch remote player actions
+  useEffect(() => {
+    if (mode !== 'host') return
+    return mpChannel.onMessage('player_action', (payload: { seatIndex: number; action: PlayerAction }) => {
+      if (!remoteSeatIndices.includes(payload.seatIndex)) return
+      const result = mapActionToHandler(
+        payload.action,
+        payload.seatIndex,
+        gameStateRef.current,
+        {
+          handleDrawFromPile,
+          handleTakeDiscard,
+          handleDeclineFreeOffer,
+          handleMeldConfirm,
+          handleLayOff,
+          handleJokerSwap,
+          handleDiscard,
+          handleBuyDecision,
+        },
+      )
+      if (!result.ok) {
+        mpChannel.broadcast('action_rejected', { seatIndex: payload.seatIndex, reason: result.error ?? 'Invalid action' })
+      }
+    })
+  }, [mode, mpChannel.onMessage]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Buy timeout for remote players (15 seconds)
+  const buyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (mode !== 'host' || uiPhase !== 'buying') return
+    if (buyTimeoutRef.current) clearTimeout(buyTimeoutRef.current)
+    const currentBuyerIdx = buyerOrder[buyerStep]
+    if (currentBuyerIdx !== undefined && remoteSeatIndices.includes(currentBuyerIdx)) {
+      const buyer = gameState.players[currentBuyerIdx]
+      if (buyer && !buyer.isAI) {
+        buyTimeoutRef.current = setTimeout(() => {
+          handleBuyDecision(false) // auto-pass
+        }, 15000)
+      }
+    }
+    return () => {
+      if (buyTimeoutRef.current) clearTimeout(buyTimeoutRef.current)
+    }
+  }, [mode, uiPhase, buyerStep]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function addBuyLog(entry: BuyLogEntry) {
     setBuyLog(prev => [...prev, entry])

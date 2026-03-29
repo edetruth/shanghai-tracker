@@ -6,6 +6,7 @@ import { PERSONALITIES } from '../../game/types'
 
 interface Props {
   onStart: (players: PlayerConfig[], personality: AIPersonality, buyLimit: number, tournamentMode: boolean) => void
+  onCreateOnline?: (players: PlayerConfig[], personality: AIPersonality, buyLimit: number, hostName: string) => void
   onBack: () => void
 }
 
@@ -485,7 +486,7 @@ function Step3({
 }
 
 // ── Root component ──────────────────────────────────────────────────────────
-export default function GameSetup({ onStart, onBack }: Props) {
+export default function GameSetup({ onStart, onCreateOnline, onBack }: Props) {
   const [step, setStep] = useState(1)
   const [stepDirection, setStepDirection] = useState<'forward' | 'back'>('forward')
   const [playerCount, setPlayerCount] = useState<number | null>(null)
@@ -656,22 +657,52 @@ export default function GameSetup({ onStart, onBack }: Props) {
             Next →
           </button>
         ) : (
-          <button
-            onClick={handleDeal}
-            style={{
-              width: '100%',
-              padding: '15px',
-              borderRadius: 12,
-              border: 'none',
-              background: '#e2b858',
-              color: '#2c1810',
-              fontSize: 16,
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
-          >
-            {tournamentMode ? 'Start Tournament \u2192' : 'Deal the cards \u2192'}
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <button
+              onClick={handleDeal}
+              style={{
+                width: '100%',
+                padding: '15px',
+                borderRadius: 12,
+                border: 'none',
+                background: '#e2b858',
+                color: '#2c1810',
+                fontSize: 16,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              {tournamentMode ? 'Start Tournament \u2192' : 'Deal the cards \u2192'}
+            </button>
+            {onCreateOnline && !tournamentMode && (
+              <button
+                onClick={() => {
+                  if (!playerCount || !allNamed) return
+                  const hostPlayer = players.find(p => !p.isAI)
+                  if (!hostPlayer) return
+                  onCreateOnline(
+                    players.map(p => ({ name: p.name.trim(), isAI: p.isAI })),
+                    selectedPersonality,
+                    buyLimit,
+                    hostPlayer.name.trim(),
+                  )
+                }}
+                style={{
+                  width: '100%',
+                  padding: '15px',
+                  borderRadius: 12,
+                  border: '1px solid #2d5a3a',
+                  background: 'transparent',
+                  color: '#a8d0a8',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Create Online Room
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>

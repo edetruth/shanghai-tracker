@@ -3,9 +3,12 @@ import GameSetup from './play/GameSetup'
 import GameBoard from './play/GameBoard'
 import GameOver from './play/GameOver'
 import TournamentTrophy from './play/TournamentTrophy'
+import Lobby from './play/Lobby'
+import RemoteGameBoard from './play/RemoteGameBoard'
 import type { PlayerConfig, Player, AIPersonality, TournamentState, TournamentGameResult, TournamentPlayerStats } from '../game/types'
+import type { GameRoomConfig, GameRoomPlayer } from '../game/multiplayer-types'
 
-type PlayView = 'landing' | 'setup' | 'game' | 'tournament-gameover' | 'tournament-trophy'
+type PlayView = 'landing' | 'setup' | 'game' | 'lobby-host' | 'lobby-join' | 'remote-game' | 'tournament-gameover' | 'tournament-trophy'
 
 const ROUNDS = [
   { num: 1, req: '2 Sets of 3+',    cards: 10 },
@@ -121,6 +124,13 @@ export default function PlayTab({ onBack }: Props) {
   const [lastGamePlayers, setLastGamePlayers] = useState<Player[]>([])
   const [gameKey, setGameKey] = useState(0) // force remount GameBoard for new tournament games
   const [startingGame, setStartingGame] = useState(false)
+
+  // Online multiplayer state
+  const [roomCode, setRoomCode] = useState<string | null>(null)
+  const [mySeatIndex, setMySeatIndex] = useState(0)
+  const [onlineHostName, setOnlineHostName] = useState('')
+  const [onlineConfig, setOnlineConfig] = useState<GameRoomConfig | null>(null)
+  const [remotePlayers, setRemotePlayers] = useState<GameRoomPlayer[]>([])
 
   function handleStart(players: PlayerConfig[], personality: AIPersonality, limit: number, tournamentMode: boolean) {
     setPlayerConfigs(players)
@@ -243,11 +253,64 @@ export default function PlayTab({ onBack }: Props) {
     setView('setup')
   }
 
+  // Online multiplayer: host creates room and goes to lobby
+  function handleCreateOnline(
+    players: PlayerConfig[],
+    personality: AIPersonality,
+    limit: number,
+    hostName: string,
+  ) {
+    setPlayerConfigs(players)
+    setAiPersonality(personality)
+    setBuyLimit(limit)
+    setOnlineHostName(hostName)
+    const config: GameRoomConfig = {
+      playerCount: players.length,
+      buyLimit: limit,
+      aiPersonality: personality,
+      seats: players.map((p, i) => ({
+        seatIndex: i,
+        isAI: p.isAI,
+        personality: p.isAI ? personality : undefined,
+      })),
+    }
+    setOnlineConfig(config)
+    setView('lobby-host')
+  }
+
+  // Online multiplayer: host starts game from lobby
+  function handleHostGameStart(code: string, lobbyPlayers: GameRoomPlayer[]) {
+    setRoomCode(code)
+    setRemotePlayers(lobbyPlayers)
+    // Build playerConfigs from lobby seats
+    const configs: PlayerConfig[] = lobbyPlayers.map(p => ({
+      name: p.player_name,
+      isAI: p.is_ai,
+    }))
+    setPlayerConfigs(configs)
+    setMySeatIndex(0)
+    setGameKey(k => k + 1)
+    setStartingGame(true)
+    setTimeout(() => {
+      setView('game')
+      setStartingGame(false)
+    }, 400)
+  }
+
+  // Online multiplayer: joiner enters remote game
+  function handleJoinGameStart(code: string, seatIdx: number, lobbyPlayers: GameRoomPlayer[]) {
+    setRoomCode(code)
+    setMySeatIndex(seatIdx)
+    setRemotePlayers(lobbyPlayers)
+    setView('remote-game')
+  }
+
   if (view === 'setup') {
     return (
       <>
         <GameSetup
           onStart={handleStart}
+          onCreateOnline={handleCreateOnline}
           onBack={() => setView('landing')}
         />
         {startingGame && (
@@ -301,6 +364,42 @@ export default function PlayTab({ onBack }: Props) {
     )
   }
 
+  if (view === 'lobby-host' && onlineConfig) {
+    return (
+      <Lobby
+        mode="host"
+        config={onlineConfig}
+        hostName={onlineHostName}
+        aiPersonality={aiPersonality}
+        onGameStart={handleHostGameStart}
+        onBack={() => setView('setup')}
+      />
+    )
+  }
+
+  if (view === 'lobby-join') {
+    return (
+      <Lobby
+        mode="join"
+        onGameStart={handleJoinGameStart}
+        onBack={() => setView('landing')}
+      />
+    )
+  }
+
+  if (view === 'remote-game' && roomCode) {
+    return (
+      <RemoteGameBoard
+        roomCode={roomCode}
+        mySeatIndex={mySeatIndex}
+        onExit={() => {
+          setRoomCode(null)
+          setView('landing')
+        }}
+      />
+    )
+  }
+
   if (view === 'game') {
     return (
       <GameBoard
@@ -308,8 +407,13 @@ export default function PlayTab({ onBack }: Props) {
         initialPlayers={playerConfigs}
         aiPersonality={aiPersonality}
         buyLimit={buyLimit}
+        mode={roomCode ? 'host' : 'local'}
+        roomCode={roomCode ?? undefined}
+        hostSeatIndex={mySeatIndex}
+        remoteSeatIndices={roomCode ? remotePlayers.filter(p => !p.is_host && !p.is_ai).map(p => p.seat_index) : undefined}
         onExit={() => {
           setTournamentState(null)
+          setRoomCode(null)
           setView('landing')
         }}
         onGameComplete={tournamentState ? handleTournamentGameComplete : undefined}
@@ -498,6 +602,9 @@ export default function PlayTab({ onBack }: Props) {
         paddingBottom: 'max(24px, env(safe-area-inset-bottom))',
         background: '#1a3a2a',
         flexShrink: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
       }}>
         <button
           onClick={() => setView('setup')}
@@ -515,6 +622,23 @@ export default function PlayTab({ onBack }: Props) {
           }}
         >
           Start a Game →
+        </button>
+        <button
+          onClick={() => setView('lobby-join')}
+          style={{
+            width: '100%',
+            background: 'transparent',
+            color: '#a8d0a8',
+            border: '1px solid #2d5a3a',
+            borderRadius: 12,
+            padding: 14,
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: 'pointer',
+            minHeight: 44,
+          }}
+        >
+          Join Online Game
         </button>
       </div>
 

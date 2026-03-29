@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import type { Game, GameScore, GameWithScores, Player } from './types'
 import type { AIDecision, PlayerRoundStats, PlayerGameStats, Player as GamePlayer } from '../game/types'
+import type { GameRoom, GameRoomConfig, GameRoomPlayer } from '../game/multiplayer-types'
 import { cardPoints } from '../game/rules'
 
 // Players
@@ -453,4 +454,159 @@ export function computeWinner(scores: GameScore[]): GameScore | null {
   return scores.reduce((best, s) =>
     s.total_score < best.total_score ? s : best
   )
+}
+
+// ── Game Rooms (online multiplayer) ─────────────────────────────────────────
+
+export async function createGameRoom(
+  hostName: string,
+  config: GameRoomConfig,
+): Promise<GameRoom> {
+  const roomCode = generateRoomCode()
+  const { data, error } = await supabase
+    .from('game_rooms')
+    .insert({
+      room_code: roomCode,
+      host_player_name: hostName,
+      game_config: config,
+      status: 'waiting',
+    })
+    .select()
+    .single()
+  if (error) throw error
+
+  // Add host as first player at seat 0
+  await supabase.from('game_room_players').insert({
+    room_code: roomCode,
+    player_name: hostName,
+    seat_index: 0,
+    is_host: true,
+    is_ai: false,
+    is_connected: true,
+  })
+
+  return data as GameRoom
+}
+
+export async function joinGameRoom(
+  roomCode: string,
+  playerName: string,
+): Promise<{ room: GameRoom; seatIndex: number }> {
+  // Fetch the room
+  const { data: room, error: roomErr } = await supabase
+    .from('game_rooms')
+    .select('*')
+    .eq('room_code', roomCode)
+    .eq('status', 'waiting')
+    .single()
+  if (roomErr || !room) throw new Error('Room not found or game already started')
+
+  // Find the next available seat
+  const { data: players } = await supabase
+    .from('game_room_players')
+    .select('seat_index')
+    .eq('room_code', roomCode)
+    .order('seat_index')
+  const takenSeats = new Set((players ?? []).map(p => p.seat_index))
+  const maxSeats = (room as GameRoom).game_config.playerCount ?? 8
+  let seatIndex = -1
+  for (let i = 0; i < maxSeats; i++) {
+    if (!takenSeats.has(i)) { seatIndex = i; break }
+  }
+  if (seatIndex === -1) throw new Error('Room is full')
+
+  const { error: joinErr } = await supabase.from('game_room_players').insert({
+    room_code: roomCode,
+    player_name: playerName,
+    seat_index: seatIndex,
+    is_host: false,
+    is_ai: false,
+    is_connected: true,
+  })
+  if (joinErr) throw new Error(joinErr.message)
+
+  return { room: room as GameRoom, seatIndex }
+}
+
+export async function getGameRoom(roomCode: string): Promise<GameRoom | null> {
+  const { data } = await supabase
+    .from('game_rooms')
+    .select('*')
+    .eq('room_code', roomCode)
+    .single()
+  return (data as GameRoom) ?? null
+}
+
+export async function getGameRoomPlayers(roomCode: string): Promise<GameRoomPlayer[]> {
+  const { data } = await supabase
+    .from('game_room_players')
+    .select('*')
+    .eq('room_code', roomCode)
+    .order('seat_index')
+  return (data as GameRoomPlayer[]) ?? []
+}
+
+export async function updateRoomStatus(roomCode: string, status: string): Promise<void> {
+  await supabase
+    .from('game_rooms')
+    .update({ status })
+    .eq('room_code', roomCode)
+}
+
+export async function removePlayerFromRoom(roomCode: string, playerName: string): Promise<void> {
+  await supabase
+    .from('game_room_players')
+    .delete()
+    .eq('room_code', roomCode)
+    .eq('player_name', playerName)
+}
+
+export async function addAIToRoom(
+  roomCode: string,
+  aiName: string,
+  seatIndex: number,
+): Promise<void> {
+  await supabase.from('game_room_players').insert({
+    room_code: roomCode,
+    player_name: aiName,
+    seat_index: seatIndex,
+    is_host: false,
+    is_ai: true,
+    is_connected: true,
+  })
+}
+
+export async function removeAIFromRoom(roomCode: string, seatIndex: number): Promise<void> {
+  await supabase
+    .from('game_room_players')
+    .delete()
+    .eq('room_code', roomCode)
+    .eq('seat_index', seatIndex)
+    .eq('is_ai', true)
+}
+
+export async function saveGameStateSnapshot(
+  roomCode: string,
+  snapshot: unknown,
+): Promise<void> {
+  try {
+    await supabase
+      .from('game_rooms')
+      .update({ game_state_snapshot: snapshot })
+      .eq('room_code', roomCode)
+  } catch {
+    // Silent fail — snapshot is for recovery, never break gameplay
+  }
+}
+
+export async function updatePlayerConnection(
+  roomCode: string,
+  playerName: string,
+  isConnected: boolean,
+): Promise<void> {
+  await supabase
+    .from('game_room_players')
+    .update({ is_connected: isConnected })
+    .eq('room_code', roomCode)
+    .eq('player_name', playerName)
 }
