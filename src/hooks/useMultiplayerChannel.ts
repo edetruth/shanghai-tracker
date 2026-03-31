@@ -34,6 +34,7 @@ export function useMultiplayerChannel(roomCode: string | null) {
       'player_left',
       'player_reconnected',
       'heartbeat',
+      'action_ack',
     ] as const
 
     for (const eventName of KNOWN_EVENTS) {
