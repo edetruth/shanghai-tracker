@@ -17,6 +17,7 @@ import {
 import { SUIT_ORDER } from './HandDisplay'
 import { haptic } from '../../lib/haptics'
 import { playSound, preloadSounds, getSfxVolume, getNotifVolume, setSfxVolume, setNotifVolume } from '../../lib/sounds'
+import { notifyTurn } from '../../lib/notifications'
 import PrivacyScreen from './PrivacyScreen'
 import MeldBuilder, { type MeldBuilderHandle } from './MeldBuilder'
 // MeldModal replaced by inline MeldBuilder; LayOffModal removed — lay-offs happen inline via TableMelds
@@ -912,6 +913,15 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       if (snapshotTimerRef.current) clearInterval(snapshotTimerRef.current)
     }
   }, [mode, roomCode, uiPhase]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Host: browser notification when it's the host's turn ─────────────────
+  useEffect(() => {
+    if (mode !== 'host' || !roomCode) return
+    const currentIdx = gameState.roundState.currentPlayerIndex
+    if (currentIdx === hostSeatIndex && document.hidden) {
+      notifyTurn(roomCode)
+    }
+  }, [mode, roomCode, gameState.roundState.currentPlayerIndex, hostSeatIndex])
 
   // ── Host: handle remote player reconnections ──────────────────────────────
   useEffect(() => {

@@ -3,6 +3,7 @@ import { ChevronLeft, Copy, Check, Users, Wifi, Bot, X, Share2 } from 'lucide-re
 import { useGameLobby } from '../../hooks/useGameLobby'
 import { createGameRoom, joinGameRoom, addAIToRoom, removeAIFromRoom, removePlayerFromRoom, updateRoomStatus } from '../../lib/gameStore'
 import { haptic } from '../../lib/haptics'
+import { requestNotificationPermission } from '../../lib/notifications'
 import type { GameRoomConfig, GameRoomPlayer } from '../../game/multiplayer-types'
 import type { AIPersonality } from '../../game/types'
 import { PERSONALITIES } from '../../game/types'
@@ -46,6 +47,7 @@ export default function Lobby(props: Props) {
     if (mode !== 'host' || roomCode) return
     const hostProps = props as HostProps
     setCreating(true)
+    requestNotificationPermission()
     createGameRoom(hostProps.hostName, hostProps.config)
       .then(r => {
         setRoomCode(r.room_code)
@@ -105,6 +107,7 @@ export default function Lobby(props: Props) {
       const { room: r, seatIndex } = await joinGameRoom(code, trimmedName)
       setRoomCode(r.room_code)
       setMySeatIndex(seatIndex)
+      requestNotificationPermission()
       haptic('success')
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Could not join room'

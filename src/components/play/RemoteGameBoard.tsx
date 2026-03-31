@@ -14,6 +14,7 @@ import { useHeartbeat } from '../../multiplayer/useHeartbeat'
 import { useActionAck } from '../../multiplayer/useActionAck'
 import { haptic } from '../../lib/haptics'
 import { playSound, preloadSounds, getSfxVolume, getNotifVolume, setSfxVolume, setNotifVolume } from '../../lib/sounds'
+import { notifyTurn, notifyRoundOver, notifyGameOver } from '../../lib/notifications'
 import { ROUND_REQUIREMENTS, cardPoints } from '../../game/rules'
 import type { EmotePayload } from '../../game/multiplayer-types'
 import EmoteBar, { EMOTE_MAP } from './EmoteBar'
@@ -239,6 +240,14 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
     // Going out cinematic
     if (view.goingOutSequence === 'flash' && prev.goingOutSequence !== 'flash') {
       playSound('going-out')
+      if (view.goingOutPlayerName) {
+        notifyRoundOver(view.goingOutPlayerName, roomCode)
+      }
+    }
+
+    // Game over
+    if (view.gameOver && !prev.gameOver && view.winner) {
+      notifyGameOver(view.winner, roomCode)
     }
 
     // Turn notification (when tab is hidden)
@@ -246,6 +255,7 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
         prev.currentPlayerIndex !== view.myPlayerIndex &&
         document.hidden) {
       playSound('turn-notify')
+      notifyTurn(roomCode)
     }
 
     // Buying phase — someone snatched
