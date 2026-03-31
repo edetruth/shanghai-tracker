@@ -13,7 +13,7 @@ import BuyingCinematic, { BuyBottomSheet, FreeTakeBottomSheet } from './BuyingCi
 import { useHeartbeat } from '../../multiplayer/useHeartbeat'
 import { useActionAck } from '../../multiplayer/useActionAck'
 import { haptic } from '../../lib/haptics'
-import { playSound, preloadSounds } from '../../lib/sounds'
+import { playSound, preloadSounds, getSfxVolume, getNotifVolume, setSfxVolume, setNotifVolume } from '../../lib/sounds'
 import { ROUND_REQUIREMENTS, cardPoints } from '../../game/rules'
 
 interface Props {
@@ -28,6 +28,8 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
   const [handSort, setHandSort] = useState<'rank' | 'suit'>('rank')
   const [showMeldBuilder, setShowMeldBuilder] = useState(false)
   const [showPause, setShowPause] = useState(false)
+  const [sfxVol, setSfxVol] = useState(getSfxVolume)
+  const [notifVol, setNotifVol] = useState(getNotifVolume)
   const [showScoreboard, setShowScoreboard] = useState(false)
   const [ghostedIds, setGhostedIds] = useState<Set<string>>(new Set())
   const [jokerPositionPrompt, setJokerPositionPrompt] = useState<{ card: CardType; meld: Meld } | null>(null)
@@ -1493,6 +1495,27 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
             <p style={{ color: '#6aad7a', fontSize: 12, textAlign: 'center' }}>
               Room: {roomCode}
             </p>
+            {/* Volume controls */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ color: '#a8d0a8', fontSize: 12, minWidth: 90 }}>Game Sounds</span>
+                <input
+                  type="range" min="0" max="1" step="0.1"
+                  value={sfxVol}
+                  onChange={e => { const v = Number(e.target.value); setSfxVol(v); setSfxVolume(v) }}
+                  style={{ flex: 1, accentColor: '#e2b858' }}
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ color: '#a8d0a8', fontSize: 12, minWidth: 90 }}>Notifications</span>
+                <input
+                  type="range" min="0" max="1" step="0.1"
+                  value={notifVol}
+                  onChange={e => { const v = Number(e.target.value); setNotifVol(v); setNotifVolume(v) }}
+                  style={{ flex: 1, accentColor: '#e2b858' }}
+                />
+              </div>
+            </div>
             <button
               onClick={() => setShowPause(false)}
               style={{

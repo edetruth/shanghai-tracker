@@ -16,7 +16,7 @@ import {
 } from '../../game/ai'
 import { SUIT_ORDER } from './HandDisplay'
 import { haptic } from '../../lib/haptics'
-import { playSound, preloadSounds } from '../../lib/sounds'
+import { playSound, preloadSounds, getSfxVolume, getNotifVolume, setSfxVolume, setNotifVolume } from '../../lib/sounds'
 import PrivacyScreen from './PrivacyScreen'
 import MeldBuilder, { type MeldBuilderHandle } from './MeldBuilder'
 // MeldModal replaced by inline MeldBuilder; LayOffModal removed — lay-offs happen inline via TableMelds
@@ -317,6 +317,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     faceDown: boolean
   } | null>(null)
   const [reduceAnimations, setReduceAnimations] = useState(false)
+  const [sfxVol, setSfxVol] = useState(getSfxVolume)
+  const [notifVol, setNotifVol] = useState(getNotifVolume)
   const drawPileRef = useRef<HTMLDivElement>(null)
   const handAreaRef = useRef<HTMLDivElement>(null)
   const discardPileRef = useRef<HTMLDivElement>(null)
@@ -3982,6 +3984,27 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
                 />
               </div>
             </button>
+            {/* Volume controls */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ color: '#a8d0a8', fontSize: 12, minWidth: 90 }}>Game Sounds</span>
+                <input
+                  type="range" min="0" max="1" step="0.1"
+                  value={sfxVol}
+                  onChange={e => { const v = Number(e.target.value); setSfxVol(v); setSfxVolume(v) }}
+                  style={{ flex: 1, accentColor: '#e2b858' }}
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ color: '#a8d0a8', fontSize: 12, minWidth: 90 }}>Notifications</span>
+                <input
+                  type="range" min="0" max="1" step="0.1"
+                  value={notifVol}
+                  onChange={e => { const v = Number(e.target.value); setNotifVol(v); setNotifVolume(v) }}
+                  style={{ flex: 1, accentColor: '#e2b858' }}
+                />
+              </div>
+            </div>
             <div className="space-y-2">
               <button
                 onClick={() => setShowPauseModal(false)}
