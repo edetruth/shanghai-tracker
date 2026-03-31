@@ -64,6 +64,13 @@ interface UndoState {
   timerId: ReturnType<typeof setTimeout>
 }
 
+interface UndoLayOffState {
+  card: CardType
+  meldId: string
+  preLayOffState: GameState
+  timerId: ReturnType<typeof setTimeout>
+}
+
 interface BuyLogEntry {
   turn: number
   round: number
@@ -228,6 +235,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const [roundResults, setRoundResults] = useState<{ playerId: string; score: number; shanghaied: boolean }[] | null>(null)
   const [buyingDiscard, setBuyingDiscard] = useState<CardType | null>(null)
   const [pendingUndo, setPendingUndo] = useState<UndoState | null>(null)
+  const [pendingLayOffUndo, setPendingLayOffUndo] = useState<UndoLayOffState | null>(null)
   const [pendingBuyDiscard, setPendingBuyDiscard] = useState<CardType | null>(null)
   const [showPauseModal, setShowPauseModal] = useState(false)
   const [reshuffleMsg, setReshuffleMsg] = useState(false)
@@ -1647,6 +1655,14 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     clearSelection()
     setLayOffError(null)
 
+    // Undo window for human lay-offs (not going out, not AI)
+    if (!wentOut && !player.isAI) {
+      // Clear any previous lay-off undo
+      if (pendingLayOffUndo) clearTimeout(pendingLayOffUndo.timerId)
+      const timerId = setTimeout(() => setPendingLayOffUndo(null), 3000)
+      setPendingLayOffUndo({ card, meldId: meld.id, preLayOffState: prev, timerId })
+    }
+
     // Trigger card-join animation for the laid-off card
     setJustLaidOffCardIds(new Set([card.id]))
     setTimeout(() => setJustLaidOffCardIds(new Set()), 500)
@@ -1810,6 +1826,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
   // ── Discard (with undo support for human players) ─────────────────────────
   function handleDiscard(overrideCardId?: string) {
+    clearLayOffUndo()  // commit any pending lay-off
     const cardId = overrideCardId ?? [...selectedCardIds][0]
     if (!cardId) return
 
@@ -1920,6 +1937,22 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     setGameState(pendingUndo.preDiscardState)
     setPendingUndo(null)
     // Stay in 'action' phase
+  }
+
+  function handleUndoLayOff() {
+    if (!pendingLayOffUndo) return
+    clearTimeout(pendingLayOffUndo.timerId)
+    setGameState(pendingLayOffUndo.preLayOffState)
+    setPendingLayOffUndo(null)
+    haptic('tap')
+    // Stay in 'action' phase
+  }
+
+  function clearLayOffUndo() {
+    if (pendingLayOffUndo) {
+      clearTimeout(pendingLayOffUndo.timerId)
+      setPendingLayOffUndo(null)
+    }
   }
 
   // ── End turn without discarding (stuck with 1 unplayable card) ──────────
@@ -3520,11 +3553,21 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           )}
         </div>
 
-        {/* Undo toast */}
+        {/* Undo discard toast */}
         {pendingUndo && (
           <div className="flex items-center justify-between bg-[#2c1810] text-white rounded-xl px-4 py-2">
             <span className="text-sm">Discarded {pendingUndo.card.rank === 0 ? 'Joker' : rankLabel(pendingUndo.card)}</span>
             <button onClick={handleUndoDiscard} className="text-[#e2b858] text-sm font-bold active:opacity-70">
+              Undo
+            </button>
+          </div>
+        )}
+
+        {/* Undo lay-off toast */}
+        {pendingLayOffUndo && !pendingUndo && (
+          <div className="flex items-center justify-between bg-[#2c1810] text-white rounded-xl px-4 py-2">
+            <span className="text-sm">Laid off {pendingLayOffUndo.card.rank === 0 ? 'Joker' : rankLabel(pendingLayOffUndo.card)}</span>
+            <button onClick={handleUndoLayOff} className="text-[#e2b858] text-sm font-bold active:opacity-70">
               Undo
             </button>
           </div>
