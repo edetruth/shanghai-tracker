@@ -1,14 +1,16 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Pause, Wifi, WifiOff } from 'lucide-react'
 import { useMultiplayerChannel } from '../../hooks/useMultiplayerChannel'
-import { sendAction } from '../../game/multiplayer-client'
-import type { RemoteGameView, PlayerAction } from '../../game/multiplayer-types'
+import type { RemoteGameView } from '../../game/multiplayer-types'
 import type { Card as CardType, Meld } from '../../game/types'
 import HandDisplay from './HandDisplay'
 import TableMelds from './TableMelds'
 import CardComponent from './Card'
 import MeldBuilder from './MeldBuilder'
 import type { MeldBuilderHandle } from './MeldBuilder'
+import GameToast, { type QueuedToast } from './GameToast'
+import { useHeartbeat } from '../../multiplayer/useHeartbeat'
+import { useActionAck } from '../../multiplayer/useActionAck'
 import { haptic } from '../../lib/haptics'
 import { ROUND_REQUIREMENTS, cardPoints } from '../../game/rules'
 
@@ -26,7 +28,7 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
   const [showPause, setShowPause] = useState(false)
   const [showScoreboard, setShowScoreboard] = useState(false)
   const [ghostedIds, setGhostedIds] = useState<Set<string>>(new Set())
-  const [activeToast, setActiveToast] = useState<{ message: string; style: string; icon?: string } | null>(null)
+  const [activeToast, setActiveToast] = useState<QueuedToast | null>(null)
   const [lastEvent, setLastEvent] = useState<string | null>(null)
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const eventTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -34,7 +36,25 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
   const viewRef = useRef(view)
   viewRef.current = view
 
-  const { channel, isConnected, onMessage } = useMultiplayerChannel(roomCode)
+  const mpChannel = useMultiplayerChannel(roomCode)
+  const { channel, isConnected, onMessage } = mpChannel
+
+  // Heartbeat — keep-alive for connection monitoring
+  useHeartbeat({
+    seatIndex: mySeatIndex,
+    isHost: false,
+    broadcast: mpChannel.broadcast,
+    onMessage: mpChannel.onMessage,
+    isConnected: mpChannel.isConnected,
+    remoteSeatIndices: [],
+  })
+
+  // Action ACKs — track pending state and retry
+  const { sendWithAck, isPending, lastError } = useActionAck({
+    seatIndex: mySeatIndex,
+    broadcast: mpChannel.broadcast,
+    onMessage: mpChannel.onMessage,
+  })
 
   // Listen for state updates from host
   useEffect(() => {
@@ -76,7 +96,13 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
   useEffect(() => {
     if (!view) return
     if (view.toast) {
-      setActiveToast(view.toast)
+      setActiveToast({
+        id: Date.now(),
+        message: view.toast.message,
+        style: view.toast.style as any,
+        icon: view.toast.icon,
+        duration: 3000,
+      })
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
       toastTimerRef.current = setTimeout(() => setActiveToast(null), 3000)
     }
@@ -87,10 +113,7 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
     }
   }, [view?.toast?.message, view?.lastEvent]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  function send(action: PlayerAction) {
-    if (!channel) return
-    sendAction(channel, mySeatIndex, action)
-  }
+  // sendWithAck() replaced by sendWithAck() from useActionAck
 
   // Derived state
   const isMyTurn = view ? view.currentPlayerIndex === view.myPlayerIndex : false
@@ -119,8 +142,7 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
   }, [showMeldBuilder, isMyTurn, uiPhase])
 
   // Round felt color
-  const feltColors = ['#1a3a2a', '#1a2f3a', '#2a1a3a', '#1a3a30', '#3a1a24', '#1a2a3a', '#2e2a1a']
-  const feltBg = feltColors[(currentRound - 1) % feltColors.length]
+  const feltBg = view?.feltColor ?? '#1a3a2a'
 
   // Determine if in buying phase for pile labels
   const isBuyingPhase = buyingState && buyingState.buyingPhase !== 'hidden'
@@ -260,19 +282,87 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
 
   // ── Round Announcement (simplified for remote) ──────────────────────────
   if (view.announcementStage && uiPhase === 'round-start') {
+    const isLateRound = currentRound >= 5
+    const isFinalRound = currentRound === 7
+    const glowColor = [1, 4].includes(currentRound) ? '#e2b858'
+      : [3, 7].includes(currentRound) ? '#5b9bd5' : '#b0a060'
+
     return (
       <div style={{
         minHeight: '100dvh',
-        background: feltBg,
+        background: isFinalRound ? '#1a1010' : isLateRound ? '#1a1a10' : '#000000',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 12,
+        gap: 16,
+        position: 'relative',
+        overflow: 'hidden',
       }}>
-        <span style={{ color: '#e2b858', fontSize: 14, fontWeight: 600 }}>Round {currentRound} of 7</span>
-        <span style={{ color: '#ffffff', fontSize: 24, fontWeight: 800 }}>{requirement.description}</span>
-        <span style={{ color: '#6aad7a', fontSize: 12 }}>Get ready...</span>
+        {/* Round number with glow */}
+        <div style={{
+          fontSize: 72,
+          fontWeight: 900,
+          color: glowColor,
+          textShadow: `0 0 30px ${glowColor}80, 0 0 60px ${glowColor}40`,
+          lineHeight: 1,
+          letterSpacing: -2,
+        }}>
+          {currentRound}
+        </div>
+        <div style={{
+          color: '#ffffff',
+          fontSize: 14,
+          fontWeight: 600,
+          letterSpacing: 2,
+          textTransform: 'uppercase',
+          opacity: 0.7,
+        }}>
+          Round {currentRound} of 7
+        </div>
+        <div style={{
+          color: glowColor,
+          fontSize: 22,
+          fontWeight: 800,
+          textAlign: 'center',
+          maxWidth: '80vw',
+          textShadow: `0 0 20px ${glowColor}40`,
+        }}>
+          {requirement.description}
+        </div>
+        {/* Cards dealt info */}
+        <div style={{
+          color: '#a8d0a8',
+          fontSize: 13,
+          opacity: 0.6,
+          marginTop: 8,
+        }}>
+          {currentRound <= 4 ? '10' : '12'} cards dealt
+        </div>
+        {/* Dealer info from announcement data */}
+        {view.announcementData?.dealerName && (
+          <div style={{
+            color: '#6aad7a',
+            fontSize: 12,
+            marginTop: 4,
+          }}>
+            Dealer: {view.announcementData.dealerName}
+          </div>
+        )}
+        {/* Final round warning */}
+        {isFinalRound && (
+          <div style={{
+            color: '#e07a5f',
+            fontSize: 16,
+            fontWeight: 800,
+            letterSpacing: 2,
+            textTransform: 'uppercase',
+            marginTop: 12,
+            animation: 'ready-pulse 1.5s ease-in-out infinite',
+          }}>
+            FINAL ROUND
+          </div>
+        )}
       </div>
     )
   }
@@ -353,25 +443,65 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
     }}>
       {/* Going out flash */}
       {showGoingOutFlash && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 100,
-          background: 'rgba(255,255,255,0.9)',
-          animation: 'fade-out 400ms ease-out both',
-        }} />
+        <div
+          className="go-impact-flash"
+          style={{
+            position: 'fixed', inset: 0, zIndex: 100,
+            background: 'white',
+            pointerEvents: 'none',
+          }}
+        />
       )}
       {showGoingOutAnnounce && view.goingOutPlayerName && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 100,
-          background: 'rgba(0,0,0,0.7)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          flexDirection: 'column', gap: 8,
-        }}>
-          <span style={{ color: '#e2b858', fontSize: 28, fontWeight: 800 }}>
+        <div
+          className="go-backdrop-fade"
+          style={{
+            position: 'fixed', inset: 0, zIndex: 100,
+            background: 'rgba(0,0,0,0.6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexDirection: 'column', gap: 4,
+          }}
+        >
+          <span
+            className="slam-in"
+            style={{
+              color: '#e2b858',
+              fontSize: 32,
+              fontWeight: 900,
+              textShadow: '0 0 30px rgba(226,184,88,0.6)',
+              letterSpacing: 2,
+            }}
+          >
             {view.goingOutPlayerName}
           </span>
-          <span style={{ color: '#ffffff', fontSize: 16 }}>GOES OUT!</span>
+          <span
+            className="slam-in"
+            style={{
+              color: '#ffffff',
+              fontSize: 18,
+              fontWeight: 700,
+              animationDelay: '0.15s',
+            }}
+          >
+            GOES OUT!
+          </span>
         </div>
       )}
+
+      {/* Final card drama — vignette spotlight */}
+      {view.isOnTheEdge && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'radial-gradient(ellipse at center bottom, transparent 30%, rgba(0,0,0,0.4) 100%)',
+          pointerEvents: 'none',
+          zIndex: 5,
+          transition: 'opacity 0.5s ease',
+        }} />
+      )}
+
+      {/* GameToast overlay */}
+      <GameToast toast={activeToast} />
 
       {/* ── Zone 1: Top bar ─────────────────────────────────────────────── */}
       <div style={{
@@ -435,42 +565,56 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
         </div>
       </div>
 
-      {/* ── Event notifications ───────────────────────────────────────── */}
-      {activeToast && (
+      {/* ── Event notification bar ────────────────────────────────────── */}
+      {lastEvent && (
         <div style={{
-          margin: '4px 12px',
-          padding: '8px 14px',
-          borderRadius: 10,
-          background: activeToast.style === 'celebration' ? 'rgba(45,122,58,0.85)'
-            : activeToast.style === 'taunt' ? 'rgba(142,68,173,0.85)'
-            : activeToast.style === 'pressure' ? 'rgba(184,50,50,0.85)'
-            : activeToast.style === 'drama' ? 'rgba(226,184,88,0.85)'
-            : 'rgba(42,53,34,0.85)',
-          color: '#ffffff',
-          fontSize: 13,
-          fontWeight: 700,
-          textAlign: 'center',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 6,
-          animation: 'fade-in 0.2s ease-out',
-        }}>
-          {activeToast.icon && <span>{activeToast.icon}</span>}
-          {activeToast.message}
-        </div>
-      )}
-      {lastEvent && !activeToast && (
-        <div style={{
-          margin: '2px 12px',
-          padding: '4px 12px',
-          borderRadius: 8,
-          background: 'rgba(15,34,24,0.7)',
+          position: 'fixed', top: 'max(100px, env(safe-area-inset-top, 44px) + 56px)',
+          left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(15,34,24,0.9)',
+          border: '1px solid #2d5a3a',
+          borderRadius: 20,
+          padding: '6px 16px',
           color: '#a8d0a8',
           fontSize: 11,
-          textAlign: 'center',
+          zIndex: 45,
+          animation: 'toast-enter 0.3s ease-out',
         }}>
           {lastEvent}
+        </div>
+      )}
+
+      {/* Action pending indicator */}
+      {isPending && (
+        <div style={{
+          position: 'fixed', bottom: 'max(100px, env(safe-area-inset-bottom, 12px) + 88px)',
+          left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(15,34,24,0.9)',
+          border: '1px solid #2d5a3a',
+          borderRadius: 20,
+          padding: '6px 16px',
+          color: '#a8d0a8',
+          fontSize: 11,
+          zIndex: 30,
+          animation: 'ready-pulse 1.5s ease-in-out infinite',
+        }}>
+          Sending...
+        </div>
+      )}
+
+      {/* Action error */}
+      {lastError && (
+        <div style={{
+          position: 'fixed', top: 'max(60px, env(safe-area-inset-top, 44px) + 16px)',
+          left: '50%', transform: 'translateX(-50%)',
+          background: 'rgba(184,50,50,0.9)',
+          borderRadius: 10,
+          padding: '8px 16px',
+          color: '#ffffff',
+          fontSize: 12,
+          fontWeight: 600,
+          zIndex: 40,
+        }}>
+          {lastError}
         </div>
       )}
       {view.raceMessage && (
@@ -543,6 +687,19 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
                     boxShadow: '0 0 4px rgba(226,184,88,0.6)',
                   }} />
                 )}
+                {/* Disconnected indicator */}
+                {view.disconnectedPlayers?.includes(p.seatIndex) && (
+                  <div style={{
+                    position: 'absolute',
+                    top: -3,
+                    left: -3,
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    background: '#e07a5f',
+                    boxShadow: '0 0 4px rgba(224,122,95,0.6)',
+                  }} />
+                )}
                 <div style={{
                   color: isMe ? '#e2b858' : '#a8d0a8',
                   fontSize: 10,
@@ -595,10 +752,10 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
             melds={tableMelds}
             currentPlayerId={view.myHand.length > 0 ? `p${view.myPlayerIndex}` : ''}
             onLayOff={view.myHasLaidDown && isMyTurn && uiPhase === 'action' ? (card: CardType, meld: Meld) => {
-              send({ type: 'lay_off', cardId: card.id, meldId: meld.id })
+              sendWithAck({ type: 'lay_off', cardId: card.id, meldId: meld.id })
             } : undefined}
             onJokerSwap={view.myHasLaidDown && isMyTurn && uiPhase === 'action' ? (card: CardType, meld: Meld) => {
-              send({ type: 'joker_swap', cardId: card.id, meldId: meld.id })
+              sendWithAck({ type: 'joker_swap', cardId: card.id, meldId: meld.id })
             } : undefined}
           />
         )}
@@ -632,8 +789,8 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
             )}
             {!drawLabel && <div style={{ height: 13 }} />}
             <button
-              onClick={() => drawActive && send({ type: 'draw_pile' })}
-              disabled={!drawActive}
+              onClick={() => drawActive && !isPending && sendWithAck({ type: 'draw_pile' })}
+              disabled={!drawActive || isPending}
               style={{
                 width: 64, height: 88,
                 borderRadius: 8,
@@ -687,11 +844,11 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
             {!discardLabel && <div style={{ height: 13 }} />}
             <button
               onClick={() => {
-                if (discardActive && discardTop) {
-                  send({ type: 'take_discard' })
+                if (discardActive && discardTop && !isPending) {
+                  sendWithAck({ type: 'take_discard' })
                 }
               }}
-              disabled={!discardActive || !discardTop}
+              disabled={!discardActive || !discardTop || isPending}
               style={{
                 width: 64, height: 88,
                 borderRadius: 8,
@@ -728,7 +885,7 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
               const meldCardIds = meldGroups.map(group => group.map(c => c.id))
               const jp: Record<string, number> = {}
               jokerPositions.forEach((rank, jokerId) => { jp[jokerId] = rank })
-              send({
+              sendWithAck({
                 type: 'meld_confirm',
                 meldCardIds,
                 jokerPositions: Object.keys(jp).length > 0 ? jp : undefined,
@@ -759,7 +916,7 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
           <span style={{ color: '#a8d0a8', fontSize: 12 }}>Take discard for free?</span>
           <div style={{ display: 'flex', gap: 8 }}>
             <button
-              onClick={() => send({ type: 'take_discard' })}
+              onClick={() => sendWithAck({ type: 'take_discard' })}
               style={{
                 background: '#e2b858', border: 'none', borderRadius: 6,
                 padding: '6px 14px', color: '#2c1810', fontWeight: 600,
@@ -769,7 +926,7 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
               Take
             </button>
             <button
-              onClick={() => send({ type: 'decline_free_offer' })}
+              onClick={() => sendWithAck({ type: 'decline_free_offer' })}
               style={{
                 background: 'transparent', border: '1px solid #2d5a3a', borderRadius: 6,
                 padding: '6px 14px', color: '#6aad7a',
@@ -798,7 +955,7 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
             <CardComponent card={buyingState.buyingDiscard} />
             <div style={{ flex: 1, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button
-                onClick={() => send({ type: 'buy', wantsToBuy: true })}
+                onClick={() => sendWithAck({ type: 'buy', wantsToBuy: true })}
                 style={{
                   background: '#e2b858', border: 'none', borderRadius: 8,
                   padding: '10px 20px', color: '#2c1810', fontWeight: 700,
@@ -808,7 +965,7 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
                 Buy
               </button>
               <button
-                onClick={() => send({ type: 'buy', wantsToBuy: false })}
+                onClick={() => sendWithAck({ type: 'buy', wantsToBuy: false })}
                 style={{
                   background: 'transparent', border: '1px solid #2d5a3a', borderRadius: 8,
                   padding: '10px 20px', color: '#6aad7a',
@@ -822,28 +979,33 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
         </div>
       )}
 
-      {/* ── Turn indicator ─────────────────────────────────────────────── */}
+      {/* ── Turn banner ──────────────────────────────────────────────── */}
       {isMyTurn && uiPhase !== 'round-end' && uiPhase !== 'game-over' && uiPhase !== 'round-start' && (
-        <div style={{
-          margin: '4px 12px',
-          padding: '8px 14px',
-          borderRadius: 10,
-          background: 'rgba(42,53,34,0.85)',
-          border: '2px solid #e2b858',
-          textAlign: 'center',
-          animation: 'ready-pulse 2s ease-in-out infinite',
-        }}>
+        <div
+          className="turnBannerIn"
+          style={{
+            margin: '4px 12px',
+            padding: '10px 14px',
+            borderRadius: 12,
+            background: 'linear-gradient(135deg, rgba(226,184,88,0.15), rgba(45,122,58,0.15))',
+            border: '2px solid #e2b858',
+            textAlign: 'center',
+            boxShadow: '0 0 20px rgba(226,184,88,0.2)',
+            animation: 'ready-pulse 2s ease-in-out infinite',
+          }}
+        >
           <span style={{
             color: '#e2b858',
-            fontSize: 14,
-            fontWeight: 800,
-            letterSpacing: 1,
+            fontSize: 16,
+            fontWeight: 900,
+            letterSpacing: 2,
+            textTransform: 'uppercase',
           }}>
-            YOUR TURN
+            {uiPhase === 'draw' ? (hasFreeOffer ? 'FREE TAKE OFFER' : 'YOUR TURN — DRAW') : 'YOUR TURN'}
           </span>
         </div>
       )}
-      {!isMyTurn && uiPhase !== 'round-end' && uiPhase !== 'game-over' && uiPhase !== 'round-start' && (
+      {!isMyTurn && uiPhase !== 'round-end' && uiPhase !== 'game-over' && uiPhase !== 'round-start' && !isBuyingMyTurn && (
         <div style={{
           margin: '4px 12px',
           padding: '6px 14px',
@@ -859,7 +1021,15 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
       )}
 
       {/* ── Zone 4: Hand ────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '0 8px' }}>
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'flex-end',
+        padding: '0 8px',
+        opacity: isMyTurn ? 1 : 0.7,
+        transition: 'opacity 0.3s ease',
+      }}>
         {/* Hand info label */}
         <div style={{
           display: 'flex',
@@ -897,8 +1067,9 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
           cards={myHand}
           selectedIds={selectedCardIds}
           ghostedIds={showMeldBuilder ? ghostedIds : undefined}
+          edgeGlow={view.isOnTheEdge}
           onToggle={(cardId: string) => {
-            if (!isMyTurn) return
+            if (!isMyTurn || isPending) return
             if (uiPhase === 'action') {
               if (showMeldBuilder && meldBuilderRef.current) {
                 const card = myHand.find(c => c.id === cardId)
@@ -954,7 +1125,7 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
               <button
                 onClick={() => {
                   const cardId = [...selectedCardIds][0]
-                  send({ type: 'discard', cardId })
+                  sendWithAck({ type: 'discard', cardId })
                   setSelectedCardIds(new Set())
                 }}
                 style={{
