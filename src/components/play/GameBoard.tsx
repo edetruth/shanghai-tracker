@@ -272,6 +272,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   // Stalemate tracking (turns without any meld)
   const noProgressTurnsRef = useRef(0)
   const drawPileDepletionsRef = useRef(0)
+  // Stalemate UX: two-phase detection
+  const [stalematePhase, setStalematePhase] = useState<'none' | 'nudge' | 'prompt'>('none')
+  const stalemateSnoozeRef = useRef(0)  // turns remaining before re-prompting after "Keep Playing"
   // Opponent history: tracks picked/discarded cards per player per round (Hard AI awareness)
   const opponentHistoryRef = useRef<Map<string, OpponentHistory>>(new Map())
   // Hard AI going-down timing: how many turns this AI could have gone down but chose to wait
@@ -1347,10 +1350,59 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     resetRoundTelemetry()
   }
 
+  // ── Stalemate detection (phased UX) ──────────────────────────────────────
+  // Called after every discard/stuck-turn. Updates stalemate phase based on no-progress turns.
+  function checkStalemateProgress() {
+    const totalPlayers = gameState.players.length
+    const downCount = gameState.players.filter(p => p.hasLaidDown).length
+    const allDown = downCount === totalPlayers
+    const mostDown = downCount >= Math.ceil(totalPlayers * 0.75)
+    const noProgress = noProgressTurnsRef.current
+    const reshuffles = drawPileDepletionsRef.current
+
+    // Decrement snooze counter
+    if (stalemateSnoozeRef.current > 0) {
+      stalemateSnoozeRef.current -= 1
+      return  // snoozed — don't check
+    }
+
+    // Phase 1 → nudge: most players down, 1+ reshuffle, 2 full cycles no progress
+    if (mostDown && reshuffles >= 1 && noProgress >= totalPlayers * 2 && stalematePhase === 'none') {
+      setStalematePhase('nudge')
+      return
+    }
+
+    // Phase 2 → prompt: nudge already shown, 1 more full cycle with no progress
+    if (stalematePhase === 'nudge' && noProgress >= totalPlayers * 3) {
+      setStalematePhase('prompt')
+      return
+    }
+
+    // Auto-end for all-AI stalemate: all players are AI (or all non-AI have laid down and are cycling)
+    // and prompt conditions are met — don't make human watch
+    const allAI = gameState.players.every(p => p.isAI)
+    if (allAI && allDown && reshuffles >= 1 && noProgress >= totalPlayers * 4) {
+      forceEndRound(gameState)
+    }
+  }
+
+  function handleKeepPlaying() {
+    setStalematePhase('none')
+    // Snooze for 2 full cycles before re-checking
+    stalemateSnoozeRef.current = gameState.players.length * 2
+  }
+
+  function handleEndRoundStalemate() {
+    setStalematePhase('none')
+    forceEndRound(gameState)
+  }
+
   // ── Force end round (stalemate) ───────────────────────────────────────────
   function forceEndRound(state: GameState) {
     noProgressTurnsRef.current = 0
     drawPileDepletionsRef.current = 0
+    setStalematePhase('none')
+    stalemateSnoozeRef.current = 0
     // If nobody has gone out, score all remaining hands (nobody gets 0)
     const results = state.players.map(p => ({
       playerId: p.id,
@@ -1840,15 +1892,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     // Record discard for opponent awareness (Hard AI)
     recordOpponentEvent(player.id, 'discarded', card)
 
-    // Increment no-progress counter
-    if (!player.hasLaidDown) noProgressTurnsRef.current += 1
-
-    // Check stalemate conditions
-    const totalPlayers = gameState.players.length
-    if (drawPileDepletionsRef.current >= 2 && noProgressTurnsRef.current > totalPlayers * 8) {
-      setTimeout(() => forceEndRound(afterDiscard), 500)
-      return
-    }
+    // Increment no-progress counter (any discard without a prior lay-off is "no progress")
+    noProgressTurnsRef.current += 1
+    checkStalemateProgress()
 
     function afterUndoExpires() {
       setPendingUndo(null)
@@ -1880,12 +1926,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   function handleEndTurnStuck() {
     noProgressTurnsRef.current += 1
     haptic('tap')
-    // Check stalemate before advancing
-    const totalPlayers = gameState.players.length
-    if (drawPileDepletionsRef.current >= 2 && noProgressTurnsRef.current > totalPlayers * 8) {
-      forceEndRound(gameState)
-      return
-    }
+    checkStalemateProgress()
     const advanced = advancePlayer(gameState)
     const nextPlayer = advanced.players[advanced.roundState.currentPlayerIndex]
     setGameState(advanced)
@@ -2057,6 +2098,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     turnCountRef.current = 0
     noProgressTurnsRef.current = 0
     drawPileDepletionsRef.current = 0
+    setStalematePhase('none')
+    stalemateSnoozeRef.current = 0
     aiLayOffCountRef.current = 0
     opponentHistoryRef.current = new Map()
     aiTurnsCouldGoDownRef.current = new Map()
@@ -2175,6 +2218,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       setRoundSummaryExiting(false)
       noProgressTurnsRef.current = 0
       drawPileDepletionsRef.current = 0
+      setStalematePhase('none')
+      stalemateSnoozeRef.current = 0
       opponentHistoryRef.current = new Map()
       aiTurnsCouldGoDownRef.current = new Map()
       aiTurnsElapsedRef.current = new Map()
@@ -2425,6 +2470,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     if (uiPhase !== 'draw' && uiPhase !== 'action') return
     // BAIL if someone has gone out — round is over
     if (gameState.roundState.goOutPlayerId) return
+    // BAIL if stalemate prompt is showing — wait for user decision
+    if (stalematePhase === 'prompt') return
 
     const delay = getAIDelay(gameSpeed)
     const timerId = setTimeout(() => {
@@ -2469,7 +2516,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     }, delay)
 
     return () => clearTimeout(timerId)
-  }, [uiPhase, currentPlayer.isAI, handLen, rs.currentPlayerIndex, aiActionTick]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [uiPhase, currentPlayer.isAI, handLen, rs.currentPlayerIndex, aiActionTick, stalematePhase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── AI buying automation ──────────────────────────────────────────────────
   useEffect(() => {
@@ -3166,6 +3213,72 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           <span key={raceMessage} style={{ fontSize: 11, fontWeight: 700, color: '#e2b858', display: 'flex', alignItems: 'center', gap: 6, animation: 'race-message-fade 4.5s ease both' }}>
             {raceMessage}
           </span>
+        </div>
+      )}
+
+      {/* Stalemate nudge banner — Phase 1 */}
+      {stalematePhase === 'nudge' && (
+        <div className="flex justify-center" style={{
+          flexShrink: 0,
+          padding: '4px 16px',
+          background: 'rgba(30,20,10,0.9)',
+          borderTop: '1px solid rgba(184,50,50,0.2)',
+        }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#d4a843', display: 'flex', alignItems: 'center', gap: 6 }}>
+            ⏳ Round winding down — cards aren't lining up
+          </span>
+        </div>
+      )}
+
+      {/* Stalemate prompt — Phase 2: bottom sheet overlay */}
+      {stalematePhase === 'prompt' && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 55,
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+        }}>
+          {/* Backdrop */}
+          <div
+            style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)' }}
+            onClick={handleKeepPlaying}
+          />
+          {/* Sheet */}
+          <div style={{
+            position: 'relative', zIndex: 1, width: '100%', maxWidth: 400,
+            background: '#1a2e1e', borderTop: '2px solid #e2b858',
+            borderRadius: '16px 16px 0 0',
+            padding: '20px 24px', paddingBottom: 'max(20px, env(safe-area-inset-bottom))',
+            animation: 'bc-sheet-up 300ms ease-out',
+          }}>
+            <p style={{ color: '#e2b858', fontSize: 16, fontWeight: 700, margin: '0 0 8px 0', textAlign: 'center' }}>
+              End Round?
+            </p>
+            <p style={{ color: '#a8d0a8', fontSize: 13, margin: '0 0 16px 0', textAlign: 'center', lineHeight: 1.4 }}>
+              No one can go out. Score remaining cards and move to the next round?
+            </p>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <button
+                onClick={handleKeepPlaying}
+                style={{
+                  flex: 1, padding: '12px 16px', borderRadius: 10,
+                  background: '#162e22', border: '1px solid #2d5a3a',
+                  color: '#a8d0a8', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                Keep Playing
+              </button>
+              <button
+                onClick={handleEndRoundStalemate}
+                style={{
+                  flex: 1, padding: '12px 16px', borderRadius: 10,
+                  background: 'linear-gradient(135deg, #e2b858, #d4a843)',
+                  border: 'none',
+                  color: '#2c1810', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                End Round
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
