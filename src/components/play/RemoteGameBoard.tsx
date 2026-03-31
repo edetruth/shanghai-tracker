@@ -15,6 +15,9 @@ import { useActionAck } from '../../multiplayer/useActionAck'
 import { haptic } from '../../lib/haptics'
 import { playSound, preloadSounds, getSfxVolume, getNotifVolume, setSfxVolume, setNotifVolume } from '../../lib/sounds'
 import { ROUND_REQUIREMENTS, cardPoints } from '../../game/rules'
+import type { EmotePayload } from '../../game/multiplayer-types'
+import EmoteBar, { EMOTE_MAP } from './EmoteBar'
+import EmoteBubble from './EmoteBubble'
 
 interface Props {
   roomCode: string
@@ -36,6 +39,7 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
   const [activeToast, setActiveToast] = useState<QueuedToast | null>(null)
   const [lastEvent, setLastEvent] = useState<string | null>(null)
   const [hostDisconnected, setHostDisconnected] = useState(false)
+  const [activeEmotes, setActiveEmotes] = useState<Map<number, string>>(new Map())
   const lastHostMessageRef = useRef(Date.now())
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const eventTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -172,6 +176,25 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
       eventTimerRef.current = setTimeout(() => setLastEvent(null), 4000)
     }
   }, [view?.toast?.message, view?.lastEvent]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Emote system — send and receive ───────────────────────────────────────
+  function handleEmoteSend(emoteId: string) {
+    if (!isConnected) return
+    mpChannel.broadcast('emote', { seatIndex: mySeatIndex, emoteId, timestamp: Date.now() })
+    // Show own emote locally
+    const emoji = EMOTE_MAP[emoteId] ?? '\u{1F60A}'
+    setActiveEmotes(prev => { const next = new Map(prev); next.set(mySeatIndex, emoji); return next })
+    setTimeout(() => setActiveEmotes(prev => { const next = new Map(prev); next.delete(mySeatIndex); return next }), 2500)
+  }
+
+  useEffect(() => {
+    if (!channel) return
+    return onMessage('emote', (payload: EmotePayload) => {
+      const emoji = EMOTE_MAP[payload.emoteId] ?? '\u{1F60A}'
+      setActiveEmotes(prev => { const next = new Map(prev); next.set(payload.seatIndex, emoji); return next })
+      setTimeout(() => setActiveEmotes(prev => { const next = new Map(prev); next.delete(payload.seatIndex); return next }), 2500)
+    })
+  }, [channel, onMessage])
 
   // sendWithAck() replaced by sendWithAck() from useActionAck
 
@@ -651,7 +674,7 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
         paddingTop: 'env(safe-area-inset-top, 44px)',
         padding: '8px 12px',
         display: 'grid',
-        gridTemplateColumns: '36px 1fr 36px',
+        gridTemplateColumns: '36px 1fr auto',
         alignItems: 'center',
         flexShrink: 0,
       }}>
@@ -701,8 +724,9 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
           </span>
         </div>
 
-        {/* Right: Wifi icon */}
-        <div style={{ justifySelf: 'end', display: 'flex', alignItems: 'center' }}>
+        {/* Right: Emote + Wifi icon */}
+        <div style={{ justifySelf: 'end', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <EmoteBar onSend={handleEmoteSend} disabled={!isConnected} />
           {isConnected ? <Wifi size={12} style={{ color: '#6aad7a' }} /> : <WifiOff size={12} style={{ color: '#e07a5f' }} />}
         </div>
       </div>
@@ -816,6 +840,10 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
                   position: 'relative',
                 }}
               >
+                {/* Emote bubble */}
+                {activeEmotes.has(p.seatIndex) && (
+                  <EmoteBubble emoji={activeEmotes.get(p.seatIndex)!} onDone={() => {}} />
+                )}
                 {/* Current turn gold dot */}
                 {isCurrentTurn && (
                   <div style={{

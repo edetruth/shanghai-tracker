@@ -190,6 +190,14 @@ export interface PlayerConnectionState {
   missedBeats: number
 }
 
+// ── Emote payload ──────────────────────────────────────────────────────────
+
+export interface EmotePayload {
+  seatIndex: number
+  emoteId: string
+  timestamp: number
+}
+
 // ── Channel messages ────────────────────────────────────────────────────────
 
 export type ChannelMessage =
@@ -204,6 +212,7 @@ export type ChannelMessage =
   | { event: 'player_disconnected'; payload: { seatIndex: number; playerName: string } }
   | { event: 'turn_skipped'; payload: { seatIndex: number; reason: 'timeout' | 'disconnected' } }
   | { event: 'player_reconnected'; payload: { seatIndex: number } }
+  | { event: 'emote'; payload: EmotePayload }
 
 // ── Multiplayer mode for GameBoard ──────────────────────────────────────────
 

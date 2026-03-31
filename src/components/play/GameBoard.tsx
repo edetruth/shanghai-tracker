@@ -31,7 +31,9 @@ import RoundAnnouncement, { type AnnouncementStage } from './RoundAnnouncement'
 import { useMultiplayerChannel } from '../../hooks/useMultiplayerChannel'
 import { useHeartbeat } from '../../multiplayer/useHeartbeat'
 import { sanitizeGameViewForPlayer, mapActionToHandler } from '../../game/multiplayer-host'
-import type { PlayerAction } from '../../game/multiplayer-types'
+import type { PlayerAction, EmotePayload } from '../../game/multiplayer-types'
+import EmoteBar, { EMOTE_MAP } from './EmoteBar'
+import EmoteBubble from './EmoteBubble'
 
 interface Props {
   initialPlayers: PlayerConfig[]
@@ -240,6 +242,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const [pendingLayOffUndo, setPendingLayOffUndo] = useState<UndoLayOffState | null>(null)
   const [pendingBuyDiscard, setPendingBuyDiscard] = useState<CardType | null>(null)
   const [showPauseModal, setShowPauseModal] = useState(false)
+  const [activeEmotes, setActiveEmotes] = useState<Map<number, string>>(new Map())
   const [reshuffleMsg, setReshuffleMsg] = useState(false)
   const [newCardIds, setNewCardIds] = useState<Set<string>>(new Set())
   const [leavingCardId, setLeavingCardId] = useState<string | null>(null)
@@ -868,6 +871,26 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       }
     })
   }, [mode, mpChannel.onMessage]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Emote system — send and receive ───────────────────────────────────────
+  function handleEmoteSend(emoteId: string) {
+    if (mode !== 'host' || !mpChannel.isConnected) return
+    const seatIndex = hostSeatIndex ?? 0
+    mpChannel.broadcast('emote', { seatIndex, emoteId, timestamp: Date.now() })
+    // Show own emote locally
+    const emoji = EMOTE_MAP[emoteId] ?? '\u{1F60A}'
+    setActiveEmotes(prev => { const next = new Map(prev); next.set(seatIndex, emoji); return next })
+    setTimeout(() => setActiveEmotes(prev => { const next = new Map(prev); next.delete(seatIndex); return next }), 2500)
+  }
+
+  useEffect(() => {
+    if (mode !== 'host') return
+    return mpChannel.onMessage('emote', (payload: EmotePayload) => {
+      const emoji = EMOTE_MAP[payload.emoteId] ?? '\u{1F60A}'
+      setActiveEmotes(prev => { const next = new Map(prev); next.set(payload.seatIndex, emoji); return next })
+      setTimeout(() => setActiveEmotes(prev => { const next = new Map(prev); next.delete(payload.seatIndex); return next }), 2500)
+    })
+  }, [mode, mpChannel.onMessage])
 
   // ── Host: persist game state snapshot periodically + on key transitions ────
   const snapshotTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -3152,19 +3175,24 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
             {rs.requirement.description}
           </div>
 
-          {/* Pause button */}
-          <button
-            onClick={() => setShowPauseModal(true)}
-            aria-label="Pause game"
-            style={{
-              background: '#0f2218', border: '1px solid #2d5a3a', borderRadius: 8,
-              color: '#a8d0a8', minWidth: 40, minHeight: 40,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', flexShrink: 0,
-            }}
-          >
-            <Pause size={18} />
-          </button>
+          {/* Pause button + Emote bar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            {mode === 'host' && remoteSeatIndices.length > 0 && (
+              <EmoteBar onSend={handleEmoteSend} disabled={!mpChannel.isConnected} />
+            )}
+            <button
+              onClick={() => setShowPauseModal(true)}
+              aria-label="Pause game"
+              style={{
+                background: '#0f2218', border: '1px solid #2d5a3a', borderRadius: 8,
+                color: '#a8d0a8', minWidth: 40, minHeight: 40,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: 'pointer', flexShrink: 0,
+              }}
+            >
+              <Pause size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Host multiplayer connection indicator */}
@@ -3257,6 +3285,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
                       : isActiveTurn
                         ? '#4a7a5a'
                         : '#2d5a3a'
+                  const playerSeatIdx = gameState.players.indexOf(p)
                   return (
                     <div
                       key={p.id}
@@ -3270,8 +3299,12 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
                         padding: '6px 8px',
                         minWidth: 68,
                         transition: 'all 200ms ease',
+                        position: 'relative' as const,
                       }}
                     >
+                      {activeEmotes.has(playerSeatIdx) && (
+                        <EmoteBubble emoji={activeEmotes.get(playerSeatIdx)!} onDone={() => {}} />
+                      )}
                       <div className="flex items-center gap-1 mb-0.5">
                         <div style={{
                           width: 6, height: 6, borderRadius: '50%', flexShrink: 0,

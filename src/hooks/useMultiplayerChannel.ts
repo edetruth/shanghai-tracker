@@ -37,6 +37,7 @@ export function useMultiplayerChannel(roomCode: string | null) {
       'player_disconnected',
       'turn_skipped',
       'heartbeat',
+      'emote',
     ] as const
 
     for (const eventName of KNOWN_EVENTS) {
