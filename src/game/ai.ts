@@ -737,35 +737,80 @@ export function aiFindBestMeldsForLayOff(
     addIfNew(tryMeldOrder(hand, requirement, 'runs-first'))
   }
 
+  // Generate alternative set-subset candidates when a rank has 4+ cards.
+  // For R1 (2 sets) / R2 (1 set + 1 run), different choices of WHICH 3 cards
+  // form a set can leave different leftover cards with better lay-off potential.
+  if (requirement.sets > 0 && candidates.length > 0) {
+    const baseCandidate = candidates[0]
+    const naturals = hand.filter(c => !isJoker(c))
+    const byRank = groupByRank(naturals)
+
+    // Find sets in the base candidate that use a rank with 4+ available cards
+    for (let mi = 0; mi < baseCandidate.length; mi++) {
+      const meld = baseCandidate[mi]
+      const meldNaturals = meld.filter(c => !isJoker(c))
+      if (meldNaturals.length < MIN_SET_SIZE) continue  // mostly jokers, skip
+      const meldRank = meldNaturals[0].rank
+      // Check all cards of this rank share the same rank (it's a set)
+      if (!meldNaturals.every(c => c.rank === meldRank)) continue
+      const allOfRank = byRank.get(meldRank)
+      if (!allOfRank || allOfRank.length <= MIN_SET_SIZE) continue  // no extra cards
+
+      // Generate all C(n, MIN_SET_SIZE) subsets of this rank's cards
+      const jokerCount = meld.filter(isJoker).length
+      const combos = combinations(allOfRank, MIN_SET_SIZE - jokerCount)
+      const meldJokers = meld.filter(isJoker)
+      for (const combo of combos) {
+        const altMeld = [...combo, ...meldJokers]
+        const altCandidate = [...baseCandidate]
+        altCandidate[mi] = altMeld
+        addIfNew(altCandidate)
+        if (candidates.length >= 8) break  // cap total candidates
+      }
+      if (candidates.length >= 8) break
+    }
+  }
+
   if (candidates.length === 0) return aiFindBestMelds(hand, requirement)
   if (candidates.length === 1) return candidates[0]
 
-  // Score each by lay-off potential of remaining cards
-  let bestMelds = candidates[0]
-  let bestScore = -Infinity
-
-  for (const melds of candidates) {
+  // Also consider lay-off potential onto the melds the player is ABOUT to lay down
+  // (other players' table melds + the candidate's own melds become available)
+  function scoreMeldChoice(melds: Card[][]): number {
     const meldedIds = new Set(melds.flat().map(c => c.id))
     const remaining = hand.filter(c => !meldedIds.has(c.id))
 
-    if (remaining.length === 0) return melds
+    if (remaining.length === 0) return 10000  // perfect — no leftovers
+
+    // Combined melds: existing table melds + the melds being laid down
+    const allMelds = [...tablesMelds, ...melds.map(cards => ({ cards } as Meld))]
 
     let score = 0
 
     // Can go out via chain lay-offs?
-    if (remaining.length <= 4 && canGoOutViaChainLayOff(remaining, tablesMelds)) {
+    if (remaining.length <= 4 && canGoOutViaChainLayOff(remaining, allMelds)) {
       score += 1000
     }
 
-    // Count lay-off-able remaining cards
+    // Count lay-off-able remaining cards (against both table and own new melds)
     for (const c of remaining) {
-      if (tablesMelds.some(m => canLayOff(c, m))) score += 50
+      if (allMelds.some(m => canLayOff(c, m))) score += 50
     }
 
     // Penalize remaining points and count
     score -= remaining.reduce((s, c) => s + cardPoints(c.rank), 0)
     score -= remaining.length * 10
 
+    return score
+  }
+
+  // Score each by lay-off potential of remaining cards
+  let bestMelds = candidates[0]
+  let bestScore = -Infinity
+
+  for (const melds of candidates) {
+    const score = scoreMeldChoice(melds)
+    if (score >= 10000) return melds  // no leftovers — perfect
     if (score > bestScore) {
       bestScore = score
       bestMelds = melds
@@ -773,6 +818,24 @@ export function aiFindBestMeldsForLayOff(
   }
 
   return bestMelds
+}
+
+/** Generate all C(n,k) combinations from an array */
+function combinations<T>(arr: T[], k: number): T[][] {
+  if (k <= 0 || k > arr.length) return k === 0 ? [[]] : []
+  if (k === arr.length) return [arr.slice()]
+  const results: T[][] = []
+  function pick(start: number, chosen: T[]) {
+    if (chosen.length === k) { results.push([...chosen]); return }
+    const remaining = k - chosen.length
+    for (let i = start; i <= arr.length - remaining; i++) {
+      chosen.push(arr[i])
+      pick(i + 1, chosen)
+      chosen.pop()
+    }
+  }
+  pick(0, [])
+  return results
 }
 
 /**

@@ -815,6 +815,22 @@ export function simulateRound(gameState: GameState, config: SimConfig): { state:
       break mainLoop
     }
 
+    // Tighter stalemate when ALL players have gone down — only lay-offs remain,
+    // so if nobody is making progress the round is stuck cycling draw-discard.
+    const allDown = state.players.every(p => p.hasLaidDown)
+    if (allDown && noProgressTurns > state.players.length * 4) {
+      stalemate = true
+      break mainLoop
+    }
+
+    // Also detect when most players are down and no draw pile reshuffles yet —
+    // long stretches with zero progress in simple rounds (R1/R2) should end sooner.
+    const downCount = state.players.filter(p => p.hasLaidDown).length
+    if (downCount >= Math.ceil(state.players.length * 0.75) && noProgressTurns > state.players.length * 6) {
+      stalemate = true
+      break mainLoop
+    }
+
     // ── DID PLAYER GO OUT (mid-action-loop)? ─────────────────────────────
     if (state.roundState.goOutPlayerId) {
       const lastDiscard = state.roundState.discardPile[state.roundState.discardPile.length - 1] ?? null

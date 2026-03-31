@@ -202,6 +202,132 @@ export function analyze(results: GameResult[], config: { numPlayers: number; dif
   else lines.push(`  ✓ Joker usage looks healthy`)
   lines.push('')
 
+  // ── PERSONALITY BREAKDOWN ──────────────────────────────────────────────────
+  const hasPersonalities = results.length > 0 && results[0].playerPersonalities && results[0].playerPersonalities.length > 0
+  if (hasPersonalities) {
+    // Build a map from player name → personality ID
+    const nameToPersonality: Record<string, string> = {}
+    for (const game of results) {
+      game.players.forEach((name, i) => {
+        if (game.playerPersonalities?.[i]) {
+          nameToPersonality[name] = game.playerPersonalities[i]
+        }
+      })
+    }
+
+    // Collect unique personalities
+    const personalityIds = [...new Set(Object.values(nameToPersonality))]
+
+    // Aggregate stats per personality
+    interface PersonalityAgg {
+      wins: number
+      totalScores: number[]
+      roundScores: number[]
+      shanghaiCount: number
+      totalPlayerRounds: number
+      wentOutCount: number
+      laidDownTurns: number[]
+      games: number
+    }
+
+    const perso: Record<string, PersonalityAgg> = {}
+    for (const pid of personalityIds) {
+      perso[pid] = {
+        wins: 0, totalScores: [], roundScores: [], shanghaiCount: 0,
+        totalPlayerRounds: 0, wentOutCount: 0, laidDownTurns: [], games: 0,
+      }
+    }
+
+    for (const game of results) {
+      // Count wins
+      const winnerPersonality = nameToPersonality[game.winner]
+      if (winnerPersonality && perso[winnerPersonality]) {
+        perso[winnerPersonality].wins++
+      }
+
+      // Count total scores per personality
+      game.players.forEach((name, i) => {
+        const pid = nameToPersonality[name]
+        if (pid && perso[pid]) {
+          perso[pid].totalScores.push(game.finalScores[i])
+          perso[pid].games++
+        }
+      })
+
+      // Per-round stats
+      for (const round of game.rounds) {
+        if (round.wentOut === '(skipped)') continue
+        for (const [name, stats] of Object.entries(round.playerStats) as [string, PlayerRoundStats][]) {
+          const pid = nameToPersonality[name]
+          if (!pid || !perso[pid]) continue
+          perso[pid].totalPlayerRounds++
+          perso[pid].roundScores.push(round.scores[name] ?? 0)
+          if (stats.wasShanghaied) perso[pid].shanghaiCount++
+          if (round.scores[name] === 0 && round.wentOut === name) perso[pid].wentOutCount++
+          if (stats.turnLaidDown > 0) perso[pid].laidDownTurns.push(stats.turnLaidDown)
+        }
+      }
+    }
+
+    lines.push('PERSONALITY BREAKDOWN:')
+    // Sort by win count descending
+    const sortedPersonalities = personalityIds.slice().sort((a, b) => perso[b].wins - perso[a].wins)
+    // Find the longest personality name for alignment
+    const maxNameLen = Math.max(...sortedPersonalities.map(pid => pid.length))
+
+    for (const pid of sortedPersonalities) {
+      const s = perso[pid]
+      const totalGames = results.length
+      const winPctStr = pct(s.wins, totalGames)
+      const avgScore = avg(s.totalScores).toFixed(1)
+      const shanghaiPctStr = pct(s.shanghaiCount, s.totalPlayerRounds)
+      const wentOutPctStr = pct(s.wentOutCount, s.totalPlayerRounds)
+      const avgLayDown = s.laidDownTurns.length > 0 ? avg(s.laidDownTurns).toFixed(1) : 'N/A'
+      const avgRound = avg(s.roundScores).toFixed(1)
+      lines.push(`  ${pad(pid + ':', maxNameLen + 1)} ${pad(String(s.wins), 3)} wins (${pad(winPctStr, 6)}) | avg score ${pad(avgScore, 6)} | avg round ${pad(avgRound, 5)} | lay-down turn ${pad(avgLayDown, 4)} | shanghai ${pad(shanghaiPctStr, 6)} | went out ${wentOutPctStr}`)
+    }
+    lines.push('')
+
+    // ── PER-ROUND PERSONALITY BREAKDOWN ─────────────────────────────────────
+    lines.push('PER-ROUND PERSONALITY BREAKDOWN:')
+
+    for (const rs of roundStats) {
+      if (rs.turns.length === 0) continue
+
+      // Collect per-personality round-level stats
+      const roundPerso: Record<string, { wentOutCount: number; shanghaiCount: number; scores: number[]; laidDownTurns: number[]; totalAppearances: number }> = {}
+      for (const pid of personalityIds) {
+        roundPerso[pid] = { wentOutCount: 0, shanghaiCount: 0, scores: [], laidDownTurns: [], totalAppearances: 0 }
+      }
+
+      for (const game of results) {
+        const round = game.rounds.find(r => r.roundNumber === rs.roundNum)
+        if (!round || round.wentOut === '(skipped)') continue
+        for (const [name, stats] of Object.entries(round.playerStats) as [string, PlayerRoundStats][]) {
+          const pid = nameToPersonality[name]
+          if (!pid || !roundPerso[pid]) continue
+          roundPerso[pid].totalAppearances++
+          roundPerso[pid].scores.push(round.scores[name] ?? 0)
+          if (stats.wasShanghaied) roundPerso[pid].shanghaiCount++
+          if (round.scores[name] === 0 && round.wentOut === name) roundPerso[pid].wentOutCount++
+          if (stats.turnLaidDown > 0) roundPerso[pid].laidDownTurns.push(stats.turnLaidDown)
+        }
+      }
+
+      lines.push(`  Round ${rs.roundNum} (${rs.req}):`)
+      for (const pid of sortedPersonalities) {
+        const rp = roundPerso[pid]
+        if (rp.totalAppearances === 0) continue
+        const avgScoreStr = avg(rp.scores).toFixed(1)
+        const wentOutStr = pct(rp.wentOutCount, rp.totalAppearances)
+        const shanghaiStr = pct(rp.shanghaiCount, rp.totalAppearances)
+        const layDownStr = rp.laidDownTurns.length > 0 ? avg(rp.laidDownTurns).toFixed(1) : 'N/A'
+        lines.push(`    ${pad(pid + ':', maxNameLen + 1)} avg ${pad(avgScoreStr, 6)} | went out ${pad(wentOutStr, 6)} | shanghai ${pad(shanghaiStr, 6)} | lay-down turn ${layDownStr}`)
+      }
+    }
+    lines.push('')
+  }
+
   // ── PROBLEM DETECTION ─────────────────────────────────────────────────────
   const longRounds = allRounds.filter(r => r.turnsInRound > 30)
   const neverLaidDown = results.flatMap(g => g.rounds.flatMap(r =>
