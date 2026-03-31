@@ -54,7 +54,7 @@ function suitTextColor(suit: string): string {
   return '#3d2b8e' // spades
 }
 
-export default function Card({ card, selected, selectionIndex, onClick, compact, disabled, jokerLabel, isNew, faceDown, shimmer, inMeld, edgeGlow, buyRelevance, style }: Props) {
+export default function Card({ card, selected, selectionIndex, onClick, compact, disabled, jokerLabel, isNew, faceDown, shimmer, edgeGlow, buyRelevance, style }: Props) {
   // Auto-clear NEW badge after 3 seconds
   const [showNew, setShowNew] = useState(isNew ?? false)
   useEffect(() => {
