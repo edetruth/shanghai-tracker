@@ -2279,7 +2279,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
         // Near go-out: remaining <= 2 and at least one can lay off
         if (remaining.length <= 2 && tablesMelds.length > 0) {
-          const canLayOffSome = remaining.some(c => tablesMelds.some(m => canLayOff(c, m).valid))
+          const canLayOffSome = remaining.some(c => tablesMelds.some(m => canLayOff(c, m)))
           if (canLayOffSome) return true
         }
 

@@ -114,7 +114,7 @@ function shouldGoDownNow(
 
       // Near go-out: remaining <= 2 and at least one can lay off
       if (remaining.length <= 2 && tablesMelds.length > 0) {
-        const canLayOffSome = remaining.some(c => tablesMelds.some(m => canLayOff(c, m).valid))
+        const canLayOffSome = remaining.some(c => tablesMelds.some(m => canLayOff(c, m)))
         if (canLayOffSome) return true
       }
 
@@ -961,7 +961,7 @@ export function simulateGame(config: SimConfig, gameId: number): GameResult {
 
     // If we've run all requested rounds, stop early
     if (config.onlyRounds) {
-      const completedRounds = roundResults.filter(r => r.turnCount > 0).length
+      const completedRounds = roundResults.filter(r => r.turnsInRound > 0).length
       if (completedRounds >= config.onlyRounds.length) break
     }
   }
