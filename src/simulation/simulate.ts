@@ -959,7 +959,11 @@ export function simulateGame(config: SimConfig, gameId: number): GameResult {
     state = newState
     roundResults.push(result)
 
-    if (config.onlyRounds) break  // stop after first matched round
+    // If we've run all requested rounds, stop early
+    if (config.onlyRounds) {
+      const completedRounds = roundResults.filter(r => r.turnCount > 0).length
+      if (completedRounds >= config.onlyRounds.length) break
+    }
   }
 
   // Compute final scores

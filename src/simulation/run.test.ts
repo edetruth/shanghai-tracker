@@ -103,6 +103,16 @@ describe('Shanghai AI Simulations', () => {
     }, 'run-rounds')
   })
 
+  it('Test 5b: Round 7 hard — 3 runs, 4 players, 30 games', { timeout: 120_000 }, () => {
+    runAndAnalyze('Round 7 Hard Focus', {
+      numGames: 30,
+      numPlayers: 4,
+      difficulty: 'hard',
+      logLevel: 'summary',
+      onlyRounds: [7],
+    }, 'round7-hard')
+  })
+
   it('Test 6: Mixed personalities — 4 hard players, 30 games', { timeout: 120_000 }, () => {
     const personalities: AIPersonality[] = ['the-shark', 'the-mastermind', 'patient-pat', 'lucky-lou']
     runAndAnalyze('Mixed Personalities (Hard)', {
