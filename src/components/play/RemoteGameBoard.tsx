@@ -41,7 +41,7 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
   viewRef.current = view
 
   const mpChannel = useMultiplayerChannel(roomCode)
-  const { channel, isConnected, onMessage } = mpChannel
+  const { channel, channelRef, isConnected, onMessage } = mpChannel
 
   // Heartbeat — keep-alive for connection monitoring
   useHeartbeat({
@@ -95,15 +95,15 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
   const hasEverConnectedRef = useRef(false)
   const wasConnectedRef = useRef(false)
   useEffect(() => {
-    if (isConnected && !wasConnectedRef.current && channel) {
-      if (hasEverConnectedRef.current && view !== null) {
+    if (isConnected && !wasConnectedRef.current) {
+      if (hasEverConnectedRef.current && view !== null && channelRef.current) {
         // Genuine reconnection — had a previous connection and view
-        channel.send({ type: 'broadcast', event: 'player_reconnected', payload: { seatIndex: mySeatIndex } })
+        channelRef.current.send({ type: 'broadcast', event: 'player_reconnected', payload: { seatIndex: mySeatIndex } })
       }
       hasEverConnectedRef.current = true
     }
     wasConnectedRef.current = isConnected
-  }, [isConnected, channel, mySeatIndex, view])
+  }, [isConnected, channelRef, mySeatIndex, view])
 
   // Listen for action rejections
   useEffect(() => {

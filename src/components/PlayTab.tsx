@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import GameSetup from './play/GameSetup'
 import GameBoard from './play/GameBoard'
 import GameOver from './play/GameOver'
@@ -7,6 +7,7 @@ import Lobby from './play/Lobby'
 import RemoteGameBoard from './play/RemoteGameBoard'
 import type { PlayerConfig, Player, AIPersonality, TournamentState, TournamentGameResult, TournamentPlayerStats } from '../game/types'
 import type { GameRoomConfig, GameRoomPlayer } from '../game/multiplayer-types'
+import { loadGameStateSnapshot, getGameRoomPlayers } from '../lib/gameStore'
 
 type PlayView = 'landing' | 'setup' | 'game' | 'lobby-host' | 'lobby-join' | 'remote-game' | 'tournament-gameover' | 'tournament-trophy'
 
@@ -131,6 +132,48 @@ export default function PlayTab({ onBack }: Props) {
   const [onlineHostName, setOnlineHostName] = useState('')
   const [onlineConfig, setOnlineConfig] = useState<GameRoomConfig | null>(null)
   const [remotePlayers, setRemotePlayers] = useState<GameRoomPlayer[]>([])
+
+  // ── Session recovery: resume online game after host refresh ─────────────
+  useEffect(() => {
+    const saved = sessionStorage.getItem('shanghai_active_game')
+    if (!saved) return
+    try {
+      const session = JSON.parse(saved) as {
+        roomCode: string
+        role: 'host' | 'remote'
+        seatIndex: number
+      }
+      // Try to recover the game
+      ;(async () => {
+        if (session.role === 'host') {
+          const snapshot = await loadGameStateSnapshot(session.roomCode)
+          const players = await getGameRoomPlayers(session.roomCode)
+          if (snapshot && players.length > 0) {
+            const configs: PlayerConfig[] = players.map(p => ({
+              name: p.player_name,
+              isAI: p.is_ai,
+            }))
+            setPlayerConfigs(configs)
+            setRoomCode(session.roomCode)
+            setMySeatIndex(session.seatIndex)
+            setRemotePlayers(players)
+            setGameKey(k => k + 1)
+            setView('game')
+          } else {
+            // Snapshot gone or room empty — clear session
+            sessionStorage.removeItem('shanghai_active_game')
+          }
+        } else {
+          // Remote player refresh — rejoin
+          setRoomCode(session.roomCode)
+          setMySeatIndex(session.seatIndex)
+          setView('remote-game')
+        }
+      })()
+    } catch {
+      sessionStorage.removeItem('shanghai_active_game')
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleStart(players: PlayerConfig[], personality: AIPersonality, limit: number, tournamentMode: boolean) {
     setPlayerConfigs(players)
@@ -278,7 +321,6 @@ export default function PlayTab({ onBack }: Props) {
   function handleHostGameStart(code: string, lobbyPlayers: GameRoomPlayer[]) {
     setRoomCode(code)
     setRemotePlayers(lobbyPlayers)
-    // Build playerConfigs from lobby seats
     const configs: PlayerConfig[] = lobbyPlayers.map(p => ({
       name: p.player_name,
       isAI: p.is_ai,
@@ -287,6 +329,10 @@ export default function PlayTab({ onBack }: Props) {
     setMySeatIndex(0)
     setGameKey(k => k + 1)
     setStartingGame(true)
+    // Persist session for recovery on refresh
+    sessionStorage.setItem('shanghai_active_game', JSON.stringify({
+      roomCode: code, role: 'host', seatIndex: 0,
+    }))
     setTimeout(() => {
       setView('game')
       setStartingGame(false)
@@ -298,6 +344,10 @@ export default function PlayTab({ onBack }: Props) {
     setRoomCode(code)
     setMySeatIndex(seatIdx)
     setRemotePlayers(lobbyPlayers)
+    // Persist session for recovery on refresh
+    sessionStorage.setItem('shanghai_active_game', JSON.stringify({
+      roomCode: code, role: 'remote', seatIndex: seatIdx,
+    }))
     setView('remote-game')
   }
 
@@ -390,6 +440,7 @@ export default function PlayTab({ onBack }: Props) {
         mySeatIndex={mySeatIndex}
         onExit={() => {
           setRoomCode(null)
+          sessionStorage.removeItem('shanghai_active_game')
           setView('landing')
         }}
       />
@@ -410,6 +461,7 @@ export default function PlayTab({ onBack }: Props) {
         onExit={() => {
           setTournamentState(null)
           setRoomCode(null)
+          sessionStorage.removeItem('shanghai_active_game')
           setView('landing')
         }}
         onGameComplete={tournamentState ? handleTournamentGameComplete : undefined}

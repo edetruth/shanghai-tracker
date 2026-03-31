@@ -746,59 +746,82 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   }, [mode, gameState.roundState.currentPlayerIndex, uiPhase])
 
   // Broadcast sanitized state to all remote players after every relevant change
+  // Throttled: at most one broadcast per 80ms to avoid hammering Supabase
+  const broadcastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const broadcastPendingRef = useRef(false)
   useEffect(() => {
     if (mode !== 'host' || !mpChannel.isConnected) return
-    // Build streak info from streaksRef
-    let streakInfo: { playerName: string; streak: number } | null = null
-    for (const [pid, streak] of streaksRef.current.entries()) {
-      if (streak >= 2) {
-        const p = gameState.players.find(pl => pl.id === pid)
-        if (p) streakInfo = { playerName: p.name, streak }
-      }
-    }
-    // Compute felt color for broadcast
-    const ROUND_FELT_MAP: Record<number, string> = {
-      1: '#1a3a2a', 2: '#1a2f3a', 3: '#2a1a3a', 4: '#1a3a30',
-      5: '#3a1a24', 6: '#1a2a3a', 7: '#2e2a1a',
-    }
-    const broadcastFeltColor = ROUND_FELT_MAP[gameState.currentRound] ?? '#1a3a2a'
 
-    for (const remoteSeat of remoteSeatIndices) {
-      const view = sanitizeGameViewForPlayer({
-        gameState,
-        uiPhase,
-        targetSeatIndex: remoteSeat,
-        buyingState: buyingPhase !== 'hidden' ? {
-          buyingDiscard: buyingDiscard,
-          buyerOrder,
-          buyerStep,
-          buyingPhase,
-          passedPlayers: buyingPassedPlayers,
-          snatcherName: buyingSnatcherName,
-        } : null,
-        pendingFreeOffer: pendingBuyDiscard,
-        roundResults: roundResults as any,
-        goingOutPlayerName: goOutPlayerName,
-        goingOutSequence,
-        announcementStage,
-        gameOver: gameState.gameOver,
-        toast: remoteToast,
-        lastEvent: remoteEvent ?? undefined,
-        raceMessage: raceMessage || undefined,
-        streakInfo,
-        feltColor: broadcastFeltColor,
-        shimmerCardId,
-        perfectDraw: perfectDrawActive,
-        disconnectedPlayers: [...disconnectedPlayersRef.current],
-        turnTimeRemaining: turnSkipStartRef.current
-          ? Math.max(0, Math.round((15000 - (Date.now() - turnSkipStartRef.current)) / 1000))
-          : undefined,
-      })
-      mpChannel.broadcast('game_state', { targetSeatIndex: remoteSeat, view })
+    const doBroadcast = () => {
+      broadcastPendingRef.current = false
+      // Build streak info from streaksRef
+      let streakInfo: { playerName: string; streak: number } | null = null
+      for (const [pid, streak] of streaksRef.current.entries()) {
+        if (streak >= 2) {
+          const p = gameStateRef.current.players.find(pl => pl.id === pid)
+          if (p) streakInfo = { playerName: p.name, streak }
+        }
+      }
+      // Compute felt color for broadcast
+      const ROUND_FELT_MAP: Record<number, string> = {
+        1: '#1a3a2a', 2: '#1a2f3a', 3: '#2a1a3a', 4: '#1a3a30',
+        5: '#3a1a24', 6: '#1a2a3a', 7: '#2e2a1a',
+      }
+      const gs = gameStateRef.current
+      const broadcastFeltColor = ROUND_FELT_MAP[gs.currentRound] ?? '#1a3a2a'
+
+      for (const remoteSeat of remoteSeatIndices) {
+        const view = sanitizeGameViewForPlayer({
+          gameState: gs,
+          uiPhase: uiPhaseRef.current,
+          targetSeatIndex: remoteSeat,
+          buyingState: buyingPhaseRef.current !== 'hidden' ? {
+            buyingDiscard: buyingDiscard,
+            buyerOrder: buyerOrderRef.current,
+            buyerStep: buyerStepRef.current,
+            buyingPhase: buyingPhaseRef.current,
+            passedPlayers: buyingPassedPlayers,
+            snatcherName: buyingSnatcherName,
+          } : null,
+          pendingFreeOffer: pendingBuyDiscardRef.current,
+          roundResults: roundResults as any,
+          goingOutPlayerName: goOutPlayerName,
+          goingOutSequence,
+          announcementStage,
+          gameOver: gs.gameOver,
+          toast: remoteToast,
+          lastEvent: remoteEvent ?? undefined,
+          raceMessage: raceMessage || undefined,
+          streakInfo,
+          feltColor: broadcastFeltColor,
+          shimmerCardId,
+          perfectDraw: perfectDrawActive,
+          disconnectedPlayers: [...disconnectedPlayersRef.current],
+          turnTimeRemaining: turnSkipStartRef.current
+            ? Math.max(0, Math.round((15000 - (Date.now() - turnSkipStartRef.current)) / 1000))
+            : undefined,
+        })
+        mpChannel.broadcast('game_state', { targetSeatIndex: remoteSeat, view })
+      }
+      // Clear ephemeral events after broadcasting so they are not re-sent
+      if (remoteEvent) setTimeout(() => setRemoteEvent(null), 100)
+      if (remoteToast) setTimeout(() => setRemoteToast(null), 100)
     }
-    // Clear ephemeral events after broadcasting so they are not re-sent
-    if (remoteEvent) setTimeout(() => setRemoteEvent(null), 100)
-    if (remoteToast) setTimeout(() => setRemoteToast(null), 100)
+
+    // Throttle: if a broadcast is already scheduled, mark pending instead
+    if (broadcastTimerRef.current) {
+      broadcastPendingRef.current = true
+    } else {
+      doBroadcast()
+      broadcastTimerRef.current = setTimeout(() => {
+        broadcastTimerRef.current = null
+        if (broadcastPendingRef.current) doBroadcast()
+      }, 80)
+    }
+
+    return () => {
+      // Don't clear the throttle timer on cleanup — let pending broadcasts flush
+    }
   }, [mode, mpChannel.isConnected, gameState, uiPhase, buyingPhase, buyerStep, buyingPassedPlayers, buyingSnatcherName, roundResults, goingOutSequence, announcementStage, remoteEvent, remoteToast, raceMessage, shimmerCardId, perfectDrawActive]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Receive and dispatch remote player actions

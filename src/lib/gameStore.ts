@@ -599,6 +599,18 @@ export async function saveGameStateSnapshot(
   }
 }
 
+export async function loadGameStateSnapshot(
+  roomCode: string,
+): Promise<{ gameState: any; uiPhase: string; currentRound: number } | null> {
+  try {
+    const room = await getGameRoom(roomCode)
+    if (!room?.game_state_snapshot) return null
+    return room.game_state_snapshot as { gameState: any; uiPhase: string; currentRound: number }
+  } catch {
+    return null
+  }
+}
+
 export async function updatePlayerConnection(
   roomCode: string,
   playerName: string,

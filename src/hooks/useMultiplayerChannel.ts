@@ -98,6 +98,7 @@ export function useMultiplayerChannel(roomCode: string | null) {
 
   return {
     channel: channelRef.current,
+    channelRef,
     broadcast,
     onMessage,
     isConnected,
