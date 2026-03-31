@@ -37,6 +37,7 @@ import type { PlayerAction, EmotePayload } from '../../game/multiplayer-types'
 import EmoteBar, { EMOTE_MAP } from './EmoteBar'
 import EmoteBubble from './EmoteBubble'
 import { logAction } from '../../lib/actionLog'
+import { loadOpponentModel, saveOpponentModel } from '../../game/opponent-model'
 
 interface Props {
   initialPlayers: PlayerConfig[]
@@ -2573,6 +2574,26 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         setGameState(prev => ({ ...prev, gameOver: true }))
         // Telemetry: save game-level stats
         if (gameId) computeAndSaveGameStats(gameId, gameState.players)
+        // Update opponent models for The Nemesis AI
+        gameState.players.forEach((player) => {
+          if (player.isAI) return
+          try {
+            const model = loadOpponentModel(player.name)
+            if (model) {
+              model.gamesAnalyzed++
+              model.updatedAt = Date.now()
+              saveOpponentModel(model)
+            } else {
+              saveOpponentModel({
+                playerName: player.name, gamesAnalyzed: 1,
+                suitBias: { hearts: 0.25, diamonds: 0.25, clubs: 0.25, spades: 0.25 },
+                avgBuyRate: 0.5, avgGoDownRound: 3,
+                discardPatterns: {}, takePatterns: {},
+                updatedAt: Date.now(),
+              })
+            }
+          } catch { /* silent */ }
+        })
         // Check achievements at game end
         setTimeout(() => checkAndShowAchievements(true), 200)
         // Tournament callback — let PlayTab handle the game-over flow

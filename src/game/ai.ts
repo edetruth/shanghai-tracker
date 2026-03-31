@@ -150,6 +150,7 @@ const AI_EVAL_CONFIGS: Record<AIPersonality, AIEvalConfig> = {
   'patient-pat':     { takeThreshold: 4,  buyRiskTolerance: 0,   discardNoise: 3,  goDownStyle: 'immediate', opponentAware: false, denialTake: false, dangerWeight: 0 },
   'the-shark':       { takeThreshold: 3,  buyRiskTolerance: 2,   discardNoise: 0,  goDownStyle: 'immediate', opponentAware: true,  denialTake: true,  dangerWeight: 0.5 },
   'the-mastermind':  { takeThreshold: 2,  buyRiskTolerance: 5,   discardNoise: 0,  goDownStyle: 'strategic', opponentAware: true,  denialTake: true,  dangerWeight: 0.6 },
+  'the-nemesis':     { takeThreshold: 3,  buyRiskTolerance: 5,   discardNoise: 0,  goDownStyle: 'strategic', opponentAware: true,  denialTake: true,  dangerWeight: 0.6 },
 }
 
 export function getAIEvalConfig(personality: AIPersonality): AIEvalConfig {

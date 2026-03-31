@@ -49,6 +49,7 @@ export type AIPersonality =
   | 'patient-pat'
   | 'the-shark'
   | 'the-mastermind'
+  | 'the-nemesis'
 
 export interface PersonalityConfig {
   id: AIPersonality
@@ -185,12 +186,31 @@ export const PERSONALITIES: PersonalityConfig[] = [
     panicThreshold: 2,
     denialOpponentCardThreshold: 4,
   },
+  {
+    id: 'the-nemesis',
+    name: 'The Nemesis',
+    emoji: '👁️',
+    description: 'Learns your playstyle and adapts to counter it',
+    difficulty: 5,
+    takeStyle: 'aggressive-denial',
+    buyStyle: 'denial',
+    discardStyle: 'opponent-aware',
+    goDownStyle: 'strategic',
+    layOffStyle: 'unlimited',
+    jokerSwapStyle: 'optimal',
+    denialEnabled: true,
+    opponentAwareness: true,
+    randomFactor: 0,
+    buySelfLimit: 5,
+    panicThreshold: 5,
+    denialOpponentCardThreshold: 3,
+  },
 ]
 
 export function personalityToLegacyDifficulty(p: AIPersonality): AIDifficulty {
   if (p === 'rookie-riley' || p === 'steady-sam') return 'easy'
   if (p === 'lucky-lou' || p === 'patient-pat') return 'medium'
-  return 'hard'
+  return 'hard' // the-shark, the-mastermind, the-nemesis
 }
 
 export interface OpponentHistory {
