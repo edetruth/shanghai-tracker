@@ -2955,7 +2955,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       } else {
         const opponents = state.players.filter(p => p.id !== currentBuyer.id)
           .map(p => ({ hand: { length: p.hand.length }, hasLaidDown: p.hasLaidDown }))
-        shouldBuy = aiShouldBuy(currentBuyer.hand, disc, req, currentBuyer.buysRemaining, buyEvalCfg, opponents, state.roundState.tablesMelds)
+        shouldBuy = aiShouldBuy(currentBuyer.hand, disc, req, currentBuyer.buysRemaining, buyEvalCfg, opponents, state.roundState.tablesMelds, currentBuyer.hasLaidDown)
       }
 
       if (shouldBuy) {

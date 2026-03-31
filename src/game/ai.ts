@@ -936,8 +936,15 @@ export function aiShouldBuy(
   config: AIEvalConfig = DEFAULT_EVAL_CONFIG,
   players?: { hand: { length: number }, hasLaidDown: boolean }[],
   tablesMelds: Meld[] = [],
+  hasLaidDown = false,
 ): boolean {
   if (buysRemaining <= 0) return false
+
+  // After laying down, buying is almost always bad — you get the card + a penalty card,
+  // netting +1 hand size when the goal is to empty your hand. Only exception: you have
+  // exactly 1 card left and the discard can be laid off (buying = 2 cards, lay off the
+  // bought one, then you still have 2 cards — marginal). Skip buying post-lay-down.
+  if (hasLaidDown) return false
 
   // Always buy jokers unless hand is already huge (14+ cards)
   if (isJoker(discardCard) && hand.length < 14) return true

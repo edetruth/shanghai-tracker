@@ -492,7 +492,7 @@ function simProcessBuying(
     const { evalConfig: evalCfg } = getSimPlayerConfig(buyerIdx, config)
     const opponents = current.players.filter((_, i) => i !== buyerIdx)
       .map(p => ({ hand: { length: p.hand.length }, hasLaidDown: p.hasLaidDown }))
-    const shouldBuy = aiShouldBuy(buyer.hand, discardCard, current.roundState.requirement, buyer.buysRemaining, evalCfg, opponents, current.roundState.tablesMelds)
+    const shouldBuy = aiShouldBuy(buyer.hand, discardCard, current.roundState.requirement, buyer.buysRemaining, evalCfg, opponents, current.roundState.tablesMelds, buyer.hasLaidDown)
 
     if (shouldBuy) {
       buyStats[buyer.id].bought++
