@@ -36,8 +36,8 @@ import { sanitizeGameViewForPlayer, mapActionToHandler } from '../../game/multip
 import type { PlayerAction, EmotePayload } from '../../game/multiplayer-types'
 import EmoteBar, { EMOTE_MAP } from './EmoteBar'
 import EmoteBubble from './EmoteBubble'
-import { logAction } from '../../lib/actionLog'
-import { loadOpponentModel, saveOpponentModel } from '../../game/opponent-model'
+import { logAction, loadActionLog } from '../../lib/actionLog'
+import { loadOpponentModel, saveOpponentModel, buildNemesisOverrides, updateOpponentModel } from '../../game/opponent-model'
 import { reportMatchResult, advanceWinner } from '../../lib/tournamentStore'
 
 interface Props {
@@ -55,6 +55,7 @@ interface Props {
   roomCode?: string
   hostSeatIndex?: number
   remoteSeatIndices?: number[]
+  onReplay?: (gameId: string, playerNames: string[]) => void
 }
 
 type UIPhase =
@@ -210,7 +211,7 @@ function getAIDelay(speed: GameSpeed): number {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyProp = 'medium', aiPersonality, buyLimit = 5, onExit, onGameComplete, tournamentGameNumber, tournamentMatchId, mode = 'local', roomCode, hostSeatIndex = 0, remoteSeatIndices = [] }: Props) {
+export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyProp = 'medium', aiPersonality, buyLimit = 5, onExit, onGameComplete, tournamentGameNumber, tournamentMatchId, mode = 'local', roomCode, hostSeatIndex = 0, remoteSeatIndices = [], onReplay }: Props) {
   // Resolve personality config — if personality is set, use it; otherwise fall back to legacy difficulty
   const personalityConfig: PersonalityConfig | null = aiPersonality
     ? (PERSONALITIES.find(p => p.id === aiPersonality) ?? PERSONALITIES[0])
@@ -227,9 +228,25 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   }
 
   // Get the AI evaluation config for the current personality
+  // For The Nemesis: blend in opponent model overrides
+  const nemesisOverridesRef = useRef<ReturnType<typeof buildNemesisOverrides> | null>(null)
   function getEvalConfig(): AIEvalConfig {
     const cfg = getPersonalityConfig()
-    return getAIEvalConfig(cfg.id)
+    const base = getAIEvalConfig(cfg.id)
+    if (cfg.id !== 'the-nemesis') return base
+    // Load overrides once (cached in ref)
+    if (!nemesisOverridesRef.current) {
+      const humanPlayer = initialPlayers.find(p => !p.isAI)
+      const model = humanPlayer ? loadOpponentModel(humanPlayer.name) : null
+      nemesisOverridesRef.current = buildNemesisOverrides(model)
+    }
+    const ov = nemesisOverridesRef.current
+    return {
+      ...base,
+      buyRiskTolerance: base.buyRiskTolerance + ov.buyAggression,
+      dangerWeight: Math.min(1, base.dangerWeight + (Object.values(ov.suitDenial).reduce((s, v) => s + v, 0) / 400)),
+      goDownStyle: ov.goDownTiming === 'rush' ? 'immediate' : ov.goDownTiming === 'hold' ? 'strategic' : base.goDownStyle,
+    }
   }
 
   const [gameState, setGameState] = useState<GameState>(() => initGame(initialPlayers, buyLimit))
@@ -1508,7 +1525,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       return { ...prev, players, roundState: { ...prev.roundState, discardPile } }
     })
     playSound('card-snap')
-    logAction(gameLogId, ++actionSeqRef.current, gameState.roundState.currentPlayerIndex, 'take_discard')
+    logAction(gameLogId, ++actionSeqRef.current, gameState.roundState.currentPlayerIndex, 'take_discard', { cardId: card.id, suit: card.suit, rank: card.rank })
     setUiPhase('action')
   }
 
@@ -2191,7 +2208,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     clearSelection()
     haptic('heavy')
     playSound('card-snap')
-    logAction(gameLogId, ++actionSeqRef.current, playerIdx, 'discard', { cardId: card.id, cardLabel: formatCard(card) })
+    logAction(gameLogId, ++actionSeqRef.current, playerIdx, 'discard', { cardId: card.id, suit: card.suit, rank: card.rank, cardLabel: formatCard(card) })
 
     turnCountRef.current += 1
 
@@ -2577,25 +2594,33 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         setGameState(prev => ({ ...prev, gameOver: true }))
         // Telemetry: save game-level stats
         if (gameId) computeAndSaveGameStats(gameId, gameState.players)
-        // Update opponent models for The Nemesis AI
-        gameState.players.forEach((player) => {
+        // Update opponent models for The Nemesis AI — load action log and learn patterns
+        gameState.players.forEach((player, idx) => {
           if (player.isAI) return
-          try {
-            const model = loadOpponentModel(player.name)
-            if (model) {
-              model.gamesAnalyzed++
-              model.updatedAt = Date.now()
-              saveOpponentModel(model)
-            } else {
-              saveOpponentModel({
-                playerName: player.name, gamesAnalyzed: 1,
-                suitBias: { hearts: 0.25, diamonds: 0.25, clubs: 0.25, spades: 0.25 },
-                avgBuyRate: 0.5, avgGoDownRound: 3,
-                discardPatterns: {}, takePatterns: {},
-                updatedAt: Date.now(),
-              })
-            }
-          } catch { /* silent */ }
+          // Async: load action log (may not be fully written yet), then update model
+          loadActionLog(gameLogId).then(log => {
+            try {
+              updateOpponentModel(player.name, idx, log, gameState.currentRound)
+            } catch { /* silent */ }
+          }).catch(() => {
+            // Fallback: basic increment if log load fails
+            try {
+              const model = loadOpponentModel(player.name)
+              if (model) {
+                model.gamesAnalyzed++
+                model.updatedAt = Date.now()
+                saveOpponentModel(model)
+              } else {
+                saveOpponentModel({
+                  playerName: player.name, gamesAnalyzed: 1,
+                  suitBias: { hearts: 0.25, diamonds: 0.25, clubs: 0.25, spades: 0.25 },
+                  avgBuyRate: 0.5, avgGoDownRound: 3,
+                  discardPatterns: {}, takePatterns: {},
+                  updatedAt: Date.now(),
+                })
+              }
+            } catch { /* silent */ }
+          })
         })
         // Check achievements at game end
         setTimeout(() => checkAndShowAchievements(true), 200)
@@ -3219,6 +3244,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         onPlayAgain={startNewGame}
         onBack={onExit}
         aiPersonality={aiPersonality}
+        onReplay={onReplay}
       />
     )
   }

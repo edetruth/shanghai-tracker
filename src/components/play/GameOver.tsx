@@ -17,6 +17,7 @@ interface Props {
   onNextGame?: () => void
   onExitTournament?: () => void
   aiPersonality?: AIPersonality
+  onReplay?: (gameId: string, playerNames: string[]) => void
 }
 
 // ── Confetti (spec §8.1) ─────────────────────────────────────────────────────
@@ -177,7 +178,7 @@ function Avatar({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId, onPlayAgain, onBack, tournamentState, onNextGame, onExitTournament, aiPersonality }: Props) {
+export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId, onPlayAgain, onBack, tournamentState, onNextGame, onExitTournament, aiPersonality, onReplay }: Props) {
   const personalityInfo = aiPersonality ? PERSONALITIES.find(p => p.id === aiPersonality) : null
   const [saveStatus, setSaveStatus] = useState<'saving' | 'saved' | 'error'>('saving')
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -721,6 +722,23 @@ export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId,
             >
               New game
             </button>
+            {onReplay && gameId && (
+              <button
+                onClick={() => onReplay(gameId, players.map(p => p.name))}
+                style={{
+                  flex: 1,
+                  background: 'transparent',
+                  border: '1.5px solid #a8d0a8',
+                  color: '#a8d0a8',
+                  borderRadius: 10,
+                  padding: '12px 0',
+                  fontSize: 14, fontWeight: 600,
+                  cursor: 'pointer', minHeight: 44,
+                }}
+              >
+                Watch Replay
+              </button>
+            )}
             <button
               onClick={handlePlayAgain}
               style={{

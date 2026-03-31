@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { ChevronLeft, Copy, Check, Users, Wifi, Bot, X, Share2 } from 'lucide-react'
 import { useGameLobby } from '../../hooks/useGameLobby'
-import { createGameRoom, joinGameRoom, addAIToRoom, removeAIFromRoom, removePlayerFromRoom, updateRoomStatus } from '../../lib/gameStore'
+import { createGameRoom, joinGameRoom, getGameRoom, addAIToRoom, removeAIFromRoom, removePlayerFromRoom, updateRoomStatus } from '../../lib/gameStore'
 import { haptic } from '../../lib/haptics'
 import { requestNotificationPermission } from '../../lib/notifications'
 import type { GameRoomConfig, GameRoomPlayer } from '../../game/multiplayer-types'
@@ -24,6 +24,7 @@ interface JoinProps {
   aiPersonality?: never
   onGameStart: (roomCode: string, seatIndex: number, players: GameRoomPlayer[]) => void
   onBack: () => void
+  onSpectate?: (roomCode: string) => void
 }
 
 type Props = HostProps | JoinProps
@@ -39,6 +40,7 @@ export default function Lobby(props: Props) {
   const [error, setError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [joining, setJoining] = useState(false)
+  const [spectateRoomCode, setSpectateRoomCode] = useState<string | null>(null)
 
   const { players, room, loading } = useGameLobby(roomCode)
 
@@ -103,6 +105,7 @@ export default function Lobby(props: Props) {
 
     setJoining(true)
     setError(null)
+    setSpectateRoomCode(null)
     try {
       const { room: r, seatIndex } = await joinGameRoom(code, trimmedName)
       setRoomCode(r.room_code)
@@ -115,7 +118,18 @@ export default function Lobby(props: Props) {
       if (msg.includes('duplicate') || msg.includes('unique') || msg.includes('already exists')) {
         setError(`"${trimmedName}" is already taken in this room. Choose a different name.`)
       } else {
-        setError(msg)
+        // Check if the room exists but is already playing — offer spectating
+        try {
+          const existingRoom = await getGameRoom(code)
+          if (existingRoom && existingRoom.status === 'playing') {
+            setSpectateRoomCode(code)
+            setError(null)
+          } else {
+            setError(msg)
+          }
+        } catch {
+          setError(msg)
+        }
       }
     } finally {
       setJoining(false)
@@ -239,6 +253,38 @@ export default function Lobby(props: Props) {
 
           {error && (
             <p style={{ color: '#e07a5f', fontSize: 12 }}>{error}</p>
+          )}
+
+          {spectateRoomCode && (props as JoinProps).onSpectate && (
+            <div style={{
+              background: '#0f2218',
+              borderRadius: 10,
+              padding: 16,
+              border: '1px solid #2d5a3a',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 10,
+            }}>
+              <p style={{ color: '#a8d0a8', fontSize: 13, margin: 0 }}>
+                This game is already in progress.
+              </p>
+              <button
+                onClick={() => (props as JoinProps).onSpectate!(spectateRoomCode)}
+                style={{
+                  width: '100%',
+                  padding: 12,
+                  borderRadius: 10,
+                  border: '1px solid #2d5a3a',
+                  background: '#1e4a2e',
+                  color: '#e2b858',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Watch this game
+              </button>
+            </div>
           )}
         </div>
 

@@ -153,7 +153,6 @@ export default function PlayTab({ onBack }: Props) {
     setReplayPlayerNames(playerNames)
     setView('replay')
   }
-  void handleStartReplay
 
   // ── Session recovery: resume online game after host refresh ─────────────
   useEffect(() => {
@@ -379,7 +378,6 @@ export default function PlayTab({ onBack }: Props) {
     setRoomCode(code)
     setView('spectator')
   }
-  void handleSpectate
 
   // Tournament match start: create/join game room and navigate to game
   function handleTournamentMatchStart(matchRoomCode: string, isHost: boolean, matchId: string, matchPlayerNames: string[]) {
@@ -531,6 +529,7 @@ export default function PlayTab({ onBack }: Props) {
       <Lobby
         mode="join"
         onGameStart={handleJoinGameStart}
+        onSpectate={handleSpectate}
         onBack={() => setView('landing')}
       />
     )
@@ -568,6 +567,7 @@ export default function PlayTab({ onBack }: Props) {
           setView('landing')
         }}
         onGameComplete={tournamentState ? handleTournamentGameComplete : undefined}
+        onReplay={handleStartReplay}
         tournamentGameNumber={tournamentState?.currentGameNumber}
         tournamentMatchId={tournamentMatchId ?? undefined}
       />
