@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { getCompletedGames, computeWinner } from '../lib/gameStore'
 import { PLAYER_COLORS } from '../lib/constants'
+import { ACHIEVEMENTS, getCategoryIcon } from '../lib/achievements'
 import type { GameWithScores, Player, DrilldownView } from '../lib/types'
 import { format } from 'date-fns'
 import DrilldownModal from './DrilldownModal'
@@ -21,7 +22,7 @@ interface Props {
 export default function StatsLeaderboard({ onPlayerClick, onNavigateHome }: Props) {
   const [games, setGames] = useState<GameWithScores[]>([])
   const [loading, setLoading] = useState(true)
-  const [view, setView] = useState<'leaderboard' | 'records'>('leaderboard')
+  const [view, setView] = useState<'leaderboard' | 'records' | 'achievements'>('leaderboard')
   // Leaderboard
   const [minGames, setMinGames] = useState<MinGames>(3)
   const [alsoPlayedOpen, setAlsoPlayedOpen] = useState(false)
@@ -233,11 +234,11 @@ export default function StatsLeaderboard({ onPlayerClick, onNavigateHome }: Prop
 
         {/* Sub-tabs */}
         <div className="flex gap-1 mt-3 bg-[#efe9dd] rounded-xl p-1">
-          {(['leaderboard', 'records'] as const).map((tab) => (
+          {(['leaderboard', 'records', 'achievements'] as const).map((tab) => (
             <button key={tab} onClick={() => setView(tab)}
               className={`flex-1 py-2 rounded-lg text-sm font-medium capitalize transition-colors
                 ${view === tab ? 'bg-white text-[#8b6914] shadow-sm' : 'text-[#8b7355]'}`}>
-              {tab === 'leaderboard' ? 'Leaderboard' : 'Records'}
+              {tab === 'leaderboard' ? 'Leaderboard' : tab === 'records' ? 'Records' : 'Achievements'}
             </button>
           ))}
         </div>
@@ -371,7 +372,7 @@ export default function StatsLeaderboard({ onPlayerClick, onNavigateHome }: Prop
             )}
           </div>
 
-        ) : (
+        ) : view === 'records' ? (
           /* Records */
           <div className="flex flex-col gap-4">
             <div>
@@ -414,6 +415,36 @@ export default function StatsLeaderboard({ onPlayerClick, onNavigateHome }: Prop
                 })}
               </div>
             </div>
+          </div>
+        ) : (
+          /* Achievements */
+          <div style={{ padding: '12px 0' }}>
+            {(['beginner', 'skill', 'mastery', 'social'] as const).map(category => (
+              <div key={category} style={{ marginBottom: 16 }}>
+                <h4 style={{ color: '#8b7355', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>{getCategoryIcon(category)}</span> {category}
+                </h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {ACHIEVEMENTS.filter(a => a.category === category).map(a => (
+                    <div key={a.id} style={{
+                      background: '#ffffff',
+                      border: '1px solid #e2ddd2',
+                      borderRadius: 10,
+                      padding: '10px 14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                    }}>
+                      <span style={{ fontSize: 24 }}>{a.icon}</span>
+                      <div>
+                        <div style={{ color: '#2c1810', fontSize: 13, fontWeight: 600 }}>{a.name}</div>
+                        <div style={{ color: '#8b7355', fontSize: 11 }}>{a.description}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

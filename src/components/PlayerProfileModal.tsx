@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { LineChart, Line, ResponsiveContainer } from 'recharts'
-import { getCompletedGames, computeWinner } from '../lib/gameStore'
+import { getCompletedGames, computeWinner, getPlayerAchievements } from '../lib/gameStore'
 import { PLAYER_COLORS } from '../lib/constants'
+import { ACHIEVEMENTS } from '../lib/achievements'
 import type { GameWithScores, Player, DrilldownView } from '../lib/types'
 import { format } from 'date-fns'
 import DrilldownModal from './DrilldownModal'
@@ -16,6 +17,7 @@ export default function PlayerProfileModal({ playerId, onClose }: Props) {
   const [games, setGames] = useState<GameWithScores[]>([])
   const [loading, setLoading] = useState(true)
   const [visible, setVisible] = useState(false)
+  const [unlockedIds, setUnlockedIds] = useState<Set<string>>(new Set())
   const [drilldownStack, setDrilldownStack] = useState<DrilldownView[]>([])
   const pushDrilldown = (v: DrilldownView) => setDrilldownStack((s) => [...s, v])
   const popDrilldown = () => setDrilldownStack((s) => s.slice(0, -1))
@@ -26,6 +28,17 @@ export default function PlayerProfileModal({ playerId, onClose }: Props) {
     const raf = requestAnimationFrame(() => setVisible(true))
     return () => cancelAnimationFrame(raf)
   }, [])
+
+  // Load achievements once we know the player name
+  const playerName = (() => {
+    const pm = new Map<string, Player>()
+    games.forEach((g) => g.game_scores.forEach((gs) => { if (gs.player) pm.set(gs.player_id, gs.player) }))
+    return pm.get(playerId)?.name
+  })()
+  useEffect(() => {
+    if (!playerName) return
+    getPlayerAchievements(playerName).then(ids => setUnlockedIds(new Set(ids)))
+  }, [playerName])
 
   const handleClose = () => {
     setVisible(false)
@@ -264,6 +277,39 @@ export default function PlayerProfileModal({ playerId, onClose }: Props) {
                   </div>
                 </div>
               )}
+
+              {/* Achievements */}
+              <div style={{ padding: '12px 16px' }}>
+                <h4 style={{ color: '#8b7355', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
+                  Achievements ({unlockedIds.size}/{ACHIEVEMENTS.length})
+                </h4>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {ACHIEVEMENTS.map(a => {
+                    const unlocked = unlockedIds.has(a.id)
+                    return (
+                      <div
+                        key={a.id}
+                        title={unlocked ? `${a.name}: ${a.description}` : '???'}
+                        style={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: 10,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 20,
+                          background: unlocked ? '#efe9dd' : '#f0ede6',
+                          border: unlocked ? '1px solid #e2ddd2' : '1px dashed #e2ddd2',
+                          opacity: unlocked ? 1 : 0.35,
+                          cursor: 'default',
+                        }}
+                      >
+                        {unlocked ? a.icon : '?'}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
 
               {/* Game log */}
               <div className="card overflow-hidden">
