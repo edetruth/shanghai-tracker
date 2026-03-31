@@ -954,44 +954,57 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
               </span>
             )}
             {!drawLabel && <div style={{ height: 13 }} />}
-            <button
-              onClick={() => drawActive && !isPending && sendWithAck({ type: 'draw_pile' })}
-              disabled={!drawActive || isPending}
-              style={{
-                width: 64, height: 88,
-                borderRadius: 8,
-                background: '#7a1a2e',
-                border: drawActive ? '2px solid #e2b858' : '2px solid #4a1a2e',
-                cursor: drawActive ? 'pointer' : 'default',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexDirection: 'column',
-                gap: 4,
-                opacity: drawActive ? 1 : 0.5,
-                position: 'relative',
-                overflow: 'hidden',
-                animation: drawActive ? 'ready-pulse 2s ease-in-out infinite' : undefined,
-                boxShadow: drawActive ? '0 0 12px rgba(226,184,88,0.3)' : 'none',
-              }}
-            >
-              {/* Card back pattern lines */}
+            <div style={{ position: 'relative', width: 64, height: 88 }}>
+              {/* Stacked pile depth — bottom card */}
               <div style={{
-                position: 'absolute',
-                inset: 4,
-                borderRadius: 4,
-                border: '1px solid rgba(255,255,255,0.1)',
+                position: 'absolute', top: -3, left: 3, width: 64, height: 88,
+                borderRadius: 8, background: '#5a1220', border: '1px solid #3a0e18',
               }} />
+              {/* Stacked pile depth — middle card */}
               <div style={{
-                position: 'absolute',
-                inset: 8,
-                borderRadius: 2,
-                border: '1px solid rgba(255,255,255,0.06)',
+                position: 'absolute', top: -1.5, left: 1.5, width: 64, height: 88,
+                borderRadius: 8, background: '#6a1828', border: '1px solid #4a1420',
               }} />
-              <span style={{ color: '#e8c0c8', fontSize: 12, fontWeight: 700, zIndex: 1 }}>
-                {view.drawPileSize}
-              </span>
-            </button>
+              {/* Top card (interactive) */}
+              <button
+                onClick={() => drawActive && !isPending && sendWithAck({ type: 'draw_pile' })}
+                disabled={!drawActive || isPending}
+                style={{
+                  width: 64, height: 88,
+                  borderRadius: 8,
+                  background: '#7a1a2e',
+                  border: drawActive ? '2px solid #e2b858' : '2px solid #4a1a2e',
+                  cursor: drawActive ? 'pointer' : 'default',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexDirection: 'column',
+                  gap: 4,
+                  opacity: drawActive ? 1 : 0.5,
+                  position: 'relative',
+                  overflow: 'hidden',
+                  animation: drawActive ? 'ready-pulse 2s ease-in-out infinite' : undefined,
+                  boxShadow: drawActive ? '0 0 12px rgba(226,184,88,0.3)' : 'none',
+                }}
+              >
+                {/* Card back pattern lines */}
+                <div style={{
+                  position: 'absolute',
+                  inset: 4,
+                  borderRadius: 4,
+                  border: '1px solid rgba(255,255,255,0.1)',
+                }} />
+                <div style={{
+                  position: 'absolute',
+                  inset: 8,
+                  borderRadius: 2,
+                  border: '1px solid rgba(255,255,255,0.06)',
+                }} />
+                <span style={{ color: '#e8c0c8', fontSize: 12, fontWeight: 700, zIndex: 1 }}>
+                  {view.drawPileSize}
+                </span>
+              </button>
+            </div>
           </div>
 
           {/* Discard pile with label */}

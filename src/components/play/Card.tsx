@@ -16,6 +16,7 @@ interface Props {
   inMeld?: boolean
   edgeGlow?: boolean
   buyRelevance?: 'set-match' | 'run-neighbor' | 'dim' | null
+  isFlipped?: boolean
   style?: React.CSSProperties
 }
 
@@ -54,7 +55,7 @@ function suitTextColor(suit: string): string {
   return '#3d2b8e' // spades
 }
 
-export default function Card({ card, selected, selectionIndex, onClick, compact, disabled, jokerLabel, isNew, faceDown, shimmer, edgeGlow, buyRelevance, style }: Props) {
+export default function Card({ card, selected, selectionIndex, onClick, compact, disabled, jokerLabel, isNew, faceDown, shimmer, edgeGlow, buyRelevance, isFlipped, style }: Props) {
   // Auto-clear NEW badge after 3 seconds
   const [showNew, setShowNew] = useState(isNew ?? false)
   useEffect(() => {
@@ -157,12 +158,12 @@ export default function Card({ card, selected, selectionIndex, onClick, compact,
     ...style,
   }
 
-  return (
+  const cardFace = (
     <div
-      data-card-id={card.id}
-      className={`relative flex flex-col items-start justify-between select-none flex-shrink-0 transition-all duration-100 p-0.5${isInteractive ? ' cursor-pointer active:opacity-70' : ' cursor-default'}`}
-      style={cardStyle}
-      onClick={isInteractive ? () => { haptic('tap'); onClick!() } : undefined}
+      data-card-id={isFlipped !== undefined ? undefined : card.id}
+      className={`relative flex flex-col items-start justify-between select-none flex-shrink-0 transition-all duration-100 p-0.5${isInteractive && isFlipped === undefined ? ' cursor-pointer active:opacity-70' : ' cursor-default'}`}
+      style={isFlipped !== undefined ? { ...cardStyle, position: 'absolute' as const, inset: 0, backfaceVisibility: 'hidden' as const, width: '100%', height: '100%' } : cardStyle}
+      onClick={isInteractive && isFlipped === undefined ? () => { haptic('tap'); onClick!() } : undefined}
     >
       {/* NEW badge */}
       {showNew && (
@@ -247,4 +248,65 @@ export default function Card({ card, selected, selectionIndex, onClick, compact,
       )}
     </div>
   )
+
+  // 3D flip mode: wrap front/back in a perspective container
+  if (isFlipped !== undefined) {
+    return (
+      <div
+        data-card-id={card.id}
+        style={{
+          perspective: '600px',
+          width: `${width}px`,
+          height: `${height}px`,
+          minWidth: minW ? `${minW}px` : undefined,
+          minHeight: minH ? `${minH}px` : undefined,
+          flexShrink: 0,
+          cursor: isInteractive ? 'pointer' : 'default',
+          ...style,
+        }}
+        onClick={isInteractive ? () => { haptic('tap'); onClick!() } : undefined}
+      >
+        <div
+          style={{
+            position: 'relative',
+            width: '100%',
+            height: '100%',
+            transformStyle: 'preserve-3d',
+            transition: 'transform 400ms ease',
+            transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+          }}
+        >
+          {/* Front face */}
+          {cardFace}
+          {/* Back face */}
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backfaceVisibility: 'hidden',
+              transform: 'rotateY(180deg)',
+              backgroundColor: '#7a1a2e',
+              borderRadius: '6px',
+              border: '1.5px solid #c05070',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                inset: '4px',
+                border: '1px solid #c05070',
+                borderRadius: '3px',
+                opacity: 0.7,
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return cardFace
 }

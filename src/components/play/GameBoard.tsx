@@ -267,6 +267,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const [activeToast, setActiveToast] = useState<QueuedToast | null>(null)
   const activeToastRef = useRef<QueuedToast | null>(null)
   const [shimmerCardId, setShimmerCardId] = useState<string | null>(null)
+  const [lastDrawnCardId, setLastDrawnCardId] = useState<string | null>(null)
+  const [discardAnimating, setDiscardAnimating] = useState(false)
   const streaksRef = useRef<Map<string, number>>(new Map())
   const [preLayDownSwap, setPreLayDownSwap] = useState(false)
   // Selection state for the pre-lay-down swap flow
@@ -1273,6 +1275,11 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       const animDuration = reduceAnimations ? 0 : (isAI ? 200 : 500)
       setTimeout(() => {
         setNewCardIds(new Set([drawnCard.id]))
+        // Draw-slide animation on the newly drawn card
+        if (!isAI) {
+          setLastDrawnCardId(drawnCard.id)
+          setTimeout(() => setLastDrawnCardId(null), 500)
+        }
         // Shimmer the drawn card briefly for the human drawing player
         if (!isAI) {
           setShimmerCardId(drawnCard.id)
@@ -2010,6 +2017,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
     // Flying card animation: hand → discard pile
     animateDiscard(card)
+    // Discard toss animation on the discard pile
+    setDiscardAnimating(true)
+    setTimeout(() => setDiscardAnimating(false), 500)
 
     // Show discarded card label below discard pile for 2s
     {
@@ -3500,12 +3510,26 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
                 borderRadius: 6,
                 animation: isHumanDraw ? 'gbPulseGreen 1.2s ease-in-out 0.3s infinite' : 'none',
                 transform: 'scale(0.85)', transformOrigin: 'top center',
+                position: 'relative',
               }}>
-                <CardComponent
-                  card={rs.drawPile[0]}
-                  faceDown
-                  onClick={isHumanDraw ? handleDrawFromPile : undefined}
-                />
+                {/* Stacked pile depth — bottom card */}
+                <div style={{
+                  position: 'absolute', top: -3, left: 3, width: '100%', height: '100%',
+                  borderRadius: 6, background: '#5a1220', border: '1px solid #3a0e18',
+                }} />
+                {/* Stacked pile depth — middle card */}
+                <div style={{
+                  position: 'absolute', top: -1.5, left: 1.5, width: '100%', height: '100%',
+                  borderRadius: 6, background: '#6a1828', border: '1px solid #4a1420',
+                }} />
+                {/* Top card (interactive) */}
+                <div style={{ position: 'relative' }}>
+                  <CardComponent
+                    card={rs.drawPile[0]}
+                    faceDown
+                    onClick={isHumanDraw ? handleDrawFromPile : undefined}
+                  />
+                </div>
               </div>
             ) : (
               <div
@@ -3542,13 +3566,15 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
                 key={(isHumanBuyerTurn && buyingDiscard ? buyingDiscard.id : topDiscard?.id) ?? 'empty'}
                 style={{
                   borderRadius: 6,
-                  animation: discardUnwanted
-                    ? 'unwanted-dim 600ms ease-out both'
-                    : isHumanBuyerTurn
-                      ? 'for-sale-pulse 1.5s ease-in-out infinite'
-                      : isHumanDraw
-                        ? 'gbPulseGold 1.2s ease-in-out infinite'
-                        : 'card-land 250ms ease-out',
+                  animation: discardAnimating
+                    ? 'discard-toss 400ms ease-out'
+                    : discardUnwanted
+                      ? 'unwanted-dim 600ms ease-out both'
+                      : isHumanBuyerTurn
+                        ? 'for-sale-pulse 1.5s ease-in-out infinite'
+                        : isHumanDraw
+                          ? 'gbPulseGold 1.2s ease-in-out infinite'
+                          : 'card-land 250ms ease-out',
                   transform: isHumanDraw ? 'scale(0.85) translateY(-2px)' : 'scale(0.85)',
                   transformOrigin: 'top center',
                   transition: 'transform 200ms ease',
@@ -3664,6 +3690,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
             buyRelevanceMap={buyRelevanceMap}
             compact={buyingPhase === 'human-turn' || buyingPhase === 'free-offer'}
             ghostedIds={showMeldModal ? meldAssignedIds : undefined}
+            drawSlideCardId={lastDrawnCardId}
           />
         ) : aiTurnHumanViewer ? (
           <HandDisplay

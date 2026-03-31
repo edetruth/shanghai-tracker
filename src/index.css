@@ -485,8 +485,8 @@
   100% { opacity: 0; transform: translateY(160px) scale(1); }
 }
 @keyframes bc-snatch-fly {
-  0% { opacity: 1; transform: translateY(0) scale(1.8); }
-  100% { opacity: 0; transform: translateY(-120px) scale(0.6); }
+  0% { opacity: 1; transform: scale(1.8) rotate(0deg); }
+  100% { opacity: 0; transform: scale(0.6) rotate(15deg) translateY(-200px); }
 }
 @keyframes bc-snatch-burst {
   0% { opacity: 0; transform: scale(0.5); }
@@ -519,4 +519,35 @@
 @keyframes meld-staging-in {
   0% { opacity: 0; transform: translateY(20px); }
   100% { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Card Physics Animations ──────────────────────────────────── */
+@keyframes deal-arc {
+  0% { transform: translate(0, -100px) rotate(-10deg) scale(0.5); opacity: 0; }
+  60% { transform: translate(0, 10px) rotate(2deg) scale(1.02); opacity: 1; }
+  100% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+}
+
+@keyframes draw-slide {
+  0% { transform: translateX(-60px) translateY(-20px) scale(0.9); opacity: 0.5; }
+  100% { transform: translateX(0) translateY(0) scale(1); opacity: 1; }
+}
+
+@keyframes discard-toss {
+  0% { transform: translateY(0) rotate(0deg) scale(1); }
+  40% { transform: translateY(-15px) rotate(-4deg) scale(1.05); }
+  100% { transform: translateY(0) rotate(0deg) scale(1); }
+}
+
+@keyframes meld-slam-bounce {
+  0% { transform: scale(0.7); opacity: 0; }
+  60% { transform: scale(1.08); opacity: 1; }
+  80% { transform: scale(0.97); }
+  100% { transform: scale(1); }
+}
+
+@keyframes pile-wobble {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-1deg); }
+  75% { transform: rotate(1deg); }
 }

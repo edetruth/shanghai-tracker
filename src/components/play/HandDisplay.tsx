@@ -23,6 +23,8 @@ interface Props {
   compact?: boolean
   /** Card IDs that are assigned to meld slots — render at reduced opacity */
   ghostedIds?: Set<string>
+  /** Card ID that was just drawn — triggers draw-slide animation */
+  drawSlideCardId?: string | null
 }
 
 export const SUIT_ORDER: Record<string, number> = { hearts: 0, diamonds: 1, clubs: 2, spades: 3, joker: 4 }
@@ -54,6 +56,7 @@ export default function HandDisplay({
   buyRelevanceMap,
   compact,
   ghostedIds,
+  drawSlideCardId,
 }: Props) {
   const sorted = useMemo(() => {
     return [...cards].sort((a, b) => {
@@ -237,7 +240,11 @@ export default function HandDisplay({
                     zIndex: isSelected ? sorted.length + 10 : card.id === newCardId ? sorted.length + 5 : index + 1,
                     transition: isLeaving ? 'none' : 'left 300ms ease-out, transform 300ms ease-out, opacity 200ms ease',
                     opacity: isGhosted ? 0.25 : 1,
-                    ...(dealAnimation && !isFlipping && dealCardIdsRef.current.has(card.id) ? { animation: `card-deal-in 200ms ease-out ${index * 50}ms both` } : {}),
+                    ...(dealAnimation && !isFlipping && dealCardIdsRef.current.has(card.id)
+                      ? { animation: `deal-arc 400ms cubic-bezier(0.34, 1.56, 0.64, 1) ${index * 50}ms both` }
+                      : drawSlideCardId && card.id === drawSlideCardId
+                        ? { animation: 'draw-slide 400ms ease-out both' }
+                        : {}),
                   }}
                 >
                   {isFlipping ? (
