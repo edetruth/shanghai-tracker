@@ -6,7 +6,7 @@ import type { GameState, Player, Card as CardType, Meld, PlayerConfig, AIDifficu
 import { PERSONALITIES } from '../../game/types'
 import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, MAX_BUYS, cardPoints } from '../../game/rules'
 import { createDecks, shuffle, dealHands } from '../../game/deck'
-import { buildMeld, isValidSet, canLayOff, findSwappableJoker, getNextJokerOptions, isLegalDiscard, evaluateLayOffReversal } from '../../game/meld-validator'
+import { buildMeld, isValidSet, canLayOff, findSwappableJoker, getNextJokerOptions, isLegalDiscard, evaluateLayOffReversal, canGoOutViaChainLayOff } from '../../game/meld-validator'
 import { scoreRound } from '../../game/scoring'
 import {
   aiFindBestMelds, aiFindBestMeldsForLayOff, aiShouldTakeDiscard, aiChooseDiscard, aiShouldBuy,
@@ -2267,10 +2267,29 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       }
 
       if (style === 'hold-for-out') {
-        // The Mastermind: only go down if going out OR panic
-        const totalMeldCards = melds.reduce((sum, m) => sum + m.length, 0)
-        const remainingCards = player.hand.length - totalMeldCards
-        if (remainingCards === 0) return true // going out!
+        // The Mastermind: go down if going out, can go out soon, or panic
+        const meldedIds = new Set(melds.flatMap(m => m.map(c => c.id)))
+        const remaining = player.hand.filter(c => !meldedIds.has(c.id))
+        if (remaining.length === 0) return true // going out!
+
+        // Can go out via chain lay-offs on existing table melds
+        if (remaining.length <= 4 && tablesMelds.length > 0) {
+          if (canGoOutViaChainLayOff(remaining, tablesMelds)) return true
+        }
+
+        // Near go-out: remaining <= 2 and at least one can lay off
+        if (remaining.length <= 2 && tablesMelds.length > 0) {
+          const canLayOffSome = remaining.some(c => tablesMelds.some(m => canLayOff(c, m).valid))
+          if (canLayOffSome) return true
+        }
+
+        // Shanghai risk: held 3+ turns with high hand points — bail out
+        const turnsHeldSoFar = aiTurnsCouldGoDownRef.current.get(player.id) ?? 0
+        if (turnsHeldSoFar >= 3) {
+          const handPoints = remaining.reduce((sum, c) => sum + cardPoints(c.rank), 0)
+          if (handPoints > 60) return true
+        }
+
         // Check panic threshold
         if (turnsElapsed >= config.panicThreshold) return true
         // Check opponent pressure
@@ -2435,6 +2454,11 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           if (melds.some(m => canLayOff(top, m))) {
             shouldTake = true
           }
+          // Post-down joker-swap take: if the discard replaces a joker in a
+          // table run, taking it frees the joker which can then lay off anywhere
+          if (!shouldTake && melds.some(m => findSwappableJoker(top, m) !== null)) {
+            shouldTake = true
+          }
         }
 
         if (shouldTake) handleTakeDiscard()
@@ -2486,7 +2510,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       } else {
         const opponents = state.players.filter(p => p.id !== currentBuyer.id)
           .map(p => ({ hand: { length: p.hand.length }, hasLaidDown: p.hasLaidDown }))
-        shouldBuy = aiShouldBuy(currentBuyer.hand, disc, req, currentBuyer.buysRemaining, buyEvalCfg, opponents)
+        shouldBuy = aiShouldBuy(currentBuyer.hand, disc, req, currentBuyer.buysRemaining, buyEvalCfg, opponents, state.roundState.tablesMelds)
       }
 
       if (shouldBuy) {

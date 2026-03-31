@@ -10,7 +10,7 @@ import { PERSONALITIES } from '../game/types'
 import { createDecks, shuffle, dealHands } from '../game/deck'
 import { buildMeld, isValidSet, findSwappableJoker, simulateLayOff, canGoOutViaChainLayOff, isLegalDiscard, canLayOff } from '../game/meld-validator'
 import { scoreRound, calculateHandScore } from '../game/scoring'
-import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, MAX_BUYS } from '../game/rules'
+import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, MAX_BUYS, cardPoints } from '../game/rules'
 import {
   aiFindBestMelds, aiFindBestMeldsForLayOff, aiShouldTakeDiscard, aiChooseDiscard, aiShouldBuy,
   aiFindLayOff, aiFindJokerSwap, aiFindPreLayDownJokerSwap,
@@ -101,10 +101,29 @@ function shouldGoDownNow(
     }
 
     case 'hold-for-out': {
-      // Go down only if going out (remaining = 0)
+      // Go down if going out, can go out soon, or panic
       const meldedIds = new Set(melds.flatMap(m => m.map(c => c.id)))
       const remaining = hand.filter(c => !meldedIds.has(c.id))
+      const tablesMelds = state.roundState.tablesMelds
       if (remaining.length === 0) return true
+
+      // Can go out via chain lay-offs on existing table melds
+      if (remaining.length <= 4 && tablesMelds.length > 0) {
+        if (canGoOutViaChainLayOff(remaining, tablesMelds)) return true
+      }
+
+      // Near go-out: remaining <= 2 and at least one can lay off
+      if (remaining.length <= 2 && tablesMelds.length > 0) {
+        const canLayOffSome = remaining.some(c => tablesMelds.some(m => canLayOff(c, m).valid))
+        if (canLayOffSome) return true
+      }
+
+      // Shanghai risk: held 3+ turns with high hand points — bail out
+      const turnsHeldSoFar = timing.turnsCouldGoDown.get(pid) ?? 0
+      if (turnsHeldSoFar >= 3) {
+        const handPoints = remaining.reduce((sum, c) => sum + cardPoints(c.rank), 0)
+        if (handPoints > 60) return true
+      }
 
       // Panic: exceeded threshold turns
       const totalTurns = timing.turnsElapsed.get(pid) ?? 0
@@ -473,7 +492,7 @@ function simProcessBuying(
     const { evalConfig: evalCfg } = getSimPlayerConfig(buyerIdx, config)
     const opponents = current.players.filter((_, i) => i !== buyerIdx)
       .map(p => ({ hand: { length: p.hand.length }, hasLaidDown: p.hasLaidDown }))
-    const shouldBuy = aiShouldBuy(buyer.hand, discardCard, current.roundState.requirement, buyer.buysRemaining, evalCfg, opponents)
+    const shouldBuy = aiShouldBuy(buyer.hand, discardCard, current.roundState.requirement, buyer.buysRemaining, evalCfg, opponents, current.roundState.tablesMelds)
 
     if (shouldBuy) {
       buyStats[buyer.id].bought++
@@ -686,7 +705,9 @@ export function simulateRound(gameState: GameState, config: SimConfig): { state:
     const shouldTake = topDiscard !== null && (
       aiShouldTakeDiscard(player.hand, topDiscard, state.roundState.requirement, player.hasLaidDown, takeEvalCfg, state.roundState.tablesMelds, opponentsForDraw) ||
       // Fix 1: Post-down discard taking — if player has laid down and top discard can lay off onto any table meld, take it
-      (player.hasLaidDown && state.roundState.tablesMelds.some(m => canLayOff(topDiscard, m)))
+      (player.hasLaidDown && state.roundState.tablesMelds.some(m => canLayOff(topDiscard, m))) ||
+      // Fix 2: Post-down joker-swap take — take a card that replaces a joker in a table run, freeing the joker for lay-off
+      (player.hasLaidDown && state.roundState.tablesMelds.some(m => findSwappableJoker(topDiscard, m) !== null))
     )
 
     if (shouldTake) {

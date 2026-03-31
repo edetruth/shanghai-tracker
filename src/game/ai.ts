@@ -183,7 +183,11 @@ function cardDanger(
     for (const opp of opponents) {
       if (!opp.hasLaidDown) continue
       const oppMelds = tablesMelds.filter(m => m.ownerId === opp.id)
-      if (oppMelds.some(m => canLayOff(card, m))) d += 100
+      if (oppMelds.some(m => canLayOff(card, m))) {
+        // Opponent close to going out — this card is extremely dangerous
+        if (opp.hand.length <= 3) d += 200
+        else d += 100
+      }
     }
   }
 
@@ -1016,13 +1020,21 @@ export function aiShouldTakeDiscard(
 
   // Denial take: take the card to prevent an opponent from getting it,
   // even if it doesn't help our hand. Only for opponent-aware personalities.
-  if (config.denialTake && tablesMelds.length > 0 && hand.length < 12) {
-    // Card extends a long run (4+) owned by an opponent with few cards left
+  const handLimitForDenial = config.dangerWeight >= 0.6 ? 14 : 12
+  if (config.denialTake && tablesMelds.length > 0 && hand.length < handLimitForDenial) {
     for (const opp of opponents) {
-      if (!opp.hasLaidDown || opp.hand.length > 4) continue
+      if (!opp.hasLaidDown || opp.hand.length > 6) continue
       const oppMelds = tablesMelds.filter(m => m.ownerId === opp.id)
-      if (oppMelds.some(m => m.type === 'run' && m.cards.length >= 4 && canLayOff(discardCard, m))) {
-        // Only denial-take low-point cards (don't bloat hand with Aces/Kings)
+
+      // Check runs: card extends a run (4+) owned by the opponent
+      const extendsRun = oppMelds.some(m => m.type === 'run' && m.cards.length >= 4 && canLayOff(discardCard, m))
+      // Check sets: card matches rank of an opponent's set (3+), could lay off
+      const extendsSet = oppMelds.some(m => m.type === 'set' && m.cards.length >= 3 && canLayOff(discardCard, m))
+
+      if (extendsRun || extendsSet) {
+        // Mastermind (dangerWeight >= 0.6) denies even high-point cards when opponent is close
+        if (config.dangerWeight >= 0.6) return true
+        // Others only denial-take low-point cards (don't bloat hand with Aces/Kings)
         if (cardPoints(discardCard.rank) <= 10) return true
       }
     }
@@ -1043,6 +1055,7 @@ export function aiShouldBuy(
   buysRemaining: number,
   config: AIEvalConfig = DEFAULT_EVAL_CONFIG,
   players?: { hand: { length: number }, hasLaidDown: boolean }[],
+  tablesMelds: Meld[] = [],
 ): boolean {
   if (buysRemaining <= 0) return false
 
@@ -1106,7 +1119,20 @@ export function aiShouldBuy(
 
   // === DECISION ===
   // buyRiskTolerance adjusts the threshold: positive = more willing to buy
-  return improvement + runBuyBonus + config.buyRiskTolerance > risk
+  if (improvement + runBuyBonus + config.buyRiskTolerance > risk) return true
+
+  // === DENIAL BUY ===
+  // Shark/Mastermind: buy a card purely to deny an opponent close to going out,
+  // but only if we have buys to spare (>= 2) and tablesMelds info is available.
+  if (config.denialTake && buysRemaining >= 2 && tablesMelds.length > 0 && players) {
+    for (const opp of players) {
+      if (!opp.hasLaidDown || opp.hand.length > 4) continue
+      // Check if the discard can lay off onto any opponent's meld on the table
+      if (tablesMelds.some(m => canLayOff(discardCard, m))) return true
+    }
+  }
+
+  return false
 }
 
 /**
@@ -1144,7 +1170,37 @@ export function aiChooseDiscard(
     )
 
     if (cantLayOff.length > 0) {
-      // Discard the highest-point dead-weight card
+      // ── Cooperative post-down discarding ──────────────────────────────
+      // Among dead-weight cards (can't lay off), prefer discarding cards
+      // that downed opponents CAN use (extends their melds) — this keeps
+      // the game moving and reduces stalemates. But avoid feeding cards to
+      // opponents who haven't laid down yet (they could use them to go down).
+      if (opponents && opponents.length > 0) {
+        const scored = cantLayOff.map(card => {
+          let coopScore = 0
+          for (const opp of opponents) {
+            if (!opp.hasLaidDown) continue
+            const oppMelds = tablesMelds.filter(m => m.ownerId === opp.id)
+            if (oppMelds.some(m => canLayOff(card, m))) {
+              // This card helps a downed opponent lay off — prefer discarding it
+              coopScore += 10
+            }
+          }
+          // Penalize cards that help NOT-downed opponents
+          for (const opp of opponents) {
+            if (opp.hasLaidDown) continue
+            const oppMelds = tablesMelds.filter(m => m.ownerId === opp.id)
+            if (oppMelds.some(m => canLayOff(card, m))) {
+              coopScore -= 20
+            }
+          }
+          return { card, coopScore, points: cardPoints(card.rank) }
+        })
+        // Sort: highest coopScore first, then highest points as tiebreaker
+        scored.sort((a, b) => b.coopScore - a.coopScore || b.points - a.points)
+        return scored[0].card
+      }
+      // Fallback: discard the highest-point dead-weight card
       return cantLayOff.reduce((worst, c) =>
         cardPoints(c.rank) > cardPoints(worst.rank) ? c : worst
       )
@@ -1465,7 +1521,7 @@ export function aiShouldGoDownHard(
   if (remaining.length === 0) return true
 
   // Always go down: can go out via chain lay-offs
-  if (remaining.length <= 3 && tablesMelds.length > 0) {
+  if (remaining.length <= 4 && tablesMelds.length > 0) {
     if (canGoOutViaChainLayOff(remaining, tablesMelds)) return true
   }
 

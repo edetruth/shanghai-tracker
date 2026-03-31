@@ -668,18 +668,18 @@ describe('aiShouldTakeDiscard — denial', () => {
     expect(aiShouldTakeDiscard(hand, c('spades', 1), req1, false, sharkConfig, [oppMeld], [opponent])).toBe(false)
   })
 
-  it('does NOT denial-take when opponent has many cards (5+)', () => {
-    // Denial only fires when opponent has ≤ 4 cards and is close to going out
+  it('does NOT denial-take when opponent has many cards (7+)', () => {
+    // Denial only fires when opponent has ≤ 6 cards and is close to going out
     const hand = [
       c('hearts', 2), c('spades', 5), c('clubs', 10), c('diamonds', 3),
     ]
     const oppMeld = { ...makeMeld([c('hearts', 5), c('hearts', 6), c('hearts', 7), c('hearts', 8)], 'run'), ownerId: 'opp1' }
     const opponent: Player = {
       id: 'opp1', name: 'Opp',
-      hand: [c('hearts', 11), c('spades', 3), c('clubs', 2), c('diamonds', 8), c('spades', 7)], // 5 cards — not close
+      hand: [c('hearts', 11), c('spades', 3), c('clubs', 2), c('diamonds', 8), c('spades', 7), c('clubs', 9), c('diamonds', 6)], // 7 cards — not close
       melds: [oppMeld], hasLaidDown: true, buysRemaining: 3, roundScores: [],
     }
-    // 9♥ extends run but opponent has 5 cards — denial guard won't fire
+    // 9♥ extends run but opponent has 7 cards — denial guard won't fire
     expect(aiShouldTakeDiscard(hand, c('hearts', 9), req1, false, sharkConfig, [oppMeld], [opponent])).toBe(false)
   })
 
