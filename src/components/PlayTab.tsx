@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Trophy } from 'lucide-react'
 import GameSetup from './play/GameSetup'
 import GameBoard from './play/GameBoard'
 import GameOver from './play/GameOver'
@@ -7,11 +8,12 @@ import Lobby from './play/Lobby'
 import RemoteGameBoard from './play/RemoteGameBoard'
 import SpectatorBoard from './play/SpectatorBoard'
 import ReplayViewer from './play/ReplayViewer'
+import TournamentLobby from './play/TournamentLobby'
 import type { PlayerConfig, Player, AIPersonality, TournamentState, TournamentGameResult, TournamentPlayerStats } from '../game/types'
 import type { GameRoomConfig, GameRoomPlayer } from '../game/multiplayer-types'
 import { loadGameStateSnapshot, getGameRoomPlayers } from '../lib/gameStore'
 
-type PlayView = 'landing' | 'setup' | 'game' | 'lobby-host' | 'lobby-join' | 'remote-game' | 'spectator' | 'replay' | 'tournament-gameover' | 'tournament-trophy'
+type PlayView = 'landing' | 'setup' | 'game' | 'lobby-host' | 'lobby-join' | 'remote-game' | 'spectator' | 'replay' | 'tournament-gameover' | 'tournament-trophy' | 'tournament-lobby-create' | 'tournament-lobby-join'
 
 const ROUNDS = [
   { num: 1, req: '2 Sets of 3+',    cards: 10 },
@@ -134,6 +136,9 @@ export default function PlayTab({ onBack }: Props) {
   const [onlineHostName, setOnlineHostName] = useState('')
   const [onlineConfig, setOnlineConfig] = useState<GameRoomConfig | null>(null)
   const [remotePlayers, setRemotePlayers] = useState<GameRoomPlayer[]>([])
+
+  // Online tournament bracket state
+  const [tournamentHostName, setTournamentHostName] = useState('')
 
   // Replay state
   const [replayGameId, setReplayGameId] = useState<string | null>(null)
@@ -372,6 +377,32 @@ export default function PlayTab({ onBack }: Props) {
     setView('spectator')
   }
   void handleSpectate
+
+  if (view === 'tournament-lobby-create') {
+    return (
+      <TournamentLobby
+        mode="create"
+        hostName={tournamentHostName}
+        onMatchStart={() => {
+          // Full match integration is a future enhancement
+          setView('landing')
+        }}
+        onBack={() => setView('landing')}
+      />
+    )
+  }
+
+  if (view === 'tournament-lobby-join') {
+    return (
+      <TournamentLobby
+        mode="join"
+        onMatchStart={() => {
+          setView('landing')
+        }}
+        onBack={() => setView('landing')}
+      />
+    )
+  }
 
   if (view === 'spectator' && roomCode) {
     return (
@@ -732,6 +763,48 @@ export default function PlayTab({ onBack }: Props) {
           }}
         >
           Join Online Game
+        </button>
+        <button
+          onClick={() => { setTournamentHostName('Host'); setView('tournament-lobby-create') }}
+          style={{
+            width: '100%',
+            background: '#1e4a2e',
+            color: '#a8d0a8',
+            border: '1px solid #2d5a3a',
+            borderRadius: 12,
+            padding: 14,
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: 'pointer',
+            minHeight: 44,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+          }}
+        >
+          <Trophy size={14} /> Create Tournament
+        </button>
+        <button
+          onClick={() => setView('tournament-lobby-join')}
+          style={{
+            width: '100%',
+            background: 'transparent',
+            color: '#6aad7a',
+            border: '1px solid #2d5a3a',
+            borderRadius: 12,
+            padding: 14,
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: 'pointer',
+            minHeight: 44,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+          }}
+        >
+          <Trophy size={14} /> Join Tournament
         </button>
       </div>
 
