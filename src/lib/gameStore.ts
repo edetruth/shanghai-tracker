@@ -611,6 +611,29 @@ export async function loadGameStateSnapshot(
   }
 }
 
+export async function saveAchievement(playerName: string, achievementId: string): Promise<void> {
+  try {
+    await supabase.from('player_achievements').upsert(
+      { player_name: playerName, achievement_id: achievementId, unlocked_at: new Date().toISOString() },
+      { onConflict: 'player_name,achievement_id' }
+    )
+  } catch {
+    // Silent fail — achievements are nice-to-have, never break gameplay
+  }
+}
+
+export async function getPlayerAchievements(playerName: string): Promise<string[]> {
+  try {
+    const { data } = await supabase
+      .from('player_achievements')
+      .select('achievement_id')
+      .eq('player_name', playerName)
+    return (data ?? []).map(r => r.achievement_id)
+  } catch {
+    return []
+  }
+}
+
 export async function updatePlayerConnection(
   roomCode: string,
   playerName: string,

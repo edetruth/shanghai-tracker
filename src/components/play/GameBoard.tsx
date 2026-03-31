@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { createPlayedGame, saveGameEvents, saveAIDecisions, backfillDecisionOutcomes, savePlayerRoundStats, savePlayerGameStats, saveGameStateSnapshot } from '../../lib/gameStore'
+import { createPlayedGame, saveGameEvents, saveAIDecisions, backfillDecisionOutcomes, savePlayerRoundStats, savePlayerGameStats, saveGameStateSnapshot, saveAchievement, getPlayerAchievements } from '../../lib/gameStore'
+import { checkAchievements, ACHIEVEMENTS } from '../../lib/achievements'
 import type { AIDecision, PlayerRoundStats, PlayerGameStats } from '../../game/types'
 import { Pause, Wifi } from 'lucide-react'
 import type { GameState, Player, Card as CardType, Meld, PlayerConfig, AIDifficulty, AIPersonality, PersonalityConfig, OpponentHistory } from '../../game/types'
@@ -297,6 +298,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const aiTurnsCouldGoDownRef = useRef<Map<string, number>>(new Map())
   // Panic mode: total turns elapsed per AI player per round (resets each round)
   const aiTurnsElapsedRef = useRef<Map<string, number>>(new Map())
+  // Achievements: track already-unlocked to avoid duplicate toasts
+  const unlockedAchievementsRef = useRef<Set<string>>(new Set())
   const [yourTurnPulse, setYourTurnPulse] = useState(false)
   const [perfectDrawActive, setPerfectDrawActive] = useState(false)
   const perfectDrawTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -546,6 +549,16 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   useEffect(() => { pendingBuyDiscardRef.current = pendingBuyDiscard }, [pendingBuyDiscard])
   useEffect(() => { freeOfferDeclinedRef.current = freeOfferDeclined }, [freeOfferDeclined])
   useEffect(() => { buyingPhaseRef.current = buyingPhase }, [buyingPhase])
+
+  // Load already-unlocked achievements for the first human player on mount
+  useEffect(() => {
+    const humanPlayers = initialPlayers.filter(p => !p.isAI)
+    if (humanPlayers.length > 0) {
+      getPlayerAchievements(humanPlayers[0].name).then(ids => {
+        unlockedAchievementsRef.current = new Set(ids)
+      })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { preloadSounds() }, [])
 
@@ -1111,6 +1124,34 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     if (!activeToastRef.current) showNextToast()
   }
 
+  function checkAndShowAchievements(isGameEnd: boolean) {
+    const gs = gameStateRef.current
+    gs.players.forEach((player, idx) => {
+      if (player.isAI) return
+      const ctx = {
+        gameState: gs,
+        playerName: player.name,
+        playerIndex: idx,
+        roundResults: roundResults ?? undefined,
+        isGameEnd,
+      }
+      const newIds = checkAchievements(ctx, unlockedAchievementsRef.current)
+      newIds.forEach(id => {
+        unlockedAchievementsRef.current.add(id)
+        saveAchievement(player.name, id)
+        const achievement = ACHIEVEMENTS.find(a => a.id === id)
+        if (achievement) {
+          queueToast({
+            message: `${achievement.icon} ${achievement.name}`,
+            subtext: achievement.description,
+            style: 'celebration',
+            duration: 4000,
+          })
+        }
+      })
+    })
+  }
+
   const rs = gameState.roundState
   const currentPlayer = getCurrentPlayer(gameState)
   const topDiscard = rs.discardPile[rs.discardPile.length - 1] ?? null
@@ -1530,6 +1571,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       }
     }
     resetRoundTelemetry()
+
+    // Check achievements at round end
+    setTimeout(() => checkAndShowAchievements(false), 600)
   }
 
   // ── Stalemate detection (phased UX) ──────────────────────────────────────
@@ -1620,6 +1664,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       }
     }
     resetRoundTelemetry()
+
+    // Check achievements at round end (stalemate path)
+    setTimeout(() => checkAndShowAchievements(false), 600)
   }
 
   // ── Meld confirmation ─────────────────────────────────────────────────────
@@ -1912,6 +1959,13 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     }
     setGameState(prev => computeJokerSwap(prev, naturalCard, meld) ?? prev)
     clearSelection()
+    // Achievement: The Heist (joker swap by human)
+    if (!swapPlayer.isAI && !unlockedAchievementsRef.current.has('the-heist')) {
+      unlockedAchievementsRef.current.add('the-heist')
+      saveAchievement(swapPlayer.name, 'the-heist')
+      const ach = ACHIEVEMENTS.find(a => a.id === 'the-heist')!
+      queueToast({ message: `${ach.icon} ${ach.name}`, subtext: ach.description, style: 'celebration', duration: 4000 })
+    }
     // Fix D: flash the meld that just had its joker swapped
     setFlashMeldId(meld.id)
     setFlashIsHeist(isFromOtherMeld)
@@ -2202,6 +2256,14 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       btc.buysMade++
       btc.buyOpportunities++
 
+      // Achievement: Buyer's Market (first buy by human)
+      if (!buyer.isAI && !unlockedAchievementsRef.current.has('buyers-market')) {
+        unlockedAchievementsRef.current.add('buyers-market')
+        saveAchievement(buyer.name, 'buyers-market')
+        const ach = ACHIEVEMENTS.find(a => a.id === 'buyers-market')!
+        queueToast({ message: `${ach.icon} ${ach.name}`, subtext: ach.description, style: 'celebration', duration: 4000 })
+      }
+
       // Highlight newly received buy cards
       const buyNewIds = new Set<string>()
       if (buyingDiscard) buyNewIds.add(buyingDiscard.id)
@@ -2447,6 +2509,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         setGameState(prev => ({ ...prev, gameOver: true }))
         // Telemetry: save game-level stats
         if (gameId) computeAndSaveGameStats(gameId, gameState.players)
+        // Check achievements at game end
+        setTimeout(() => checkAndShowAchievements(true), 200)
         // Tournament callback — let PlayTab handle the game-over flow
         if (onGameComplete) onGameComplete(gameState.players)
         setShowDarkBeat(true)
