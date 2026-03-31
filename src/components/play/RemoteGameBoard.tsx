@@ -13,6 +13,7 @@ import BuyingCinematic, { BuyBottomSheet, FreeTakeBottomSheet } from './BuyingCi
 import { useHeartbeat } from '../../multiplayer/useHeartbeat'
 import { useActionAck } from '../../multiplayer/useActionAck'
 import { haptic } from '../../lib/haptics'
+import { playSound, preloadSounds } from '../../lib/sounds'
 import { ROUND_REQUIREMENTS, cardPoints } from '../../game/rules'
 
 interface Props {
@@ -197,6 +198,47 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
       setGhostedIds(new Set())
     }
   }, [showMeldBuilder, isMyTurn, uiPhase])
+
+  // Preload sound assets
+  useEffect(() => { preloadSounds() }, [])
+
+  // Sound effects triggered by remote state changes
+  const prevSoundViewRef = useRef<RemoteGameView | null>(null)
+  useEffect(() => {
+    if (!view) return
+    const prev = prevSoundViewRef.current
+    prevSoundViewRef.current = view
+
+    if (!prev) return
+
+    // Going out cinematic
+    if (view.goingOutSequence === 'flash' && prev.goingOutSequence !== 'flash') {
+      playSound('going-out')
+    }
+
+    // Turn notification (when tab is hidden)
+    if (view.currentPlayerIndex === view.myPlayerIndex &&
+        prev.currentPlayerIndex !== view.myPlayerIndex &&
+        document.hidden) {
+      playSound('turn-notify')
+    }
+
+    // Buying phase — someone snatched
+    if (view.buyingCinematicPhase === 'snatched' && prev.buyingCinematicPhase !== 'snatched') {
+      playSound('buy-ding')
+    }
+
+    // Event-based sounds from lastEvent string matching
+    if (view.lastEvent && view.lastEvent !== prev.lastEvent) {
+      const evt = view.lastEvent.toLowerCase()
+      if (evt.includes('drew') || evt.includes('draw')) playSound('card-draw')
+      else if (evt.includes('discard') || evt.includes('took')) playSound('card-snap')
+      else if (evt.includes('went down') || evt.includes('laid down')) playSound('meld-slam')
+      else if (evt.includes('laid off')) playSound('lay-off')
+      else if (evt.includes('swapped a joker') || evt.includes('heist')) playSound('joker-swap')
+      else if (evt.includes('bought')) playSound('buy-ding')
+    }
+  }, [view])
 
   // Round felt color
   const feltBg = view?.feltColor ?? '#1a3a2a'
