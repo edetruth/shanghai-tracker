@@ -3498,6 +3498,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
             disabled={false}
             sortMode={handSort}
             onSortChange={setHandSort}
+            dealAnimation={showDealAnimation}
+            dealFlipPhase={dealFlipPhase}
           />
         ) : null}
         </div>
