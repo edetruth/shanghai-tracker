@@ -16,6 +16,7 @@ import {
 } from '../../game/ai'
 import { SUIT_ORDER } from './HandDisplay'
 import { haptic } from '../../lib/haptics'
+import { playSound, preloadSounds } from '../../lib/sounds'
 import PrivacyScreen from './PrivacyScreen'
 import MeldBuilder, { type MeldBuilderHandle } from './MeldBuilder'
 // MeldModal replaced by inline MeldBuilder; LayOffModal removed — lay-offs happen inline via TableMelds
@@ -538,6 +539,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   useEffect(() => { freeOfferDeclinedRef.current = freeOfferDeclined }, [freeOfferDeclined])
   useEffect(() => { buyingPhaseRef.current = buyingPhase }, [buyingPhase])
 
+  useEffect(() => { preloadSounds() }, [])
+
   // ── Flying card animation helpers ─────────────────────────────────────────
   function getRefCenter(ref: React.RefObject<HTMLDivElement | null>): { x: number, y: number } | null {
     if (!ref.current) return null
@@ -653,6 +656,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       }
     })
     setReshuffleMsg(true)
+    playSound('card-shuffle')
     setTimeout(() => setReshuffleMsg(false), 2500)
   }, [uiPhase, gameState.roundState.currentPlayerIndex]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1252,6 +1256,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         roundState: { ...gameState.roundState, drawPile: drawPileSnapshot, discardPile: discardPileSnapshot },
       }
       setGameState(updatedState)
+      playSound('card-draw')
 
       // Perfect Draw detection: did this card unlock the round requirement?
       const handBefore = gameState.players[gameState.roundState.currentPlayerIndex].hand
@@ -1283,6 +1288,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
     if (needsReshuffle) {
       setReshuffleMsg(true)
+      playSound('card-shuffle')
       setTimeout(() => setReshuffleMsg(false), 2500)
     }
 
@@ -1359,6 +1365,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       )
       return { ...prev, players, roundState: { ...prev.roundState, discardPile } }
     })
+    playSound('card-snap')
     setUiPhase('action')
   }
 
@@ -1419,6 +1426,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
   // ── Going-out cinematic ──────────────────────────────────────────────────
   function triggerGoingOut(playerName: string, stateToEnd: GameState) {
+    playSound('going-out')
     setGoOutPlayerName(playerName)
     setGoingOutSequence('flash')
     haptic('success')
@@ -1640,6 +1648,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     setPreLayDownSwap(false)
     clearSelection() // always reset selection after meld
     haptic(wentOut ? 'success' : 'heavy')
+    playSound('meld-slam')
 
     if (wentOut) {
       // Round ends immediately — no buying window, no further actions
@@ -1678,6 +1687,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           if (newMin < 1) {
             setLayOffError('Cannot extend run below Ace.')
             haptic('error')
+            playSound('error-buzz')
             setTimeout(() => setLayOffError(null), 3000)
             return
           }
@@ -1690,6 +1700,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           if (newMax > 14) {
             setLayOffError('Cannot extend run above Ace.')
             haptic('error')
+            playSound('error-buzz')
             setTimeout(() => setLayOffError(null), 3000)
             return
           }
@@ -1778,6 +1789,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     setGameState(updated)
     clearSelection()
     setLayOffError(null)
+    playSound('lay-off')
 
     // Undo window for human lay-offs (not going out, not AI)
     if (!wentOut && !player.isAI) {
@@ -1846,6 +1858,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       style: 'taunt', icon: '🃏', duration: 1500,
     })
     haptic('heavy')
+    playSound('joker-swap')
     // Broadcast event to remote players
     setRemoteEvent(`${swapPlayer.name} swapped a joker!`)
     setRemoteToast({ message: isFromOtherMeld ? 'The heist!' : 'Joker reclaimed!', style: 'taunt', icon: '🃏' })
@@ -2013,6 +2026,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     setGameState(afterDiscard)
     clearSelection()
     haptic('heavy')
+    playSound('card-snap')
 
     turnCountRef.current += 1
 
@@ -2100,6 +2114,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       const buyerIdx = buyerOrder[buyerStep]
       const buyer = gameState.players[buyerIdx]
       if (!buyingDiscard || buyer.buysRemaining <= 0) return
+      playSound('buy-ding')
       setLeavingCardId(null) // clear any in-progress exit animation for the discarded card
 
       let drawPile = [...gameState.roundState.drawPile]
