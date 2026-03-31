@@ -1,4 +1,6 @@
+import { useEffect } from 'react'
 import type { Card as CardType } from '../../game/types'
+import { playSound } from '../../lib/sounds'
 import CardComponent from './Card'
 
 export type BuyingPhase =
@@ -203,6 +205,12 @@ export default function BuyingCinematic({
   buyerName,
   cardLabel,
 }: Props) {
+  useEffect(() => {
+    if (phase === 'snatched') {
+      playSound('buy-ding')
+    }
+  }, [phase])
+
   // human-turn → BuyBottomSheet, free-offer → FreeTakeBottomSheet (both inline in GameBoard)
   if (phase === 'hidden' || phase === 'human-turn' || phase === 'free-offer' || !card) return null
 

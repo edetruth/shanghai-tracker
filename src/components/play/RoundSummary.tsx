@@ -3,6 +3,7 @@ import type { Player, Card as CardType } from '../../game/types'
 import { ROUNDS, PLAYER_COLORS } from '../../lib/constants'
 import { TOTAL_ROUNDS } from '../../game/rules'
 import { haptic } from '../../lib/haptics'
+import { playSound } from '../../lib/sounds'
 import CardComponent from './Card'
 
 interface RoundResult {
@@ -225,11 +226,18 @@ export default function RoundSummary({ players, roundResults, roundNum, onNext, 
   const shanghaiedCount = roundResults.filter(r => r.shanghaied).length
   useEffect(() => {
     if (shanghaiedCount >= 1) {
+      playSound('shanghai-sting')
       setShowShanghai(true)
       const t = setTimeout(() => setShowShanghai(false), 2500)
       return () => clearTimeout(t)
     }
   }, [shanghaiedCount])
+
+  // Play win celebration on mount if someone went out
+  useEffect(() => {
+    const hasWinner = roundResults.some(r => r.score === 0 && !r.shanghaied)
+    if (hasWinner) playSound('win-celebration')
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Winner = player who went out (score 0, not shanghaied)
   const winnerResult = roundResults.find(r => r.score === 0 && !r.shanghaied)

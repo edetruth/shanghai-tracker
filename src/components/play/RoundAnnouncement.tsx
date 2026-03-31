@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { playSound } from '../../lib/sounds'
 
 interface Standing {
   name: string
@@ -95,6 +96,16 @@ export default function RoundAnnouncement({
     })
     return () => cancelAnimationFrame(id)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Sound effects on countdown ──
+  useEffect(() => {
+    if (stage === 'countdown-3' || stage === 'countdown-2' || stage === 'countdown-1') {
+      playSound('countdown-tick')
+    }
+    if (stage === 'countdown-1') {
+      setTimeout(() => playSound('round-fanfare'), 600)
+    }
+  }, [stage])
 
   // ── Standings flash ──────────────────────────────────────────────────────
   if (stage === 'standings') {
