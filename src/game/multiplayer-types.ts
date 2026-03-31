@@ -117,6 +117,28 @@ export interface RemoteGameView {
   lastEvent?: string  // e.g. "Sam bought 7♥", "Pat went down!", "Lou swapped a joker!"
   raceMessage?: string  // "Race to finish!" tension message
   streakInfo?: { playerName: string; streak: number }
+
+  // Cinematic sync
+  perfectDraw?: boolean
+  shimmerCardId?: string | null
+  isOnTheEdge?: boolean
+  feltColor?: string
+
+  // Buying cinematic sync
+  buyingCinematicPhase?: 'hidden' | 'reveal' | 'free-offer' | 'ai-deciding' | 'human-turn' | 'snatched' | 'unclaimed'
+  buyingSnatcherName?: string | null
+
+  // Round announcement sync
+  announcementData?: {
+    stage: string
+    standings?: Array<{ name: string; total: number; delta?: number }>
+    dealerName?: string
+    firstPlayerName?: string
+  }
+
+  // Disconnection info
+  disconnectedPlayers?: number[]
+  turnTimeRemaining?: number
 }
 
 // Remote UI phases mirror host UIPhase, but no 'privacy' (remote players are on separate devices)
@@ -141,6 +163,33 @@ export type PlayerAction =
   | { type: 'buy'; wantsToBuy: boolean }
   | { type: 'undo_discard' }
 
+// ── Connection Infrastructure ────────────────────────────────────────────────
+
+export interface HeartbeatPayload {
+  seatIndex: number
+  timestamp: number
+}
+
+export interface ActionAck {
+  actionId: string
+  ok: boolean
+  error?: string
+}
+
+export interface PendingAction {
+  id: string
+  action: PlayerAction
+  sentAt: number
+  retries: number
+}
+
+export interface PlayerConnectionState {
+  seatIndex: number
+  lastHeartbeat: number
+  isConnected: boolean
+  missedBeats: number
+}
+
 // ── Channel messages ────────────────────────────────────────────────────────
 
 export type ChannelMessage =
@@ -150,7 +199,11 @@ export type ChannelMessage =
   | { event: 'player_joined'; payload: { name: string; seatIndex: number } }
   | { event: 'player_left'; payload: { seatIndex: number } }
   | { event: 'action_rejected'; payload: { seatIndex: number; reason: string } }
-  | { event: 'heartbeat'; payload: { timestamp: number } }
+  | { event: 'heartbeat'; payload: HeartbeatPayload }
+  | { event: 'action_ack'; payload: ActionAck & { seatIndex: number } }
+  | { event: 'player_disconnected'; payload: { seatIndex: number; playerName: string } }
+  | { event: 'turn_skipped'; payload: { seatIndex: number; reason: 'timeout' | 'disconnected' } }
+  | { event: 'player_reconnected'; payload: { seatIndex: number } }
 
 // ── Multiplayer mode for GameBoard ──────────────────────────────────────────
 
