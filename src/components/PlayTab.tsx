@@ -6,11 +6,12 @@ import TournamentTrophy from './play/TournamentTrophy'
 import Lobby from './play/Lobby'
 import RemoteGameBoard from './play/RemoteGameBoard'
 import SpectatorBoard from './play/SpectatorBoard'
+import ReplayViewer from './play/ReplayViewer'
 import type { PlayerConfig, Player, AIPersonality, TournamentState, TournamentGameResult, TournamentPlayerStats } from '../game/types'
 import type { GameRoomConfig, GameRoomPlayer } from '../game/multiplayer-types'
 import { loadGameStateSnapshot, getGameRoomPlayers } from '../lib/gameStore'
 
-type PlayView = 'landing' | 'setup' | 'game' | 'lobby-host' | 'lobby-join' | 'remote-game' | 'spectator' | 'tournament-gameover' | 'tournament-trophy'
+type PlayView = 'landing' | 'setup' | 'game' | 'lobby-host' | 'lobby-join' | 'remote-game' | 'spectator' | 'replay' | 'tournament-gameover' | 'tournament-trophy'
 
 const ROUNDS = [
   { num: 1, req: '2 Sets of 3+',    cards: 10 },
@@ -133,6 +134,18 @@ export default function PlayTab({ onBack }: Props) {
   const [onlineHostName, setOnlineHostName] = useState('')
   const [onlineConfig, setOnlineConfig] = useState<GameRoomConfig | null>(null)
   const [remotePlayers, setRemotePlayers] = useState<GameRoomPlayer[]>([])
+
+  // Replay state
+  const [replayGameId, setReplayGameId] = useState<string | null>(null)
+  const [replayPlayerNames, setReplayPlayerNames] = useState<string[]>([])
+
+  // Replay launcher (for future "Watch Replay" button integration)
+  const handleStartReplay = (gameId: string, playerNames: string[]) => {
+    setReplayGameId(gameId)
+    setReplayPlayerNames(playerNames)
+    setView('replay')
+  }
+  void handleStartReplay
 
   // ── Session recovery: resume online game after host refresh ─────────────
   useEffect(() => {
@@ -369,6 +382,16 @@ export default function PlayTab({ onBack }: Props) {
           sessionStorage.removeItem('shanghai_active_game')
           setView('landing')
         }}
+      />
+    )
+  }
+
+  if (view === 'replay' && replayGameId) {
+    return (
+      <ReplayViewer
+        gameId={replayGameId}
+        playerNames={replayPlayerNames}
+        onExit={() => { setReplayGameId(null); setView('landing') }}
       />
     )
   }

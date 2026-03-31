@@ -36,6 +36,7 @@ import { sanitizeGameViewForPlayer, mapActionToHandler } from '../../game/multip
 import type { PlayerAction, EmotePayload } from '../../game/multiplayer-types'
 import EmoteBar, { EMOTE_MAP } from './EmoteBar'
 import EmoteBubble from './EmoteBubble'
+import { logAction } from '../../lib/actionLog'
 
 interface Props {
   initialPlayers: PlayerConfig[]
@@ -228,6 +229,13 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   }
 
   const [gameState, setGameState] = useState<GameState>(() => initGame(initialPlayers, buyLimit))
+  const [gameLogId] = useState(() => {
+    const id = crypto.randomUUID()
+    // Log round 1 start immediately (fire-and-forget)
+    logAction(id, 1, -1, 'round_start', { round: 1 })
+    return id
+  })
+  const actionSeqRef = useRef(1) // starts at 1 because round_start is seq 1
   const [uiPhase, setUiPhase] = useState<UIPhase>('round-start')
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set())
   const selectedCardOrderRef = useRef<string[]>([])
@@ -1381,6 +1389,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       }
       setGameState(updatedState)
       playSound('card-draw')
+      logAction(gameLogId, ++actionSeqRef.current, gameState.roundState.currentPlayerIndex, 'draw_pile')
 
       // Perfect Draw detection: did this card unlock the round requirement?
       const handBefore = gameState.players[gameState.roundState.currentPlayerIndex].hand
@@ -1495,6 +1504,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       return { ...prev, players, roundState: { ...prev.roundState, discardPile } }
     })
     playSound('card-snap')
+    logAction(gameLogId, ++actionSeqRef.current, gameState.roundState.currentPlayerIndex, 'take_discard')
     setUiPhase('action')
   }
 
@@ -1556,6 +1566,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   // ── Going-out cinematic ──────────────────────────────────────────────────
   function triggerGoingOut(playerName: string, stateToEnd: GameState) {
     playSound('going-out')
+    logAction(gameLogId, ++actionSeqRef.current, stateToEnd.players.findIndex(p => p.name === playerName), 'going_out')
     setGoOutPlayerName(playerName)
     setGoingOutSequence('flash')
     haptic('success')
@@ -1600,6 +1611,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     })
     setGameState({ ...state, players })
     setRoundResults(results)
+    logAction(gameLogId, ++actionSeqRef.current, -1, 'round_end', { round: state.currentRound })
     setShowDarkBeat(true)
     setTimeout(() => {
       setShowDarkBeat(false)
@@ -1784,6 +1796,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     clearSelection() // always reset selection after meld
     haptic(wentOut ? 'success' : 'heavy')
     playSound('meld-slam')
+    logAction(gameLogId, ++actionSeqRef.current, gameState.roundState.currentPlayerIndex, 'meld_confirm')
 
     if (wentOut) {
       // Round ends immediately — no buying window, no further actions
@@ -1925,6 +1938,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     clearSelection()
     setLayOffError(null)
     playSound('lay-off')
+    logAction(gameLogId, ++actionSeqRef.current, gameState.roundState.currentPlayerIndex, 'lay_off', { cardId: card.id, meldId: meld.id })
 
     // Undo window for human lay-offs (not going out, not AI)
     if (!wentOut && !player.isAI) {
@@ -1994,6 +2008,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     })
     haptic('heavy')
     playSound('joker-swap')
+    logAction(gameLogId, ++actionSeqRef.current, gameState.roundState.currentPlayerIndex, 'joker_swap', { cardId: naturalCard.id, meldId: meld.id })
     // Broadcast event to remote players
     setRemoteEvent(`${swapPlayer.name} swapped a joker!`)
     setRemoteToast({ message: isFromOtherMeld ? 'The heist!' : 'Joker reclaimed!', style: 'taunt', icon: '🃏' })
@@ -2172,6 +2187,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     clearSelection()
     haptic('heavy')
     playSound('card-snap')
+    logAction(gameLogId, ++actionSeqRef.current, playerIdx, 'discard', { cardId: card.id, cardLabel: formatCard(card) })
 
     turnCountRef.current += 1
 
@@ -2260,6 +2276,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       const buyer = gameState.players[buyerIdx]
       if (!buyingDiscard || buyer.buysRemaining <= 0) return
       playSound('buy-ding')
+      logAction(gameLogId, ++actionSeqRef.current, buyerIdx, 'buy', { wantsToBuy: true })
       setLeavingCardId(null) // clear any in-progress exit animation for the discarded card
 
       let drawPile = [...gameState.roundState.drawPile]
@@ -2363,6 +2380,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         ptc.buyOpportunities++
       }
 
+      logAction(gameLogId, ++actionSeqRef.current, passerIdx ?? -1, 'buy', { wantsToBuy: false })
       addBuyLog({
         turn: turnCountRef.current,
         round: gameState.currentRound,
@@ -2581,6 +2599,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
         const next = setupRound(gameState, nextRound)
         setGameState(next)
+        logAction(gameLogId, ++actionSeqRef.current, -1, 'round_start', { round: nextRound })
         setRoundResults(null)
         clearSelection()
         setPendingBuyDiscard(null)
