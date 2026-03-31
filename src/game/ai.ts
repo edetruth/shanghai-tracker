@@ -871,11 +871,12 @@ export function aiShouldTakeDiscard(
   tablesMelds: Meld[] = [],
   opponents: Player[] = [],
 ): boolean {
-  // Always take jokers
-  if (isJoker(discardCard)) return true
-
-  // After laying down, only take via lay-off (handled by GameBoard)
+  // After laying down, only take via lay-off (handled by GameBoard override).
+  // Even jokers: don't blindly take if we can't use them.
   if (hasLaidDown) return false
+
+  // Always take jokers pre-lay-down
+  if (isJoker(discardCard)) return true
 
   // Core: does taking this card improve hand score?
   const scoreBefore = evaluateHand(hand, requirement)
@@ -946,8 +947,9 @@ export function aiShouldBuy(
   // bought one, then you still have 2 cards — marginal). Skip buying post-lay-down.
   if (hasLaidDown) return false
 
-  // Always buy jokers unless hand is already huge (14+ cards)
-  if (isJoker(discardCard) && hand.length < 14) return true
+  // Always buy jokers unless hand is too large relative to round's base dealt count
+  const jokerBaseDealt = (requirement.sets + requirement.runs >= 3 && requirement.runs >= 1) ? 12 : 10
+  if (isJoker(discardCard) && hand.length < jokerBaseDealt + 4) return true
 
   // === VALUE: how much does this card improve my hand? ===
   const scoreBefore = evaluateHand(hand, requirement)
@@ -1093,13 +1095,17 @@ export function aiChooseDiscard(
       )
     }
 
-    // All cards can lay off — discard the one with the lowest lay-off priority:
-    // fewest matching melds first, highest point value as tiebreaker.
+    // All cards can lay off — discard the highest-point card to minimize penalty
+    // exposure. Use fewest meld matches as tiebreaker (shed the least-flexible card).
     return nonJokers.reduce((best, c) => {
-      const cMatches = tablesMelds.filter(m => canLayOff(c, m)).length
-      const bestMatches = tablesMelds.filter(m => canLayOff(best, m)).length
-      if (cMatches < bestMatches) return c
-      if (cMatches === bestMatches && cardPoints(c.rank) > cardPoints(best.rank)) return c
+      const cPts = cardPoints(c.rank)
+      const bestPts = cardPoints(best.rank)
+      if (cPts > bestPts) return c
+      if (cPts === bestPts) {
+        const cMatches = tablesMelds.filter(m => canLayOff(c, m)).length
+        const bestMatches = tablesMelds.filter(m => canLayOff(best, m)).length
+        if (cMatches < bestMatches) return c
+      }
       return best
     })
   }
@@ -1370,7 +1376,7 @@ export function aiChooseJokerLayOffPosition(meld: Meld): 'low' | 'high' {
 //   - Runs over sets (runs extend further, creating more future lay-off positions)
 //   - Runs matching remaining hand cards' suit (enables future lay-offs for those cards)
 //   - Own melds over opponent melds (avoid helping opponents go out)
-export function aiFindLayOff(hand: Card[], tablesMelds: Meld[]): { card: Card; meld: Meld; jokerPosition?: 'low' | 'high' } | null {
+export function aiFindLayOff(hand: Card[], tablesMelds: Meld[], currentPlayerId?: string): { card: Card; meld: Meld; jokerPosition?: 'low' | 'high' } | null {
   const jokers = hand.filter(c => c.suit === 'joker')
   const nonJokers = hand.filter(c => c.suit !== 'joker')
   const prioritisedHand = [...jokers, ...nonJokers]
@@ -1385,7 +1391,9 @@ export function aiFindLayOff(hand: Card[], tablesMelds: Meld[]): { card: Card; m
           ? aiChooseJokerLayOffPosition(meld)
           : undefined
 
-        // Check stranding safety
+        // Check stranding safety — don't lay off if it leaves exactly 1 card that can't
+        // chain-lay-off (since you can't discard your last card to go out).
+        // At 2+ remaining cards, you still have draw/discard turns to work with.
         const remaining = hand.filter(c => c.id !== card.id)
         if (remaining.length === 1) {
           const updatedMelds = tablesMelds.map(m => m.id === meld.id ? simulateLayOff(card, meld, jokerPosition) : m)
@@ -1419,9 +1427,11 @@ export function aiFindLayOff(hand: Card[], tablesMelds: Meld[]): { card: Card; m
             }
           }
         } else {
-          // Non-joker cards: prefer melds that DON'T extend opponent's run length
-          // (neutral scoring — just take the first valid target)
-          score += 0
+          // Non-joker cards: prefer own melds over opponent melds
+          // Meld IDs encode owner like "meld-p0-0" — check if it belongs to us
+          if (currentPlayerId && meld.id?.includes(currentPlayerId)) {
+            score += 50  // strongly prefer own melds
+          }
         }
 
         validTargets.push({ meld, jokerPosition, score })

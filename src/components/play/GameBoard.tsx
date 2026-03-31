@@ -2828,7 +2828,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     const hasJokerInHand = player.hand.some(c => c.suit === 'joker')
     if (layOffCap > 0 && player.hasLaidDown && tablesMelds.length > 0 &&
         (aiLayOffCountRef.current < layOffCap || player.hand.length === 1 || hasJokerInHand)) {
-      const layOff = aiFindLayOff(player.hand, tablesMelds)
+      const layOff = aiFindLayOff(player.hand, tablesMelds, player.id)
       if (layOff) {
         if (layOff.card.suit !== 'joker') aiLayOffCountRef.current++
         handleLayOff(layOff.card, layOff.meld, layOff.jokerPosition)
