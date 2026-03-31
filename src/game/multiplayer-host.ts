@@ -35,6 +35,17 @@ interface SanitizeParams {
   lastEvent?: string
   raceMessage?: string
   streakInfo?: { playerName: string; streak: number } | null
+  // Cinematic sync
+  feltColor?: string
+  perfectDraw?: boolean
+  shimmerCardId?: string | null
+  // Announcement data
+  standings?: Array<{ name: string; total: number; delta?: number }>
+  dealerName?: string
+  firstPlayerName?: string
+  // Disconnection
+  disconnectedPlayers?: number[]
+  turnTimeRemaining?: number
 }
 
 export function sanitizeGameViewForPlayer(params: SanitizeParams): RemoteGameView {
@@ -143,6 +154,24 @@ export function sanitizeGameViewForPlayer(params: SanitizeParams): RemoteGameVie
     ...(lastEvent ? { lastEvent } : {}),
     ...(raceMessage ? { raceMessage } : {}),
     ...(streakInfo ? { streakInfo } : {}),
+    // Cinematic sync
+    feltColor: params.feltColor,
+    perfectDraw: params.perfectDraw,
+    shimmerCardId: params.shimmerCardId,
+    isOnTheEdge: targetPlayer ? (targetPlayer.hasLaidDown && targetPlayer.hand.length <= 2 && targetPlayer.hand.length > 0) : false,
+    // Buying cinematic
+    buyingCinematicPhase: buyingState?.buyingPhase ?? 'hidden',
+    buyingSnatcherName: buyingState?.snatcherName ?? null,
+    // Announcement data
+    announcementData: announcementStage ? {
+      stage: announcementStage,
+      standings: params.standings,
+      dealerName: params.dealerName,
+      firstPlayerName: params.firstPlayerName,
+    } : undefined,
+    // Disconnection
+    disconnectedPlayers: params.disconnectedPlayers,
+    turnTimeRemaining: params.turnTimeRemaining,
   }
 }
 
