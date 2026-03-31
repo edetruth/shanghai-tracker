@@ -202,8 +202,8 @@ export default function Card({ card, selected, selectionIndex, onClick, compact,
         </div>
       )}
 
-      {/* Joker shimmer overlay — in hand only, not in melds */}
-      {isJoker && !inMeld && !faceDown && (
+      {/* Joker shimmer overlay */}
+      {isJoker && !faceDown && (
         <div className="absolute inset-0 rounded-[5px] overflow-hidden pointer-events-none joker-shimmer" />
       )}
 
