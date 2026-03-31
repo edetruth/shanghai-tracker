@@ -828,6 +828,52 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         })
         mpChannel.broadcast('game_state', { targetSeatIndex: remoteSeat, view })
       }
+      // Broadcast spectator view (all hands visible)
+      const spectatorView = {
+        players: gs.players.map((p, i) => ({
+          name: p.name,
+          hand: [...p.hand],
+          hasLaidDown: p.hasLaidDown,
+          buysRemaining: p.buysRemaining,
+          isAI: !!p.isAI,
+          seatIndex: i,
+          melds: p.melds,
+        })),
+        tableMelds: gs.roundState.tablesMelds,
+        discardTop: gs.roundState.discardPile.length > 0
+          ? gs.roundState.discardPile[gs.roundState.discardPile.length - 1]
+          : null,
+        drawPileSize: gs.roundState.drawPile.length,
+        currentPlayerIndex: gs.roundState.currentPlayerIndex,
+        uiPhase: uiPhaseRef.current,
+        currentRound: gs.currentRound,
+        roundRequirement: gs.roundState.requirement,
+        scores: gs.players.map(p => ({ name: p.name, roundScores: [...p.roundScores] })),
+        buyLimit: gs.buyLimit,
+        goingOutPlayerName: goOutPlayerName,
+        goingOutSequence,
+        announcementStage,
+        gameOver: gs.gameOver,
+        winner: gs.gameOver
+          ? gs.players.reduce((best, p) => {
+              const t = p.roundScores.reduce((a, b) => a + b, 0)
+              const bt = best.roundScores.reduce((a, b) => a + b, 0)
+              return t < bt ? p : best
+            }).name
+          : undefined,
+        feltColor: broadcastFeltColor,
+        toast: remoteToast as any,
+        roundResults: roundResults
+          ? (roundResults as any[]).map(r => ({
+              playerName: gs.players.find(p => p.id === r.playerId)?.name ?? r.playerId,
+              score: r.score,
+              shanghaied: r.shanghaied,
+              wentOut: r.score === 0,
+            }))
+          : undefined,
+      }
+      mpChannel.broadcast('spectator_view', { view: spectatorView })
+
       // Clear ephemeral events after broadcasting so they are not re-sent
       if (remoteEvent) setTimeout(() => setRemoteEvent(null), 100)
       if (remoteToast) setTimeout(() => setRemoteToast(null), 100)

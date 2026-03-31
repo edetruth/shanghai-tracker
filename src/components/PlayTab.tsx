@@ -5,11 +5,12 @@ import GameOver from './play/GameOver'
 import TournamentTrophy from './play/TournamentTrophy'
 import Lobby from './play/Lobby'
 import RemoteGameBoard from './play/RemoteGameBoard'
+import SpectatorBoard from './play/SpectatorBoard'
 import type { PlayerConfig, Player, AIPersonality, TournamentState, TournamentGameResult, TournamentPlayerStats } from '../game/types'
 import type { GameRoomConfig, GameRoomPlayer } from '../game/multiplayer-types'
 import { loadGameStateSnapshot, getGameRoomPlayers } from '../lib/gameStore'
 
-type PlayView = 'landing' | 'setup' | 'game' | 'lobby-host' | 'lobby-join' | 'remote-game' | 'tournament-gameover' | 'tournament-trophy'
+type PlayView = 'landing' | 'setup' | 'game' | 'lobby-host' | 'lobby-join' | 'remote-game' | 'spectator' | 'tournament-gameover' | 'tournament-trophy'
 
 const ROUNDS = [
   { num: 1, req: '2 Sets of 3+',    cards: 10 },
@@ -349,6 +350,27 @@ export default function PlayTab({ onBack }: Props) {
       roomCode: code, role: 'remote', seatIndex: seatIdx,
     }))
     setView('remote-game')
+  }
+
+  // Online multiplayer: join as spectator (read-only, all hands visible)
+  // Exposed for future Lobby "Watch" button integration
+  const handleSpectate = (code: string) => {
+    setRoomCode(code)
+    setView('spectator')
+  }
+  void handleSpectate
+
+  if (view === 'spectator' && roomCode) {
+    return (
+      <SpectatorBoard
+        roomCode={roomCode}
+        onExit={() => {
+          setRoomCode(null)
+          sessionStorage.removeItem('shanghai_active_game')
+          setView('landing')
+        }}
+      />
+    )
   }
 
   if (view === 'setup') {

@@ -213,6 +213,40 @@ export type ChannelMessage =
   | { event: 'turn_skipped'; payload: { seatIndex: number; reason: 'timeout' | 'disconnected' } }
   | { event: 'player_reconnected'; payload: { seatIndex: number } }
   | { event: 'emote'; payload: EmotePayload }
+  | { event: 'spectator_view'; payload: { view: SpectatorGameView } }
+
+// ── Spectator view (host → spectators, full hand visibility) ────────────────
+
+export interface SpectatorPlayerView {
+  name: string
+  hand: Card[]
+  hasLaidDown: boolean
+  buysRemaining: number
+  isAI: boolean
+  seatIndex: number
+  melds: Meld[]
+}
+
+export interface SpectatorGameView {
+  players: SpectatorPlayerView[]
+  tableMelds: Meld[]
+  discardTop: Card | null
+  drawPileSize: number
+  currentPlayerIndex: number
+  uiPhase: string
+  currentRound: number
+  roundRequirement: RoundRequirement
+  scores: { name: string; roundScores: number[] }[]
+  buyLimit: number
+  goingOutPlayerName?: string
+  goingOutSequence: 'idle' | 'flash' | 'announce'
+  announcementStage: string | null
+  gameOver: boolean
+  winner?: string
+  feltColor?: string
+  toast?: { message: string; style: string; icon?: string }
+  roundResults?: Array<{ playerName: string; score: number; shanghaied: boolean; wentOut: boolean }>
+}
 
 // ── Multiplayer mode for GameBoard ──────────────────────────────────────────
 
