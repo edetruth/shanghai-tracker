@@ -3,64 +3,63 @@
 ═══════════════════════════════════════════════════════
 
 OVERALL:
-  Average winner score:      4.2 pts
-  Average player score:      23.6 pts
-  Average turns per round:   116.2
-  Average turns per game:    116.2
-  Longest round:             216 turns (Round 3)
-  Shortest round:            61 turns (Round 3)
-  Total Shanghai events:     23 across 50 games
+  Average winner score:      0.6 pts
+  Average player score:      19.4 pts
+  Average turns per round:   89.0
+  Average turns per game:    89.0
+  Longest round:             175 turns (Round 3)
+  Shortest round:            38 turns (Round 3)
+  Total Shanghai events:     21 across 50 games
 
 WIN DISTRIBUTION:
-  AI 1:        11 wins (22.0%)
-  AI 2:        15 wins (30.0%)
-  AI 3:        10 wins (20.0%)
-  AI 4:        14 wins (28.0%)
+  AI 1:        10 wins (20.0%)
+  AI 2:        12 wins (24.0%)
+  AI 3:        13 wins (26.0%)
+  AI 4:        15 wins (30.0%)
   → Fairly balanced (expected ~25% each)
 
 ROUND-BY-ROUND:
-  Round 3 (2 Runs):             avg 116.2 turns | 12%   Shanghai rate ⚠️ (9 stalemates)
+  Round 3 (2 Runs):             avg 89.0  turns | 11%   Shanghai rate ⚠️ (3 stalemates)
 
 DRAW DECISIONS:
-  Drew from discard: 28.6% of the time
-  Drew from pile:    71.4% of the time
+  Drew from discard: 23.8% of the time
+  Drew from pile:    76.2% of the time
   ✓ In target range (30-40% discard takes)
 
 BUYING:
-  Total buys across all games:           496
-  Total buy offers:                      10756
-  Average buys per round per player:     2.48
-  Buy accept rate (offered → taken):     4.6%
-  ✓ Buy rate in reasonable range
+  Total buys across all games:           751
+  Total buy offers:                      6435
+  Average buys per round per player:     3.75
+  Buy accept rate (offered → taken):     11.7%
+  ⚠️  HIGH BUY RATE: AI may be buying too aggressively
 
 MELD TIMING (avg turn to first lay-down):
-  Round 3 (2 Runs): turn 65.8
+  Round 3 (2 Runs): turn 47.1
 
 JOKER ANALYSIS:
-  Total jokers dealt:           70
-  Jokers stuck in hand at end:  11 (15.7%)
-  ⚠️  HIGH JOKER WASTE: AI is failing to use jokers
+  Total jokers dealt:           67
+  Jokers stuck in hand at end:  5 (7.5%)
+  ⚠️  MODERATE JOKER WASTE: Could be better
 
 PROBLEM DETECTION:
   ⚠️  Rounds exceeding 30 turns: 50
-  ⚠️  Players never laying down in a round: 10 occurrences
+  ⚠️  Players never laying down in a round: 18 occurrences
   ✓ At least one buy occurred in every game
 
 ═══════════════════════════════════════════════════════
   AUTO-DIAGNOSIS
 ═══════════════════════════════════════════════════════
 
-  1. SLOW GAMES: Avg turns/round = 116.2. Target < 50. AI is not building melds efficiently.
-  2. JOKER WASTE: 15.7% of jokers end up stuck in hand at round end. AI should lay off jokers after laying down.
-  3. ROUND 3 TOO SLOW: avg 116.2 turns (2 Runs). Target < 50.
+  1. SLOW GAMES: Avg turns/round = 89.0. Target < 50. AI is not building melds efficiently.
+  2. ROUND 3 TOO SLOW: avg 89.0 turns (2 Runs). Target < 50.
 
 TARGET SCORECARD:
-  ✗ Avg turns/round < 50           (116.2)
-  ✓ Shanghai rate < 35%            (11.5%)
-  ✓ Buy rate > 0.5/round/player    (2.48)
-  ✓ Discard take 25-45%            (28.6%)
-  ✗ Joker stuck rate < 5%          (15.7%)
+  ✗ Avg turns/round < 50           (89.0)
+  ✓ Shanghai rate < 35%            (10.5%)
+  ✓ Buy rate > 0.5/round/player    (3.75)
+  ✗ Discard take 25-45%            (23.8%)
+  ✗ Joker stuck rate < 5%          (7.5%)
 
-  3/5 targets met
+  2/5 targets met
 
 ═══════════════════════════════════════════════════════

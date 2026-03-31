@@ -11,6 +11,7 @@ import { describe, it } from 'vitest'
 import { writeFileSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { runSimulation, type SimConfig } from './simulate'
+import type { AIPersonality } from '../game/types'
 import { analyze } from './analyze'
 
 const RESULTS_DIR = join(process.cwd(), 'src', 'simulation', 'results')
@@ -31,7 +32,10 @@ function saveText(filename: string, text: string) {
 function runAndAnalyze(label: string, config: SimConfig, outBase: string) {
   console.log(`\n${'─'.repeat(60)}`)
   console.log(`Running: ${label}`)
-  console.log(`  ${config.numGames} games × ${config.numPlayers} players × difficulty=${config.difficulty}`)
+  const personalityInfo = config.personalities
+    ? `personalities=[${config.personalities.join(', ')}]`
+    : `difficulty=${config.difficulty}`
+  console.log(`  ${config.numGames} games × ${config.numPlayers} players × ${personalityInfo}`)
   const t0 = Date.now()
   const results = runSimulation(config)
   const elapsed = ((Date.now() - t0) / 1000).toFixed(2)
@@ -97,6 +101,17 @@ describe('Shanghai AI Simulations', () => {
       logLevel: 'summary',
       onlyRounds: [3, 7],
     }, 'run-rounds')
+  })
+
+  it('Test 6: Mixed personalities — 4 hard players, 30 games', { timeout: 120_000 }, () => {
+    const personalities: AIPersonality[] = ['the-shark', 'the-mastermind', 'patient-pat', 'lucky-lou']
+    runAndAnalyze('Mixed Personalities (Hard)', {
+      numGames: 30,
+      numPlayers: 4,
+      difficulty: 'hard',
+      logLevel: 'summary',
+      personalities,
+    }, 'mixed-personalities')
   })
 
 })

@@ -68,7 +68,7 @@ describe('Debug: 2 games', () => {
         }
         const t0 = Date.now()
         console.log(`  Round ${roundNum} starting... (hand sizes: ${state.players.map(p => p.hand.length).join(', ')})`)
-        const { state: newState, result } = simulateRound(state, config.difficulty)
+        const { state: newState, result } = simulateRound(state, config)
         const ms = Date.now() - t0
         console.log(`  Round ${roundNum}: ${result.turnsInRound} turns, went out: ${result.wentOut}, stalemate: ${result.stalemate}, ${ms}ms`)
         state = newState

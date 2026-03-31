@@ -5,14 +5,16 @@
  * No React, no delays, no UI. Runs complete 7-round games at maximum speed.
  */
 
-import type { Card, Meld, Player, GameState, PlayerConfig, AIDifficulty } from '../game/types'
+import type { Card, Meld, Player, GameState, PlayerConfig, AIDifficulty, AIPersonality, PersonalityConfig } from '../game/types'
+import { PERSONALITIES } from '../game/types'
 import { createDecks, shuffle, dealHands } from '../game/deck'
-import { buildMeld, isValidSet, findSwappableJoker, simulateLayOff, canGoOutViaChainLayOff, isLegalDiscard } from '../game/meld-validator'
+import { buildMeld, isValidSet, findSwappableJoker, simulateLayOff, canGoOutViaChainLayOff, isLegalDiscard, canLayOff } from '../game/meld-validator'
 import { scoreRound, calculateHandScore } from '../game/scoring'
 import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, MAX_BUYS } from '../game/rules'
 import {
-  aiFindBestMelds, aiShouldTakeDiscard, aiChooseDiscard, aiShouldBuy,
+  aiFindBestMelds, aiFindBestMeldsForLayOff, aiShouldTakeDiscard, aiChooseDiscard, aiShouldBuy,
   aiFindLayOff, aiFindJokerSwap, aiFindPreLayDownJokerSwap,
+  aiShouldGoDownHard,
   getAIEvalConfig, type AIEvalConfig,
 } from '../game/ai'
 
@@ -25,12 +27,113 @@ export interface SimConfig {
   logLevel: 'summary' | 'detailed' | 'verbose'
   outputFile?: string
   onlyRounds?: number[]  // if set, only simulate specific round numbers
+  personalities?: AIPersonality[]  // per-player personality; falls back to difficulty-based mapping
 }
 
 function difficultyToEvalConfig(difficulty: AIDifficulty): AIEvalConfig {
   if (difficulty === 'easy') return getAIEvalConfig('rookie-riley')
   if (difficulty === 'hard') return getAIEvalConfig('the-shark')
   return getAIEvalConfig('steady-sam')
+}
+
+function difficultyToPersonality(difficulty: AIDifficulty): PersonalityConfig {
+  if (difficulty === 'easy') return PERSONALITIES.find(p => p.id === 'rookie-riley')!
+  if (difficulty === 'hard') return PERSONALITIES.find(p => p.id === 'the-shark')!
+  return PERSONALITIES.find(p => p.id === 'steady-sam')!
+}
+
+/** Get eval config and personality for a given player index based on SimConfig. */
+export function getSimPlayerConfig(index: number, config: SimConfig): { evalConfig: AIEvalConfig; personality: PersonalityConfig } {
+  if (config.personalities && config.personalities[index]) {
+    const pid = config.personalities[index]
+    const personality = PERSONALITIES.find(p => p.id === pid)!
+    return { evalConfig: getAIEvalConfig(pid), personality }
+  }
+  return { evalConfig: difficultyToEvalConfig(config.difficulty), personality: difficultyToPersonality(config.difficulty) }
+}
+
+// ── Go-down timing state (per-round, per-player) ───────────────────────────
+
+interface GoDownTimingState {
+  /** How many turns this player has been able to go down but chose to hold */
+  turnsCouldGoDown: Map<string, number>
+  /** Total turns elapsed per player this round */
+  turnsElapsed: Map<string, number>
+}
+
+function createGoDownTimingState(playerIds: string[]): GoDownTimingState {
+  const turnsCouldGoDown = new Map<string, number>()
+  const turnsElapsed = new Map<string, number>()
+  playerIds.forEach(id => {
+    turnsCouldGoDown.set(id, 0)
+    turnsElapsed.set(id, 0)
+  })
+  return { turnsCouldGoDown, turnsElapsed }
+}
+
+/**
+ * Determine whether a player should go down now, based on their personality's goDownStyle.
+ * Returns true if they should meld, false if they should hold.
+ */
+function shouldGoDownNow(
+  personality: PersonalityConfig,
+  melds: Card[][],
+  hand: Card[],
+  state: GameState,
+  playerIdx: number,
+  timing: GoDownTimingState,
+): boolean {
+  const pid = state.players[playerIdx].id
+  const style = personality.goDownStyle
+  const turnsHeld = timing.turnsCouldGoDown.get(pid) ?? 0
+
+  switch (style) {
+    case 'immediate':
+      return true
+
+    case 'immediate-random-hold': {
+      // First time seeing valid melds: 25% chance to hold 1 turn
+      if (turnsHeld === 0) {
+        return Math.random() > 0.25
+      }
+      // Already held once — go down now
+      return true
+    }
+
+    case 'hold-for-out': {
+      // Go down only if going out (remaining = 0)
+      const meldedIds = new Set(melds.flatMap(m => m.map(c => c.id)))
+      const remaining = hand.filter(c => !meldedIds.has(c.id))
+      if (remaining.length === 0) return true
+
+      // Panic: exceeded threshold turns
+      const totalTurns = timing.turnsElapsed.get(pid) ?? 0
+      if (totalTurns >= personality.panicThreshold) return true
+
+      // Opponent close: any opponent has laid down and has <= 3 cards
+      const opponentClose = state.players.some((p, i) =>
+        i !== playerIdx && p.hasLaidDown && p.hand.length <= 3
+      )
+      if (opponentClose) return true
+
+      return false
+    }
+
+    case 'strategic': {
+      return aiShouldGoDownHard(
+        hand,
+        melds,
+        state.roundState.requirement,
+        state.roundState.tablesMelds,
+        state.players,
+        playerIdx,
+        turnsHeld,
+      )
+    }
+
+    default:
+      return true
+  }
 }
 
 export interface PlayerRoundStats {
@@ -69,6 +172,8 @@ export interface GameResult {
   totalTurns: number
   totalBuys: number
   duration: number
+  /** Personality ID used by each player (same order as players[]) */
+  playerPersonalities?: string[]
 }
 
 // ── Pure game helpers (mirroring GameBoard.tsx) ───────────────────────────────
@@ -350,7 +455,7 @@ function simProcessBuying(
   activePlayerIdx: number,
   discardCard: Card,
   isPostDraw: boolean,
-  difficulty: AIDifficulty,
+  config: SimConfig,
   buyStats: BuyStats,
 ): GameState {
   const buyerOrder = isPostDraw
@@ -365,7 +470,7 @@ function simProcessBuying(
     buyStats[buyer.id] = buyStats[buyer.id] ?? { offered: 0, bought: 0 }
     buyStats[buyer.id].offered++
 
-    const evalCfg = difficultyToEvalConfig(difficulty)
+    const { evalConfig: evalCfg } = getSimPlayerConfig(buyerIdx, config)
     const opponents = current.players.filter((_, i) => i !== buyerIdx)
       .map(p => ({ hand: { length: p.hand.length }, hasLaidDown: p.hasLaidDown }))
     const shouldBuy = aiShouldBuy(buyer.hand, discardCard, current.roundState.requirement, buyer.buysRemaining, evalCfg, opponents)
@@ -399,18 +504,22 @@ interface ActionResult {
 
 function simExecuteAIAction(
   state: GameState,
-  difficulty: AIDifficulty,
+  config: SimConfig,
   layOffDoneThisTurn: boolean,
+  timing: GoDownTimingState,
 ): ActionResult {
   const player = getCurrentPlayer(state)
+  const playerIdx = state.roundState.currentPlayerIndex
   const { tablesMelds, requirement } = state.roundState
-  const isHard = difficulty === 'hard'
-  const isEasy = difficulty === 'easy'
+  const { evalConfig, personality } = getSimPlayerConfig(playerIdx, config)
+  // Determine hard/easy based on personality difficulty when personalities are set, else legacy
+  const isHard = config.personalities ? personality.difficulty >= 5 : config.difficulty === 'hard'
+  const isEasy = config.personalities ? personality.difficulty <= 1 : config.difficulty === 'easy'
 
   // Easy AI: lay down when possible, 1 lay-off per turn, random-ish discard
   if (isEasy) {
     if (!player.hasLaidDown) {
-      const melds = aiFindBestMelds(player.hand, requirement)
+      const melds = aiFindBestMeldsForLayOff(player.hand, requirement, tablesMelds)
       if (melds && melds.length > 0) {
         const newState = simMeld(state, melds)
         return { state: newState, action: 'meld', meldsCount: melds.length }
@@ -428,8 +537,8 @@ function simExecuteAIAction(
         }
       }
     }
-    const easyEvalCfg = difficultyToEvalConfig('easy')
-    const card = aiChooseDiscard(player.hand, requirement, easyEvalCfg)
+    const easyOpponents = state.players.filter((_, i) => i !== state.roundState.currentPlayerIndex)
+    const card = aiChooseDiscard(player.hand, requirement, evalConfig, tablesMelds, easyOpponents, undefined, player.hasLaidDown)
     const result = simDiscard(state, card.id)
     if (!result) return { state, action: 'stuck' }
     return { state: result.state, action: 'discard' }
@@ -442,18 +551,24 @@ function simExecuteAIAction(
       const newState = simJokerSwap(state, swap.card, swap.meld)
       if (newState) {
         // After swap, immediately try to meld (re-run action on new state)
-        const afterSwap = simExecuteAIAction(newState, difficulty, layOffDoneThisTurn)
+        const afterSwap = simExecuteAIAction(newState, config, layOffDoneThisTurn, timing)
         return { ...afterSwap, swapped: true }
       }
     }
   }
 
-  // Medium/Hard: lay down (required melds only)
+  // Medium/Hard: lay down (required melds only) — with go-down timing
   if (!player.hasLaidDown) {
-    const melds = aiFindBestMelds(player.hand, requirement)
+    const melds = aiFindBestMeldsForLayOff(player.hand, requirement, tablesMelds)
     if (melds && melds.length > 0) {
-      const newState = simMeld(state, melds)
-      return { state: newState, action: 'meld', meldsCount: melds.length }
+      // Apply go-down timing logic based on personality
+      if (shouldGoDownNow(personality, melds, player.hand, state, playerIdx, timing)) {
+        const newState = simMeld(state, melds)
+        // Reset turnsCouldGoDown since they went down
+        timing.turnsCouldGoDown.set(player.id, 0)
+        return { state: newState, action: 'meld', meldsCount: melds.length }
+      }
+      // Player holds — fall through to discard (turnsCouldGoDown incremented in round loop)
     }
   }
 
@@ -464,7 +579,7 @@ function simExecuteAIAction(
       const newState = simJokerSwap(state, swap.card, swap.meld)
       if (newState) {
         // After joker swap, re-run to lay off the recovered joker
-        const afterSwap = simExecuteAIAction(newState, difficulty, layOffDoneThisTurn)
+        const afterSwap = simExecuteAIAction(newState, config, true, timing)
         return { ...afterSwap, swapped: true }
       }
     }
@@ -481,7 +596,7 @@ function simExecuteAIAction(
         const isJokerLayOff = layOff.card.suit === 'joker'
         if (isHard && !newState.roundState.goOutPlayerId) {
           // Hard AI: keep laying off until can't
-          const next = simExecuteAIAction(newState, difficulty, true)
+          const next = simExecuteAIAction(newState, config, true, timing)
           return { ...next, cardsLaidOff: (next.cardsLaidOff ?? 0) + 1, isJokerLayOff: isJokerLayOff || next.isJokerLayOff }
         }
         return { state: newState, action: 'layoff', cardsLaidOff: 1, isJokerLayOff }
@@ -491,8 +606,8 @@ function simExecuteAIAction(
 
   // Discard
   if (player.hand.length > 0) {
-    const discardEvalCfg = difficultyToEvalConfig(difficulty)
-    const card = aiChooseDiscard(player.hand, requirement, discardEvalCfg, tablesMelds)
+    const discardOpponents = state.players.filter((_, i) => i !== state.roundState.currentPlayerIndex)
+    const card = aiChooseDiscard(player.hand, requirement, evalConfig, tablesMelds, discardOpponents, undefined, player.hasLaidDown)
     const result = simDiscard(state, card.id)
     if (!result) {
       // Stuck with 1 card that can't be discarded
@@ -522,7 +637,8 @@ function makePlayerRoundStats(player: Player): PlayerRoundStats {
   }
 }
 
-export function simulateRound(gameState: GameState, difficulty: AIDifficulty): { state: GameState; result: RoundResult } {
+export function simulateRound(gameState: GameState, config: SimConfig): { state: GameState; result: RoundResult } {
+  const difficulty = config.difficulty
   let state = gameState
   let noProgressTurns = 0
   let drawPileDepletions = 0
@@ -538,6 +654,9 @@ export function simulateRound(gameState: GameState, difficulty: AIDifficulty): {
 
   const buyStats: BuyStats = {}
   playerIds.forEach(id => { buyStats[id] = { offered: 0, bought: 0 } })
+
+  // Go-down timing state for this round
+  const timing = createGoDownTimingState(playerIds)
 
   // Count jokers dealt this round
   const jokersDealt = state.players.reduce((sum, p) => sum + p.hand.filter(c => c.suit === 'joker').length, 0)
@@ -557,11 +676,18 @@ export function simulateRound(gameState: GameState, difficulty: AIDifficulty): {
     const player = getCurrentPlayer(state)
     const pid = player.id
 
+    // Track turns elapsed for this player
+    timing.turnsElapsed.set(pid, (timing.turnsElapsed.get(pid) ?? 0) + 1)
+
     // ── DRAW PHASE ──────────────────────────────────────────────────────────
     const topDiscard = state.roundState.discardPile[state.roundState.discardPile.length - 1] ?? null
-    const takeEvalCfg = difficultyToEvalConfig(difficulty)
-    const shouldTake = topDiscard !== null &&
-      aiShouldTakeDiscard(player.hand, topDiscard, state.roundState.requirement, player.hasLaidDown, takeEvalCfg)
+    const { evalConfig: takeEvalCfg } = getSimPlayerConfig(playerIdx, config)
+    const opponentsForDraw = state.players.filter((_, i) => i !== playerIdx)
+    const shouldTake = topDiscard !== null && (
+      aiShouldTakeDiscard(player.hand, topDiscard, state.roundState.requirement, player.hasLaidDown, takeEvalCfg, state.roundState.tablesMelds, opponentsForDraw) ||
+      // Fix 1: Post-down discard taking — if player has laid down and top discard can lay off onto any table meld, take it
+      (player.hasLaidDown && state.roundState.tablesMelds.some(m => canLayOff(topDiscard, m)))
+    )
 
     if (shouldTake) {
       statsMap[pid].drewFromDiscard++
@@ -579,7 +705,7 @@ export function simulateRound(gameState: GameState, difficulty: AIDifficulty): {
       // Rule 9A: open buying window for other players
       if (discardForBuying) {
         const totalBoughtBefore = Object.values(buyStats).reduce((s, b) => s + b.bought, 0)
-        state = simProcessBuying(state, playerIdx, discardForBuying, true, difficulty, buyStats)
+        state = simProcessBuying(state, playerIdx, discardForBuying, true, config, buyStats)
         const totalBoughtAfter = Object.values(buyStats).reduce((s, b) => s + b.bought, 0)
         // Buying is progress — someone acquired a card they wanted
         if (totalBoughtAfter > totalBoughtBefore) noProgressTurns = Math.max(0, noProgressTurns - 2)
@@ -604,14 +730,19 @@ export function simulateRound(gameState: GameState, difficulty: AIDifficulty): {
     // One call to simExecuteAIAction handles ONE step (meld, layoff, or discard).
     // After meld/layoff the player still needs to finish their turn with a discard.
     // Cap: easy=1 lay-off/turn, medium=2, hard=unlimited. Joker lay-offs never count toward cap.
-    const layOffCap = difficulty === 'easy' ? 1 : difficulty === 'medium' ? 2 : Infinity
+    const { personality: playerPersonality } = getSimPlayerConfig(playerIdx, config)
+    const playerDiff = config.personalities ? playerPersonality.difficulty : (difficulty === 'easy' ? 1 : difficulty === 'medium' ? 3 : 5)
+    const layOffCap = playerDiff <= 1 ? 1 : playerDiff <= 3 ? 2 : Infinity
     let layOffCount = 0
     let turnDone = false
     let actionSteps = 0
 
+    // Check if this player could go down before their action phase (for timing tracking)
+    const couldGoDownThisTurn = !player.hasLaidDown && aiFindBestMelds(player.hand, state.roundState.requirement) !== null
+
     while (!turnDone && !state.roundState.goOutPlayerId && actionSteps < 50) {
       actionSteps++
-      const actionResult = simExecuteAIAction(state, difficulty, layOffCount >= layOffCap)
+      const actionResult = simExecuteAIAction(state, config, layOffCount >= layOffCap, timing)
       state = actionResult.state
 
       if (actionResult.swapped) statsMap[pid].jokerSwaps++
@@ -643,6 +774,12 @@ export function simulateRound(gameState: GameState, difficulty: AIDifficulty): {
       }
     }
 
+    // Track go-down timing: if player could have gone down but didn't, increment hold counter
+    const currentPlayerAfterAction = state.players[playerIdx]
+    if (couldGoDownThisTurn && !currentPlayerAfterAction.hasLaidDown) {
+      timing.turnsCouldGoDown.set(pid, (timing.turnsCouldGoDown.get(pid) ?? 0) + 1)
+    }
+
     // Safety valve: if action loop hit the step limit, force a stalemate
     if (actionSteps >= 50) {
       noProgressTurns += state.players.length
@@ -663,7 +800,7 @@ export function simulateRound(gameState: GameState, difficulty: AIDifficulty): {
       if (lastDiscard) {
         const goOutIdx = state.players.findIndex(p => p.id === state.roundState.goOutPlayerId)
         const prevBuyStats = playerIds.reduce((acc, id) => ({ ...acc, [id]: { ...buyStats[id] } }), {} as BuyStats)
-        state = simProcessBuying(state, goOutIdx, lastDiscard, false, difficulty, buyStats)
+        state = simProcessBuying(state, goOutIdx, lastDiscard, false, config, buyStats)
         playerIds.forEach(id => {
           if (buyStats[id] && prevBuyStats[id]) {
             statsMap[id].buysOffered += buyStats[id].offered - prevBuyStats[id].offered
@@ -740,8 +877,18 @@ export function simulateRound(gameState: GameState, difficulty: AIDifficulty): {
 export function simulateGame(config: SimConfig, gameId: number): GameResult {
   const t0 = Date.now()
 
-  const playerNames = Array.from({ length: config.numPlayers }, (_, i) => `AI ${i + 1}`)
-  const playerConfigs: PlayerConfig[] = playerNames.map(name => ({ name, isAI: true }))
+  // Assign personality-based names when personalities are specified
+  const playerNames = config.personalities
+    ? config.personalities.map((pid, i) => {
+        const p = PERSONALITIES.find(pp => pp.id === pid)
+        return p ? p.name : `AI ${i + 1}`
+      })
+    : Array.from({ length: config.numPlayers }, (_, i) => `AI ${i + 1}`)
+  const playerConfigs: PlayerConfig[] = playerNames.map((name, i) => ({
+    name,
+    isAI: true,
+    personality: config.personalities?.[i],
+  }))
 
   let state = initGame(playerConfigs)
   const roundResults: RoundResult[] = []
@@ -771,7 +918,7 @@ export function simulateGame(config: SimConfig, gameId: number): GameResult {
       continue
     }
 
-    const { state: newState, result } = simulateRound(state, config.difficulty)
+    const { state: newState, result } = simulateRound(state, config)
     state = newState
     roundResults.push(result)
 
@@ -788,6 +935,12 @@ export function simulateGame(config: SimConfig, gameId: number): GameResult {
   const totalBuys = roundResults.reduce((s, r) =>
     s + Object.values(r.playerStats).reduce((ps, stats) => ps + stats.buysMade, 0), 0)
 
+  // Build personality list for results
+  const playerPersonalities = playerConfigs.map((_, i) => {
+    const { personality } = getSimPlayerConfig(i, config)
+    return personality.id
+  })
+
   return {
     gameId,
     players: playerNames,
@@ -797,6 +950,7 @@ export function simulateGame(config: SimConfig, gameId: number): GameResult {
     totalTurns,
     totalBuys,
     duration: Date.now() - t0,
+    playerPersonalities,
   }
 }
 

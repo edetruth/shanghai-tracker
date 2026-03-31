@@ -7,9 +7,17 @@ const req1 = ROUND_REQUIREMENTS[0] // 2 sets
 const req3 = ROUND_REQUIREMENTS[2] // 2 runs
 
 describe('aiShouldBuyEasy', () => {
-  it('returns false when buys remaining < 3', () => {
+  it('returns false when buys remaining is 0', () => {
     const hand = [c('hearts', 7), c('diamonds', 7), c('clubs', 5)]
     const discard = c('spades', 7)
+    expect(aiShouldBuyEasy(hand, discard, req1, 0)).toBe(false)
+  })
+
+  it('returns false for a weak card even with buys remaining', () => {
+    const hand = [c('hearts', 7), c('diamonds', 7), c('clubs', 5), c('spades', 3),
+      c('hearts', 10), c('diamonds', 10), c('clubs', 10), c('spades', 10),
+      c('hearts', 12), c('diamonds', 12)]
+    const discard = c('spades', 2)  // useless card, 10-card hand
     expect(aiShouldBuyEasy(hand, discard, req1, 2)).toBe(false)
   })
 

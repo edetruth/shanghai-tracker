@@ -804,8 +804,8 @@ describe('aiShouldGoDownHard', () => {
     expect(aiShouldGoDownHard(hand, twoSets, req1, [], players, 0, 0)).toBe(true)
   })
 
-  it('waits when 40+ stuck pts, 1-2 remaining with lay-off potential, all opponents have 7+ cards', () => {
-    // Wait condition: stuckPoints >= 40 AND remaining.length >= 4 AND allOpponentsHaveMany
+  it('goes down with 4+ remaining cards even with high stuck points and opponents having many cards', () => {
+    // With bonus melds disabled, holding 4+ cards of deadweight is never worth it
     const stuck = [c('hearts', 1), c('diamonds', 13), c('clubs', 12), c('spades', 11)] // 15+10+10+10 = 45
     const hand = [...set1, ...set2, ...stuck]
     const players = [
@@ -813,7 +813,7 @@ describe('aiShouldGoDownHard', () => {
       makePlayer({ id: 'p1', name: 'Opp', hand: Array(8).fill(c('clubs', 2)) }),
       makePlayer({ id: 'p2', name: 'Opp2', hand: Array(9).fill(c('clubs', 3)) }),
     ]
-    expect(aiShouldGoDownHard(hand, twoSets, req1, [], players, 0, 0)).toBe(false)
+    expect(aiShouldGoDownHard(hand, twoSets, req1, [], players, 0, 0)).toBe(true)
   })
 
   it('does NOT wait when stuck points < 40 even with many remaining cards', () => {
@@ -844,9 +844,9 @@ describe('aiShouldGoDownHard', () => {
       makePlayer({ id: 'p0', name: 'AI', hand }),
       makePlayer({ id: 'p1', name: 'Opp', hand: Array(10).fill(c('clubs', 2)) }),
     ]
-    // turnsWaited=2 → still waits (< 3, high stuck points, opponents have many cards)
-    expect(aiShouldGoDownHard(hand, twoSets, req1, [], players, 0, 2)).toBe(false)
-    // turnsWaited=3 → forced to go down
+    // turnsWaited=2, 4 remaining cards → goes down (no point holding 4+ cards of deadweight)
+    expect(aiShouldGoDownHard(hand, twoSets, req1, [], players, 0, 2)).toBe(true)
+    // turnsWaited=3 → also forced to go down
     expect(aiShouldGoDownHard(hand, twoSets, req1, [], players, 0, 3)).toBe(true)
   })
 

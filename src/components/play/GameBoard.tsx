@@ -9,7 +9,7 @@ import { createDecks, shuffle, dealHands } from '../../game/deck'
 import { buildMeld, isValidSet, canLayOff, findSwappableJoker, getNextJokerOptions, isLegalDiscard, evaluateLayOffReversal } from '../../game/meld-validator'
 import { scoreRound } from '../../game/scoring'
 import {
-  aiFindBestMelds, aiShouldTakeDiscard, aiChooseDiscard, aiShouldBuy,
+  aiFindBestMelds, aiFindBestMeldsForLayOff, aiShouldTakeDiscard, aiChooseDiscard, aiShouldBuy,
   aiFindLayOff, aiFindJokerSwap, aiFindPreLayDownJokerSwap,
   aiShouldGoDownHard, getAIEvalConfig,
   type AIEvalConfig,
@@ -2304,7 +2304,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     // ── Basic/Easy personality: lay down required melds only, simple discard ──
     if (config.discardStyle === 'random' && config.layOffStyle === 'never') {
       if (!player.hasLaidDown) {
-        const melds = aiFindBestMelds(player.hand, requirement)
+        const melds = aiFindBestMeldsForLayOff(player.hand, requirement, tablesMelds)
         if (melds && melds.length > 0) {
           aiLayOffCountRef.current = 0
           handleMeldConfirm(melds, aiJokerPositions(melds))
@@ -2312,7 +2312,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         }
       }
       aiLayOffCountRef.current = 0
-      const card = aiChooseDiscard(player.hand, requirement, getEvalConfig(), tablesMelds)
+      const card = aiChooseDiscard(player.hand, requirement, getEvalConfig(), tablesMelds, undefined, undefined, player.hasLaidDown)
       handleDiscard(card.id)
       return
     }
@@ -2334,7 +2334,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
     // ── Try to lay down (required melds only) ──
     if (!player.hasLaidDown) {
-      const melds = aiFindBestMelds(player.hand, requirement)
+      const melds = aiFindBestMeldsForLayOff(player.hand, requirement, tablesMelds)
       if (melds && melds.length > 0) {
         if (shouldGoDownNow(melds)) {
           aiTurnsCouldGoDownRef.current.delete(player.id)
@@ -2387,7 +2387,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       } else {
         const evalCfg = getEvalConfig()
         card = aiChooseDiscard(player.hand, requirement, evalCfg, tablesMelds,
-            state.players.filter(p => p.id !== player.id), opponentHistoryRef.current)
+            state.players.filter(p => p.id !== player.id), opponentHistoryRef.current, player.hasLaidDown)
         // Lucky Lou: 15% chance to pick a random card instead
         if (config.randomFactor > 0 && Math.random() < 0.15 && player.hand.length > 1) {
           const randomIdx = Math.floor(Math.random() * player.hand.length)
@@ -2426,6 +2426,14 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           if (cfg.randomFactor > 0) {
             if (!shouldTake && Math.random() < 0.2) shouldTake = true
             else if (shouldTake && Math.random() < 0.1) shouldTake = false
+          }
+        }
+
+        // If AI has laid down and top discard can be laid off, take it
+        if (!shouldTake && top !== null && player.hasLaidDown) {
+          const melds = state.roundState.tablesMelds
+          if (melds.some(m => canLayOff(top, m))) {
+            shouldTake = true
           }
         }
 
