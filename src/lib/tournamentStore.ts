@@ -1,4 +1,6 @@
 import { supabase } from './supabase'
+import { createGameRoom } from './gameStore'
+import type { GameRoomConfig } from '../game/multiplayer-types'
 
 export interface Tournament {
   id: string
@@ -161,4 +163,28 @@ export async function setMatchRoomCode(matchId: string, roomCode: string): Promi
       .update({ room_code: roomCode, status: 'in_progress' })
       .eq('id', matchId)
   } catch { /* fire-and-forget */ }
+}
+
+/**
+ * Create a game room for a tournament match and store the room code on the match.
+ * Returns the room code on success, null on failure.
+ */
+export async function createMatchRoom(
+  matchId: string,
+  hostName: string,
+  playerCount: number,
+): Promise<string | null> {
+  try {
+    const config: GameRoomConfig = {
+      playerCount,
+      buyLimit: 5,
+      seats: [],
+    }
+    const room = await createGameRoom(hostName, config)
+    if (!room) return null
+    await setMatchRoomCode(matchId, room.room_code)
+    return room.room_code
+  } catch {
+    return null
+  }
 }

@@ -38,6 +38,7 @@ import EmoteBar, { EMOTE_MAP } from './EmoteBar'
 import EmoteBubble from './EmoteBubble'
 import { logAction } from '../../lib/actionLog'
 import { loadOpponentModel, saveOpponentModel } from '../../game/opponent-model'
+import { reportMatchResult, advanceWinner } from '../../lib/tournamentStore'
 
 interface Props {
   initialPlayers: PlayerConfig[]
@@ -47,6 +48,8 @@ interface Props {
   onExit: () => void
   onGameComplete?: (players: Player[]) => void
   tournamentGameNumber?: number
+  /** When set, game-end auto-reports result to tournament bracket */
+  tournamentMatchId?: string
   // Online multiplayer
   mode?: 'local' | 'host'
   roomCode?: string
@@ -207,7 +210,7 @@ function getAIDelay(speed: GameSpeed): number {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyProp = 'medium', aiPersonality, buyLimit = 5, onExit, onGameComplete, tournamentGameNumber, mode = 'local', roomCode, hostSeatIndex = 0, remoteSeatIndices = [] }: Props) {
+export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyProp = 'medium', aiPersonality, buyLimit = 5, onExit, onGameComplete, tournamentGameNumber, tournamentMatchId, mode = 'local', roomCode, hostSeatIndex = 0, remoteSeatIndices = [] }: Props) {
   // Resolve personality config — if personality is set, use it; otherwise fall back to legacy difficulty
   const personalityConfig: PersonalityConfig | null = aiPersonality
     ? (PERSONALITIES.find(p => p.id === aiPersonality) ?? PERSONALITIES[0])
@@ -2596,6 +2599,32 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         })
         // Check achievements at game end
         setTimeout(() => checkAndShowAchievements(true), 200)
+        // Tournament bracket result reporting
+        if (tournamentMatchId) {
+          const sorted = [...gameState.players].sort((a, b) =>
+            a.roundScores.reduce((s, n) => s + n, 0) - b.roundScores.reduce((s, n) => s + n, 0)
+          )
+          const winnerName = sorted[0].name
+          ;(async () => {
+            try {
+              await reportMatchResult(tournamentMatchId, winnerName)
+              // Fetch match details to advance winner to next round
+              const { data: matchData } = await (await import('../../lib/supabase')).supabase
+                .from('tournament_matches')
+                .select('*')
+                .eq('id', tournamentMatchId)
+                .single()
+              if (matchData) {
+                await advanceWinner(
+                  matchData.tournament_id,
+                  matchData.round_number,
+                  matchData.match_index,
+                  winnerName,
+                )
+              }
+            } catch { /* fire-and-forget */ }
+          })()
+        }
         // Tournament callback — let PlayTab handle the game-over flow
         if (onGameComplete) onGameComplete(gameState.players)
         setShowDarkBeat(true)

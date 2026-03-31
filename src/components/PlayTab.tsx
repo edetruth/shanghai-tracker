@@ -139,6 +139,9 @@ export default function PlayTab({ onBack }: Props) {
 
   // Online tournament bracket state
   const [tournamentHostName, setTournamentHostName] = useState('')
+  const [tournamentMatchId, setTournamentMatchId] = useState<string | null>(null)
+  const [tournamentCode, setTournamentCode] = useState<string | null>(null)
+  void tournamentCode // reserved for future use (e.g. return-to-bracket after match)
 
   // Replay state
   const [replayGameId, setReplayGameId] = useState<string | null>(null)
@@ -378,16 +381,42 @@ export default function PlayTab({ onBack }: Props) {
   }
   void handleSpectate
 
+  // Tournament match start: create/join game room and navigate to game
+  function handleTournamentMatchStart(matchRoomCode: string, isHost: boolean, matchId: string, matchPlayerNames: string[]) {
+    setTournamentMatchId(matchId)
+    if (isHost) {
+      // Host: set up configs and navigate to game board
+      const configs: PlayerConfig[] = matchPlayerNames.map(name => ({
+        name,
+        isAI: false,
+      }))
+      setPlayerConfigs(configs)
+      setRoomCode(matchRoomCode)
+      setMySeatIndex(0)
+      setRemotePlayers([]) // Will be populated from lobby
+      setGameKey(k => k + 1)
+      sessionStorage.setItem('shanghai_active_game', JSON.stringify({
+        roomCode: matchRoomCode, role: 'host', seatIndex: 0,
+      }))
+      setView('game')
+    } else {
+      // Remote player: join the game room and navigate to remote game board
+      setRoomCode(matchRoomCode)
+      setMySeatIndex(-1) // Will be assigned by the room
+      sessionStorage.setItem('shanghai_active_game', JSON.stringify({
+        roomCode: matchRoomCode, role: 'remote', seatIndex: -1,
+      }))
+      setView('remote-game')
+    }
+  }
+
   if (view === 'tournament-lobby-create') {
     return (
       <TournamentLobby
         mode="create"
         hostName={tournamentHostName}
-        onMatchStart={() => {
-          // Full match integration is a future enhancement
-          setView('landing')
-        }}
-        onBack={() => setView('landing')}
+        onMatchStart={handleTournamentMatchStart}
+        onBack={() => { setTournamentCode(null); setView('landing') }}
       />
     )
   }
@@ -396,10 +425,8 @@ export default function PlayTab({ onBack }: Props) {
     return (
       <TournamentLobby
         mode="join"
-        onMatchStart={() => {
-          setView('landing')
-        }}
-        onBack={() => setView('landing')}
+        onMatchStart={handleTournamentMatchStart}
+        onBack={() => { setTournamentCode(null); setView('landing') }}
       />
     )
   }
@@ -542,6 +569,7 @@ export default function PlayTab({ onBack }: Props) {
         }}
         onGameComplete={tournamentState ? handleTournamentGameComplete : undefined}
         tournamentGameNumber={tournamentState?.currentGameNumber}
+        tournamentMatchId={tournamentMatchId ?? undefined}
       />
     )
   }
@@ -765,7 +793,7 @@ export default function PlayTab({ onBack }: Props) {
           Join Online Game
         </button>
         <button
-          onClick={() => { setTournamentHostName('Host'); setView('tournament-lobby-create') }}
+          onClick={() => { setTournamentHostName('Host'); setTournamentCode(null); setView('tournament-lobby-create') }}
           style={{
             width: '100%',
             background: '#1e4a2e',

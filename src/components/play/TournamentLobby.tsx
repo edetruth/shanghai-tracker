@@ -1,17 +1,21 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { ChevronLeft, Trophy, Copy, Users } from 'lucide-react'
 import {
-  createTournament, getTournament, getTournamentMatches,
+  createTournament, getTournament,
   generateBracket, updateTournamentStatus,
-  type Tournament, type TournamentMatch,
+  createMatchRoom, reportMatchResult, advanceWinner,
+  type TournamentMatch,
 } from '../../lib/tournamentStore'
+import { useTournamentChannel } from '../../hooks/useTournamentChannel'
+import { supabase } from '../../lib/supabase'
 import BracketView from './BracketView'
 import { haptic } from '../../lib/haptics'
 
 interface Props {
   mode: 'create' | 'join'
   hostName?: string
-  onMatchStart: (roomCode: string, playerNames: string[]) => void
+  /** Called when a match room is ready. isHost=true for the player who created the room. */
+  onMatchStart: (roomCode: string, isHost: boolean, matchId: string, matchPlayerNames: string[]) => void
   onBack: () => void
 }
 
@@ -19,11 +23,58 @@ export default function TournamentLobby({ mode, hostName, onMatchStart, onBack }
   const [code, setCode] = useState('')
   const [joinCode, setJoinCode] = useState('')
   const [playerName, setPlayerName] = useState('')
-  const [tournament, setTournament] = useState<Tournament | null>(null)
-  const [matches, setMatches] = useState<TournamentMatch[]>([])
   const [players, setPlayers] = useState<string[]>([])
   const [error, setError] = useState('')
   const [creating, setCreating] = useState(false)
+  const [startingMatch, setStartingMatch] = useState<string | null>(null)
+
+  // Live tournament + match data via Realtime
+  const { tournament, matches, refresh } = useTournamentChannel(code || null)
+
+  // Broadcast channel for player list sync (no DB table needed)
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+
+  const myName = mode === 'create' ? hostName : playerName
+
+  // Set up broadcast channel for player list when we have a code
+  useEffect(() => {
+    if (!code) return
+    const ch = supabase.channel(`tournament-players-${code}`)
+
+    ch.on('broadcast', { event: 'players' }, (payload) => {
+      const list = payload.payload?.players as string[] | undefined
+      if (list) setPlayers(list)
+    })
+      .subscribe()
+
+    channelRef.current = ch
+    return () => { supabase.removeChannel(ch) }
+  }, [code])
+
+  // Host broadcasts player list whenever it changes
+  useEffect(() => {
+    if (mode !== 'create' || !channelRef.current) return
+    channelRef.current.send({
+      type: 'broadcast',
+      event: 'players',
+      payload: { players },
+    })
+  }, [players, mode])
+
+  // Auto-navigate when a match gets a room code and I'm a player in it
+  useEffect(() => {
+    if (!myName || !matches.length) return
+    const myMatch = matches.find(
+      m => m.status === 'in_progress' && m.room_code && m.player_names.includes(myName)
+    )
+    if (myMatch && myMatch.room_code && startingMatch !== myMatch.id) {
+      // Another player (host) started this match — I'm the joiner
+      const isHost = mode === 'create' && myMatch.player_names[0] === myName
+      if (!isHost) {
+        onMatchStart(myMatch.room_code, false, myMatch.id, myMatch.player_names)
+      }
+    }
+  }, [matches, myName, mode, onMatchStart, startingMatch])
 
   // Create tournament
   async function handleCreate(playerCount: number) {
@@ -33,8 +84,8 @@ export default function TournamentLobby({ mode, hostName, onMatchStart, onBack }
     if (result) {
       setCode(result.code)
       setPlayers([hostName])
-      const t = await getTournament(result.code)
-      setTournament(t)
+      // Trigger initial fetch
+      await getTournament(result.code)
     } else {
       setError('Failed to create tournament')
     }
@@ -47,26 +98,67 @@ export default function TournamentLobby({ mode, hostName, onMatchStart, onBack }
     const t = await getTournament(joinCode.trim().toUpperCase())
     if (!t) { setError('Tournament not found'); return }
     if (t.status !== 'waiting') { setError('Tournament already started'); return }
-    setTournament(t)
     setCode(t.code)
-    // In a real implementation, we'd add the player to a tournament_players table
-    // For now, track locally
-    setPlayers(prev => [...prev, playerName.trim()])
+    // Request to join via broadcast — host will add us
+    setTimeout(() => {
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'join-request',
+        payload: { name: playerName.trim() },
+      })
+    }, 500)
   }
+
+  // Host: listen for join requests
+  useEffect(() => {
+    if (mode !== 'create' || !code) return
+    const ch = channelRef.current
+    if (!ch) return
+
+    const handler = (payload: { payload?: { name?: string } }) => {
+      const name = payload.payload?.name
+      if (name && !players.includes(name)) {
+        setPlayers(prev => {
+          const maxPlayers = tournament?.player_count ?? 4
+          if (prev.length >= maxPlayers) return prev
+          if (prev.includes(name)) return prev
+          return [...prev, name]
+        })
+      }
+    }
+
+    ch.on('broadcast', { event: 'join-request' }, handler)
+    // Note: supabase channels accumulate listeners; cleanup on unmount via removeChannel
+  }, [mode, code, players, tournament?.player_count])
 
   // Start tournament (host only)
   async function handleStart() {
     if (!tournament || players.length < 2) return
-    // Pad to nearest power of 2 if needed
     const targetCount = players.length <= 4 ? 4 : 8
     const paddedPlayers = [...players]
     while (paddedPlayers.length < targetCount) {
       paddedPlayers.push(`BYE-${paddedPlayers.length}`)
     }
-    const generatedMatches = await generateBracket(tournament.id, paddedPlayers)
-    setMatches(generatedMatches)
+    await generateBracket(tournament.id, paddedPlayers)
     await updateTournamentStatus(code, 'in_progress')
-    setTournament(prev => prev ? { ...prev, status: 'in_progress' } : null)
+    await refresh()
+  }
+
+  // Host starts a match: create game room, store room code, navigate
+  async function handleStartMatch(match: TournamentMatch) {
+    if (!myName || startingMatch) return
+    setStartingMatch(match.id)
+    haptic('tap')
+
+    const roomCode = await createMatchRoom(match.id, myName, match.player_names.length)
+    if (!roomCode) {
+      setError('Failed to create match room')
+      setStartingMatch(null)
+      return
+    }
+
+    // Navigate host to the game
+    onMatchStart(roomCode, true, match.id, match.player_names)
   }
 
   // Copy code
@@ -75,8 +167,22 @@ export default function TournamentLobby({ mode, hostName, onMatchStart, onBack }
     haptic('tap')
   }
 
-  // Suppress unused variable warnings
-  void getTournamentMatches
+  // Report a match result (called externally via onMatchStart flow, but also useful for BYE handling)
+  useEffect(() => {
+    if (!tournament || tournament.status !== 'in_progress') return
+    // Auto-resolve BYE matches
+    for (const match of matches) {
+      if (match.status !== 'pending') continue
+      if (match.player_names.length < 2) continue
+      const byePlayer = match.player_names.find(n => n.startsWith('BYE-'))
+      const realPlayer = match.player_names.find(n => !n.startsWith('BYE-'))
+      if (byePlayer && realPlayer && mode === 'create') {
+        // Host auto-resolves BYE matches
+        reportMatchResult(match.id, realPlayer)
+        advanceWinner(tournament.id, match.round_number, match.match_index, realPlayer)
+      }
+    }
+  }, [matches, tournament, mode])
 
   // Not yet created
   if (!tournament && mode === 'create') {
@@ -257,31 +363,46 @@ export default function TournamentLobby({ mode, hostName, onMatchStart, onBack }
           <BracketView
             matches={matches}
             playerCount={tournament?.player_count ?? 4}
-            currentPlayerName={isHost ? hostName : playerName}
+            currentPlayerName={myName}
           />
 
-          {/* Find my match */}
+          {/* Find my current match */}
           {(() => {
-            const myName = isHost ? hostName : playerName
             const myMatch = matches.find(m =>
               m.status !== 'finished' && m.player_names.includes(myName ?? '')
             )
             if (myMatch && myMatch.player_names.length >= 2) {
+              const hasBye = myMatch.player_names.some(n => n.startsWith('BYE-'))
+              if (hasBye) return null // BYE matches auto-resolve
+
               return (
                 <div style={{ padding: '12px 16px', textAlign: 'center' }}>
                   <p style={{ color: '#2c1810', fontSize: 13, marginBottom: 8 }}>
                     Your match: <strong>{myMatch.player_names.join(' vs ')}</strong>
                   </p>
-                  {myMatch.status === 'pending' && (
+                  {myMatch.status === 'pending' && isHost && (
                     <button
-                      onClick={() => onMatchStart(myMatch.room_code ?? code, myMatch.player_names)}
+                      onClick={() => handleStartMatch(myMatch)}
+                      disabled={!!startingMatch}
                       style={{
                         background: '#e2b858', border: 'none', borderRadius: 12,
-                        padding: '12px 32px', color: '#2c1810', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                        padding: '12px 32px', color: '#2c1810', fontSize: 14, fontWeight: 700,
+                        cursor: 'pointer',
+                        opacity: startingMatch ? 0.5 : 1,
                       }}
                     >
-                      Start Match
+                      {startingMatch === myMatch.id ? 'Creating room...' : 'Start Match'}
                     </button>
+                  )}
+                  {myMatch.status === 'pending' && !isHost && (
+                    <p style={{ color: '#8b7355', fontSize: 12 }}>
+                      Waiting for host to start match...
+                    </p>
+                  )}
+                  {myMatch.status === 'in_progress' && myMatch.room_code && (
+                    <p style={{ color: '#2d7a3a', fontSize: 12, fontWeight: 600 }}>
+                      Match in progress — Room {myMatch.room_code}
+                    </p>
                   )}
                 </div>
               )
