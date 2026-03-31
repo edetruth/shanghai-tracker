@@ -179,14 +179,17 @@ function cardDanger(
   let d = 0
 
   // Check 1: card lays off onto an opponent's existing table meld
+  // This is the most critical check — feeding an opponent who has laid down
+  // directly helps them go out. Scale danger by how close they are to winning.
   if (opponents) {
     for (const opp of opponents) {
       if (!opp.hasLaidDown) continue
       const oppMelds = tablesMelds.filter(m => m.ownerId === opp.id)
       if (oppMelds.some(m => canLayOff(card, m))) {
-        // Opponent close to going out — this card is extremely dangerous
-        if (opp.hand.length <= 3) d += 200
-        else d += 100
+        if (opp.hand.length <= 1) d += 500       // one lay-off from going out
+        else if (opp.hand.length <= 3) d += 300   // very close to going out
+        else if (opp.hand.length <= 5) d += 200   // actively clearing hand
+        else d += 150                              // laid down, any feed helps them
       }
     }
   }
