@@ -710,15 +710,18 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
   // ── Host: auto-skip disconnected player turns ─────────────────────────
   const turnSkipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const turnSkipStartRef = useRef<number | null>(null)
   useEffect(() => {
     if (mode !== 'host') return
     if (turnSkipTimerRef.current) clearTimeout(turnSkipTimerRef.current)
+    turnSkipStartRef.current = null
 
     const currentIdx = gameState.roundState.currentPlayerIndex
     if (!remoteSeatIndices.includes(currentIdx)) return
     if (!disconnectedPlayersRef.current.has(currentIdx)) return
 
     // Disconnected player's turn — auto-skip after 15 seconds
+    turnSkipStartRef.current = Date.now()
     turnSkipTimerRef.current = setTimeout(() => {
       if (disconnectedPlayersRef.current.has(currentIdx)) {
         if (uiPhaseRef.current === 'draw') {
@@ -784,14 +787,19 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         raceMessage: raceMessage || undefined,
         streakInfo,
         feltColor: broadcastFeltColor,
+        shimmerCardId,
+        perfectDraw: perfectDrawActive,
         disconnectedPlayers: [...disconnectedPlayersRef.current],
+        turnTimeRemaining: turnSkipStartRef.current
+          ? Math.max(0, Math.round((15000 - (Date.now() - turnSkipStartRef.current)) / 1000))
+          : undefined,
       })
       mpChannel.broadcast('game_state', { targetSeatIndex: remoteSeat, view })
     }
     // Clear ephemeral events after broadcasting so they are not re-sent
     if (remoteEvent) setTimeout(() => setRemoteEvent(null), 100)
     if (remoteToast) setTimeout(() => setRemoteToast(null), 100)
-  }, [mode, mpChannel.isConnected, gameState, uiPhase, buyingPhase, buyerStep, buyingPassedPlayers, buyingSnatcherName, roundResults, goingOutSequence, announcementStage, remoteEvent, remoteToast, raceMessage]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mode, mpChannel.isConnected, gameState, uiPhase, buyingPhase, buyerStep, buyingPassedPlayers, buyingSnatcherName, roundResults, goingOutSequence, announcementStage, remoteEvent, remoteToast, raceMessage, shimmerCardId, perfectDrawActive]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Receive and dispatch remote player actions
   useEffect(() => {

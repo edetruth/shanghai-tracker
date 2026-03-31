@@ -90,11 +90,17 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
   }, [view, isConnected])
 
   // Notify host when we reconnect so they re-broadcast state
+  // Track reconnections: only send player_reconnected after a genuine disconnect→reconnect,
+  // not on the initial connection. hasEverConnectedRef gates the first connection.
+  const hasEverConnectedRef = useRef(false)
   const wasConnectedRef = useRef(false)
   useEffect(() => {
-    if (isConnected && !wasConnectedRef.current && view !== null && channel) {
-      // Transition from disconnected → connected while we already had a view = reconnection
-      channel.send({ type: 'broadcast', event: 'player_reconnected', payload: { seatIndex: mySeatIndex } })
+    if (isConnected && !wasConnectedRef.current && channel) {
+      if (hasEverConnectedRef.current && view !== null) {
+        // Genuine reconnection — had a previous connection and view
+        channel.send({ type: 'broadcast', event: 'player_reconnected', payload: { seatIndex: mySeatIndex } })
+      }
+      hasEverConnectedRef.current = true
     }
     wasConnectedRef.current = isConnected
   }, [isConnected, channel, mySeatIndex, view])
@@ -424,6 +430,8 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
 
   // ── Round End ─────────────────────────────────────────────────────────────
   if (uiPhase === 'round-end' && view.roundResults) {
+    const sortedResults = [...view.roundResults].sort((a, b) => a.score - b.score)
+    const hasShanghaiVictim = sortedResults.some(r => r.shanghaied)
     return (
       <div style={{
         minHeight: '100dvh',
@@ -431,40 +439,79 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
         display: 'flex',
         flexDirection: 'column',
         padding: 16,
-        paddingTop: 'max(16px, env(safe-area-inset-top))',
+        paddingTop: 'max(48px, env(safe-area-inset-top, 44px) + 16px)',
       }}>
-        <h2 style={{ color: '#e2b858', fontSize: 20, fontWeight: 700, marginBottom: 16, textAlign: 'center' }}>
+        <h2 style={{ color: '#e2b858', fontSize: 22, fontWeight: 800, marginBottom: 4, textAlign: 'center' }}>
           Round {currentRound} Complete
         </h2>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {view.roundResults.map(r => (
+        <p style={{ color: '#6aad7a', fontSize: 12, textAlign: 'center', marginBottom: 20, opacity: 0.7 }}>
+          {requirement.description}
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {sortedResults.map((r, i) => (
             <div
               key={r.playerName}
               style={{
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
-                background: '#0f2218',
-                borderRadius: 8,
-                padding: '10px 14px',
+                background: r.wentOut ? 'rgba(45,122,58,0.15)' : r.shanghaied ? 'rgba(184,50,50,0.1)' : '#0f2218',
+                borderRadius: 10,
+                padding: '12px 16px',
+                border: r.wentOut ? '1px solid rgba(45,122,58,0.3)' : r.shanghaied ? '1px solid rgba(184,50,50,0.2)' : '1px solid #1a3a2a',
+                animation: `meld-staging-in 0.3s ease-out ${i * 0.1}s both`,
               }}
             >
-              <div>
-                <span style={{ color: '#ffffff', fontSize: 14 }}>{r.playerName}</span>
-                {r.shanghaied && (
-                  <span style={{ color: '#e07a5f', fontSize: 10, marginLeft: 6 }}>Shanghaied!</span>
-                )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{
+                  color: r.wentOut ? '#6aad7a' : '#a8d0a8',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  width: 20,
+                }}>
+                  {r.wentOut ? '⭐' : `#${i + 1}`}
+                </span>
+                <div>
+                  <span style={{ color: '#ffffff', fontSize: 14, fontWeight: 600 }}>{r.playerName}</span>
+                  {r.shanghaied && (
+                    <span
+                      className="slam-in"
+                      style={{
+                        display: 'inline-block',
+                        marginLeft: 8,
+                        color: '#e07a5f',
+                        fontSize: 11,
+                        fontWeight: 800,
+                        letterSpacing: 0.5,
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Shanghaied!
+                    </span>
+                  )}
+                </div>
               </div>
               <span style={{
-                color: r.wentOut ? '#6aad7a' : '#ffffff',
-                fontSize: 16,
-                fontWeight: 700,
+                color: r.wentOut ? '#6aad7a' : r.shanghaied ? '#e07a5f' : '#ffffff',
+                fontSize: 20,
+                fontWeight: 800,
               }}>
-                {r.wentOut ? 'Out!' : r.score}
+                {r.wentOut ? 'OUT!' : r.score}
               </span>
             </div>
           ))}
         </div>
+        {hasShanghaiVictim && (
+          <p style={{
+            color: '#e07a5f',
+            fontSize: 11,
+            textAlign: 'center',
+            marginTop: 12,
+            opacity: 0.7,
+          }}>
+            Shanghaied players receive penalty points for cards in hand
+          </p>
+        )}
         <p style={{ color: '#3a5a3a', fontSize: 11, textAlign: 'center', marginTop: 16 }}>
           Waiting for next round...
         </p>
@@ -785,6 +832,17 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
                     </span>
                   )}
                 </div>
+                {/* Turn timer countdown for disconnected player */}
+                {isCurrentTurn && view.turnTimeRemaining !== undefined && view.turnTimeRemaining <= 15 && (
+                  <div style={{
+                    color: view.turnTimeRemaining <= 5 ? '#e07a5f' : '#a8d0a8',
+                    fontSize: 9,
+                    fontWeight: 700,
+                    marginTop: 1,
+                  }}>
+                    {view.turnTimeRemaining}s
+                  </div>
+                )}
                 <div style={{
                   color: '#8b7355',
                   fontSize: 8,
@@ -1054,6 +1112,19 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
         opacity: isMyTurn ? 1 : 0.7,
         transition: 'opacity 0.3s ease',
       }}>
+        {/* Perfect draw indicator */}
+        {view.perfectDraw && (
+          <div style={{
+            textAlign: 'center',
+            padding: '4px 0',
+            color: '#e2b858',
+            fontSize: 12,
+            fontWeight: 700,
+            animation: 'ready-pulse 1.5s ease-in-out infinite',
+          }}>
+            Ready to lay down!
+          </div>
+        )}
         {/* Hand info label */}
         <div style={{
           display: 'flex',
@@ -1092,6 +1163,8 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
           selectedIds={selectedCardIds}
           ghostedIds={showMeldBuilder ? ghostedIds : undefined}
           edgeGlow={view.isOnTheEdge}
+          shimmerCardId={view.shimmerCardId}
+          compact={isBuyingPhase}
           onToggle={(cardId: string) => {
             if (!isMyTurn || isPending) return
             if (uiPhase === 'action') {
