@@ -27,7 +27,12 @@ src/
 │   ├── constants.ts         # Round definitions, player colors, import templates
 │   ├── supabase.ts          # Supabase client (reads VITE_SUPABASE_URL/ANON_KEY)
 │   ├── gameStore.ts         # Every database operation (single module, no ORM)
-│   └── haptics.ts           # haptic() utility — navigator.vibrate wrapper, silent no-op on iOS
+│   ├── haptics.ts           # haptic() utility — navigator.vibrate wrapper, silent no-op on iOS
+│   ├── sounds.ts            # Sound engine — Web Audio API, 2 channels (SFX + Notification), volume persistence
+│   ├── notifications.ts     # Browser Notification API — turn alerts, round/game events (local only)
+│   ├── achievements.ts      # 16 achievements across 4 categories, detection logic, ACHIEVEMENTS array
+│   ├── actionLog.ts         # Game action logging — fire-and-forget Supabase inserts for replay system
+│   └── tournamentStore.ts   # Tournament CRUD — create, bracket generation, match results, advancement
 ├── game/                    # Digital card game engine (no Supabase calls)
 │   ├── types.ts             # Card, Meld, RoundState, GameState, PlayerConfig
 │   ├── deck.ts              # Deck creation, shuffle, deal
@@ -38,19 +43,23 @@ src/
 │   ├── round-manager.ts     # Round setup and progression
 │   ├── game-manager.ts      # Full game flow across 7 rounds
 │   ├── rules.ts             # Point values, round requirement constants
-│   └── ai.ts                # AI engine: evaluateHand (holistic hand scoring 0-200+),
-│                            #   AIEvalConfig per personality, aiShouldTakeDiscard, aiChooseDiscard,
-│                            #   aiShouldBuy (all evaluation-based), aiFindBestMelds (greedy +
-│                            #   bounded backtrack + suit-permutation search), cardDanger (opponent
-│                            #   awareness), aiFindLayOff, aiFindJokerSwap, aiFindPreLayDownJokerSwap
+│   ├── ai.ts                # AI engine: evaluateHand (holistic hand scoring 0-200+),
+│   │                        #   AIEvalConfig per personality, aiShouldTakeDiscard, aiChooseDiscard,
+│   │                        #   aiShouldBuy (all evaluation-based), aiFindBestMelds (greedy +
+│   │                        #   bounded backtrack + suit-permutation search), cardDanger (opponent
+│   │                        #   awareness), aiFindLayOff, aiFindJokerSwap, aiFindPreLayDownJokerSwap
+│   └── opponent-model.ts    # Opponent pattern tracking for The Nemesis AI — localStorage models
 ├── multiplayer/               # Online multiplayer system
 │   ├── multiplayer-types.ts   # RemoteGameView, PlayerAction, RoomState, BroadcastPayload types
 │   ├── multiplayer-host.ts    # Host-side logic: state broadcasting, action validation, mapActionToHandler
 │   ├── multiplayer-client.ts  # Client-side logic: action sending, state receiving
 │   ├── useMultiplayerChannel.ts # Supabase Realtime Broadcast hook (host + client)
-│   └── useGameLobby.ts       # Lobby state management: join/leave, ready-up, AI slot control
+│   ├── useGameLobby.ts       # Lobby state management: join/leave, ready-up, AI slot control
+│   ├── useHeartbeat.ts      # Connection heartbeat system — send/receive, detect disconnections
+│   └── useActionAck.ts      # Action acknowledgment system — pending state, timeout retries
 ├── hooks/
-│   └── useRealtimeScores.ts # Supabase Realtime subscriptions for score tracker multiplayer
+│   ├── useRealtimeScores.ts # Supabase Realtime subscriptions for score tracker multiplayer
+│   └── useTournamentChannel.ts # Supabase Realtime subscription for live tournament bracket updates
 └── components/
     ├── HomePage.tsx          # Landing screen: 4 nav cards (Play, Score Tracker, Stats, Analytics) + HelpCircle tutorial button
     ├── AnalyticsPage.tsx     # Telemetry dashboard: Overview / AI Quality / Rounds / Decisions tabs
@@ -79,7 +88,13 @@ src/
         ├── BuyingCinematic.tsx # Buying window: BuyingCinematic (overlay) + BuyBottomSheet (inline bottom sheet)
         ├── RoundAnnouncement.tsx # Round countdown + dealing interstitial
         ├── Lobby.tsx            # Pre-game lobby: player list, ready-up, AI slots, start game
-        └── RemoteGameBoard.tsx  # Remote player view: receives RemoteGameView, sends PlayerAction
+        ├── RemoteGameBoard.tsx  # Remote player view: receives RemoteGameView, sends PlayerAction
+        ├── SpectatorBoard.tsx   # Read-only spectator view: all hands visible, full cinematics
+        ├── EmoteBar.tsx         # Emoji reaction selector (8 presets, 3s cooldown)
+        ├── EmoteBubble.tsx      # Floating emoji bubble above player cards
+        ├── ReplayViewer.tsx     # Game replay: action timeline with playback controls
+        ├── TournamentLobby.tsx  # Tournament creation/joining, bracket display, match lifecycle
+        └── BracketView.tsx      # Visual tournament bracket with live match status
 
 supabase/
 ├── add_game_type.sql         # Migration: ALTER TABLE games ADD COLUMN game_type text DEFAULT 'manual'
@@ -118,8 +133,12 @@ Nine tables — no row-level security (public anon key access):
 | `player_game_stats` | `id`, `game_id`, `player_name`, `total_score`, `final_rank`, `won`, ... (per-game summary) |
 | `game_rooms` | `id`, `room_code`, `host_player_id`, `status`, `game_id`, `created_at` |
 | `game_room_players` | `id`, `room_id`, `player_name`, `is_ai`, `is_ready`, `is_connected`, `seat_index` |
+| `player_achievements` | `id`, `player_name`, `achievement_id`, `unlocked_at` |
+| `game_action_log` | `id`, `game_id`, `seq`, `player_index`, `action_type`, `action_data` (jsonb), `created_at` |
+| `tournaments` | `id`, `code`, `host_name`, `player_count`, `format`, `status`, `created_at` |
+| `tournament_matches` | `id`, `tournament_id`, `round_number`, `match_index`, `player_names` (text[]), `winner_name`, `room_code`, `status` |
 
-All DB access goes through `src/lib/gameStore.ts`. Never call Supabase directly from components.
+All DB access goes through `src/lib/gameStore.ts` and `src/lib/tournamentStore.ts`. Never call Supabase directly from components.
 
 Key functions: `getPlayers`, `upsertPlayer`, `createGame(playerIds, date, gameType?)`, `getGame`, `getCompletedGames`, `updateRoundScore`, `saveAllRoundScores`, `completeGame`, `deleteGame`, `updateGame`, `importGame`, `savePlayedGame(players, date, gameType)`, `saveShanghaiEvents(gameId, roundNumber, playerIds)`, `computeWinner`, `generateRoomCode`.
 
@@ -315,6 +334,42 @@ Suit backgrounds (cards): hearts `#fff0f0` pink, diamonds `#f0f5ff` blue, clubs 
 Game table background: `bg-[#1a3a2a]` (dark green felt). Top bar: `bg-[#0f2218]`. In-game secondary surface: `bg-[#1e4a2e]`. In-game text: white / `#a8d0a8` / `#6aad7a`.
 
 Tab pill pattern: container `bg-[#efe9dd]`, active `bg-white text-[#8b6914] shadow-sm`, inactive `text-[#8b7355]`.
+
+## Sound System
+
+`src/lib/sounds.ts` — Web Audio API with two gain channels (SFX + Notification). 16 sounds triggered from game handlers via `playSound('card-snap')`. Volume persisted in localStorage (`shanghai_sfx_volume`, `shanghai_notif_volume`). Lazy AudioContext creation on first user interaction. Max 4 concurrent sounds. Remote players hear sounds via view state change detection. Volume sliders in pause menu.
+
+## Card Physics
+
+CSS 3D animations: card flip (`rotateY` with `backface-visibility`), deal arc, draw slide, discard toss, meld slam bounce, stacked pile depth. All animations use `transform` and `opacity` only (GPU composited). Keyframes in `src/index.css`.
+
+## Emotes
+
+8 preset emoji reactions for multiplayer. Broadcast as `emote` event on the Supabase channel. `EmoteBar.tsx` (selector with 3s cooldown) + `EmoteBubble.tsx` (floating bubble, 2.5s fade). Ephemeral — no database storage.
+
+## Push Notifications
+
+Browser `Notification` API (local, not Web Push). Fires when tab is hidden: turn alerts, round over, game over. Permission requested in lobby. `src/lib/notifications.ts`.
+
+## Achievements
+
+16 badges across 4 categories (beginner/skill/mastery/social). Detected at round-end and game-end via `checkAchievements()` in `src/lib/achievements.ts`. Stored in `player_achievements` table. Celebration toast on unlock. The Heist and Buyer's Market detected inline in handlers.
+
+## Spectator Mode
+
+`SpectatorBoard.tsx` — read-only view with all hands visible. Host broadcasts `spectator_view` event alongside per-player `game_state`. Spectators join via room code, not tracked in `game_room_players`.
+
+## Game Replay
+
+Action log infrastructure: every game action logged fire-and-forget to `game_action_log` table via `logAction()` in `src/lib/actionLog.ts`. `ReplayViewer.tsx` loads action log and displays as scrollable timeline with play/pause/step/scrub controls.
+
+## Adaptive AI — The Nemesis
+
+`src/game/opponent-model.ts` — tracks per-player patterns in localStorage. `OpponentModel` includes suit bias, buy rate, go-down timing, discard/take rank patterns. Updated post-game. `buildNemesisOverrides()` returns counter-strategy adjustments. The Nemesis personality in `PERSONALITIES` and `AI_EVAL_CONFIGS` uses Shark as base with model-driven overrides.
+
+## Online Tournaments
+
+`src/lib/tournamentStore.ts` — tournament CRUD with `TRNY-XXXX` codes. Single elimination, 4 or 8 players. `TournamentLobby.tsx` handles creation/joining/bracket display. `BracketView.tsx` renders visual bracket. `useTournamentChannel.ts` provides live Realtime updates. Match lifecycle: host clicks "Start Match" → `createMatchRoom()` creates game room → both players auto-navigate → game ends → `reportMatchResult` + `advanceWinner` update bracket.
 
 ## Deployment
 
