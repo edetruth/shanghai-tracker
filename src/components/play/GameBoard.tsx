@@ -2841,22 +2841,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         />
       )}
 
-      {/* Rotating race commentary — appears at tension level 2+ */}
-      {effectiveTension >= 2 && raceMessage && (
-        <div className="flex justify-center py-1.5" style={{ position: 'absolute', top: 'max(52px, calc(env(safe-area-inset-top) + 44px))', left: 0, right: 0, zIndex: 40, pointerEvents: 'none' }}>
-          <div style={{
-            background: 'rgba(42,53,34,0.85)',
-            backdropFilter: 'blur(4px)',
-            padding: '4px 16px',
-            borderRadius: 20,
-            border: '1px solid rgba(226,184,88,0.2)',
-          }}>
-            <span key={raceMessage} style={{ fontSize: 12, fontWeight: 700, color: '#e2b858', display: 'flex', alignItems: 'center', gap: 6, animation: 'race-message-fade 4.5s ease both' }}>
-              {raceMessage}
-            </span>
-          </div>
-        </div>
-      )}
+      {/* Rotating race commentary — moved to inline position, rendered between Zone 2 and Zone 3 below */}
 
       {/* Turn banner — non-blocking overlay for solo-human games */}
       {turnBanner && (
@@ -3169,6 +3154,20 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         />
         </div>
       </div>
+
+      {/* Rotating race commentary — inline between Zone 2 and Zone 3 */}
+      {effectiveTension >= 2 && raceMessage && (
+        <div className="flex justify-center" style={{
+          flexShrink: 0,
+          padding: '3px 16px',
+          background: 'rgba(15,34,24,0.9)',
+          borderTop: '1px solid rgba(226,184,88,0.15)',
+        }}>
+          <span key={raceMessage} style={{ fontSize: 11, fontWeight: 700, color: '#e2b858', display: 'flex', alignItems: 'center', gap: 6, animation: 'race-message-fade 4.5s ease both' }}>
+            {raceMessage}
+          </span>
+        </div>
+      )}
 
       {/* ── ZONE 3: Piles strip — hidden during AI turns, buy bottom sheet, meld-building ── */}
       {(uiPhase === 'draw' || uiPhase === 'buying') &&
