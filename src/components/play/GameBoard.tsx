@@ -28,6 +28,7 @@ import BuyingCinematic, { BuyBottomSheet, FreeTakeBottomSheet, type BuyingPhase 
 import GameToast, { type QueuedToast } from './GameToast'
 import RoundAnnouncement, { type AnnouncementStage } from './RoundAnnouncement'
 import { useMultiplayerChannel } from '../../hooks/useMultiplayerChannel'
+import { useHeartbeat } from '../../multiplayer/useHeartbeat'
 import { sanitizeGameViewForPlayer, mapActionToHandler } from '../../game/multiplayer-host'
 import type { PlayerAction } from '../../game/multiplayer-types'
 
@@ -670,6 +671,77 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   // ── Online multiplayer: host broadcast + action receiver ─────────────────
   const mpChannel = useMultiplayerChannel(mode === 'host' ? roomCode ?? null : null)
 
+  // ── Host: broadcast game_start when game initializes ──────────────────
+  useEffect(() => {
+    if (mode !== 'host' || !mpChannel.isConnected) return
+    mpChannel.broadcast('game_start', {
+      playerNames: gameState.players.map(p => p.name),
+      playerCount: gameState.players.length,
+      currentRound: gameState.currentRound,
+      buyLimit,
+      hostSeatIndex,
+      remoteSeatIndices,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, mpChannel.isConnected])
+
+  // ── Host: heartbeat + disconnection tracking ────────────────────────────
+  const disconnectedPlayersRef = useRef<Set<number>>(new Set())
+
+  // getDisconnectedPlayers available for future use (e.g. UI indicators)
+  const { getDisconnectedPlayers: _getDisconnectedPlayers } = useHeartbeat({
+    seatIndex: hostSeatIndex ?? 0,
+    isHost: mode === 'host',
+    broadcast: mpChannel.broadcast,
+    onMessage: mpChannel.onMessage,
+    isConnected: mpChannel.isConnected,
+    remoteSeatIndices: remoteSeatIndices ?? [],
+    onPlayerDisconnected: (seat) => {
+      disconnectedPlayersRef.current.add(seat)
+      mpChannel.broadcast('player_disconnected', {
+        seatIndex: seat,
+        playerName: gameState.players[seat]?.name ?? 'Unknown',
+      })
+    },
+    onPlayerReconnected: (seat) => {
+      disconnectedPlayersRef.current.delete(seat)
+    },
+  })
+
+  // ── Host: auto-skip disconnected player turns ─────────────────────────
+  const turnSkipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (mode !== 'host') return
+    if (turnSkipTimerRef.current) clearTimeout(turnSkipTimerRef.current)
+
+    const currentIdx = gameState.roundState.currentPlayerIndex
+    if (!remoteSeatIndices.includes(currentIdx)) return
+    if (!disconnectedPlayersRef.current.has(currentIdx)) return
+
+    // Disconnected player's turn — auto-skip after 15 seconds
+    turnSkipTimerRef.current = setTimeout(() => {
+      if (disconnectedPlayersRef.current.has(currentIdx)) {
+        if (uiPhaseRef.current === 'draw') {
+          handleDrawFromPile()
+          // After draw, auto-discard highest point card
+          setTimeout(() => {
+            const player = gameStateRef.current.players[currentIdx]
+            if (player) {
+              const highest = [...player.hand].sort((a, b) => cardPoints(b.rank) - cardPoints(a.rank))[0]
+              if (highest) handleDiscard(highest.id)
+            }
+          }, 500)
+        }
+        mpChannel.broadcast('turn_skipped', { seatIndex: currentIdx, reason: 'disconnected' })
+      }
+    }, 15000)
+
+    return () => {
+      if (turnSkipTimerRef.current) clearTimeout(turnSkipTimerRef.current)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, gameState.roundState.currentPlayerIndex, uiPhase])
+
   // Broadcast sanitized state to all remote players after every relevant change
   useEffect(() => {
     if (mode !== 'host' || !mpChannel.isConnected) return
@@ -681,6 +753,13 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         if (p) streakInfo = { playerName: p.name, streak }
       }
     }
+    // Compute felt color for broadcast
+    const ROUND_FELT_MAP: Record<number, string> = {
+      1: '#1a3a2a', 2: '#1a2f3a', 3: '#2a1a3a', 4: '#1a3a30',
+      5: '#3a1a24', 6: '#1a2a3a', 7: '#2e2a1a',
+    }
+    const broadcastFeltColor = ROUND_FELT_MAP[gameState.currentRound] ?? '#1a3a2a'
+
     for (const remoteSeat of remoteSeatIndices) {
       const view = sanitizeGameViewForPlayer({
         gameState,
@@ -704,6 +783,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         lastEvent: remoteEvent ?? undefined,
         raceMessage: raceMessage || undefined,
         streakInfo,
+        feltColor: broadcastFeltColor,
+        disconnectedPlayers: [...disconnectedPlayersRef.current],
       })
       mpChannel.broadcast('game_state', { targetSeatIndex: remoteSeat, view })
     }
@@ -715,8 +796,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   // Receive and dispatch remote player actions
   useEffect(() => {
     if (mode !== 'host') return
-    return mpChannel.onMessage('player_action', (payload: { seatIndex: number; action: PlayerAction }) => {
+    return mpChannel.onMessage('player_action', (payload: { seatIndex: number; action: PlayerAction & { actionId?: string } }) => {
       if (!remoteSeatIndices.includes(payload.seatIndex)) return
+      const actionId = (payload.action as any).actionId as string | undefined
       const result = mapActionToHandler(
         payload.action,
         payload.seatIndex,
@@ -732,6 +814,15 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           handleBuyDecision,
         },
       )
+      // Send ACK back to the player
+      if (actionId) {
+        mpChannel.broadcast('action_ack', {
+          seatIndex: payload.seatIndex,
+          actionId,
+          ok: result.ok,
+          error: result.ok ? undefined : (result.error ?? 'Invalid action'),
+        })
+      }
       if (!result.ok) {
         mpChannel.broadcast('action_rejected', { seatIndex: payload.seatIndex, reason: result.error ?? 'Invalid action' })
       }
@@ -784,6 +875,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         goingOutSequence,
         announcementStage,
         gameOver: gameStateRef.current.gameOver,
+        disconnectedPlayers: [...disconnectedPlayersRef.current],
       })
       mpChannel.broadcast('game_state', { targetSeatIndex: remoteSeat, view })
     })
