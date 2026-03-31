@@ -194,6 +194,7 @@ export function mapActionToHandler(
   seatIndex: number,
   gameState: GameState,
   handlers: ActionHandlers,
+  uiPhase?: string,
 ): { ok: boolean; error?: string } {
   const rs = gameState.roundState
   const player = gameState.players[seatIndex]
@@ -270,7 +271,8 @@ export function mapActionToHandler(
     }
 
     case 'buy': {
-      // Buy decisions can come from non-current players
+      // Buy decisions can come from non-current players, but only during buying phase
+      if (uiPhase && uiPhase !== 'buying') return { ok: false, error: 'Not in buying phase' }
       handlers.handleBuyDecision(action.wantsToBuy)
       return { ok: true }
     }

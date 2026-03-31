@@ -29,12 +29,14 @@ export function useMultiplayerChannel(roomCode: string | null) {
       'game_state',
       'player_action',
       'action_rejected',
+      'action_ack',
       'game_start',
       'player_joined',
       'player_left',
       'player_reconnected',
+      'player_disconnected',
+      'turn_skipped',
       'heartbeat',
-      'action_ack',
     ] as const
 
     for (const eventName of KNOWN_EVENTS) {

@@ -813,6 +813,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           handleDiscard,
           handleBuyDecision,
         },
+        uiPhaseRef.current,
       )
       // Send ACK back to the player
       if (actionId) {
@@ -2015,7 +2016,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       setUiPhase(nextPhaseForPlayer(nextPlayer))
     }
 
-    if (!player.isAI) {
+    // Skip undo delay for AI and remote players (they have no undo UI)
+    const isRemotePlayer = mode === 'host' && remoteSeatIndices.includes(playerIdx)
+    if (!player.isAI && !isRemotePlayer) {
       const timerId = setTimeout(afterUndoExpires, 3000)
       setPendingUndo({ card, preDiscardState, discarderIdx: playerIdx, timerId })
     } else {
