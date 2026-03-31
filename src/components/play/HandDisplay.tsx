@@ -235,17 +235,21 @@ export default function HandDisplay({
                 <div
                   key={card.id}
                   className={`absolute bottom-0${isLeaving ? ' animate-card-exit' : ''}`}
-                  style={{
-                    left: `${positions[index]}px`,
-                    zIndex: isSelected ? sorted.length + 10 : card.id === newCardId ? sorted.length + 5 : index + 1,
-                    transition: isLeaving ? 'none' : 'left 300ms ease-out, transform 300ms ease-out, opacity 200ms ease',
-                    opacity: isGhosted ? 0.25 : 1,
-                    ...(dealAnimation && !isFlipping && dealCardIdsRef.current.has(card.id)
-                      ? { animation: `deal-arc 400ms cubic-bezier(0.34, 1.56, 0.64, 1) ${index * 50}ms both` }
-                      : drawSlideCardId && card.id === drawSlideCardId
-                        ? { animation: 'draw-slide 400ms ease-out both' }
-                        : {}),
-                  }}
+                  style={(() => {
+                    const isDealArc = dealAnimation && !isFlipping && dealCardIdsRef.current.has(card.id)
+                    const isDrawSlide = drawSlideCardId && card.id === drawSlideCardId
+                    return {
+                      left: `${positions[index]}px`,
+                      zIndex: isSelected ? sorted.length + 10 : card.id === newCardId ? sorted.length + 5 : index + 1,
+                      transition: isLeaving || isDealArc || isDrawSlide ? 'none' : 'left 300ms ease-out, transform 300ms ease-out, opacity 200ms ease',
+                      opacity: isGhosted ? 0.25 : 1,
+                      animation: isDealArc
+                        ? `deal-arc 250ms ease-out ${index * 30}ms both`
+                        : isDrawSlide
+                          ? 'draw-slide 200ms ease-out both'
+                          : undefined,
+                    }
+                  })()}
                 >
                   {isFlipping ? (
                     /* 3D flip: wrapper rotates, back hides, face reveals */
