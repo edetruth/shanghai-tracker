@@ -47,7 +47,9 @@ async function loadBuffer(name: string): Promise<AudioBuffer | null> {
   if (bufferCache.has(name)) return bufferCache.get(name)!
   try {
     const ctx = ensureContext()
-    const response = await fetch(`/sounds/${name}.mp3`)
+    // Try .wav first (higher quality), fall back to .mp3
+    let response = await fetch(`/sounds/${name}.wav`)
+    if (!response.ok) response = await fetch(`/sounds/${name}.mp3`)
     const arrayBuffer = await response.arrayBuffer()
     const audioBuffer = await ctx.decodeAudioData(arrayBuffer)
     bufferCache.set(name, audioBuffer)
