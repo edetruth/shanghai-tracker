@@ -1542,17 +1542,26 @@ export function aiChooseJokerLayOffPosition(meld: Meld): 'low' | 'high' {
 
 // Find a card in hand that can be laid off on any of the given melds.
 // Jokers are prioritised first. Skips lay-offs that would strand the AI.
+// For jokers with multiple valid targets, strategically picks the best meld:
+//   - Runs over sets (runs extend further, creating more future lay-off positions)
+//   - Runs matching remaining hand cards' suit (enables future lay-offs for those cards)
+//   - Own melds over opponent melds (avoid helping opponents go out)
 export function aiFindLayOff(hand: Card[], tablesMelds: Meld[]): { card: Card; meld: Meld; jokerPosition?: 'low' | 'high' } | null {
   const jokers = hand.filter(c => c.suit === 'joker')
   const nonJokers = hand.filter(c => c.suit !== 'joker')
   const prioritisedHand = [...jokers, ...nonJokers]
 
   for (const card of prioritisedHand) {
+    // Collect all valid lay-off targets for this card
+    const validTargets: { meld: Meld; jokerPosition?: 'low' | 'high'; score: number }[] = []
+
     for (const meld of tablesMelds) {
       if (canLayOff(card, meld)) {
         const jokerPosition = (card.suit === 'joker' && meld.type === 'run')
           ? aiChooseJokerLayOffPosition(meld)
           : undefined
+
+        // Check stranding safety
         const remaining = hand.filter(c => c.id !== card.id)
         if (remaining.length === 1) {
           const updatedMelds = tablesMelds.map(m => m.id === meld.id ? simulateLayOff(card, meld, jokerPosition) : m)
@@ -1560,8 +1569,46 @@ export function aiFindLayOff(hand: Card[], tablesMelds: Meld[]): { card: Card; m
             continue
           }
         }
-        return { card, meld, jokerPosition }
+
+        // Score this target strategically (higher = better)
+        let score = 0
+
+        if (isJoker(card)) {
+          // Runs >> sets for joker lay-offs (runs extend further, more future positions)
+          if (meld.type === 'run') score += 100
+
+          // Prefer runs whose suit matches remaining hand cards
+          if (meld.type === 'run' && meld.runSuit) {
+            const remainingInSuit = hand.filter(c =>
+              c.id !== card.id && c.suit === meld.runSuit && !isJoker(c)
+            )
+            // Each remaining card in this suit is a potential future lay-off
+            score += remainingInSuit.length * 30
+
+            // Extra bonus if a remaining card is adjacent to where the joker extends
+            const newMin = jokerPosition === 'low' ? (meld.runMin ?? 1) - 1 : meld.runMin ?? 1
+            const newMax = jokerPosition === 'high' ? (meld.runMax ?? 13) + 1 : meld.runMax ?? 13
+            for (const rc of remainingInSuit) {
+              if (rc.rank === newMin - 1 || rc.rank === newMax + 1) {
+                score += 50  // this card can lay off right after the joker
+              }
+            }
+          }
+        } else {
+          // Non-joker cards: prefer melds that DON'T extend opponent's run length
+          // (neutral scoring — just take the first valid target)
+          score += 0
+        }
+
+        validTargets.push({ meld, jokerPosition, score })
       }
+    }
+
+    if (validTargets.length > 0) {
+      // Pick the highest-scoring target
+      validTargets.sort((a, b) => b.score - a.score)
+      const best = validTargets[0]
+      return { card, meld: best.meld, jokerPosition: best.jokerPosition }
     }
   }
   return null
