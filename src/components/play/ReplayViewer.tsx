@@ -83,8 +83,8 @@ export default function ReplayViewer({ gameId, playerNames, onExit }: Props) {
   return (
     <div style={{ height: '100dvh', background: feltBg, display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'background 1s ease' }}>
       {/* Header */}
-      <div style={{ background: '#0f2218', paddingTop: 'max(8px, env(safe-area-inset-top, 44px))', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-        <button onClick={onExit} style={{ background: 'transparent', border: 'none', color: '#6aad7a', cursor: 'pointer', padding: 8, minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Back">
+      <div style={{ background: '#0f2218', paddingTop: 'max(12px, env(safe-area-inset-top, 44px))', paddingBottom: 8, paddingLeft: 12, paddingRight: 12, display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <button onClick={onExit} style={{ background: '#1e4a2e', border: '1px solid #2d5a3a', borderRadius: 10, color: '#6aad7a', cursor: 'pointer', padding: 8, minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Back">
           <ChevronLeft size={24} />
         </button>
         <span style={{ color: '#e2b858', fontSize: 13, fontWeight: 700, flex: 1 }}>
@@ -166,26 +166,36 @@ export default function ReplayViewer({ gameId, playerNames, onExit }: Props) {
         {/* All players' hands */}
         {state?.players.map((p, i) => {
           const totalPts = p.hand.reduce((sum, c) => sum + cardPoints(c.rank), 0)
+          const isCurrent = i === state.currentPlayerIndex
           return (
             <div key={i} style={{
-              background: i === state.currentPlayerIndex ? 'rgba(30,74,46,0.3)' : 'rgba(15,34,24,0.2)',
-              border: i === state.currentPlayerIndex ? '1px solid #e2b858' : '1px solid rgba(45,90,58,0.2)',
-              borderRadius: 10, padding: '6px 8px', marginBottom: 6,
+              background: isCurrent ? 'rgba(30,74,46,0.3)' : 'rgba(15,34,24,0.2)',
+              border: isCurrent ? '1px solid #e2b858' : '1px solid rgba(45,90,58,0.2)',
+              borderRadius: 10, padding: '8px 10px', marginBottom: 6,
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 }}>
-                <span style={{ color: i === state.currentPlayerIndex ? '#e2b858' : '#a8d0a8', fontSize: 11, fontWeight: 600 }}>
-                  {p.name}
-                  {p.hasLaidDown && <span style={{ color: '#2d7a3a', fontSize: 8, fontWeight: 700, marginLeft: 6, background: 'rgba(45,122,58,0.15)', borderRadius: 3, padding: '0 4px' }}>DOWN</span>}
-                </span>
-                <span style={{ color: '#8b7355', fontSize: 9 }}>{p.hand.length} cards · {totalPts} pts</span>
+              {/* Player name + status */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {isCurrent && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#e2b858', boxShadow: '0 0 4px rgba(226,184,88,0.6)' }} />}
+                  <span style={{ color: isCurrent ? '#e2b858' : '#a8d0a8', fontSize: 12, fontWeight: 700 }}>
+                    {p.name}
+                  </span>
+                  {p.hasLaidDown && <span style={{ color: '#2d7a3a', fontSize: 8, fontWeight: 700, background: 'rgba(45,122,58,0.2)', borderRadius: 3, padding: '1px 5px' }}>LAID DOWN</span>}
+                </div>
+                <span style={{ color: '#8b7355', fontSize: 9 }}>{totalPts} pts</span>
               </div>
+              {/* Hand label */}
+              <div style={{ color: '#3a5a3a', fontSize: 8, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 2 }}>
+                Hand ({p.hand.length} cards)
+              </div>
+              {/* Cards in hand */}
               <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                 {p.hand.map(card => (
                   <div key={card.id} style={{ transform: 'scale(0.55)', transformOrigin: 'top left', marginBottom: -28, marginRight: -18 }}>
                     <CardComponent card={card} />
                   </div>
                 ))}
-                {p.hand.length === 0 && <span style={{ color: '#3a5a3a', fontSize: 10 }}>No cards</span>}
+                {p.hand.length === 0 && <span style={{ color: '#6aad7a', fontSize: 11, fontWeight: 600 }}>Went out!</span>}
               </div>
             </div>
           )
