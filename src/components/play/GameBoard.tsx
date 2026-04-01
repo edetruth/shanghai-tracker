@@ -209,15 +209,12 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const buyingPhase = useGameStore(s => s.buyingPhase)
   const setBuyingPhase = useGameStore(s => s.setBuyingPhase)
   const buyerOrder = useGameStore(s => s.buyerOrder)
-  const setBuyerOrder = useGameStore(s => s.setBuyerOrder)
   const buyerStep = useGameStore(s => s.buyerStep)
-  const setBuyerStep = useGameStore(s => s.setBuyerStep)
   const buyingPassedPlayers = useGameStore(s => s.buyingPassedPlayers)
   const setBuyingPassedPlayers = useGameStore(s => s.setBuyingPassedPlayers)
   const buyingSnatcherName = useGameStore(s => s.buyingSnatcherName)
   const setBuyingSnatcherName = useGameStore(s => s.setBuyingSnatcherName)
   const buyingDiscard = useGameStore(s => s.buyingDiscard)
-  const setBuyingDiscard = useGameStore(s => s.setBuyingDiscard)
   const pendingBuyDiscard = useGameStore(s => s.pendingBuyDiscard)
   const setPendingBuyDiscard = useGameStore(s => s.setPendingBuyDiscard)
   const freeOfferDeclined = useGameStore(s => s.freeOfferDeclined)
@@ -1146,9 +1143,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     const buyerNames = order.map(i => state.players[i].name).join(', ')
     console.log(`[Buy] ${drewPlayer.name} (next-in-turn) passed on discard [${discardCard.rank === 0 ? 'Joker' : `${discardCard.rank}${discardCard.suit}`}]. Buy window open for: ${buyerNames || 'nobody'}`)
 
-    setBuyingDiscard(discardCard)
-    setBuyerOrder(order)
-    setBuyerStep(0)
     buyingIsPostDrawRef.current = true
 
     if (order.length === 0) {
@@ -1168,10 +1162,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         card: formatCard(discardCard),
         detail: `post-draw, ${order.length} buyer(s)`,
       })
-      // Launch cinematic: reveal card, then open buying
-      setBuyingPassedPlayers([])
-      setBuyingSnatcherName(undefined)
-      setBuyingPhase('reveal')
+      // Atomic: sets buyerOrder, buyerStep, buyingDiscard, buyingPassedPlayers, buyingSnatcherName, buyingPhase
+      useGameStore.getState().startBuyingWindow(order, discardCard)
       setTimeout(() => {
         setBuyingPhase(prev => prev === 'reveal' ? 'ai-deciding' : prev)
         setUiPhase('buying')
@@ -1416,13 +1408,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
     if (wentOut) {
       // Round ends immediately — no buying window, no further actions
-      setPendingBuyDiscard(null)
+      useGameStore.getState().cancelBuyingOnGoOut()
       pendingBuyDiscardRef.current = null
-      setBuyerOrder([])
-      setBuyingDiscard(null)
-      setFreeOfferDeclined(false)
       freeOfferDeclinedRef.current = false
-      setBuyingPhase('hidden')
       if (pendingUndo) {
         clearTimeout(pendingUndo.timerId)
         setPendingUndo(null)
@@ -1573,13 +1561,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       addBuyLog({ round: prev.currentRound, turn: turnCountRef.current, event: 'went_out', playerName: player.name, card: '', detail: 'hand was empty' })
       setJokerPositionPrompt(null)
       // Round ends immediately — no buying window, no further actions
-      setPendingBuyDiscard(null)
+      useGameStore.getState().cancelBuyingOnGoOut()
       pendingBuyDiscardRef.current = null
-      setBuyerOrder([])
-      setBuyingDiscard(null)
-      setFreeOfferDeclined(false)
       freeOfferDeclinedRef.current = false
-      setBuyingPhase('hidden')
       if (pendingUndo) {
         clearTimeout(pendingUndo.timerId)
         setPendingUndo(null)
@@ -1954,8 +1938,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       if (isPostDraw) {
         // Post-draw buy: current player (who drew from pile) still acts after this
         buyingIsPostDrawRef.current = false
-        setBuyerOrder([])
-        setBuyerStep(0)
+        useGameStore.getState().completeBuyingRound()
         if (withBuy.roundState.goOutPlayerId !== null) {
           endRound(withBuy)
         } else {
@@ -1995,7 +1978,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         card: buyingDiscard ? formatCard(buyingDiscard) : '?',
       })
       if (nextStep < buyerOrder.length) {
-        setBuyerStep(nextStep)
+        useGameStore.getState().advanceBuyerStep()
       } else {
         // All buyers passed — show unclaimed cinematic, then resume
         setDiscardUnwanted(true)
@@ -2012,7 +1995,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         // Show unclaimed cinematic for 900ms before resuming
         setBuyingPhase('unclaimed')
         setTimeout(() => {
-          setBuyingPhase('hidden')
+          useGameStore.getState().completeBuyingRound()
           if (isPostDraw) {
             buyingIsPostDrawRef.current = false
             if (gameStateRef.current.roundState.goOutPlayerId !== null) {

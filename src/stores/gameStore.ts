@@ -26,6 +26,8 @@ type ActionKeys =
   | 'setBuyingPassedPlayers' | 'setBuyingSnatcherName'
   | 'setBuyingDiscard' | 'setPendingBuyDiscard' | 'setFreeOfferDeclined'
   | 'setRoundResults' | 'setGoingOutSequence' | 'setGoOutPlayerName'
+  | 'startBuyingWindow' | 'advanceBuyerStep' | 'completeBuyingRound'
+  | 'cancelBuyingOnGoOut' | 'advanceToNextPlayer'
   | 'batch' | 'reset'
 
 interface GameStore {
@@ -64,6 +66,15 @@ interface GameStore {
   setRoundResults: (results: RoundResult[] | null) => void
   setGoingOutSequence: (seq: 'idle' | 'flash' | 'announce') => void
   setGoOutPlayerName: (name: string) => void
+
+  // ── Buying state machine (atomic transitions) ────────────────────────────
+  startBuyingWindow: (order: number[], discardCard: Card) => void
+  advanceBuyerStep: () => void
+  completeBuyingRound: () => void
+  cancelBuyingOnGoOut: () => void
+
+  // ── Round flow ───────────────────────────────────────────────────────────
+  advanceToNextPlayer: () => GameState
 
   // ── Batch update (multiple fields atomically) ────────────────────────────
   batch: (updates: Partial<Omit<GameStore, ActionKeys>>) => void
@@ -135,6 +146,54 @@ export const useGameStore = create<GameStore>((set) => ({
   setRoundResults: (results) => set({ roundResults: results }),
   setGoingOutSequence: (seq) => set({ goingOutSequence: seq }),
   setGoOutPlayerName: (name) => set({ goOutPlayerName: name }),
+
+  // ── Buying state machine (atomic transitions) ────────────────────────────
+  startBuyingWindow: (order, discardCard) =>
+    set({
+      buyerOrder: order,
+      buyerStep: 0,
+      buyingDiscard: discardCard,
+      buyingPassedPlayers: [],
+      buyingSnatcherName: undefined,
+      buyingPhase: 'reveal',
+    }),
+
+  advanceBuyerStep: () =>
+    set((state) => ({ buyerStep: state.buyerStep + 1 })),
+
+  completeBuyingRound: () =>
+    set({
+      buyingPhase: 'hidden',
+      buyerOrder: [],
+      buyerStep: 0,
+      buyingDiscard: null,
+      buyingPassedPlayers: [],
+      buyingSnatcherName: undefined,
+    }),
+
+  cancelBuyingOnGoOut: () =>
+    set({
+      pendingBuyDiscard: null,
+      buyerOrder: [],
+      buyingDiscard: null,
+      freeOfferDeclined: false,
+      buyingPhase: 'hidden',
+    }),
+
+  // ── Round flow ───────────────────────────────────────────────────────────
+  advanceToNextPlayer: () => {
+    let result: GameState = undefined as unknown as GameState
+    set((state) => {
+      const count = state.gameState.players.length
+      const next = (state.gameState.roundState.currentPlayerIndex + 1) % count
+      result = {
+        ...state.gameState,
+        roundState: { ...state.gameState.roundState, currentPlayerIndex: next },
+      }
+      return { gameState: result }
+    })
+    return result
+  },
 
   // ── Batch ────────────────────────────────────────────────────────────────
   batch: (updates) => set(updates),
