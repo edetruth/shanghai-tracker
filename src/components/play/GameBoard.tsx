@@ -3240,7 +3240,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         players={gameState.players}
         buyLimit={gameState.buyLimit}
         buyLog={buyLog}
-        gameId={gameId}
+        gameId={gameLogId}
         onPlayAgain={startNewGame}
         onBack={onExit}
         aiPersonality={aiPersonality}
