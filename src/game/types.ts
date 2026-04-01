@@ -250,6 +250,7 @@ export interface GameState {
   deckCount: number
   gameOver: boolean
   buyLimit: number      // configured at setup; default 5; 0 = buying disabled; resets buysRemaining each round
+  seed?: number         // initial deck seed for replay reconstruction
 }
 
 // ── Tournament types ─────────────────────────────────────────────────────────

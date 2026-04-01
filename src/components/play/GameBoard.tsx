@@ -112,6 +112,7 @@ function initGame(configs: PlayerConfig[], buyLimit = 5): GameState {
   const deckCount = configs.length <= 4 ? 2 : 3
   // -1 = unlimited; store as 999 so the game engine's numeric guards work correctly
   const effectiveBuyLimit = buyLimit === -1 ? 999 : buyLimit
+  const gameSeed = Math.floor(Math.random() * 2147483647)
   const players: Player[] = configs.map((cfg, i) => ({
     id: `p${i}`,
     name: cfg.name,
@@ -123,7 +124,7 @@ function initGame(configs: PlayerConfig[], buyLimit = 5): GameState {
     isAI: cfg.isAI,
   }))
 
-  const deck = shuffle(createDecks(deckCount))
+  const deck = shuffle(createDecks(deckCount), gameSeed)
   const cardsDealt = CARDS_DEALT[0]
   const { hands, remaining } = dealHands(deck, players.length, cardsDealt)
   players.forEach((p, i) => { p.hand = hands[i] })
@@ -135,6 +136,7 @@ function initGame(configs: PlayerConfig[], buyLimit = 5): GameState {
     deckCount,
     buyLimit: effectiveBuyLimit,
     gameOver: false,
+    seed: gameSeed,
     roundState: {
       roundNumber: 1,
       requirement: ROUND_REQUIREMENTS[0],
@@ -154,7 +156,8 @@ function setupRound(state: GameState, roundNum: number): GameState {
   const roundIdx = roundNum - 1
   const requirement = ROUND_REQUIREMENTS[roundIdx]
   const cardsDealt = CARDS_DEALT[roundIdx]
-  const deck = shuffle(createDecks(state.deckCount))
+  const roundSeed = Math.floor(Math.random() * 2147483647)
+  const deck = shuffle(createDecks(state.deckCount), roundSeed)
   const { hands, remaining } = dealHands(deck, state.players.length, cardsDealt)
   const topDiscard = remaining.shift()!
 
@@ -177,6 +180,7 @@ function setupRound(state: GameState, roundNum: number): GameState {
     players,
     currentRound: roundNum,
     gameOver: false,
+    seed: roundSeed,
     roundState: {
       roundNumber: roundNum,
       requirement,
@@ -252,8 +256,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const [gameState, setGameState] = useState<GameState>(() => initGame(initialPlayers, buyLimit))
   const [gameLogId] = useState(() => {
     const id = crypto.randomUUID()
-    // Log round 1 start immediately (fire-and-forget)
-    logAction(id, 1, -1, 'round_start', { round: 1 })
+    // Log round 1 start with seed for replay reconstruction (fire-and-forget)
+    logAction(id, 1, -1, 'round_start', { round: 1, seed: gameState.seed, deckCount: gameState.deckCount, playerCount: gameState.players.length })
     return id
   })
   const actionSeqRef = useRef(1) // starts at 1 because round_start is seq 1
@@ -2674,7 +2678,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
         const next = setupRound(gameState, nextRound)
         setGameState(next)
-        logAction(gameLogId, ++actionSeqRef.current, -1, 'round_start', { round: nextRound })
+        logAction(gameLogId, ++actionSeqRef.current, -1, 'round_start', { round: nextRound, seed: next.seed, deckCount: next.deckCount, playerCount: next.players.length })
         setRoundResults(null)
         clearSelection()
         setPendingBuyDiscard(null)
