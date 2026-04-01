@@ -17,20 +17,23 @@ import RoundSummary from './RoundSummary'
 import GameOver from './GameOver'
 import HandDisplay from './HandDisplay'
 import TableMelds from './TableMelds'
-import CardComponent from './Card'
+// CardComponent moved to PileArea
 import BuyingCinematic, { BuyBottomSheet, FreeTakeBottomSheet, type BuyingPhase } from './BuyingCinematic'
 import GameToast, { type QueuedToast } from './GameToast'
 import RoundAnnouncement, { type AnnouncementStage } from './RoundAnnouncement'
 import { useMultiplayerSync } from '../../hooks/useMultiplayerSync'
 import EmoteBubble from './EmoteBubble'
 import TopBar from './TopBar'
+import PauseMenu from './PauseMenu'
+import PileArea from './PileArea'
+import ActionBar from './ActionBar'
 import { loadOpponentModel, saveOpponentModel, updateOpponentModel } from '../../game/opponent-model'
 import { useAIAutomation } from '../../hooks/useAIAutomation'
 import { useGameAudio } from '../../hooks/useGameAudio'
 import { useGameAchievements } from '../../hooks/useGameAchievements'
 import { useActionLogger } from '../../hooks/useActionLogger'
 import { reportMatchResult, advanceWinner } from '../../lib/tournamentStore'
-import { useGameStore, type UIPhase, type GameSpeed } from '../../stores/gameStore'
+import { useGameStore, type UIPhase } from '../../stores/gameStore'
 
 interface Props {
   initialPlayers: PlayerConfig[]
@@ -2971,142 +2974,23 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
        buyingPhase !== 'free-offer' &&
        !showMeldModal &&
        (!soloHuman || !currentPlayer.isAI || isHumanBuyerTurn) && (
-        <div
-          style={{
-            flexShrink: 0,
-            background: '#162e22',
-            borderTop: '1px solid #2d5a3a',
-            borderBottom: '1px solid #2d5a3a',
-            padding: '6px 16px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 32,
-          }}
-        >
-          {/* Draw pile */}
-          <div ref={drawPileRef} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-            <p style={{
-              color: isHumanDraw ? '#ffffff' : '#6aad7a',
-              fontSize: isHumanDraw ? 10 : 9,
-              fontWeight: isHumanDraw ? 700 : 400,
-              textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0,
-            }}>
-              {isHumanDraw ? 'TAP TO DRAW' : 'Draw'}
-            </p>
-            {isHumanDraw && (
-              <div
-                className="flex justify-center"
-                style={{ marginBottom: 2, animation: 'draw-arrow-pulse 1.5s ease-in-out infinite' }}
-              >
-                <span style={{ color: '#6aad7a', fontSize: 10, opacity: 0.6 }}>▲</span>
-              </div>
-            )}
-            {rs.drawPile.length > 0 ? (
-              <div className="draw-pile-press" style={{
-                borderRadius: 6,
-                animation: isHumanDraw ? 'gbPulseGreen 1.2s ease-in-out 0.3s infinite' : 'none',
-                transform: 'scale(0.85)', transformOrigin: 'top center',
-                position: 'relative',
-              }}>
-                {/* Stacked pile depth — bottom card */}
-                <div style={{
-                  position: 'absolute', top: -3, left: 3, width: '100%', height: '100%',
-                  borderRadius: 6, background: '#5a1220', border: '1px solid #3a0e18',
-                }} />
-                {/* Stacked pile depth — middle card */}
-                <div style={{
-                  position: 'absolute', top: -1.5, left: 1.5, width: '100%', height: '100%',
-                  borderRadius: 6, background: '#6a1828', border: '1px solid #4a1420',
-                }} />
-                {/* Top card (interactive) */}
-                <div style={{ position: 'relative' }}>
-                  <CardComponent
-                    card={rs.drawPile[0]}
-                    faceDown
-                    onClick={isHumanDraw ? handleDrawFromPile : undefined}
-                  />
-                </div>
-              </div>
-            ) : (
-              <div
-                onClick={isHumanDraw ? handleDrawFromPile : undefined}
-                style={{
-                  width: 35, height: 52, borderRadius: 6,
-                  border: `2px dashed ${isHumanDraw ? '#e2b858' : '#2d5a3a'}`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: isHumanDraw ? '#e2b858' : '#2d5a3a', fontSize: 9, textAlign: 'center',
-                  cursor: isHumanDraw ? 'pointer' : 'default',
-                  animation: isHumanDraw ? 'gbPulseGreen 1.2s ease-in-out 0.3s infinite' : 'none',
-                }}
-              >
-                {isHumanDraw ? 'Tap to\nReshuffle' : 'Empty'}
-              </div>
-            )}
-            {rs.drawPile.length < 15 && (
-              <p key={rs.drawPile.length} style={{ color: '#e2b858', fontSize: 9, fontWeight: 600, margin: 0, animation: 'number-roll 300ms ease-out' }}>{rs.drawPile.length} left</p>
-            )}
-          </div>
-
-          {/* Discard pile */}
-          <div ref={discardPileRef} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-            <p style={{
-              color: isHumanDraw ? '#e2b858' : isHumanBuyerTurn ? '#e2b858' : '#6aad7a',
-              fontSize: isHumanDraw ? 10 : 9,
-              fontWeight: isHumanDraw || isHumanBuyerTurn ? 700 : 400,
-              textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0,
-            }}>
-              {isHumanDraw ? 'TAP TO TAKE' : isHumanBuyerTurn ? 'FOR SALE' : 'Discard'}
-            </p>
-            {(isHumanBuyerTurn ? buyingDiscard : topDiscard) ? (
-              <div
-                key={(isHumanBuyerTurn && buyingDiscard ? buyingDiscard.id : topDiscard?.id) ?? 'empty'}
-                style={{
-                  borderRadius: 6,
-                  animation: discardAnimating
-                    ? 'discard-toss 400ms ease-out'
-                    : discardUnwanted
-                      ? 'unwanted-dim 600ms ease-out both'
-                      : isHumanBuyerTurn
-                        ? 'for-sale-pulse 1.5s ease-in-out infinite'
-                        : isHumanDraw
-                          ? 'gbPulseGold 1.2s ease-in-out infinite'
-                          : 'card-land 250ms ease-out',
-                  transform: isHumanDraw ? 'scale(0.85) translateY(-2px)' : 'scale(0.85)',
-                  transformOrigin: 'top center',
-                  transition: 'transform 200ms ease',
-                }}>
-                <CardComponent
-                  card={(isHumanBuyerTurn && buyingDiscard ? buyingDiscard : topDiscard)!}
-                  onClick={isHumanDraw ? handleTakeDiscard : undefined}
-                  style={isHumanDraw ? { border: '2px solid #e2b858' } : undefined}
-                />
-              </div>
-            ) : (
-              <div
-                style={{
-                  width: 35, height: 52, borderRadius: 6,
-                  border: '2px dashed #2d5a3a',
-                }}
-              />
-            )}
-            <p style={{
-              color: pendingBuyDiscard && uiPhase === 'draw' && !currentPlayer.isAI ? '#e2b858' : '#6aad7a',
-              fontSize: 9, fontWeight: pendingBuyDiscard ? 600 : 400, margin: 0,
-            }}>
-              {pendingBuyDiscard && uiPhase === 'draw' && !currentPlayer.isAI ? 'Buyable' : '\u00A0'}
-            </p>
-            {lastDiscardedLabel && (
-              <p
-                key={lastDiscardedLabel}
-                style={{ animation: 'fade-in-out 2s ease both' }}
-                className="text-[10px] text-[#a8d0a8] font-medium text-center mt-0.5"
-              >
-                {lastDiscardedLabel}
-              </p>
-            )}
-          </div>
-        </div>
+        <PileArea
+          drawPileRef={drawPileRef}
+          discardPileRef={discardPileRef}
+          drawPileCards={rs.drawPile}
+          discardTop={topDiscard}
+          isHumanDraw={isHumanDraw}
+          isHumanBuyerTurn={isHumanBuyerTurn}
+          buyingDiscard={buyingDiscard}
+          discardAnimating={discardAnimating}
+          discardUnwanted={discardUnwanted}
+          lastDiscardedLabel={lastDiscardedLabel}
+          pendingBuyDiscard={pendingBuyDiscard}
+          uiPhase={uiPhase}
+          currentPlayerIsAI={!!currentPlayer.isAI}
+          onDrawFromPile={handleDrawFromPile}
+          onTakeDiscard={handleTakeDiscard}
+        />
       )}
 
       {/* ── Inline meld-building staging area ──────────────────────── */}
@@ -3209,237 +3093,55 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           </p>
         )}
 
-        {/* Status slot — stable height, content fades */}
-        <div style={{ minHeight: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {uiPhase === 'draw' && !currentPlayer.isAI ? (
-            <p className="text-center text-xs text-[#6aad7a]" style={{ margin: 0 }}>
-              Tap the draw pile or discard card
-            </p>
-          ) : (
-            <span>{'\u00A0'}</span>
-          )}
-        </div>
-
-        {/* Undo discard toast */}
-        {pendingUndo && (
-          <div className="flex items-center justify-between bg-[#2c1810] text-white rounded-xl px-4 py-2">
-            <span className="text-sm">Discarded {pendingUndo.card.rank === 0 ? 'Joker' : rankLabel(pendingUndo.card)}</span>
-            <button onClick={handleUndoDiscard} className="text-[#e2b858] text-sm font-bold active:opacity-70">
-              Undo
-            </button>
-          </div>
-        )}
-
-        {/* Undo lay-off toast */}
-        {pendingLayOffUndo && !pendingUndo && (
-          <div className="flex items-center justify-between bg-[#2c1810] text-white rounded-xl px-4 py-2">
-            <span className="text-sm">Laid off {pendingLayOffUndo.card.rank === 0 ? 'Joker' : rankLabel(pendingLayOffUndo.card)}</span>
-            <button onClick={handleUndoLayOff} className="text-[#e2b858] text-sm font-bold active:opacity-70">
-              Undo
-            </button>
-          </div>
-        )}
-
-        {/* Inline joker position prompt */}
-        {jokerPositionPrompt && (
-          <div style={{
-            backgroundColor: '#2e1a0e',
-            borderRadius: 10,
-            border: '1px solid #e2b858',
-            padding: '8px 12px',
-            marginTop: 4,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-          }}>
-            <p style={{ color: '#f0d480', fontSize: 11, fontWeight: 600, margin: 0, flex: 1 }}>
-              Place Joker where?
-            </p>
-            <button
-              onClick={() => handleJokerPositionChoice('low')}
-              style={{
-                background: '#6aad7a', color: '#0f2218', border: 'none', borderRadius: 8,
-                padding: '6px 12px', fontSize: 11, fontWeight: 700, cursor: 'pointer', minHeight: 36,
-              }}
-            >
-              Low
-            </button>
-            <button
-              onClick={() => handleJokerPositionChoice('high')}
-              style={{
-                background: '#e2b858', color: '#2c1810', border: 'none', borderRadius: 8,
-                padding: '6px 12px', fontSize: 11, fontWeight: 700, cursor: 'pointer', minHeight: 36,
-              }}
-            >
-              High
-            </button>
-          </div>
-        )}
-
-        {/* Action buttons — hidden during meld-building mode */}
-        {uiPhase === 'action' && !currentPlayer.isAI && !pendingUndo && !jokerPositionPrompt && !showMeldModal && (
-          <div className="space-y-2 mt-2">
-            {!currentPlayer.hasLaidDown && (
-              <p style={{
-                fontSize: 10, color: '#6aad7a', textAlign: 'center',
-                margin: '0 0 4px', padding: 0,
-              }}>
-                Need: {rs.requirement.description}
-              </p>
-            )}
-            {!currentPlayer.hasLaidDown ? (
-              /* Pre-lay-down: swap mode UI or [Swap Joker?] [Lay Down] [Discard] */
-              <>
-                {swapMode ? (
-                  <div>
-                    <p style={{ color: '#e2b858', fontSize: 11, textAlign: 'center', marginBottom: 8, fontWeight: 600 }}>
-                      {swapSelectedMeldId
-                        ? 'Now tap the matching card in your hand'
-                        : 'Tap a glowing joker on the table to swap it'}
-                    </p>
-                    {layOffError && (
-                      <p style={{ color: '#e87070', fontSize: 11, textAlign: 'center', marginBottom: 8 }}>
-                        {layOffError}
-                      </p>
-                    )}
-                    <button
-                      onClick={() => {
-                        setSwapMode(false)
-                        setSwapSelectedMeldId(null)
-                        setPreSwapMeldId(null)
-                        if (preLayDownSwapBaseStateRef.current) {
-                          setGameState(preLayDownSwapBaseStateRef.current)
-                          preLayDownSwapBaseStateRef.current = null
-                        }
-                        clearSelection()
-                      }}
-                      style={{
-                        width: '100%', minHeight: 38, borderRadius: 10,
-                        border: '1px solid #2d5a3a',
-                        background: '#1e4a2e', color: '#6aad7a',
-                        fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                      }}
-                    >
-                      Cancel Swap
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex gap-2">
-                    {hasSwappableJokersBeforeLayDown && (
-                      <button
-                        onClick={() => {
-                          const hand = currentPlayer.hand
-                          const hasSwappable = gameState.roundState.tablesMelds.some(meld =>
-                            meld.type === 'run' && meld.jokerMappings.length > 0 &&
-                            hand.some(c => c.suit !== 'joker' && findSwappableJoker(c, meld) !== null)
-                          )
-                          if (!hasSwappable) {
-                            setLayOffError('No swappable jokers — none of your cards match a joker position on the table.')
-                            setTimeout(() => setLayOffError(null), 5000)
-                            return
-                          }
-                          setNewCardIds(new Set())
-                          setSwapMode(true)
-                        }}
-                        style={{
-                          flex: 1, minHeight: 38, borderRadius: 10,
-                          border: '1px solid #e2b858',
-                          background: '#1e4a2e', color: '#e2b858',
-                          fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                        }}
-                      >
-                        Swap Joker
-                      </button>
-                    )}
-                    <button
-                      onClick={() => { setPerfectDrawActive(false); setShowMeldModal(true) }}
-                      style={{
-                        flex: 1, minHeight: 38, borderRadius: 10, border: 'none',
-                        background: '#e2b858', color: '#2c1810',
-                        fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                        animation: perfectDrawActive ? 'ready-pulse 1.5s ease-in-out infinite' : 'none',
-                      }}
-                    >
-                      Lay Down
-                    </button>
-                    <button
-                      onClick={selectedCardIds.size === 1 ? () => { setNewCardIds(new Set()); handleDiscard() } : undefined}
-                      disabled={selectedCardIds.size !== 1}
-                      style={{
-                        flex: 1, minHeight: 38, borderRadius: 10, border: 'none',
-                        background: selectedCardIds.size !== 1 ? '#1e4a2e' : 'white',
-                        color: selectedCardIds.size !== 1 ? '#3a5a3a' : '#2c1810',
-                        fontSize: 13, fontWeight: 600,
-                        cursor: selectedCardIds.size !== 1 ? 'not-allowed' : 'pointer',
-                      }}
-                    >
-                      Discard
-                    </button>
-                  </div>
-                )}
-              </>
-            ) : (
-              /* Post-lay-down: contextual hint + [Discard] or [End Turn] */
-              <>
-                {/* Contextual hint */}
-                <p style={{ color: '#a8d0a8', fontSize: 11, textAlign: 'center', margin: 0 }}>
-                  {selectedCardIds.size === 0
-                    ? 'Select a card to lay off or discard'
-                    : selectedCardIds.size === 1
-                      ? 'Tap a glowing meld to lay off, or discard below'
-                      : 'Select exactly 1 card'}
-                </p>
-
-                {/* Discard error */}
-                {discardError && (
-                  <p
-                    className="text-center text-xs rounded-lg px-3 py-2 border"
-                    style={{ color: '#e87070', background: 'rgba(44,24,16,0.6)', borderColor: 'rgba(232,112,112,0.3)' }}
-                  >
-                    {discardError}
-                  </p>
-                )}
-
-                {lastCardStuck ? (
-                  <button
-                    onClick={handleEndTurnStuck}
-                    style={{
-                      width: '100%', minHeight: 38, borderRadius: 10, border: 'none',
-                      background: '#e2b858', color: '#2c1810',
-                      fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                    }}
-                  >
-                    End Turn (draw next turn)
-                  </button>
-                ) : (
-                  <button
-                    onClick={selectedCardIds.size === 1 ? () => { setNewCardIds(new Set()); handleDiscard() } : undefined}
-                    disabled={selectedCardIds.size !== 1}
-                    style={{
-                      width: '100%', minHeight: 38, borderRadius: 10, border: 'none',
-                      background: selectedCardIds.size !== 1 ? '#1e4a2e' : '#e2b858',
-                      color: selectedCardIds.size !== 1 ? '#3a5a3a' : '#2c1810',
-                      fontSize: 13, fontWeight: 700,
-                      cursor: selectedCardIds.size !== 1 ? 'not-allowed' : 'pointer',
-                    }}
-                  >
-                    {selectedCardIds.size === 1 ? 'Discard Selected Card' : 'Select a card to discard'}
-                  </button>
-                )}
-              </>
-            )}
-
-            {/* Discard error (pre-lay-down) */}
-            {!currentPlayer.hasLaidDown && discardError && (
-              <p
-                className="text-center text-xs rounded-lg px-3 py-2 border"
-                style={{ color: '#e87070', background: 'rgba(44,24,16,0.6)', borderColor: 'rgba(232,112,112,0.3)' }}
-              >
-                {discardError}
-              </p>
-            )}
-          </div>
-        )}
+        <ActionBar
+          uiPhase={uiPhase}
+          currentPlayerIsAI={!!currentPlayer.isAI}
+          hasLaidDown={currentPlayer.hasLaidDown}
+          selectedCardCount={selectedCardIds.size}
+          requirementDescription={rs.requirement.description}
+          pendingUndoCard={pendingUndo?.card ?? null}
+          onUndoDiscard={handleUndoDiscard}
+          pendingLayOffUndoCard={pendingLayOffUndo?.card ?? null}
+          onUndoLayOff={handleUndoLayOff}
+          jokerPositionPrompt={!!jokerPositionPrompt}
+          onJokerLow={() => handleJokerPositionChoice('low')}
+          onJokerHigh={() => handleJokerPositionChoice('high')}
+          swapMode={swapMode}
+          swapSelectedMeldId={swapSelectedMeldId}
+          layOffError={layOffError}
+          onCancelSwap={() => {
+            setSwapMode(false)
+            setSwapSelectedMeldId(null)
+            setPreSwapMeldId(null)
+            if (preLayDownSwapBaseStateRef.current) {
+              setGameState(preLayDownSwapBaseStateRef.current)
+              preLayDownSwapBaseStateRef.current = null
+            }
+            clearSelection()
+          }}
+          hasSwappableJokersBeforeLayDown={hasSwappableJokersBeforeLayDown}
+          onSwapJoker={() => {
+            const hand = currentPlayer.hand
+            const hasSwappable = gameState.roundState.tablesMelds.some(meld =>
+              meld.type === 'run' && meld.jokerMappings.length > 0 &&
+              hand.some(c => c.suit !== 'joker' && findSwappableJoker(c, meld) !== null)
+            )
+            if (!hasSwappable) {
+              setLayOffError('No swappable jokers — none of your cards match a joker position on the table.')
+              setTimeout(() => setLayOffError(null), 5000)
+              return
+            }
+            setNewCardIds(new Set())
+            setSwapMode(true)
+          }}
+          perfectDrawActive={perfectDrawActive}
+          onLayDown={() => { setPerfectDrawActive(false); setShowMeldModal(true) }}
+          onDiscard={() => { setNewCardIds(new Set()); handleDiscard() }}
+          discardError={discardError}
+          lastCardStuck={lastCardStuck}
+          onEndTurnStuck={handleEndTurnStuck}
+          showMeldModal={showMeldModal}
+        />
 
       </div>
 
@@ -3472,98 +3174,21 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
       {/* Pause modal */}
       {showPauseModal && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-end">
-          <div className="w-full bg-[#0f2218] border-t border-[#2d5a3c] rounded-t-2xl px-4 pt-5 pb-10">
-            <h2 className="text-lg font-bold text-white text-center mb-1">Game Paused</h2>
-            <p className="text-sm text-[#6aad7a] text-center mb-4">
-              {tournamentGameNumber ? `Game ${tournamentGameNumber} of 3 · ` : ''}Round {gameState.currentRound} of {TOTAL_ROUNDS} · {currentPlayer.name}'s turn
-            </p>
-            <p className="text-xs text-[#6aad7a] text-center mb-2">AI Speed</p>
-            <div className="bg-[#1e4a2e] rounded-xl p-1 flex gap-1 mb-4">
-              {(['fast', 'normal', 'slow'] as GameSpeed[]).map(s => (
-                <button
-                  key={s}
-                  onClick={() => setGameSpeed(s)}
-                  className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all capitalize ${
-                    gameSpeed === s ? 'bg-[#e2b858] text-[#2c1810] shadow-sm' : 'text-[#8bc48b]'
-                  }`}
-                >
-                  {s.charAt(0).toUpperCase() + s.slice(1)}
-                </button>
-              ))}
-            </div>
-            {/* Reduce animations toggle */}
-            <button
-              onClick={() => setReduceAnimations(prev => !prev)}
-              className="w-full flex items-center justify-between bg-[#1e4a2e] rounded-xl px-4 py-3 mb-4"
-            >
-              <span className="text-sm text-[#a8d0a8]">Reduce animations</span>
-              <div
-                className="w-10 h-6 rounded-full transition-colors flex items-center px-0.5"
-                style={{ backgroundColor: reduceAnimations ? '#e2b858' : '#2d5a3a' }}
-              >
-                <div
-                  className="w-5 h-5 rounded-full bg-white transition-transform"
-                  style={{ transform: reduceAnimations ? 'translateX(16px)' : 'translateX(0)' }}
-                />
-              </div>
-            </button>
-            {/* Volume controls */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ color: '#a8d0a8', fontSize: 12, minWidth: 90 }}>Game Sounds</span>
-                <input
-                  type="range" min="0" max="1" step="0.1"
-                  value={sfxVol}
-                  onChange={e => updateSfxVol(Number(e.target.value))}
-                  aria-label="Game sounds volume"
-                  style={{ flex: 1, accentColor: '#e2b858' }}
-                />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ color: '#a8d0a8', fontSize: 12, minWidth: 90 }}>Notifications</span>
-                <input
-                  type="range" min="0" max="1" step="0.1"
-                  value={notifVol}
-                  onChange={e => updateNotifVol(Number(e.target.value))}
-                  aria-label="Notification volume"
-                  style={{ flex: 1, accentColor: '#e2b858' }}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <button
-                onClick={() => setShowPauseModal(false)}
-                className="bg-[#e2b858] text-[#2c1810] font-bold rounded-xl w-full py-3 text-sm active:opacity-80"
-              >
-                Resume Game
-              </button>
-              {tournamentGameNumber ? (
-                <button
-                  onClick={() => {
-                    setShowPauseModal(false)
-                    if (pendingUndo) clearTimeout(pendingUndo.timerId)
-                    onExit()
-                  }}
-                  className="w-full rounded-xl py-3 text-sm font-semibold text-[#f87171] bg-[#1e4a2e] active:opacity-80"
-                >
-                  Exit Tournament
-                </button>
-              ) : (
-                <button
-                  onClick={() => {
-                    setShowPauseModal(false)
-                    if (pendingUndo) clearTimeout(pendingUndo.timerId)
-                    onExit()
-                  }}
-                  className="w-full rounded-xl py-3 text-sm font-semibold text-[#f87171] bg-[#1e4a2e] active:opacity-80"
-                >
-                  Abandon Game
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+        <PauseMenu
+          onClose={() => setShowPauseModal(false)}
+          onExit={onExit}
+          gameSpeed={gameSpeed}
+          onSpeedChange={setGameSpeed}
+          reduceAnimations={reduceAnimations}
+          onToggleAnimations={() => setReduceAnimations(prev => !prev)}
+          sfxVol={sfxVol}
+          notifVol={notifVol}
+          onSfxVolChange={updateSfxVol}
+          onNotifVolChange={updateNotifVol}
+          roundInfo={`Round ${gameState.currentRound} of ${TOTAL_ROUNDS} · ${currentPlayer.name}'s turn`}
+          tournamentInfo={tournamentGameNumber ? `Game ${tournamentGameNumber} of 3` : undefined}
+          onCleanup={() => { if (pendingUndo) clearTimeout(pendingUndo.timerId) }}
+        />
       )}
 
       {/* Joker swap "The Exchange" cinematic overlay */}
@@ -3699,12 +3324,4 @@ function formatCard(card: CardType): string {
   return `${rank}${suit}`
 }
 
-// Helper for undo discard label
-function rankLabel(card: CardType): string {
-  const r = card.rank
-  if (r === 1) return 'A'
-  if (r === 11) return 'J'
-  if (r === 12) return 'Q'
-  if (r === 13) return 'K'
-  return String(r)
-}
+// rankLabel moved to ActionBar component
