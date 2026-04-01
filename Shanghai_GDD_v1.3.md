@@ -316,12 +316,21 @@ Six named personalities are available, grouped into three difficulty tiers:
 - Goes down immediately | Unlimited lay-offs | Optimal joker swaps
 - Full opponent awareness (dangerWeight 0.5) | Denial takes enabled
 - Grabs cards to deny opponents who are close to going out
+- Run window detection: `cardDanger` detects opponent run-building (+60 gap-fill, +30 extension)
+- Hand reading: `inferOpponentNeeds` penalizes discards matching opponent suit/rank profiles
+- Race mode: sheds highest-point cards when any opponent has ≤3 cards and has laid down
+- Round-aware strategy: `getRoundStrategy` adjusts discard weights by round type (set-heavy vs run-heavy)
 
 **The Mastermind** 🧠 (★★★★★) — "Only goes down when going out — ruthless"
 - Take style: aggressive-denial | Buy style: heavy-denial (limit 5) | Discard: opponent-aware
 - Holds hand until can go out (strategic go-down) | Unlimited lay-offs | Optimal joker swaps
 - Full opponent awareness (dangerWeight 0.6) | Denial takes enabled
 - Most aggressive buying, lowest panic threshold
+- Run window detection: `cardDanger` detects opponent run-building (+60 gap-fill, +30 extension)
+- Hand reading: `inferOpponentNeeds` penalizes discards matching opponent suit/rank profiles
+- Predictive go-down: `aiShouldGoDownHard` bails if 2+ opponents laid down with ≤3 cards, or holding 80+ pts with any opponent down
+- Race mode: sheds highest-point cards when any opponent has ≤3 cards and has laid down
+- Round-aware strategy: `getRoundStrategy` adjusts discard weights by round type (set-heavy vs run-heavy)
 
 ### 11.2 Evaluation Engine
 
@@ -726,17 +735,7 @@ Telemetry is fire-and-forget — logging never blocks or breaks gameplay. Three 
 | 1.0 | March 2025 | Initial master document — rules extracted from source and verified with game owner. |
 | 1.1 | March 2025 | Corrected scoring values. Buys changed to configurable per-round setting (default 5). Fixed 7 rounds confirmed. Shanghai defined as name only. Confirmed lay-off allowed onto own fresh melds same turn. Bonus meld type rules confirmed. |
 | 1.2 | March 2026 | **Major update to match codebase.** Removed bonus melds (§3.4 — code only supports required melds). Replaced 3-level AI difficulty with 6-personality evaluation-based system (§11). Removed joker-swap reversal rule (§8.2 — not enforced in code). Added online multiplayer (§13), score tracker (§14), analytics dashboard (§15), game presentation/cinematics (§12), undo discard (§5.3), buy-window highlights (§7.3), joker run bounds (§8.1), deployment details (§17). Updated buy limit options. Added edge cases for stalemate and AI lay-off cap. |
-| 1.3 | March 2026 | **Feature expansion.** Added sound system (§18), card physics/3D animations (§19), in-game emotes (§20), push notifications (§21), achievements/milestones (§22), spectator mode (§23), game replay system (§24), adaptive AI "The Nemesis" (§25), online tournaments (§26). AI strategic fixes: no buying after laying down, post-down discard prioritizes highest points, lay-off prefers own melds, joker take gated by hasLaidDown, round-relative joker buy threshold. Multiplayer overhaul: heartbeat, action ACKs, host disconnect detection, broadcast throttle, session recovery. |
-
----
-
-*This document must be updated any time a rule changes. All departments must be notified. The GDD is the contract — code follows it, not the other way around.*
-
-| Version | Date | Changes |
-|---|---|---|
-| 1.0 | March 2025 | Initial master document — rules extracted from source and verified with game owner. |
-| 1.1 | March 2025 | Corrected scoring values. Buys changed to configurable per-round setting (default 5). Fixed 7 rounds confirmed. Shanghai defined as name only. Confirmed lay-off allowed onto own fresh melds same turn. Bonus meld type rules confirmed. |
-| 1.2 | March 2026 | **Major update to match codebase.** Removed bonus melds (§3.4 — code only supports required melds). Replaced 3-level AI difficulty with 6-personality evaluation-based system (§11). Removed joker-swap reversal rule (§8.2 — not enforced in code). Added online multiplayer (§13), score tracker (§14), analytics dashboard (§15), game presentation/cinematics (§12), undo discard (§5.3), buy-window highlights (§7.3), joker run bounds (§8.1), deployment details (§17). Updated buy limit options. Added edge cases for stalemate and AI lay-off cap. |
+| 1.3 | March 2026 | **Feature expansion.** Added sound system (§18), card physics/3D animations (§19), in-game emotes (§20), push notifications (§21), achievements/milestones (§22), spectator mode (§23), game replay system (§24), adaptive AI "The Nemesis" (§25), online tournaments (§26). AI strategic fixes: no buying after laying down, post-down discard prioritizes highest points, lay-off prefers own melds, joker take gated by hasLaidDown, round-relative joker buy threshold. AI intelligence upgrades for Shark/Mastermind/Nemesis: run window detection, hand reading (`inferOpponentNeeds`), predictive go-down (Mastermind), race mode, round-aware strategy (`getRoundStrategy`). Multiplayer overhaul: heartbeat, action ACKs, host disconnect detection, broadcast throttle, session recovery. |
 
 ---
 
