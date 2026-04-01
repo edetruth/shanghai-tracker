@@ -30,7 +30,7 @@ import { useGameAudio } from '../../hooks/useGameAudio'
 import { useGameAchievements } from '../../hooks/useGameAchievements'
 import { useActionLogger } from '../../hooks/useActionLogger'
 import { reportMatchResult, advanceWinner } from '../../lib/tournamentStore'
-import { useGameStore } from '../../stores/gameStore'
+import { useGameStore, type UIPhase, type GameSpeed } from '../../stores/gameStore'
 
 interface Props {
   initialPlayers: PlayerConfig[]
@@ -49,17 +49,6 @@ interface Props {
   remoteSeatIndices?: number[]
   onReplay?: (gameId: string, playerNames: string[]) => void
 }
-
-type UIPhase =
-  | 'round-start'
-  | 'privacy'
-  | 'draw'
-  | 'action'
-  | 'buying'
-  | 'round-end'
-  | 'game-over'
-
-type GameSpeed = 'fast' | 'normal' | 'slow'
 
 interface UndoState {
   card: CardType
@@ -204,11 +193,45 @@ function advancePlayer(state: GameState): GameState {
 export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyProp = 'medium', aiPersonality, buyLimit = 5, onExit, onGameComplete, tournamentGameNumber, tournamentMatchId, mode = 'local', roomCode, hostSeatIndex = 0, remoteSeatIndices = [], onReplay }: Props) {
   const aiDifficulty: AIDifficulty = aiDifficultyProp
 
-  const [gameState, setGameState] = useState<GameState>(() => initGame(initialPlayers, buyLimit))
+  // ── Initialize Zustand store synchronously before first render ───────────
+  const [_storeInit] = useState(() => {
+    useGameStore.getState().reset(initGame(initialPlayers, buyLimit))
+    return true
+  })
+
+  // ── Read core game state from Zustand store ─────────────────────────────
+  const gameState = useGameStore(s => s.gameState)
+  const setGameState = useGameStore(s => s.setGameState)
+  const uiPhase = useGameStore(s => s.uiPhase)
+  const setUiPhase = useGameStore(s => s.setUiPhase)
+  const gameSpeed = useGameStore(s => s.gameSpeed)
+  const setGameSpeed = useGameStore(s => s.setGameSpeed)
+  const buyingPhase = useGameStore(s => s.buyingPhase)
+  const setBuyingPhase = useGameStore(s => s.setBuyingPhase)
+  const buyerOrder = useGameStore(s => s.buyerOrder)
+  const setBuyerOrder = useGameStore(s => s.setBuyerOrder)
+  const buyerStep = useGameStore(s => s.buyerStep)
+  const setBuyerStep = useGameStore(s => s.setBuyerStep)
+  const buyingPassedPlayers = useGameStore(s => s.buyingPassedPlayers)
+  const setBuyingPassedPlayers = useGameStore(s => s.setBuyingPassedPlayers)
+  const buyingSnatcherName = useGameStore(s => s.buyingSnatcherName)
+  const setBuyingSnatcherName = useGameStore(s => s.setBuyingSnatcherName)
+  const buyingDiscard = useGameStore(s => s.buyingDiscard)
+  const setBuyingDiscard = useGameStore(s => s.setBuyingDiscard)
+  const pendingBuyDiscard = useGameStore(s => s.pendingBuyDiscard)
+  const setPendingBuyDiscard = useGameStore(s => s.setPendingBuyDiscard)
+  const freeOfferDeclined = useGameStore(s => s.freeOfferDeclined)
+  const setFreeOfferDeclined = useGameStore(s => s.setFreeOfferDeclined)
+  const roundResults = useGameStore(s => s.roundResults)
+  const setRoundResults = useGameStore(s => s.setRoundResults)
+  const goingOutSequence = useGameStore(s => s.goingOutSequence)
+  const setGoingOutSequence = useGameStore(s => s.setGoingOutSequence)
+  const goOutPlayerName = useGameStore(s => s.goOutPlayerName)
+  const setGoOutPlayerName = useGameStore(s => s.setGoOutPlayerName)
+
   const { gameLogId, log: logActionHook, getLog: getActionLog } = useActionLogger(
     { round: 1, seed: gameState.seed, deckCount: gameState.deckCount, playerCount: gameState.players.length }
   )
-  const [uiPhase, setUiPhase] = useState<UIPhase>('round-start')
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set())
   const selectedCardOrderRef = useRef<string[]>([])
   const [handSort, setHandSort] = useState<'rank' | 'suit'>('rank')
@@ -216,27 +239,15 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const [meldAssignedIds, setMeldAssignedIds] = useState<Set<string>>(new Set())
   const meldBuilderRef = useRef<MeldBuilderHandle>(null)
   const [jokerPositionPrompt, setJokerPositionPrompt] = useState<{ card: CardType; meld: Meld } | null>(null)
-  const [buyerOrder, setBuyerOrder] = useState<number[]>([])
-  const [buyerStep, setBuyerStep] = useState(0)
-  const [roundResults, setRoundResults] = useState<{ playerId: string; score: number; shanghaied: boolean }[] | null>(null)
-  const [buyingDiscard, setBuyingDiscard] = useState<CardType | null>(null)
   const [pendingUndo, setPendingUndo] = useState<UndoState | null>(null)
   const [pendingLayOffUndo, setPendingLayOffUndo] = useState<UndoLayOffState | null>(null)
-  const [pendingBuyDiscard, setPendingBuyDiscard] = useState<CardType | null>(null)
   const [showPauseModal, setShowPauseModal] = useState(false)
   const [reshuffleMsg, setReshuffleMsg] = useState(false)
   const [newCardIds, setNewCardIds] = useState<Set<string>>(new Set())
   const [leavingCardId, setLeavingCardId] = useState<string | null>(null)
   const [dealFlipPhase, setDealFlipPhase] = useState<'facedown' | 'flipping' | null>(null)
-  const [gameSpeed, setGameSpeed] = useState<GameSpeed>('normal')
   const [buyLog, setBuyLog] = useState<BuyLogEntry[]>([])
   const [gameId, setGameId] = useState<string | null>(null)
-  // True after player taps "Pass" on the free discard offer — hides banner until next offer
-  const [freeOfferDeclined, setFreeOfferDeclined] = useState(false)
-  // Cinematic buying window state
-  const [buyingPhase, setBuyingPhase] = useState<BuyingPhase>('hidden')
-  const [buyingPassedPlayers, setBuyingPassedPlayers] = useState<string[]>([])
-  const [buyingSnatcherName, setBuyingSnatcherName] = useState<string | undefined>(undefined)
   const buyingPhaseRef = useRef<BuyingPhase>('hidden')
   const [stripExpanded, setStripExpanded] = useState(false)
   const turnCountRef = useRef(0)
@@ -261,9 +272,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const [swapSelectedMeldId, setSwapSelectedMeldId] = useState<string | null>(null)
   // Snapshot of game state BEFORE any pre-lay-down joker swaps — used to undo if player can't lay down after all swaps
   const preLayDownSwapBaseStateRef = useRef<GameState | null>(null)
-  // Going-out cinematic sequence
-  const [goingOutSequence, setGoingOutSequence] = useState<'idle' | 'flash' | 'announce'>('idle')
-  const [goOutPlayerName, setGoOutPlayerName] = useState('')
   // Stalemate tracking (turns without any meld)
   const noProgressTurnsRef = useRef(0)
   const drawPileDepletionsRef = useRef(0)
@@ -333,23 +341,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const previousLeaderRef = useRef<string | null>(null)
   const countdownActiveRef = useRef(false)
   const previousStandingsPctRef = useRef<Map<string, number>>(new Map())
-
-  // ── Bridge: sync React state → Zustand store (removed in Phase 2) ────────
-  const store = useGameStore()
-  useEffect(() => { store.setGameState(gameState) }, [gameState]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { store.setUiPhase(uiPhase) }, [uiPhase]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { store.setGameSpeed(gameSpeed) }, [gameSpeed]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { store.setBuyingPhase(buyingPhase) }, [buyingPhase]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { store.setBuyerOrder(buyerOrder) }, [buyerOrder]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { store.setBuyerStep(buyerStep) }, [buyerStep]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { store.setBuyingPassedPlayers(buyingPassedPlayers) }, [buyingPassedPlayers]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { store.setBuyingSnatcherName(buyingSnatcherName) }, [buyingSnatcherName]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { store.setBuyingDiscard(buyingDiscard) }, [buyingDiscard]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { store.setPendingBuyDiscard(pendingBuyDiscard) }, [pendingBuyDiscard]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { store.setFreeOfferDeclined(freeOfferDeclined) }, [freeOfferDeclined]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { store.setRoundResults(roundResults) }, [roundResults]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { store.setGoingOutSequence(goingOutSequence) }, [goingOutSequence]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { store.setGoOutPlayerName(goOutPlayerName) }, [goOutPlayerName]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Finish announcement: save leader, start deal animation, transition to game
   function finishAnnouncement(gs: GameState) {

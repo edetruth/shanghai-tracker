@@ -84,7 +84,7 @@ interface UseAIAutomationParams {
   // Buying cinematic setters
   setBuyingSnatcherName: (name: string | undefined) => void
   setBuyingPhase: (phase: BuyingPhase) => void
-  setBuyingPassedPlayers: React.Dispatch<React.SetStateAction<string[]>>
+  setBuyingPassedPlayers: (updater: string[] | ((prev: string[]) => string[])) => void
 }
 
 interface UseAIAutomationReturn {

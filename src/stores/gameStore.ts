@@ -53,10 +53,10 @@ interface GameStore {
   setGameState: (updater: GameState | ((prev: GameState) => GameState)) => void
   setUiPhase: (phase: UIPhase) => void
   setGameSpeed: (speed: GameSpeed) => void
-  setBuyingPhase: (phase: BuyingPhase) => void
+  setBuyingPhase: (updater: BuyingPhase | ((prev: BuyingPhase) => BuyingPhase)) => void
   setBuyerOrder: (order: number[]) => void
   setBuyerStep: (step: number) => void
-  setBuyingPassedPlayers: (players: string[]) => void
+  setBuyingPassedPlayers: (updater: string[] | ((prev: string[]) => string[])) => void
   setBuyingSnatcherName: (name: string | undefined) => void
   setBuyingDiscard: (card: Card | null) => void
   setPendingBuyDiscard: (card: Card | null) => void
@@ -118,10 +118,16 @@ export const useGameStore = create<GameStore>((set) => ({
     })),
   setUiPhase: (phase) => set({ uiPhase: phase }),
   setGameSpeed: (speed) => set({ gameSpeed: speed }),
-  setBuyingPhase: (phase) => set({ buyingPhase: phase }),
+  setBuyingPhase: (updater) =>
+    set((state) => ({
+      buyingPhase: typeof updater === 'function' ? updater(state.buyingPhase) : updater,
+    })),
   setBuyerOrder: (order) => set({ buyerOrder: order }),
   setBuyerStep: (step) => set({ buyerStep: step }),
-  setBuyingPassedPlayers: (players) => set({ buyingPassedPlayers: players }),
+  setBuyingPassedPlayers: (updater) =>
+    set((state) => ({
+      buyingPassedPlayers: typeof updater === 'function' ? updater(state.buyingPassedPlayers) : updater,
+    })),
   setBuyingSnatcherName: (name) => set({ buyingSnatcherName: name }),
   setBuyingDiscard: (card) => set({ buyingDiscard: card }),
   setPendingBuyDiscard: (card) => set({ pendingBuyDiscard: card }),
