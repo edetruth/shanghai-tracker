@@ -30,6 +30,7 @@ import { useGameAudio } from '../../hooks/useGameAudio'
 import { useGameAchievements } from '../../hooks/useGameAchievements'
 import { useActionLogger } from '../../hooks/useActionLogger'
 import { reportMatchResult, advanceWinner } from '../../lib/tournamentStore'
+import { useGameStore } from '../../stores/gameStore'
 
 interface Props {
   initialPlayers: PlayerConfig[]
@@ -332,6 +333,23 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const previousLeaderRef = useRef<string | null>(null)
   const countdownActiveRef = useRef(false)
   const previousStandingsPctRef = useRef<Map<string, number>>(new Map())
+
+  // ── Bridge: sync React state → Zustand store (removed in Phase 2) ────────
+  const store = useGameStore()
+  useEffect(() => { store.setGameState(gameState) }, [gameState]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { store.setUiPhase(uiPhase) }, [uiPhase]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { store.setGameSpeed(gameSpeed) }, [gameSpeed]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { store.setBuyingPhase(buyingPhase) }, [buyingPhase]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { store.setBuyerOrder(buyerOrder) }, [buyerOrder]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { store.setBuyerStep(buyerStep) }, [buyerStep]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { store.setBuyingPassedPlayers(buyingPassedPlayers) }, [buyingPassedPlayers]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { store.setBuyingSnatcherName(buyingSnatcherName) }, [buyingSnatcherName]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { store.setBuyingDiscard(buyingDiscard) }, [buyingDiscard]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { store.setPendingBuyDiscard(pendingBuyDiscard) }, [pendingBuyDiscard]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { store.setFreeOfferDeclined(freeOfferDeclined) }, [freeOfferDeclined]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { store.setRoundResults(roundResults) }, [roundResults]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { store.setGoingOutSequence(goingOutSequence) }, [goingOutSequence]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { store.setGoOutPlayerName(goOutPlayerName) }, [goOutPlayerName]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Finish announcement: save leader, start deal animation, transition to game
   function finishAnnouncement(gs: GameState) {
