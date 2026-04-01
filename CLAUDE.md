@@ -88,6 +88,9 @@ src/
         ├── GameSetup.tsx     # 2–8 players, Human/AI toggle per slot, name autocomplete, difficulty selector
         ├── GameBoard.tsx     # Main game board orchestrator — delegates to hooks for AI, multiplayer, audio, achievements, logging
         ├── TopBar.tsx        # Zone 1: round badge, requirement, pause button, emote bar, connection indicator
+        ├── PileArea.tsx      # Zone 3: draw/discard piles with stacked depth, active states, labels
+        ├── ActionBar.tsx     # Zone 5: action buttons, undo toasts, joker prompt, stuck state
+        ├── PauseMenu.tsx     # Pause modal: game speed, animations toggle, volume, resume/exit
         ├── GameOver.tsx      # End-of-game results + auto-save badge
         ├── GameToast.tsx     # Queued toast overlay: 5 styles (celebration/pressure/neutral/drama/taunt)
         ├── Card.tsx          # Card component: suit tints, haptic on tap, shimmer/edgeGlow/buyRelevance props
