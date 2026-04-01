@@ -15,18 +15,20 @@ import MeldBuilder, { type MeldBuilderHandle } from './MeldBuilder'
 // MeldModal replaced by inline MeldBuilder; LayOffModal removed — lay-offs happen inline via TableMelds
 import RoundSummary from './RoundSummary'
 import GameOver from './GameOver'
-import HandDisplay from './HandDisplay'
 import TableMelds from './TableMelds'
 // CardComponent moved to PileArea
 import BuyingCinematic, { BuyBottomSheet, FreeTakeBottomSheet, type BuyingPhase } from './BuyingCinematic'
 import GameToast, { type QueuedToast } from './GameToast'
 import RoundAnnouncement, { type AnnouncementStage } from './RoundAnnouncement'
 import { useMultiplayerSync } from '../../hooks/useMultiplayerSync'
-import EmoteBubble from './EmoteBubble'
+// EmoteBubble moved to OpponentStrip
 import TopBar from './TopBar'
 import PauseMenu from './PauseMenu'
 import PileArea from './PileArea'
 import ActionBar from './ActionBar'
+import OpponentStrip from './OpponentStrip'
+import HandArea from './HandArea'
+import CinematicOverlays from './CinematicOverlays'
 import { loadOpponentModel, saveOpponentModel, updateOpponentModel } from '../../game/opponent-model'
 import { useAIAutomation } from '../../hooks/useAIAutomation'
 import { useGameAudio } from '../../hooks/useGameAudio'
@@ -2598,62 +2600,18 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         @keyframes turnBannerOut{0%{opacity:1}100%{opacity:0}}
       `}</style>
 
-      {/* Dark beat overlay — briefly flashes black on round end */}
-      {showDarkBeat && (
-        <div
-          className="fixed inset-0 z-40 bg-black"
-          style={{ animation: 'fade-in-black 500ms ease both' }}
-        />
-      )}
-
-      {/* Rotating race commentary — moved to inline position, rendered between Zone 2 and Zone 3 below */}
-
-      {/* Turn banner — non-blocking overlay for solo-human games */}
-      {turnBanner && (
-        <div style={{
-          position: 'absolute',
-          top: 'max(52px, calc(env(safe-area-inset-top) + 44px))',
-          left: 0, right: 0,
-          zIndex: 40,
-          display: 'flex',
-          justifyContent: 'center',
-          pointerEvents: 'none',
-          animation: 'turnBannerIn 0.3s ease-out',
-        }}>
-          <div style={{
-            background: 'linear-gradient(135deg, #e2b858, #d4a843)',
-            color: '#2c1810',
-            padding: '8px 24px',
-            borderRadius: 12,
-            fontSize: 14,
-            fontWeight: 700,
-            boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
-          }}>
-            {turnBanner}
-          </div>
-        </div>
-      )}
+      <CinematicOverlays
+        goingOutSequence={goingOutSequence}
+        goOutPlayerName={goOutPlayerName}
+        showDarkBeat={showDarkBeat}
+        turnBanner={turnBanner}
+        swapAnim={swapAnim}
+        flyingCard={flyingCard}
+        flyingCardDuration={currentPlayer.isAI ? 200 : 500}
+      />
 
       {/* Game-feel toast overlay */}
       <GameToast toast={activeToast} />
-
-      {/* Going-out cinematic overlay */}
-      {goingOutSequence !== 'idle' && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-          {goingOutSequence === 'flash' && (
-            <div className="absolute inset-0 bg-white" style={{ animation: 'go-impact-flash 400ms ease-out forwards' }} />
-          )}
-          {goingOutSequence === 'announce' && (
-            <>
-              <div className="absolute inset-0 bg-black/40" style={{ animation: 'go-backdrop-fade 300ms ease-out forwards' }} />
-              <div className="z-10 text-center" style={{ animation: 'slam-in 400ms ease-out' }}>
-                <p className="text-4xl font-black text-[#e2b858] m-0" style={{ textShadow: '0 2px 16px rgba(226,184,88,0.5)' }}>{goOutPlayerName}</p>
-                <p className="text-xl font-bold text-white mt-2 m-0">GOES OUT!</p>
-              </div>
-            </>
-          )}
-        </div>
-      )}
 
       {/* ── ZONE 1: Fixed top — top bar + collapsible opponent strip ─── */}
       <div
@@ -2672,149 +2630,16 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           connectedPlayerCount={mpChannel.connectedPlayerCount}
         />
 
-        {/* Compressed opponent strip — single-line ticker, tap to expand */}
-        <div
-          onClick={() => setStripExpanded(!stripExpanded)}
-          style={{ cursor: 'pointer', userSelect: 'none' }}
-        >
-          {!stripExpanded ? (
-            /* ── Collapsed: compact single-line view ── */
-            <div
-              className="flex items-center gap-1 px-3 py-1.5"
-              style={{ overflowX: 'auto', scrollbarWidth: 'none', flexWrap: 'nowrap' }}
-            >
-              {(() => {
-                const isCompact = gameState.players.length >= 5
-                return gameState.players.map((p, i) => {
-                const total = p.roundScores.reduce((s, n) => s + n, 0)
-                const isMe = p.id === displayPlayer.id
-                const isActiveTurn = p.id === currentPlayer.id
-                const isBuyingNow = uiPhase === 'buying' && activeBuyer?.id === p.id
-                const displayName = isMe && !p.isAI
-                  ? 'You'
-                  : isCompact && !isActiveTurn
-                    ? p.name.split(' ')[0].slice(0, 3)
-                    : p.name.split(' ')[0]
-                return (
-                  <span key={p.id} style={{
-                    display: 'inline-flex', alignItems: 'center', flexShrink: 0,
-                    borderLeft: isActiveTurn ? '3px solid #e2b858' : '3px solid transparent',
-                    paddingLeft: isActiveTurn ? 4 : 0,
-                    transition: 'border-color 200ms ease, padding-left 200ms ease',
-                  }}>
-                    {i > 0 && <span style={{ color: '#2d5a3a', margin: '0 5px', fontSize: 10 }}>·</span>}
-                    {/* Meld dot */}
-                    <span style={{
-                      width: 5, height: 5, borderRadius: '50%', display: 'inline-block', marginRight: 3, flexShrink: 0,
-                      background: p.hasLaidDown ? '#6aad7a' : '#2d5a3a',
-                    }} />
-                    <span style={{
-                      color: isMe ? '#e2b858' : isActiveTurn ? '#ffffff' : '#a8d0a8',
-                      fontSize: isCompact ? 10 : 11, fontWeight: isMe || isActiveTurn ? 700 : 500,
-                      maxWidth: isCompact ? 36 : 52, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>
-                      {displayName}{p.isAI ? '🤖' : ''}
-                    </span>
-                    {(!isCompact || isActiveTurn) && (
-                      <span style={{ color: '#6aad7a', fontSize: 10, fontFamily: 'monospace', fontWeight: 700, marginLeft: 3 }}>
-                        {total}
-                      </span>
-                    )}
-                    <span key={p.hand.length} style={{ color: '#a8d0a8', fontSize: 10, marginLeft: 2, animation: 'number-roll 300ms ease-out' }}>
-                      🃏{p.hand.length}
-                    </span>
-                    {isBuyingNow && !isMe && (
-                      <span style={{ color: '#e2b858', fontSize: 9, marginLeft: 2, fontWeight: 700 }}>BUY</span>
-                    )}
-                  </span>
-                )
-              })
-              })()}
-              {/* Expand chevron */}
-              <span style={{ color: '#6aad7a', fontSize: 10, marginLeft: 'auto', paddingLeft: 6, flexShrink: 0 }}>▼</span>
-            </div>
-          ) : (
-            /* ── Expanded: full detail cards ── */
-            <>
-              <div
-                className="flex gap-2 px-3 py-2"
-                style={{ overflowX: 'auto', overflowY: 'hidden', flexWrap: 'nowrap', scrollbarWidth: 'none' }}
-              >
-                {gameState.players.map(p => {
-                  const total = p.roundScores.reduce((s, n) => s + n, 0)
-                  const isBuyingNow = uiPhase === 'buying' && activeBuyer?.id === p.id
-                  const isMe = p.id === displayPlayer.id
-                  const isActiveTurn = p.id === currentPlayer.id
-                  const borderColor = isMe
-                    ? '#e2b858'
-                    : isBuyingNow
-                      ? '#e2b858'
-                      : isActiveTurn
-                        ? '#4a7a5a'
-                        : '#2d5a3a'
-                  const playerSeatIdx = gameState.players.indexOf(p)
-                  return (
-                    <div
-                      key={p.id}
-                      className={isBuyingNow && !isMe ? 'animate-pulse' : ''}
-                      style={{
-                        flexShrink: 0,
-                        background: isActiveTurn ? '#1e4a2e' : (isMe ? '#1e3010' : '#0f2218'),
-                        border: `1px solid ${borderColor}`,
-                        borderLeft: isActiveTurn ? '3px solid #e2b858' : `1px solid ${borderColor}`,
-                        borderRadius: 10,
-                        padding: '6px 8px',
-                        minWidth: 68,
-                        transition: 'all 200ms ease',
-                        position: 'relative' as const,
-                      }}
-                    >
-                      {activeEmotes.has(playerSeatIdx) && (
-                        <EmoteBubble emoji={activeEmotes.get(playerSeatIdx)!} onDone={() => {}} />
-                      )}
-                      <div className="flex items-center gap-1 mb-0.5">
-                        <div style={{
-                          width: 6, height: 6, borderRadius: '50%', flexShrink: 0,
-                          background: p.hasLaidDown ? '#6aad7a' : '#2d5a3a',
-                        }} />
-                        <p style={{
-                          color: isMe ? '#e2b858' : '#a8d0a8', fontSize: 11, fontWeight: 500,
-                          maxWidth: 56, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        }}>
-                          {isMe && !p.isAI ? 'You' : `${p.name.split(' ')[0]}${p.isAI ? ' 🤖' : ''}`}
-                        </p>
-                        {p.hasLaidDown && (
-                          <span style={{ color: '#6aad7a', fontSize: 8, fontWeight: 700, marginLeft: 2 }}>DOWN</span>
-                        )}
-                      </div>
-                      {isActiveTurn && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginBottom: 2 }}>
-                          <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#e2b858', flexShrink: 0 }} />
-                          <p style={{ color: '#e2b858', fontSize: 9, fontWeight: 700, margin: 0 }}>
-                            {p.isAI ? `${p.name.split(' ')[0]}'s turn` : 'your turn'}
-                          </p>
-                        </div>
-                      )}
-                      <p style={{ color: '#6aad7a', fontSize: 10, fontFamily: 'monospace', fontWeight: 700 }}>
-                        {total} pts
-                      </p>
-                      <p key={p.hand.length} style={{ color: '#a8d0a8', fontSize: 10, animation: 'number-roll 300ms ease-out' }}>🃏 {p.hand.length}</p>
-                      {(uiPhase === 'buying' || p.buysRemaining === 0) && (
-                        <p style={{ color: p.buysRemaining === 0 ? '#f87171' : '#6aad7a', fontSize: 10, fontWeight: 600 }}>
-                          {p.buysRemaining}🛒
-                        </p>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-              {/* Collapse chevron */}
-              <div style={{ textAlign: 'center', paddingBottom: 2 }}>
-                <span style={{ color: '#6aad7a', fontSize: 10 }}>▲ tap to collapse</span>
-              </div>
-            </>
-          )}
-        </div>
+        <OpponentStrip
+          players={gameState.players}
+          currentPlayerId={currentPlayer.id}
+          displayPlayerId={displayPlayer.id}
+          uiPhase={uiPhase}
+          activeBuyerId={activeBuyer?.id}
+          expanded={stripExpanded}
+          onToggle={() => setStripExpanded(!stripExpanded)}
+          activeEmotes={activeEmotes}
+        />
       </div>
 
       {/* Phase indicator */}
@@ -3019,79 +2844,32 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       >
         {/* Buy prompt area removed — replaced by BuyingCinematic overlay */}
 
-        {/* Buy-window match label */}
-        {buyRelevanceMap && buyingPhase !== 'hidden' && (
-          <p className="text-center text-xs font-semibold mb-1" style={{
-            color: buyMatchLabel === 'match' ? '#6aad7a' : '#8b7355',
-            margin: 0, paddingBottom: 4,
-          }}>
-            {buyMatchLabel === 'match' ? 'Fits your hand' : 'No match in hand'}
-          </p>
-        )}
-
-        {/* Perfect Draw: "Ready to lay down!" indicator */}
-        {perfectDrawActive && (
-          <p className="text-center text-xs font-semibold mb-1"
-             style={{ color: '#e2b858', animation: 'fade-in-out 3s ease both' }}>
-            Ready to lay down!
-          </p>
-        )}
-
-        {/* Player hand — sort toggle + fan layout */}
-        <div ref={handAreaRef} style={{
-          position: 'relative',
-          border: yourTurnPulse ? '2px solid transparent' : '2px solid transparent',
-          borderRadius: 8,
-          animation: yourTurnPulse ? 'your-turn-pulse 1s ease-in-out 2' : 'none',
-        }}>
-        {isOnTheEdge && (
-          <div className="absolute inset-0 pointer-events-none rounded-xl"
-            style={{
-              background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.15) 100%)',
-              zIndex: 50,
-            }}
-          />
-        )}
-        {!displayPlayer.isAI ? (
-          <HandDisplay
-            cards={displayPlayer.hand}
-            selectedIds={selectedCardIds}
-            selectionOrder={selectedCardOrderRef.current}
-            onToggle={toggleCard}
-            label={`${isHumanBuyerTurn ? displayPlayer.name + "'s " : 'Your '}hand (${displayPlayer.hand.length} cards) · ${displayPlayer.hand.reduce((sum, c) => sum + cardPoints(c.rank), 0)} pts`}
-            disabled={false}
-            sortMode={handSort}
-            onSortChange={setHandSort}
-            newCardId={[...newCardIds][0]}
-            shimmerCardId={shimmerCardId}
-            dealAnimation={showDealAnimation}
-            leavingCardId={leavingCardId}
-            dealFlipPhase={dealFlipPhase}
-            edgeGlow={isOnTheEdge}
-            buyRelevanceMap={buyRelevanceMap}
-            compact={buyingPhase === 'human-turn' || buyingPhase === 'free-offer'}
-            ghostedIds={showMeldModal ? meldAssignedIds : undefined}
-            drawSlideCardId={lastDrawnCardId}
-          />
-        ) : aiTurnHumanViewer ? (
-          <HandDisplay
-            cards={aiTurnHumanViewer.hand}
-            selectedIds={new Set()}
-            onToggle={() => {}}
-            label={`${aiTurnHumanViewer.name}'s hand (${aiTurnHumanViewer.hand.length} cards) — planning`}
-            disabled={false}
-            sortMode={handSort}
-            onSortChange={setHandSort}
-            dealAnimation={showDealAnimation}
-            dealFlipPhase={dealFlipPhase}
-          />
-        ) : null}
-        </div>
-        {currentPlayer.hand.length === 1 && currentPlayer.hasLaidDown && !currentPlayer.isAI && (
-          <p className="text-center text-[10px] text-[#e2b858] font-semibold mt-1">
-            Final card — lay it off to go out
-          </p>
-        )}
+        <HandArea
+          ref={handAreaRef}
+          displayPlayer={displayPlayer}
+          isHumanBuyerTurn={isHumanBuyerTurn}
+          aiTurnHumanViewer={aiTurnHumanViewer}
+          currentPlayer={currentPlayer}
+          selectedCardIds={selectedCardIds}
+          selectionOrder={selectedCardOrderRef.current}
+          onToggle={toggleCard}
+          handSort={handSort}
+          onSortChange={setHandSort}
+          newCardIds={newCardIds}
+          shimmerCardId={shimmerCardId}
+          showDealAnimation={showDealAnimation}
+          leavingCardId={leavingCardId}
+          dealFlipPhase={dealFlipPhase}
+          isOnTheEdge={isOnTheEdge}
+          buyRelevanceMap={buyRelevanceMap}
+          buyMatchLabel={buyMatchLabel}
+          buyingPhase={buyingPhase}
+          showMeldModal={showMeldModal}
+          meldAssignedIds={meldAssignedIds}
+          lastDrawnCardId={lastDrawnCardId}
+          yourTurnPulse={yourTurnPulse}
+          perfectDrawActive={perfectDrawActive}
+        />
 
         <ActionBar
           uiPhase={uiPhase}
@@ -3191,41 +2969,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         />
       )}
 
-      {/* Joker swap "The Exchange" cinematic overlay */}
-      {swapAnim && (
-        <div className="fixed inset-0 z-[150] pointer-events-none flex items-center justify-center">
-          {/* Center burst glow */}
-          <div style={{
-            position: 'absolute', width: 96, height: 96, borderRadius: '50%',
-            background: swapAnim.isHeist
-              ? 'radial-gradient(circle, rgba(248,113,113,0.5) 0%, rgba(226,184,88,0.3) 50%, transparent 70%)'
-              : 'radial-gradient(circle, rgba(226,184,88,0.6) 0%, rgba(226,184,88,0.2) 50%, transparent 70%)',
-            animation: 'swap-burst 850ms ease-out forwards',
-          }} />
-
-          {/* Label */}
-          <div style={{
-            position: 'absolute', top: 'calc(50% + 56px)',
-            color: swapAnim.isHeist ? '#f87171' : '#e2b858',
-            fontSize: 13, fontWeight: 800, letterSpacing: '0.05em',
-            textShadow: '0 1px 6px rgba(0,0,0,0.8)',
-            animation: 'swap-label 850ms ease-out forwards',
-          }}>
-            {swapAnim.isHeist ? '⚡ THE HEIST' : '♻ JOKER FREE'}
-          </div>
-
-          {/* Natural card: enters bottom-right, exits top-left */}
-          <div style={{ position: 'absolute', animation: 'swap-natural 850ms ease-in-out forwards' }}>
-            <SwapCard card={swapAnim.natural} />
-          </div>
-
-          {/* Joker card: enters top-left, exits bottom-right */}
-          <div style={{ position: 'absolute', animation: 'swap-joker 850ms ease-in-out forwards' }}>
-            <SwapCard card={swapAnim.joker} />
-          </div>
-        </div>
-      )}
-
       {/* Cinematic buying window overlay */}
       <BuyingCinematic
         phase={buyingPhase}
@@ -3248,69 +2991,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         onPass={buyingPhase === 'free-offer' ? handleCinematicFreeOfferDecline : handleCinematicPass}
       />
 
-      {/* Flying card animation overlay */}
-      {flyingCard && (
-        <div
-          className="fixed z-[100] pointer-events-none"
-          style={{
-            left: flyingCard.from.x - 24,
-            top: flyingCard.from.y,
-            width: 48,
-            height: 68,
-            willChange: 'transform',
-            animation: `fly-card ${currentPlayer.isAI ? 200 : 500}ms ease-out forwards`,
-            '--fly-to-x': `${flyingCard.to.x - flyingCard.from.x}px`,
-            '--fly-to-y': `${flyingCard.to.y - flyingCard.from.y}px`,
-          } as React.CSSProperties}
-        >
-          {flyingCard.faceDown ? (
-            <div className="w-full h-full rounded-lg bg-[#2d5a3c] border-2 border-[#e2b858]" />
-          ) : flyingCard.card ? (
-            <div className="w-full h-full rounded-lg overflow-hidden" style={{ backgroundColor: '#fff', border: '1.5px solid #e2ddd2' }}>
-              <div className="text-center pt-1 text-xs font-bold" style={{ color: flyingCard.card.suit === 'hearts' || flyingCard.card.suit === 'diamonds' ? '#c0393b' : '#2c1810' }}>
-                {flyingCard.card.rank === 0 ? 'JKR' : flyingCard.card.rank === 1 ? 'A' : flyingCard.card.rank === 11 ? 'J' : flyingCard.card.rank === 12 ? 'Q' : flyingCard.card.rank === 13 ? 'K' : flyingCard.card.rank}
-              </div>
-            </div>
-          ) : null}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// Large card face used in the joker swap cinematic overlay
-function SwapCard({ card }: { card: CardType }) {
-  const isJoker = card.suit === 'joker'
-  const rank = card.rank === 0 ? 'JKR' : card.rank === 1 ? 'A' : card.rank === 11 ? 'J' : card.rank === 12 ? 'Q' : card.rank === 13 ? 'K' : String(card.rank)
-  const symbol = card.suit === 'hearts' ? '♥' : card.suit === 'diamonds' ? '♦' : card.suit === 'clubs' ? '♣' : card.suit === 'spades' ? '♠' : ''
-  const bg = isJoker ? 'linear-gradient(135deg, #f5e6a3, #e2b858 50%, #c9952c)' :
-    card.suit === 'hearts' ? '#fff0f0' : card.suit === 'diamonds' ? '#f0f5ff' :
-    card.suit === 'clubs' ? '#e0f7e8' : '#eeecff'
-  const color = isJoker ? '#6b4c1e' : card.suit === 'hearts' ? '#c0393b' : card.suit === 'diamonds' ? '#2158b8' : card.suit === 'clubs' ? '#1a6b3a' : '#3d2b8e'
-  const border = isJoker ? '2px solid #c9952c' : '1.5px solid rgba(0,0,0,0.12)'
-
-  return (
-    <div style={{
-      width: 68, height: 100, borderRadius: 10,
-      background: bg, border,
-      boxShadow: isJoker
-        ? '0 4px 20px rgba(226,184,88,0.7), 0 2px 8px rgba(0,0,0,0.4)'
-        : '0 4px 20px rgba(0,0,0,0.35)',
-      display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      gap: 2,
-    }}>
-      {isJoker ? (
-        <>
-          <span style={{ fontSize: 28, lineHeight: 1 }}>👑</span>
-          <span style={{ fontSize: 9, fontWeight: 900, color, letterSpacing: '0.08em' }}>JOKER</span>
-        </>
-      ) : (
-        <>
-          <span style={{ fontSize: 26, fontWeight: 900, color, lineHeight: 1 }}>{rank}</span>
-          <span style={{ fontSize: 22, color, lineHeight: 1 }}>{symbol}</span>
-        </>
-      )}
     </div>
   )
 }
