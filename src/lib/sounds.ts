@@ -43,10 +43,18 @@ function ensureContext(): AudioContext {
   return audioCtx
 }
 
+/** Call this from any user interaction (click/tap) to ensure iOS audio works */
+export function initAudioOnInteraction(): void {
+  ensureContext()
+}
+
 async function loadBuffer(name: string): Promise<AudioBuffer | null> {
   if (bufferCache.has(name)) return bufferCache.get(name)!
+  // Don't create AudioContext outside user gesture — iOS requires it within a tap/click handler.
+  // If context doesn't exist yet, skip preloading; playSound() will create it on first user interaction.
+  if (!audioCtx) return null
   try {
-    const ctx = ensureContext()
+    const ctx = audioCtx
     // Try .wav first (higher quality), fall back to .mp3
     let response = await fetch(`/sounds/${name}.wav`)
     if (!response.ok) response = await fetch(`/sounds/${name}.mp3`)

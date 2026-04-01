@@ -2601,7 +2601,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         // Update opponent models for The Nemesis AI — load action log and learn patterns
         gameState.players.forEach((player, idx) => {
           if (player.isAI) return
-          // Async: load action log (may not be fully written yet), then update model
+          // Delay to let fire-and-forget log writes flush to Supabase
+          setTimeout(() => {
           loadActionLog(gameLogId).then(log => {
             try {
               updateOpponentModel(player.name, idx, log, gameState.currentRound)
@@ -2625,6 +2626,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
               }
             } catch { /* silent */ }
           })
+          }, 3000) // 3 second delay for writes to flush
         })
         // Check achievements at game end
         setTimeout(() => checkAndShowAchievements(true), 200)

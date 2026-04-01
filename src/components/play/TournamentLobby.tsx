@@ -36,6 +36,23 @@ export default function TournamentLobby({ mode, hostName, onMatchStart, onBack }
 
   const myName = mode === 'create' ? hostName : playerName
 
+  // Persist player list to sessionStorage for recovery
+  useEffect(() => {
+    if (code && players.length > 0) {
+      sessionStorage.setItem(`tournament_players_${code}`, JSON.stringify(players))
+    }
+  }, [code, players])
+
+  // Recover player list on mount
+  useEffect(() => {
+    if (code) {
+      const saved = sessionStorage.getItem(`tournament_players_${code}`)
+      if (saved) {
+        try { setPlayers(JSON.parse(saved)) } catch { /* ignore */ }
+      }
+    }
+  }, [code])
+
   // Set up broadcast channel for player list when we have a code
   useEffect(() => {
     if (!code) return
