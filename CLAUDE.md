@@ -9,6 +9,7 @@ Progressive Web App (PWA) for playing and tracking Shanghai Rummy card games. Mo
 - **React 18** + **TypeScript 5** — UI layer
 - **Vite 5** — build tool, dev server, PWA plugin
 - **Tailwind CSS 3** — utility-first styling with warm cream/gold light theme
+- **Zustand 5** — game state management (core game state in store, UI state in React)
 - **Supabase JS 2** — PostgreSQL backend, real-time subscriptions
 - **Recharts** — score trend line charts
 - **XLSX** — Excel/CSV import and export
@@ -57,6 +58,8 @@ src/
 │   ├── useGameLobby.ts       # Lobby state management: join/leave, ready-up, AI slot control
 │   ├── useHeartbeat.ts      # Connection heartbeat system — send/receive, detect disconnections
 │   └── useActionAck.ts      # Action acknowledgment system — pending state, timeout retries
+├── stores/
+│   └── gameStore.ts         # Zustand store — core game state (gameState, uiPhase, buying, round flow)
 ├── hooks/
 │   ├── useRealtimeScores.ts   # Supabase Realtime subscriptions for score tracker multiplayer
 │   ├── useTournamentChannel.ts # Supabase Realtime subscription for live tournament bracket updates
@@ -307,10 +310,10 @@ Warm cream theme (not dark table). Uses `safe-top` for header padding.
 
 ## Key Conventions
 
-- **State lives in `App.tsx`** — no Context or Redux. Components receive props.
+- **App state lives in `App.tsx`** — no Context. Components receive props.
+- **Play mode state** uses **Zustand** (`src/stores/gameStore.ts`). Core game state (gameState, uiPhase, buying state, round flow) lives in the store. UI-only state (selection, modals, animations) remains in GameBoard useState. Hooks (`useMultiplayerSync`, `useAIAutomation`, etc.) can read/write the store directly.
 - **`section`** drives top-level navigation: `'home' | 'play' | 'scoretracker' | 'stats' | 'analytics'`
 - **`scoreTrackerState`** drives the score tracker sub-machine: `'list' | 'setup' | 'playing' | 'summary' | 'joining'`
-- **Play mode state** is self-contained in `GameBoard` — does not touch App.tsx.
 - **Player colors** are assigned deterministically from `PLAYER_COLORS` in constants.
 - **Room codes** use format `SHNG-XXXX` (4 random uppercase chars).
 - **Winner** = player with the lowest total score (`computeWinner()` in gameStore.ts).
