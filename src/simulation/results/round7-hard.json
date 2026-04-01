@@ -7,12 +7,12 @@
       "AI 3",
       "AI 4"
     ],
-    "winner": "AI 1",
+    "winner": "AI 4",
     "finalScores": [
-      0,
-      15,
-      130,
-      90
+      110,
+      135,
+      100,
+      0
     ],
     "rounds": [
       {
@@ -90,80 +90,81 @@
       {
         "roundNumber": 7,
         "requirement": "3 Runs",
-        "wentOut": "AI 1",
-        "turnsInRound": 56,
+        "wentOut": "AI 4",
+        "turnsInRound": 79,
         "shanghaiVictims": [
-          "AI 3",
-          "AI 4"
+          "AI 1",
+          "AI 2",
+          "AI 3"
         ],
         "scores": {
-          "AI 1": 0,
-          "AI 2": 15,
-          "AI 3": 130,
-          "AI 4": 90
+          "AI 1": 110,
+          "AI 2": 135,
+          "AI 3": 100,
+          "AI 4": 0
         },
         "playerStats": {
           "AI 1": {
-            "drewFromDiscard": 4,
-            "drewFromPile": 10,
+            "drewFromDiscard": 10,
+            "drewFromPile": 9,
             "buysMade": 2,
-            "buysOffered": 24,
-            "turnLaidDown": 44,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 2,
-            "jokerSwaps": 0,
-            "finalHandSize": 0,
-            "finalHandValue": 0,
-            "wasShanghaied": false
-          },
-          "AI 2": {
-            "drewFromDiscard": 8,
-            "drewFromPile": 6,
-            "buysMade": 3,
-            "buysOffered": 28,
-            "turnLaidDown": 45,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 1,
-            "finalHandSize": 3,
-            "finalHandValue": 15,
-            "wasShanghaied": false
-          },
-          "AI 3": {
-            "drewFromDiscard": 4,
-            "drewFromPile": 10,
-            "buysMade": 1,
-            "buysOffered": 24,
+            "buysOffered": 35,
             "turnLaidDown": 0,
             "meldsLaidDown": 0,
             "cardsLaidOff": 0,
             "jokerSwaps": 0,
-            "finalHandSize": 14,
-            "finalHandValue": 130,
+            "finalHandSize": 16,
+            "finalHandValue": 110,
+            "wasShanghaied": true
+          },
+          "AI 2": {
+            "drewFromDiscard": 10,
+            "drewFromPile": 10,
+            "buysMade": 2,
+            "buysOffered": 34,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 16,
+            "finalHandValue": 135,
+            "wasShanghaied": true
+          },
+          "AI 3": {
+            "drewFromDiscard": 10,
+            "drewFromPile": 10,
+            "buysMade": 0,
+            "buysOffered": 32,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 12,
+            "finalHandValue": 100,
             "wasShanghaied": true
           },
           "AI 4": {
-            "drewFromDiscard": 4,
-            "drewFromPile": 10,
-            "buysMade": 1,
-            "buysOffered": 24,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 14,
-            "finalHandValue": 90,
-            "wasShanghaied": true
+            "drewFromDiscard": 3,
+            "drewFromPile": 17,
+            "buysMade": 2,
+            "buysOffered": 27,
+            "turnLaidDown": 23,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 2,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
           }
         },
         "stalemate": false,
-        "jokersDealt": 1,
+        "jokersDealt": 2,
         "jokersStuckInHand": 1
       }
     ],
-    "totalTurns": 56,
-    "totalBuys": 7,
-    "duration": 56,
+    "totalTurns": 79,
+    "totalBuys": 6,
+    "duration": 75,
     "playerPersonalities": [
       "the-shark",
       "the-shark",
@@ -179,12 +180,12 @@
       "AI 3",
       "AI 4"
     ],
-    "winner": "AI 4",
+    "winner": "AI 3",
     "finalScores": [
-      185,
-      40,
       15,
-      0
+      10,
+      0,
+      135
     ],
     "rounds": [
       {
@@ -262,79 +263,79 @@
       {
         "roundNumber": 7,
         "requirement": "3 Runs",
-        "wentOut": "AI 4",
-        "turnsInRound": 119,
+        "wentOut": "AI 3",
+        "turnsInRound": 82,
         "shanghaiVictims": [
-          "AI 1"
+          "AI 4"
         ],
         "scores": {
-          "AI 1": 185,
-          "AI 2": 40,
-          "AI 3": 15,
-          "AI 4": 0
+          "AI 1": 15,
+          "AI 2": 10,
+          "AI 3": 0,
+          "AI 4": 135
         },
         "playerStats": {
           "AI 1": {
-            "drewFromDiscard": 13,
+            "drewFromDiscard": 10,
+            "drewFromPile": 10,
+            "buysMade": 3,
+            "buysOffered": 33,
+            "turnLaidDown": 80,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 2,
+            "finalHandValue": 15,
+            "wasShanghaied": false
+          },
+          "AI 2": {
+            "drewFromDiscard": 9,
+            "drewFromPile": 12,
+            "buysMade": 2,
+            "buysOffered": 32,
+            "turnLaidDown": 73,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          },
+          "AI 3": {
+            "drewFromDiscard": 5,
             "drewFromPile": 16,
             "buysMade": 4,
-            "buysOffered": 47,
+            "buysOffered": 29,
+            "turnLaidDown": 30,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 3,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          },
+          "AI 4": {
+            "drewFromDiscard": 11,
+            "drewFromPile": 9,
+            "buysMade": 2,
+            "buysOffered": 34,
             "turnLaidDown": 0,
             "meldsLaidDown": 0,
             "cardsLaidOff": 0,
             "jokerSwaps": 0,
-            "finalHandSize": 20,
-            "finalHandValue": 185,
+            "finalHandSize": 16,
+            "finalHandValue": 135,
             "wasShanghaied": true
-          },
-          "AI 2": {
-            "drewFromDiscard": 14,
-            "drewFromPile": 16,
-            "buysMade": 5,
-            "buysOffered": 13,
-            "turnLaidDown": 117,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 1,
-            "finalHandSize": 6,
-            "finalHandValue": 40,
-            "wasShanghaied": false
-          },
-          "AI 3": {
-            "drewFromDiscard": 11,
-            "drewFromPile": 19,
-            "buysMade": 4,
-            "buysOffered": 44,
-            "turnLaidDown": 118,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 1,
-            "finalHandSize": 3,
-            "finalHandValue": 15,
-            "wasShanghaied": false
-          },
-          "AI 4": {
-            "drewFromDiscard": 13,
-            "drewFromPile": 17,
-            "buysMade": 5,
-            "buysOffered": 17,
-            "turnLaidDown": 71,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 5,
-            "jokerSwaps": 2,
-            "finalHandSize": 0,
-            "finalHandValue": 0,
-            "wasShanghaied": false
           }
         },
         "stalemate": false,
         "jokersDealt": 2,
-        "jokersStuckInHand": 1
+        "jokersStuckInHand": 0
       }
     ],
-    "totalTurns": 119,
-    "totalBuys": 18,
-    "duration": 237,
+    "totalTurns": 82,
+    "totalBuys": 11,
+    "duration": 83,
     "playerPersonalities": [
       "the-shark",
       "the-shark",
@@ -350,12 +351,12 @@
       "AI 3",
       "AI 4"
     ],
-    "winner": "AI 4",
+    "winner": "AI 2",
     "finalScores": [
-      115,
-      25,
-      130,
-      0
+      10,
+      0,
+      5,
+      5
     ],
     "rounds": [
       {
@@ -433,80 +434,77 @@
       {
         "roundNumber": 7,
         "requirement": "3 Runs",
-        "wentOut": "AI 4",
-        "turnsInRound": 63,
-        "shanghaiVictims": [
-          "AI 1",
-          "AI 3"
-        ],
+        "wentOut": "AI 2",
+        "turnsInRound": 101,
+        "shanghaiVictims": [],
         "scores": {
-          "AI 1": 115,
-          "AI 2": 25,
-          "AI 3": 130,
-          "AI 4": 0
+          "AI 1": 10,
+          "AI 2": 0,
+          "AI 3": 5,
+          "AI 4": 5
         },
         "playerStats": {
           "AI 1": {
-            "drewFromDiscard": 4,
-            "drewFromPile": 11,
-            "buysMade": 3,
-            "buysOffered": 32,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 18,
-            "finalHandValue": 115,
-            "wasShanghaied": true
-          },
-          "AI 2": {
-            "drewFromDiscard": 7,
-            "drewFromPile": 9,
-            "buysMade": 3,
-            "buysOffered": 31,
-            "turnLaidDown": 49,
+            "drewFromDiscard": 5,
+            "drewFromPile": 20,
+            "buysMade": 4,
+            "buysOffered": 49,
+            "turnLaidDown": 84,
             "meldsLaidDown": 3,
             "cardsLaidOff": 0,
-            "jokerSwaps": 1,
-            "finalHandSize": 5,
-            "finalHandValue": 25,
+            "jokerSwaps": 0,
+            "finalHandSize": 1,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          },
+          "AI 2": {
+            "drewFromDiscard": 6,
+            "drewFromPile": 20,
+            "buysMade": 4,
+            "buysOffered": 49,
+            "turnLaidDown": 85,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 0,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
             "wasShanghaied": false
           },
           "AI 3": {
-            "drewFromDiscard": 7,
-            "drewFromPile": 9,
-            "buysMade": 2,
-            "buysOffered": 29,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
+            "drewFromDiscard": 6,
+            "drewFromPile": 19,
+            "buysMade": 3,
+            "buysOffered": 49,
+            "turnLaidDown": 86,
+            "meldsLaidDown": 3,
             "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 16,
-            "finalHandValue": 130,
-            "wasShanghaied": true
+            "jokerSwaps": 1,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
           },
           "AI 4": {
-            "drewFromDiscard": 2,
-            "drewFromPile": 14,
-            "buysMade": 2,
-            "buysOffered": 25,
-            "turnLaidDown": 47,
+            "drewFromDiscard": 9,
+            "drewFromPile": 16,
+            "buysMade": 3,
+            "buysOffered": 54,
+            "turnLaidDown": 87,
             "meldsLaidDown": 3,
-            "cardsLaidOff": 2,
-            "jokerSwaps": 1,
-            "finalHandSize": 0,
-            "finalHandValue": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 2,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
             "wasShanghaied": false
           }
         },
         "stalemate": false,
         "jokersDealt": 1,
-        "jokersStuckInHand": 1
+        "jokersStuckInHand": 0
       }
     ],
-    "totalTurns": 63,
-    "totalBuys": 10,
-    "duration": 74,
+    "totalTurns": 101,
+    "totalBuys": 14,
+    "duration": 197,
     "playerPersonalities": [
       "the-shark",
       "the-shark",
@@ -522,10 +520,183 @@
       "AI 3",
       "AI 4"
     ],
+    "winner": "AI 2",
+    "finalScores": [
+      110,
+      0,
+      140,
+      115
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "AI 2",
+        "turnsInRound": 61,
+        "shanghaiVictims": [
+          "AI 1",
+          "AI 3",
+          "AI 4"
+        ],
+        "scores": {
+          "AI 1": 110,
+          "AI 2": 0,
+          "AI 3": 140,
+          "AI 4": 115
+        },
+        "playerStats": {
+          "AI 1": {
+            "drewFromDiscard": 6,
+            "drewFromPile": 9,
+            "buysMade": 2,
+            "buysOffered": 27,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 16,
+            "finalHandValue": 110,
+            "wasShanghaied": true
+          },
+          "AI 2": {
+            "drewFromDiscard": 2,
+            "drewFromPile": 14,
+            "buysMade": 2,
+            "buysOffered": 23,
+            "turnLaidDown": 21,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 0,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          },
+          "AI 3": {
+            "drewFromDiscard": 7,
+            "drewFromPile": 8,
+            "buysMade": 3,
+            "buysOffered": 30,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 18,
+            "finalHandValue": 140,
+            "wasShanghaied": true
+          },
+          "AI 4": {
+            "drewFromDiscard": 6,
+            "drewFromPile": 9,
+            "buysMade": 2,
+            "buysOffered": 28,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 16,
+            "finalHandValue": 115,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 1
+      }
+    ],
+    "totalTurns": 61,
+    "totalBuys": 9,
+    "duration": 80,
+    "playerPersonalities": [
+      "the-shark",
+      "the-shark",
+      "the-shark",
+      "the-shark"
+    ]
+  },
+  {
+    "gameId": 5,
+    "players": [
+      "AI 1",
+      "AI 2",
+      "AI 3",
+      "AI 4"
+    ],
     "winner": "AI 3",
     "finalScores": [
-      10,
-      10,
+      40,
+      195,
       0,
       160
     ],
@@ -606,192 +777,50 @@
         "roundNumber": 7,
         "requirement": "3 Runs",
         "wentOut": "AI 3",
-        "turnsInRound": 90,
+        "turnsInRound": 66,
         "shanghaiVictims": [
+          "AI 2",
           "AI 4"
         ],
         "scores": {
-          "AI 1": 10,
-          "AI 2": 10,
+          "AI 1": 40,
+          "AI 2": 195,
           "AI 3": 0,
           "AI 4": 160
         },
         "playerStats": {
           "AI 1": {
-            "drewFromDiscard": 8,
-            "drewFromPile": 14,
-            "buysMade": 4,
-            "buysOffered": 43,
-            "turnLaidDown": 68,
+            "drewFromDiscard": 10,
+            "drewFromPile": 6,
+            "buysMade": 5,
+            "buysOffered": 12,
+            "turnLaidDown": 64,
             "meldsLaidDown": 3,
             "cardsLaidOff": 0,
             "jokerSwaps": 0,
-            "finalHandSize": 2,
-            "finalHandValue": 10,
+            "finalHandSize": 8,
+            "finalHandValue": 40,
             "wasShanghaied": false
           },
           "AI 2": {
-            "drewFromDiscard": 8,
-            "drewFromPile": 15,
-            "buysMade": 3,
-            "buysOffered": 41,
-            "turnLaidDown": 85,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 1,
-            "finalHandSize": 2,
-            "finalHandValue": 10,
-            "wasShanghaied": false
-          },
-          "AI 3": {
-            "drewFromDiscard": 3,
-            "drewFromPile": 20,
-            "buysMade": 3,
-            "buysOffered": 34,
-            "turnLaidDown": 30,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 2,
-            "jokerSwaps": 1,
-            "finalHandSize": 0,
-            "finalHandValue": 0,
-            "wasShanghaied": false
-          },
-          "AI 4": {
-            "drewFromDiscard": 11,
+            "drewFromDiscard": 6,
             "drewFromPile": 11,
-            "buysMade": 2,
-            "buysOffered": 43,
+            "buysMade": 4,
+            "buysOffered": 18,
             "turnLaidDown": 0,
             "meldsLaidDown": 0,
             "cardsLaidOff": 0,
             "jokerSwaps": 0,
-            "finalHandSize": 16,
-            "finalHandValue": 160,
+            "finalHandSize": 20,
+            "finalHandValue": 195,
             "wasShanghaied": true
-          }
-        },
-        "stalemate": false,
-        "jokersDealt": 2,
-        "jokersStuckInHand": 2
-      }
-    ],
-    "totalTurns": 90,
-    "totalBuys": 12,
-    "duration": 121,
-    "playerPersonalities": [
-      "the-shark",
-      "the-shark",
-      "the-shark",
-      "the-shark"
-    ]
-  },
-  {
-    "gameId": 5,
-    "players": [
-      "AI 1",
-      "AI 2",
-      "AI 3",
-      "AI 4"
-    ],
-    "winner": "AI 1",
-    "finalScores": [
-      0,
-      5,
-      5,
-      10
-    ],
-    "rounds": [
-      {
-        "roundNumber": 1,
-        "requirement": "2 Sets",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 2,
-        "requirement": "1 Set + 1 Run",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 3,
-        "requirement": "2 Runs",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 4,
-        "requirement": "3 Sets",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 5,
-        "requirement": "2 Sets + 1 Run",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 6,
-        "requirement": "1 Set + 2 Runs",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 7,
-        "requirement": "3 Runs",
-        "wentOut": "AI 1",
-        "turnsInRound": 84,
-        "shanghaiVictims": [],
-        "scores": {
-          "AI 1": 0,
-          "AI 2": 5,
-          "AI 3": 5,
-          "AI 4": 10
-        },
-        "playerStats": {
-          "AI 1": {
+          },
+          "AI 3": {
             "drewFromDiscard": 6,
-            "drewFromPile": 15,
-            "buysMade": 4,
-            "buysOffered": 32,
-            "turnLaidDown": 52,
+            "drewFromPile": 11,
+            "buysMade": 1,
+            "buysOffered": 16,
+            "turnLaidDown": 66,
             "meldsLaidDown": 3,
             "cardsLaidOff": 3,
             "jokerSwaps": 1,
@@ -799,44 +828,18 @@
             "finalHandValue": 0,
             "wasShanghaied": false
           },
-          "AI 2": {
-            "drewFromDiscard": 5,
-            "drewFromPile": 16,
-            "buysMade": 4,
-            "buysOffered": 32,
-            "turnLaidDown": 65,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 2,
-            "finalHandSize": 1,
-            "finalHandValue": 5,
-            "wasShanghaied": false
-          },
-          "AI 3": {
-            "drewFromDiscard": 11,
-            "drewFromPile": 10,
-            "buysMade": 4,
-            "buysOffered": 36,
-            "turnLaidDown": 74,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 1,
-            "finalHandSize": 1,
-            "finalHandValue": 5,
-            "wasShanghaied": false
-          },
           "AI 4": {
-            "drewFromDiscard": 10,
-            "drewFromPile": 11,
+            "drewFromDiscard": 9,
+            "drewFromPile": 7,
             "buysMade": 4,
-            "buysOffered": 36,
-            "turnLaidDown": 83,
-            "meldsLaidDown": 3,
+            "buysOffered": 26,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
             "cardsLaidOff": 0,
-            "jokerSwaps": 1,
-            "finalHandSize": 2,
-            "finalHandValue": 10,
-            "wasShanghaied": false
+            "jokerSwaps": 0,
+            "finalHandSize": 20,
+            "finalHandValue": 160,
+            "wasShanghaied": true
           }
         },
         "stalemate": false,
@@ -844,9 +847,9 @@
         "jokersStuckInHand": 0
       }
     ],
-    "totalTurns": 84,
-    "totalBuys": 16,
-    "duration": 119,
+    "totalTurns": 66,
+    "totalBuys": 14,
+    "duration": 95,
     "playerPersonalities": [
       "the-shark",
       "the-shark",
@@ -864,525 +867,8 @@
     ],
     "winner": "AI 2",
     "finalScores": [
-      15,
-      0,
-      190,
-      5
-    ],
-    "rounds": [
-      {
-        "roundNumber": 1,
-        "requirement": "2 Sets",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 2,
-        "requirement": "1 Set + 1 Run",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 3,
-        "requirement": "2 Runs",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 4,
-        "requirement": "3 Sets",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 5,
-        "requirement": "2 Sets + 1 Run",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 6,
-        "requirement": "1 Set + 2 Runs",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 7,
-        "requirement": "3 Runs",
-        "wentOut": "AI 2",
-        "turnsInRound": 65,
-        "shanghaiVictims": [
-          "AI 3"
-        ],
-        "scores": {
-          "AI 1": 15,
-          "AI 2": 0,
-          "AI 3": 190,
-          "AI 4": 5
-        },
-        "playerStats": {
-          "AI 1": {
-            "drewFromDiscard": 5,
-            "drewFromPile": 11,
-            "buysMade": 3,
-            "buysOffered": 29,
-            "turnLaidDown": 60,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 2,
-            "finalHandSize": 2,
-            "finalHandValue": 15,
-            "wasShanghaied": false
-          },
-          "AI 2": {
-            "drewFromDiscard": 1,
-            "drewFromPile": 16,
-            "buysMade": 2,
-            "buysOffered": 25,
-            "turnLaidDown": 57,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 2,
-            "jokerSwaps": 0,
-            "finalHandSize": 0,
-            "finalHandValue": 0,
-            "wasShanghaied": false
-          },
-          "AI 3": {
-            "drewFromDiscard": 7,
-            "drewFromPile": 9,
-            "buysMade": 5,
-            "buysOffered": 10,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 22,
-            "finalHandValue": 190,
-            "wasShanghaied": true
-          },
-          "AI 4": {
-            "drewFromDiscard": 5,
-            "drewFromPile": 11,
-            "buysMade": 4,
-            "buysOffered": 30,
-            "turnLaidDown": 59,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 2,
-            "finalHandSize": 1,
-            "finalHandValue": 5,
-            "wasShanghaied": false
-          }
-        },
-        "stalemate": false,
-        "jokersDealt": 3,
-        "jokersStuckInHand": 0
-      }
-    ],
-    "totalTurns": 65,
-    "totalBuys": 14,
-    "duration": 108,
-    "playerPersonalities": [
-      "the-shark",
-      "the-shark",
-      "the-shark",
-      "the-shark"
-    ]
-  },
-  {
-    "gameId": 7,
-    "players": [
-      "AI 1",
-      "AI 2",
-      "AI 3",
-      "AI 4"
-    ],
-    "winner": "AI 4",
-    "finalScores": [
-      115,
-      130,
       5,
-      0
-    ],
-    "rounds": [
-      {
-        "roundNumber": 1,
-        "requirement": "2 Sets",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 2,
-        "requirement": "1 Set + 1 Run",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 3,
-        "requirement": "2 Runs",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 4,
-        "requirement": "3 Sets",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 5,
-        "requirement": "2 Sets + 1 Run",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 6,
-        "requirement": "1 Set + 2 Runs",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 7,
-        "requirement": "3 Runs",
-        "wentOut": "AI 4",
-        "turnsInRound": 55,
-        "shanghaiVictims": [
-          "AI 1",
-          "AI 2"
-        ],
-        "scores": {
-          "AI 1": 115,
-          "AI 2": 130,
-          "AI 3": 5,
-          "AI 4": 0
-        },
-        "playerStats": {
-          "AI 1": {
-            "drewFromDiscard": 5,
-            "drewFromPile": 8,
-            "buysMade": 2,
-            "buysOffered": 29,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 16,
-            "finalHandValue": 115,
-            "wasShanghaied": true
-          },
-          "AI 2": {
-            "drewFromDiscard": 2,
-            "drewFromPile": 12,
-            "buysMade": 1,
-            "buysOffered": 25,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 14,
-            "finalHandValue": 130,
-            "wasShanghaied": true
-          },
-          "AI 3": {
-            "drewFromDiscard": 4,
-            "drewFromPile": 10,
-            "buysMade": 2,
-            "buysOffered": 27,
-            "turnLaidDown": 42,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 1,
-            "finalHandSize": 1,
-            "finalHandValue": 5,
-            "wasShanghaied": false
-          },
-          "AI 4": {
-            "drewFromDiscard": 5,
-            "drewFromPile": 9,
-            "buysMade": 2,
-            "buysOffered": 26,
-            "turnLaidDown": 35,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 2,
-            "jokerSwaps": 1,
-            "finalHandSize": 0,
-            "finalHandValue": 0,
-            "wasShanghaied": false
-          }
-        },
-        "stalemate": false,
-        "jokersDealt": 3,
-        "jokersStuckInHand": 1
-      }
-    ],
-    "totalTurns": 55,
-    "totalBuys": 7,
-    "duration": 61,
-    "playerPersonalities": [
-      "the-shark",
-      "the-shark",
-      "the-shark",
-      "the-shark"
-    ]
-  },
-  {
-    "gameId": 8,
-    "players": [
-      "AI 1",
-      "AI 2",
-      "AI 3",
-      "AI 4"
-    ],
-    "winner": "AI 1",
-    "finalScores": [
-      155,
-      155,
-      190,
-      165
-    ],
-    "rounds": [
-      {
-        "roundNumber": 1,
-        "requirement": "2 Sets",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 2,
-        "requirement": "1 Set + 1 Run",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 3,
-        "requirement": "2 Runs",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 4,
-        "requirement": "3 Sets",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 5,
-        "requirement": "2 Sets + 1 Run",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 6,
-        "requirement": "1 Set + 2 Runs",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 7,
-        "requirement": "3 Runs",
-        "wentOut": "(stalemate)",
-        "turnsInRound": 113,
-        "shanghaiVictims": [
-          "AI 1",
-          "AI 2",
-          "AI 3",
-          "AI 4"
-        ],
-        "scores": {
-          "AI 1": 155,
-          "AI 2": 155,
-          "AI 3": 190,
-          "AI 4": 165
-        },
-        "playerStats": {
-          "AI 1": {
-            "drewFromDiscard": 7,
-            "drewFromPile": 21,
-            "buysMade": 3,
-            "buysOffered": 51,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 18,
-            "finalHandValue": 155,
-            "wasShanghaied": true
-          },
-          "AI 2": {
-            "drewFromDiscard": 8,
-            "drewFromPile": 21,
-            "buysMade": 4,
-            "buysOffered": 56,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 20,
-            "finalHandValue": 155,
-            "wasShanghaied": true
-          },
-          "AI 3": {
-            "drewFromDiscard": 9,
-            "drewFromPile": 19,
-            "buysMade": 5,
-            "buysOffered": 14,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 22,
-            "finalHandValue": 190,
-            "wasShanghaied": true
-          },
-          "AI 4": {
-            "drewFromDiscard": 9,
-            "drewFromPile": 19,
-            "buysMade": 4,
-            "buysOffered": 54,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 20,
-            "finalHandValue": 165,
-            "wasShanghaied": true
-          }
-        },
-        "stalemate": true,
-        "jokersDealt": 1,
-        "jokersStuckInHand": 4
-      }
-    ],
-    "totalTurns": 113,
-    "totalBuys": 16,
-    "duration": 295,
-    "playerPersonalities": [
-      "the-shark",
-      "the-shark",
-      "the-shark",
-      "the-shark"
-    ]
-  },
-  {
-    "gameId": 9,
-    "players": [
-      "AI 1",
-      "AI 2",
-      "AI 3",
-      "AI 4"
-    ],
-    "winner": "AI 1",
-    "finalScores": [
       0,
-      150,
       10,
       15
     ],
@@ -1462,68 +948,237 @@
       {
         "roundNumber": 7,
         "requirement": "3 Runs",
-        "wentOut": "AI 1",
-        "turnsInRound": 64,
-        "shanghaiVictims": [
-          "AI 2"
-        ],
+        "wentOut": "AI 2",
+        "turnsInRound": 73,
+        "shanghaiVictims": [],
         "scores": {
-          "AI 1": 0,
-          "AI 2": 150,
+          "AI 1": 5,
+          "AI 2": 0,
           "AI 3": 10,
           "AI 4": 15
         },
         "playerStats": {
           "AI 1": {
-            "drewFromDiscard": 5,
-            "drewFromPile": 11,
+            "drewFromDiscard": 9,
+            "drewFromPile": 9,
+            "buysMade": 4,
+            "buysOffered": 26,
+            "turnLaidDown": 60,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 2,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          },
+          "AI 2": {
+            "drewFromDiscard": 9,
+            "drewFromPile": 10,
             "buysMade": 3,
-            "buysOffered": 23,
-            "turnLaidDown": 56,
+            "buysOffered": 26,
+            "turnLaidDown": 65,
             "meldsLaidDown": 3,
             "cardsLaidOff": 2,
-            "jokerSwaps": 2,
+            "jokerSwaps": 1,
             "finalHandSize": 0,
             "finalHandValue": 0,
             "wasShanghaied": false
           },
-          "AI 2": {
-            "drewFromDiscard": 6,
-            "drewFromPile": 10,
-            "buysMade": 2,
-            "buysOffered": 27,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 16,
-            "finalHandValue": 150,
-            "wasShanghaied": true
-          },
           "AI 3": {
-            "drewFromDiscard": 3,
+            "drewFromDiscard": 5,
             "drewFromPile": 13,
             "buysMade": 3,
-            "buysOffered": 27,
-            "turnLaidDown": 54,
+            "buysOffered": 25,
+            "turnLaidDown": 62,
             "meldsLaidDown": 3,
             "cardsLaidOff": 0,
-            "jokerSwaps": 1,
-            "finalHandSize": 2,
+            "jokerSwaps": 2,
+            "finalHandSize": 1,
             "finalHandValue": 10,
             "wasShanghaied": false
           },
           "AI 4": {
             "drewFromDiscard": 8,
-            "drewFromPile": 8,
+            "drewFromPile": 10,
             "buysMade": 5,
-            "buysOffered": 8,
-            "turnLaidDown": 55,
+            "buysOffered": 18,
+            "turnLaidDown": 63,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 2,
+            "finalHandSize": 3,
+            "finalHandValue": 15,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 0
+      }
+    ],
+    "totalTurns": 73,
+    "totalBuys": 15,
+    "duration": 168,
+    "playerPersonalities": [
+      "the-shark",
+      "the-shark",
+      "the-shark",
+      "the-shark"
+    ]
+  },
+  {
+    "gameId": 7,
+    "players": [
+      "AI 1",
+      "AI 2",
+      "AI 3",
+      "AI 4"
+    ],
+    "winner": "AI 1",
+    "finalScores": [
+      0,
+      135,
+      5,
+      20
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "AI 1",
+        "turnsInRound": 72,
+        "shanghaiVictims": [
+          "AI 2"
+        ],
+        "scores": {
+          "AI 1": 0,
+          "AI 2": 135,
+          "AI 3": 5,
+          "AI 4": 20
+        },
+        "playerStats": {
+          "AI 1": {
+            "drewFromDiscard": 6,
+            "drewFromPile": 12,
+            "buysMade": 5,
+            "buysOffered": 12,
+            "turnLaidDown": 40,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 4,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          },
+          "AI 2": {
+            "drewFromDiscard": 8,
+            "drewFromPile": 10,
+            "buysMade": 2,
+            "buysOffered": 31,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 15,
+            "finalHandValue": 135,
+            "wasShanghaied": true
+          },
+          "AI 3": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 15,
+            "buysMade": 3,
+            "buysOffered": 28,
+            "turnLaidDown": 34,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          },
+          "AI 4": {
+            "drewFromDiscard": 8,
+            "drewFromPile": 10,
+            "buysMade": 3,
+            "buysOffered": 34,
+            "turnLaidDown": 63,
             "meldsLaidDown": 3,
             "cardsLaidOff": 0,
             "jokerSwaps": 1,
-            "finalHandSize": 2,
-            "finalHandValue": 15,
+            "finalHandSize": 4,
+            "finalHandValue": 20,
             "wasShanghaied": false
           }
         },
@@ -1532,9 +1187,352 @@
         "jokersStuckInHand": 1
       }
     ],
-    "totalTurns": 64,
+    "totalTurns": 72,
     "totalBuys": 13,
-    "duration": 85,
+    "duration": 61,
+    "playerPersonalities": [
+      "the-shark",
+      "the-shark",
+      "the-shark",
+      "the-shark"
+    ]
+  },
+  {
+    "gameId": 8,
+    "players": [
+      "AI 1",
+      "AI 2",
+      "AI 3",
+      "AI 4"
+    ],
+    "winner": "AI 4",
+    "finalScores": [
+      165,
+      145,
+      15,
+      0
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "AI 4",
+        "turnsInRound": 127,
+        "shanghaiVictims": [
+          "AI 1",
+          "AI 2"
+        ],
+        "scores": {
+          "AI 1": 165,
+          "AI 2": 145,
+          "AI 3": 15,
+          "AI 4": 0
+        },
+        "playerStats": {
+          "AI 1": {
+            "drewFromDiscard": 11,
+            "drewFromPile": 20,
+            "buysMade": 3,
+            "buysOffered": 61,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 18,
+            "finalHandValue": 165,
+            "wasShanghaied": true
+          },
+          "AI 2": {
+            "drewFromDiscard": 9,
+            "drewFromPile": 23,
+            "buysMade": 3,
+            "buysOffered": 60,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 18,
+            "finalHandValue": 145,
+            "wasShanghaied": true
+          },
+          "AI 3": {
+            "drewFromDiscard": 12,
+            "drewFromPile": 20,
+            "buysMade": 5,
+            "buysOffered": 21,
+            "turnLaidDown": 90,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 3,
+            "finalHandSize": 3,
+            "finalHandValue": 15,
+            "wasShanghaied": false
+          },
+          "AI 4": {
+            "drewFromDiscard": 9,
+            "drewFromPile": 23,
+            "buysMade": 2,
+            "buysOffered": 56,
+            "turnLaidDown": 87,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 1,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 1
+      }
+    ],
+    "totalTurns": 127,
+    "totalBuys": 13,
+    "duration": 204,
+    "playerPersonalities": [
+      "the-shark",
+      "the-shark",
+      "the-shark",
+      "the-shark"
+    ]
+  },
+  {
+    "gameId": 9,
+    "players": [
+      "AI 1",
+      "AI 2",
+      "AI 3",
+      "AI 4"
+    ],
+    "winner": "AI 1",
+    "finalScores": [
+      0,
+      125,
+      25,
+      5
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "AI 1",
+        "turnsInRound": 68,
+        "shanghaiVictims": [
+          "AI 2"
+        ],
+        "scores": {
+          "AI 1": 0,
+          "AI 2": 125,
+          "AI 3": 25,
+          "AI 4": 5
+        },
+        "playerStats": {
+          "AI 1": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 13,
+            "buysMade": 2,
+            "buysOffered": 22,
+            "turnLaidDown": 32,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 1,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          },
+          "AI 2": {
+            "drewFromDiscard": 10,
+            "drewFromPile": 7,
+            "buysMade": 4,
+            "buysOffered": 31,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 20,
+            "finalHandValue": 125,
+            "wasShanghaied": true
+          },
+          "AI 3": {
+            "drewFromDiscard": 9,
+            "drewFromPile": 8,
+            "buysMade": 5,
+            "buysOffered": 13,
+            "turnLaidDown": 62,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 5,
+            "finalHandValue": 25,
+            "wasShanghaied": false
+          },
+          "AI 4": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 12,
+            "buysMade": 2,
+            "buysOffered": 22,
+            "turnLaidDown": 59,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      }
+    ],
+    "totalTurns": 68,
+    "totalBuys": 13,
+    "duration": 86,
     "playerPersonalities": [
       "the-shark",
       "the-shark",
@@ -1550,12 +1548,12 @@
       "AI 3",
       "AI 4"
     ],
-    "winner": "AI 4",
+    "winner": "AI 3",
     "finalScores": [
-      5,
-      45,
-      5,
-      0
+      20,
+      140,
+      0,
+      15
     ],
     "rounds": [
       {
@@ -1633,77 +1631,79 @@
       {
         "roundNumber": 7,
         "requirement": "3 Runs",
-        "wentOut": "AI 4",
-        "turnsInRound": 71,
-        "shanghaiVictims": [],
+        "wentOut": "AI 3",
+        "turnsInRound": 102,
+        "shanghaiVictims": [
+          "AI 2"
+        ],
         "scores": {
-          "AI 1": 5,
-          "AI 2": 45,
-          "AI 3": 5,
-          "AI 4": 0
+          "AI 1": 20,
+          "AI 2": 140,
+          "AI 3": 0,
+          "AI 4": 15
         },
         "playerStats": {
           "AI 1": {
-            "drewFromDiscard": 1,
-            "drewFromPile": 16,
+            "drewFromDiscard": 15,
+            "drewFromPile": 10,
             "buysMade": 4,
-            "buysOffered": 29,
-            "turnLaidDown": 24,
+            "buysOffered": 48,
+            "turnLaidDown": 100,
             "meldsLaidDown": 3,
             "cardsLaidOff": 0,
             "jokerSwaps": 1,
-            "finalHandSize": 1,
-            "finalHandValue": 5,
+            "finalHandSize": 4,
+            "finalHandValue": 20,
             "wasShanghaied": false
           },
           "AI 2": {
-            "drewFromDiscard": 11,
-            "drewFromPile": 7,
-            "buysMade": 4,
-            "buysOffered": 36,
-            "turnLaidDown": 69,
-            "meldsLaidDown": 3,
+            "drewFromDiscard": 9,
+            "drewFromPile": 17,
+            "buysMade": 2,
+            "buysOffered": 39,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
             "cardsLaidOff": 0,
-            "jokerSwaps": 1,
-            "finalHandSize": 6,
-            "finalHandValue": 45,
-            "wasShanghaied": false
+            "jokerSwaps": 0,
+            "finalHandSize": 16,
+            "finalHandValue": 140,
+            "wasShanghaied": true
           },
           "AI 3": {
-            "drewFromDiscard": 5,
-            "drewFromPile": 13,
-            "buysMade": 4,
-            "buysOffered": 28,
-            "turnLaidDown": 38,
+            "drewFromDiscard": 7,
+            "drewFromPile": 19,
+            "buysMade": 3,
+            "buysOffered": 36,
+            "turnLaidDown": 70,
             "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
+            "cardsLaidOff": 2,
             "jokerSwaps": 1,
-            "finalHandSize": 1,
-            "finalHandValue": 5,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
             "wasShanghaied": false
           },
           "AI 4": {
-            "drewFromDiscard": 7,
-            "drewFromPile": 11,
+            "drewFromDiscard": 11,
+            "drewFromPile": 14,
             "buysMade": 2,
-            "buysOffered": 27,
-            "turnLaidDown": 67,
+            "buysOffered": 43,
+            "turnLaidDown": 95,
             "meldsLaidDown": 3,
-            "cardsLaidOff": 2,
-            "jokerSwaps": 0,
-            "finalHandSize": 0,
-            "finalHandValue": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 3,
+            "finalHandValue": 15,
             "wasShanghaied": false
           }
         },
         "stalemate": false,
-        "jokersDealt": 1,
-        "jokersStuckInHand": 0
+        "jokersDealt": 2,
+        "jokersStuckInHand": 1
       }
     ],
-    "totalTurns": 71,
-    "totalBuys": 14,
-    "duration": 88,
+    "totalTurns": 102,
+    "totalBuys": 11,
+    "duration": 138,
     "playerPersonalities": [
       "the-shark",
       "the-shark",
@@ -1719,353 +1719,10 @@
       "AI 3",
       "AI 4"
     ],
-    "winner": "AI 4",
-    "finalScores": [
-      105,
-      15,
-      140,
-      0
-    ],
-    "rounds": [
-      {
-        "roundNumber": 1,
-        "requirement": "2 Sets",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 2,
-        "requirement": "1 Set + 1 Run",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 3,
-        "requirement": "2 Runs",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 4,
-        "requirement": "3 Sets",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 5,
-        "requirement": "2 Sets + 1 Run",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 6,
-        "requirement": "1 Set + 2 Runs",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 7,
-        "requirement": "3 Runs",
-        "wentOut": "AI 4",
-        "turnsInRound": 35,
-        "shanghaiVictims": [
-          "AI 1",
-          "AI 3"
-        ],
-        "scores": {
-          "AI 1": 105,
-          "AI 2": 15,
-          "AI 3": 140,
-          "AI 4": 0
-        },
-        "playerStats": {
-          "AI 1": {
-            "drewFromDiscard": 3,
-            "drewFromPile": 5,
-            "buysMade": 1,
-            "buysOffered": 15,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 14,
-            "finalHandValue": 105,
-            "wasShanghaied": true
-          },
-          "AI 2": {
-            "drewFromDiscard": 5,
-            "drewFromPile": 4,
-            "buysMade": 2,
-            "buysOffered": 15,
-            "turnLaidDown": 21,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 1,
-            "finalHandSize": 3,
-            "finalHandValue": 15,
-            "wasShanghaied": false
-          },
-          "AI 3": {
-            "drewFromDiscard": 5,
-            "drewFromPile": 4,
-            "buysMade": 1,
-            "buysOffered": 15,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 14,
-            "finalHandValue": 140,
-            "wasShanghaied": true
-          },
-          "AI 4": {
-            "drewFromDiscard": 1,
-            "drewFromPile": 8,
-            "buysMade": 2,
-            "buysOffered": 11,
-            "turnLaidDown": 15,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 2,
-            "jokerSwaps": 1,
-            "finalHandSize": 0,
-            "finalHandValue": 0,
-            "wasShanghaied": false
-          }
-        },
-        "stalemate": false,
-        "jokersDealt": 3,
-        "jokersStuckInHand": 1
-      }
-    ],
-    "totalTurns": 35,
-    "totalBuys": 6,
-    "duration": 25,
-    "playerPersonalities": [
-      "the-shark",
-      "the-shark",
-      "the-shark",
-      "the-shark"
-    ]
-  },
-  {
-    "gameId": 12,
-    "players": [
-      "AI 1",
-      "AI 2",
-      "AI 3",
-      "AI 4"
-    ],
-    "winner": "AI 4",
-    "finalScores": [
-      140,
-      10,
-      5,
-      0
-    ],
-    "rounds": [
-      {
-        "roundNumber": 1,
-        "requirement": "2 Sets",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 2,
-        "requirement": "1 Set + 1 Run",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 3,
-        "requirement": "2 Runs",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 4,
-        "requirement": "3 Sets",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 5,
-        "requirement": "2 Sets + 1 Run",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 6,
-        "requirement": "1 Set + 2 Runs",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 7,
-        "requirement": "3 Runs",
-        "wentOut": "AI 4",
-        "turnsInRound": 71,
-        "shanghaiVictims": [
-          "AI 1"
-        ],
-        "scores": {
-          "AI 1": 140,
-          "AI 2": 10,
-          "AI 3": 5,
-          "AI 4": 0
-        },
-        "playerStats": {
-          "AI 1": {
-            "drewFromDiscard": 6,
-            "drewFromPile": 11,
-            "buysMade": 2,
-            "buysOffered": 29,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 16,
-            "finalHandValue": 140,
-            "wasShanghaied": true
-          },
-          "AI 2": {
-            "drewFromDiscard": 6,
-            "drewFromPile": 12,
-            "buysMade": 3,
-            "buysOffered": 29,
-            "turnLaidDown": 37,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 1,
-            "finalHandSize": 2,
-            "finalHandValue": 10,
-            "wasShanghaied": false
-          },
-          "AI 3": {
-            "drewFromDiscard": 7,
-            "drewFromPile": 11,
-            "buysMade": 2,
-            "buysOffered": 29,
-            "turnLaidDown": 62,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 1,
-            "finalHandSize": 1,
-            "finalHandValue": 5,
-            "wasShanghaied": false
-          },
-          "AI 4": {
-            "drewFromDiscard": 9,
-            "drewFromPile": 9,
-            "buysMade": 3,
-            "buysOffered": 29,
-            "turnLaidDown": 55,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 2,
-            "jokerSwaps": 1,
-            "finalHandSize": 0,
-            "finalHandValue": 0,
-            "wasShanghaied": false
-          }
-        },
-        "stalemate": false,
-        "jokersDealt": 2,
-        "jokersStuckInHand": 0
-      }
-    ],
-    "totalTurns": 71,
-    "totalBuys": 10,
-    "duration": 72,
-    "playerPersonalities": [
-      "the-shark",
-      "the-shark",
-      "the-shark",
-      "the-shark"
-    ]
-  },
-  {
-    "gameId": 13,
-    "players": [
-      "AI 1",
-      "AI 2",
-      "AI 3",
-      "AI 4"
-    ],
     "winner": "AI 3",
     "finalScores": [
+      10,
       5,
-      100,
       0,
       5
     ],
@@ -2146,23 +1803,34 @@
         "roundNumber": 7,
         "requirement": "3 Runs",
         "wentOut": "AI 3",
-        "turnsInRound": 34,
-        "shanghaiVictims": [
-          "AI 2"
-        ],
+        "turnsInRound": 74,
+        "shanghaiVictims": [],
         "scores": {
-          "AI 1": 5,
-          "AI 2": 100,
+          "AI 1": 10,
+          "AI 2": 5,
           "AI 3": 0,
           "AI 4": 5
         },
         "playerStats": {
           "AI 1": {
-            "drewFromDiscard": 1,
-            "drewFromPile": 7,
+            "drewFromDiscard": 7,
+            "drewFromPile": 11,
             "buysMade": 3,
-            "buysOffered": 12,
-            "turnLaidDown": 28,
+            "buysOffered": 36,
+            "turnLaidDown": 68,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          },
+          "AI 2": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 16,
+            "buysMade": 4,
+            "buysOffered": 32,
+            "turnLaidDown": 25,
             "meldsLaidDown": 3,
             "cardsLaidOff": 0,
             "jokerSwaps": 1,
@@ -2170,54 +1838,41 @@
             "finalHandValue": 5,
             "wasShanghaied": false
           },
-          "AI 2": {
-            "drewFromDiscard": 5,
-            "drewFromPile": 4,
-            "buysMade": 1,
-            "buysOffered": 14,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 14,
-            "finalHandValue": 100,
-            "wasShanghaied": true
-          },
           "AI 3": {
-            "drewFromDiscard": 2,
-            "drewFromPile": 7,
-            "buysMade": 1,
-            "buysOffered": 13,
-            "turnLaidDown": 26,
+            "drewFromDiscard": 7,
+            "drewFromPile": 12,
+            "buysMade": 4,
+            "buysOffered": 33,
+            "turnLaidDown": 70,
             "meldsLaidDown": 3,
             "cardsLaidOff": 2,
-            "jokerSwaps": 0,
+            "jokerSwaps": 1,
             "finalHandSize": 0,
             "finalHandValue": 0,
             "wasShanghaied": false
           },
           "AI 4": {
-            "drewFromDiscard": 4,
-            "drewFromPile": 4,
-            "buysMade": 4,
-            "buysOffered": 17,
-            "turnLaidDown": 31,
+            "drewFromDiscard": 7,
+            "drewFromPile": 11,
+            "buysMade": 2,
+            "buysOffered": 34,
+            "turnLaidDown": 67,
             "meldsLaidDown": 3,
             "cardsLaidOff": 0,
-            "jokerSwaps": 1,
+            "jokerSwaps": 0,
             "finalHandSize": 1,
             "finalHandValue": 5,
             "wasShanghaied": false
           }
         },
         "stalemate": false,
-        "jokersDealt": 0,
+        "jokersDealt": 1,
         "jokersStuckInHand": 0
       }
     ],
-    "totalTurns": 34,
-    "totalBuys": 9,
-    "duration": 39,
+    "totalTurns": 74,
+    "totalBuys": 13,
+    "duration": 80,
     "playerPersonalities": [
       "the-shark",
       "the-shark",
@@ -2226,7 +1881,7 @@
     ]
   },
   {
-    "gameId": 14,
+    "gameId": 12,
     "players": [
       "AI 1",
       "AI 2",
@@ -2235,9 +1890,9 @@
     ],
     "winner": "AI 2",
     "finalScores": [
-      15,
+      120,
       0,
-      115,
+      15,
       10
     ],
     "rounds": [
@@ -2317,62 +1972,62 @@
         "roundNumber": 7,
         "requirement": "3 Runs",
         "wentOut": "AI 2",
-        "turnsInRound": 81,
+        "turnsInRound": 105,
         "shanghaiVictims": [
-          "AI 3"
+          "AI 1"
         ],
         "scores": {
-          "AI 1": 15,
+          "AI 1": 120,
           "AI 2": 0,
-          "AI 3": 115,
+          "AI 3": 15,
           "AI 4": 10
         },
         "playerStats": {
           "AI 1": {
-            "drewFromDiscard": 8,
-            "drewFromPile": 12,
-            "buysMade": 3,
-            "buysOffered": 32,
-            "turnLaidDown": 60,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 3,
-            "finalHandValue": 15,
-            "wasShanghaied": false
-          },
-          "AI 2": {
-            "drewFromDiscard": 9,
-            "drewFromPile": 12,
-            "buysMade": 3,
-            "buysOffered": 30,
-            "turnLaidDown": 69,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 2,
-            "jokerSwaps": 1,
-            "finalHandSize": 0,
-            "finalHandValue": 0,
-            "wasShanghaied": false
-          },
-          "AI 3": {
-            "drewFromDiscard": 7,
-            "drewFromPile": 13,
+            "drewFromDiscard": 12,
+            "drewFromPile": 14,
             "buysMade": 2,
-            "buysOffered": 29,
+            "buysOffered": 52,
             "turnLaidDown": 0,
             "meldsLaidDown": 0,
             "cardsLaidOff": 0,
             "jokerSwaps": 0,
             "finalHandSize": 16,
-            "finalHandValue": 115,
+            "finalHandValue": 120,
             "wasShanghaied": true
           },
+          "AI 2": {
+            "drewFromDiscard": 12,
+            "drewFromPile": 15,
+            "buysMade": 4,
+            "buysOffered": 49,
+            "turnLaidDown": 69,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 3,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          },
+          "AI 3": {
+            "drewFromDiscard": 6,
+            "drewFromPile": 20,
+            "buysMade": 4,
+            "buysOffered": 44,
+            "turnLaidDown": 58,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 3,
+            "finalHandValue": 15,
+            "wasShanghaied": false
+          },
           "AI 4": {
-            "drewFromDiscard": 10,
-            "drewFromPile": 10,
-            "buysMade": 3,
-            "buysOffered": 34,
-            "turnLaidDown": 75,
+            "drewFromDiscard": 8,
+            "drewFromPile": 18,
+            "buysMade": 2,
+            "buysOffered": 45,
+            "turnLaidDown": 91,
             "meldsLaidDown": 3,
             "cardsLaidOff": 0,
             "jokerSwaps": 1,
@@ -2382,13 +2037,13 @@
           }
         },
         "stalemate": false,
-        "jokersDealt": 2,
+        "jokersDealt": 0,
         "jokersStuckInHand": 0
       }
     ],
-    "totalTurns": 81,
-    "totalBuys": 11,
-    "duration": 92,
+    "totalTurns": 105,
+    "totalBuys": 12,
+    "duration": 103,
     "playerPersonalities": [
       "the-shark",
       "the-shark",
@@ -2397,19 +2052,19 @@
     ]
   },
   {
-    "gameId": 15,
+    "gameId": 13,
     "players": [
       "AI 1",
       "AI 2",
       "AI 3",
       "AI 4"
     ],
-    "winner": "AI 4",
+    "winner": "AI 2",
     "finalScores": [
-      5,
-      190,
-      15,
-      0
+      90,
+      0,
+      100,
+      150
     ],
     "rounds": [
       {
@@ -2487,79 +2142,81 @@
       {
         "roundNumber": 7,
         "requirement": "3 Runs",
-        "wentOut": "AI 4",
-        "turnsInRound": 63,
+        "wentOut": "AI 2",
+        "turnsInRound": 65,
         "shanghaiVictims": [
-          "AI 2"
+          "AI 1",
+          "AI 3",
+          "AI 4"
         ],
         "scores": {
-          "AI 1": 5,
-          "AI 2": 190,
-          "AI 3": 15,
-          "AI 4": 0
+          "AI 1": 90,
+          "AI 2": 0,
+          "AI 3": 100,
+          "AI 4": 150
         },
         "playerStats": {
           "AI 1": {
-            "drewFromDiscard": 3,
-            "drewFromPile": 12,
+            "drewFromDiscard": 8,
+            "drewFromPile": 8,
             "buysMade": 2,
-            "buysOffered": 31,
-            "turnLaidDown": 32,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 1,
-            "finalHandSize": 1,
-            "finalHandValue": 5,
-            "wasShanghaied": false
-          },
-          "AI 2": {
-            "drewFromDiscard": 7,
-            "drewFromPile": 9,
-            "buysMade": 4,
-            "buysOffered": 36,
+            "buysOffered": 27,
             "turnLaidDown": 0,
             "meldsLaidDown": 0,
             "cardsLaidOff": 0,
             "jokerSwaps": 0,
-            "finalHandSize": 20,
-            "finalHandValue": 190,
+            "finalHandSize": 16,
+            "finalHandValue": 90,
             "wasShanghaied": true
           },
-          "AI 3": {
-            "drewFromDiscard": 2,
-            "drewFromPile": 14,
-            "buysMade": 2,
-            "buysOffered": 28,
-            "turnLaidDown": 38,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 1,
-            "finalHandValue": 15,
-            "wasShanghaied": false
-          },
-          "AI 4": {
-            "drewFromDiscard": 4,
-            "drewFromPile": 12,
-            "buysMade": 3,
-            "buysOffered": 31,
-            "turnLaidDown": 43,
+          "AI 2": {
+            "drewFromDiscard": 7,
+            "drewFromPile": 10,
+            "buysMade": 1,
+            "buysOffered": 23,
+            "turnLaidDown": 33,
             "meldsLaidDown": 3,
             "cardsLaidOff": 2,
-            "jokerSwaps": 2,
+            "jokerSwaps": 1,
             "finalHandSize": 0,
             "finalHandValue": 0,
             "wasShanghaied": false
+          },
+          "AI 3": {
+            "drewFromDiscard": 9,
+            "drewFromPile": 7,
+            "buysMade": 1,
+            "buysOffered": 27,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 14,
+            "finalHandValue": 100,
+            "wasShanghaied": true
+          },
+          "AI 4": {
+            "drewFromDiscard": 6,
+            "drewFromPile": 10,
+            "buysMade": 2,
+            "buysOffered": 26,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 16,
+            "finalHandValue": 150,
+            "wasShanghaied": true
           }
         },
         "stalemate": false,
-        "jokersDealt": 2,
-        "jokersStuckInHand": 1
+        "jokersDealt": 1,
+        "jokersStuckInHand": 2
       }
     ],
-    "totalTurns": 63,
-    "totalBuys": 11,
-    "duration": 72,
+    "totalTurns": 65,
+    "totalBuys": 6,
+    "duration": 67,
     "playerPersonalities": [
       "the-shark",
       "the-shark",
@@ -2568,7 +2225,178 @@
     ]
   },
   {
-    "gameId": 16,
+    "gameId": 14,
+    "players": [
+      "AI 1",
+      "AI 2",
+      "AI 3",
+      "AI 4"
+    ],
+    "winner": "AI 1",
+    "finalScores": [
+      0,
+      5,
+      10,
+      140
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "AI 1",
+        "turnsInRound": 64,
+        "shanghaiVictims": [
+          "AI 4"
+        ],
+        "scores": {
+          "AI 1": 0,
+          "AI 2": 5,
+          "AI 3": 10,
+          "AI 4": 140
+        },
+        "playerStats": {
+          "AI 1": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 11,
+            "buysMade": 3,
+            "buysOffered": 26,
+            "turnLaidDown": 56,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 3,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          },
+          "AI 2": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 11,
+            "buysMade": 3,
+            "buysOffered": 27,
+            "turnLaidDown": 49,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          },
+          "AI 3": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 12,
+            "buysMade": 3,
+            "buysOffered": 25,
+            "turnLaidDown": 46,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          },
+          "AI 4": {
+            "drewFromDiscard": 8,
+            "drewFromPile": 8,
+            "buysMade": 3,
+            "buysOffered": 30,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 18,
+            "finalHandValue": 140,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      }
+    ],
+    "totalTurns": 64,
+    "totalBuys": 12,
+    "duration": 73,
+    "playerPersonalities": [
+      "the-shark",
+      "the-shark",
+      "the-shark",
+      "the-shark"
+    ]
+  },
+  {
+    "gameId": 15,
     "players": [
       "AI 1",
       "AI 2",
@@ -2577,9 +2405,9 @@
     ],
     "winner": "AI 4",
     "finalScores": [
-      25,
-      105,
-      5,
+      150,
+      125,
+      85,
       0
     ],
     "rounds": [
@@ -2661,76 +2489,78 @@
         "wentOut": "AI 4",
         "turnsInRound": 51,
         "shanghaiVictims": [
-          "AI 2"
+          "AI 1",
+          "AI 2",
+          "AI 3"
         ],
         "scores": {
-          "AI 1": 25,
-          "AI 2": 105,
-          "AI 3": 5,
+          "AI 1": 150,
+          "AI 2": 125,
+          "AI 3": 85,
           "AI 4": 0
         },
         "playerStats": {
           "AI 1": {
-            "drewFromDiscard": 2,
-            "drewFromPile": 10,
-            "buysMade": 4,
-            "buysOffered": 22,
-            "turnLaidDown": 32,
-            "meldsLaidDown": 3,
+            "drewFromDiscard": 7,
+            "drewFromPile": 5,
+            "buysMade": 3,
+            "buysOffered": 25,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
             "cardsLaidOff": 0,
             "jokerSwaps": 0,
-            "finalHandSize": 5,
-            "finalHandValue": 25,
-            "wasShanghaied": false
+            "finalHandSize": 18,
+            "finalHandValue": 150,
+            "wasShanghaied": true
           },
           "AI 2": {
-            "drewFromDiscard": 5,
-            "drewFromPile": 8,
+            "drewFromDiscard": 6,
+            "drewFromPile": 7,
             "buysMade": 1,
-            "buysOffered": 22,
+            "buysOffered": 21,
             "turnLaidDown": 0,
             "meldsLaidDown": 0,
             "cardsLaidOff": 0,
             "jokerSwaps": 0,
             "finalHandSize": 14,
-            "finalHandValue": 105,
+            "finalHandValue": 125,
             "wasShanghaied": true
           },
           "AI 3": {
-            "drewFromDiscard": 5,
-            "drewFromPile": 8,
-            "buysMade": 3,
-            "buysOffered": 23,
-            "turnLaidDown": 34,
-            "meldsLaidDown": 3,
+            "drewFromDiscard": 6,
+            "drewFromPile": 7,
+            "buysMade": 1,
+            "buysOffered": 21,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
             "cardsLaidOff": 0,
-            "jokerSwaps": 3,
-            "finalHandSize": 1,
-            "finalHandValue": 5,
-            "wasShanghaied": false
+            "jokerSwaps": 0,
+            "finalHandSize": 14,
+            "finalHandValue": 85,
+            "wasShanghaied": true
           },
           "AI 4": {
-            "drewFromDiscard": 4,
-            "drewFromPile": 9,
-            "buysMade": 3,
-            "buysOffered": 22,
-            "turnLaidDown": 35,
+            "drewFromDiscard": 1,
+            "drewFromPile": 12,
+            "buysMade": 1,
+            "buysOffered": 17,
+            "turnLaidDown": 11,
             "meldsLaidDown": 3,
             "cardsLaidOff": 2,
-            "jokerSwaps": 1,
+            "jokerSwaps": 0,
             "finalHandSize": 0,
             "finalHandValue": 0,
             "wasShanghaied": false
           }
         },
         "stalemate": false,
-        "jokersDealt": 1,
-        "jokersStuckInHand": 0
+        "jokersDealt": 2,
+        "jokersStuckInHand": 2
       }
     ],
     "totalTurns": 51,
-    "totalBuys": 11,
-    "duration": 50,
+    "totalBuys": 6,
+    "duration": 44,
     "playerPersonalities": [
       "the-shark",
       "the-shark",
@@ -2739,7 +2569,7 @@
     ]
   },
   {
-    "gameId": 17,
+    "gameId": 16,
     "players": [
       "AI 1",
       "AI 2",
@@ -2748,9 +2578,9 @@
     ],
     "winner": "AI 4",
     "finalScores": [
-      120,
-      120,
-      10,
+      15,
+      90,
+      160,
       0
     ],
     "rounds": [
@@ -2830,239 +2660,68 @@
         "roundNumber": 7,
         "requirement": "3 Runs",
         "wentOut": "AI 4",
-        "turnsInRound": 71,
+        "turnsInRound": 63,
         "shanghaiVictims": [
-          "AI 1",
-          "AI 2"
+          "AI 2",
+          "AI 3"
         ],
         "scores": {
-          "AI 1": 120,
-          "AI 2": 120,
-          "AI 3": 10,
+          "AI 1": 15,
+          "AI 2": 90,
+          "AI 3": 160,
           "AI 4": 0
         },
         "playerStats": {
           "AI 1": {
-            "drewFromDiscard": 8,
-            "drewFromPile": 9,
-            "buysMade": 2,
-            "buysOffered": 30,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
+            "drewFromDiscard": 3,
+            "drewFromPile": 12,
+            "buysMade": 3,
+            "buysOffered": 23,
+            "turnLaidDown": 32,
+            "meldsLaidDown": 3,
             "cardsLaidOff": 0,
             "jokerSwaps": 0,
-            "finalHandSize": 16,
-            "finalHandValue": 120,
-            "wasShanghaied": true
+            "finalHandSize": 1,
+            "finalHandValue": 15,
+            "wasShanghaied": false
           },
           "AI 2": {
-            "drewFromDiscard": 10,
-            "drewFromPile": 8,
-            "buysMade": 4,
-            "buysOffered": 32,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 20,
-            "finalHandValue": 120,
-            "wasShanghaied": true
-          },
-          "AI 3": {
-            "drewFromDiscard": 8,
-            "drewFromPile": 10,
-            "buysMade": 3,
-            "buysOffered": 27,
-            "turnLaidDown": 66,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 1,
-            "finalHandSize": 2,
-            "finalHandValue": 10,
-            "wasShanghaied": false
-          },
-          "AI 4": {
-            "drewFromDiscard": 3,
-            "drewFromPile": 15,
-            "buysMade": 2,
-            "buysOffered": 22,
-            "turnLaidDown": 59,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 2,
-            "jokerSwaps": 0,
-            "finalHandSize": 0,
-            "finalHandValue": 0,
-            "wasShanghaied": false
-          }
-        },
-        "stalemate": false,
-        "jokersDealt": 3,
-        "jokersStuckInHand": 0
-      }
-    ],
-    "totalTurns": 71,
-    "totalBuys": 11,
-    "duration": 95,
-    "playerPersonalities": [
-      "the-shark",
-      "the-shark",
-      "the-shark",
-      "the-shark"
-    ]
-  },
-  {
-    "gameId": 18,
-    "players": [
-      "AI 1",
-      "AI 2",
-      "AI 3",
-      "AI 4"
-    ],
-    "winner": "AI 2",
-    "finalScores": [
-      10,
-      0,
-      110,
-      25
-    ],
-    "rounds": [
-      {
-        "roundNumber": 1,
-        "requirement": "2 Sets",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 2,
-        "requirement": "1 Set + 1 Run",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 3,
-        "requirement": "2 Runs",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 4,
-        "requirement": "3 Sets",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 5,
-        "requirement": "2 Sets + 1 Run",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 6,
-        "requirement": "1 Set + 2 Runs",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 7,
-        "requirement": "3 Runs",
-        "wentOut": "AI 2",
-        "turnsInRound": 77,
-        "shanghaiVictims": [
-          "AI 3"
-        ],
-        "scores": {
-          "AI 1": 10,
-          "AI 2": 0,
-          "AI 3": 110,
-          "AI 4": 25
-        },
-        "playerStats": {
-          "AI 1": {
-            "drewFromDiscard": 10,
-            "drewFromPile": 9,
+            "drewFromDiscard": 11,
+            "drewFromPile": 5,
             "buysMade": 3,
             "buysOffered": 29,
-            "turnLaidDown": 68,
-            "meldsLaidDown": 3,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
             "cardsLaidOff": 0,
-            "jokerSwaps": 1,
-            "finalHandSize": 2,
-            "finalHandValue": 10,
-            "wasShanghaied": false
-          },
-          "AI 2": {
-            "drewFromDiscard": 5,
-            "drewFromPile": 15,
-            "buysMade": 1,
-            "buysOffered": 23,
-            "turnLaidDown": 61,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 2,
-            "jokerSwaps": 2,
-            "finalHandSize": 0,
-            "finalHandValue": 0,
-            "wasShanghaied": false
+            "jokerSwaps": 0,
+            "finalHandSize": 18,
+            "finalHandValue": 90,
+            "wasShanghaied": true
           },
           "AI 3": {
-            "drewFromDiscard": 11,
-            "drewFromPile": 8,
+            "drewFromDiscard": 4,
+            "drewFromPile": 12,
             "buysMade": 2,
-            "buysOffered": 33,
+            "buysOffered": 22,
             "turnLaidDown": 0,
             "meldsLaidDown": 0,
             "cardsLaidOff": 0,
             "jokerSwaps": 0,
             "finalHandSize": 16,
-            "finalHandValue": 110,
+            "finalHandValue": 160,
             "wasShanghaied": true
           },
           "AI 4": {
-            "drewFromDiscard": 7,
-            "drewFromPile": 12,
-            "buysMade": 4,
-            "buysOffered": 30,
-            "turnLaidDown": 51,
+            "drewFromDiscard": 8,
+            "drewFromPile": 8,
+            "buysMade": 1,
+            "buysOffered": 24,
+            "turnLaidDown": 47,
             "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 1,
-            "finalHandSize": 5,
-            "finalHandValue": 25,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 4,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
             "wasShanghaied": false
           }
         },
@@ -3071,9 +2730,9 @@
         "jokersStuckInHand": 0
       }
     ],
-    "totalTurns": 77,
-    "totalBuys": 10,
-    "duration": 90,
+    "totalTurns": 63,
+    "totalBuys": 9,
+    "duration": 70,
     "playerPersonalities": [
       "the-shark",
       "the-shark",
@@ -3082,7 +2741,7 @@
     ]
   },
   {
-    "gameId": 19,
+    "gameId": 17,
     "players": [
       "AI 1",
       "AI 2",
@@ -3091,10 +2750,10 @@
     ],
     "winner": "AI 1",
     "finalScores": [
-      140,
-      160,
-      180,
-      140
+      120,
+      125,
+      170,
+      120
     ],
     "rounds": [
       {
@@ -3181,73 +2840,415 @@
           "AI 4"
         ],
         "scores": {
-          "AI 1": 140,
-          "AI 2": 160,
-          "AI 3": 180,
-          "AI 4": 140
+          "AI 1": 120,
+          "AI 2": 125,
+          "AI 3": 170,
+          "AI 4": 120
         },
         "playerStats": {
           "AI 1": {
-            "drewFromDiscard": 40,
-            "drewFromPile": 20,
+            "drewFromDiscard": 54,
+            "drewFromPile": 6,
+            "buysMade": 1,
+            "buysOffered": 13,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 14,
+            "finalHandValue": 120,
+            "wasShanghaied": true
+          },
+          "AI 2": {
+            "drewFromDiscard": 53,
+            "drewFromPile": 7,
+            "buysMade": 2,
+            "buysOffered": 15,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 16,
+            "finalHandValue": 125,
+            "wasShanghaied": true
+          },
+          "AI 3": {
+            "drewFromDiscard": 54,
+            "drewFromPile": 6,
             "buysMade": 3,
-            "buysOffered": 36,
+            "buysOffered": 16,
             "turnLaidDown": 0,
             "meldsLaidDown": 0,
             "cardsLaidOff": 0,
             "jokerSwaps": 0,
             "finalHandSize": 18,
-            "finalHandValue": 140,
-            "wasShanghaied": true
-          },
-          "AI 2": {
-            "drewFromDiscard": 49,
-            "drewFromPile": 11,
-            "buysMade": 4,
-            "buysOffered": 44,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 20,
-            "finalHandValue": 160,
-            "wasShanghaied": true
-          },
-          "AI 3": {
-            "drewFromDiscard": 43,
-            "drewFromPile": 17,
-            "buysMade": 4,
-            "buysOffered": 40,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 20,
-            "finalHandValue": 180,
+            "finalHandValue": 170,
             "wasShanghaied": true
           },
           "AI 4": {
-            "drewFromDiscard": 48,
-            "drewFromPile": 12,
-            "buysMade": 4,
-            "buysOffered": 43,
+            "drewFromDiscard": 54,
+            "drewFromPile": 6,
+            "buysMade": 3,
+            "buysOffered": 14,
             "turnLaidDown": 0,
             "meldsLaidDown": 0,
             "cardsLaidOff": 0,
             "jokerSwaps": 0,
-            "finalHandSize": 20,
-            "finalHandValue": 140,
+            "finalHandSize": 18,
+            "finalHandValue": 120,
             "wasShanghaied": true
           }
         },
         "stalemate": true,
-        "jokersDealt": 1,
-        "jokersStuckInHand": 4
+        "jokersDealt": 0,
+        "jokersStuckInHand": 3
       }
     ],
     "totalTurns": 241,
-    "totalBuys": 15,
-    "duration": 430,
+    "totalBuys": 9,
+    "duration": 243,
+    "playerPersonalities": [
+      "the-shark",
+      "the-shark",
+      "the-shark",
+      "the-shark"
+    ]
+  },
+  {
+    "gameId": 18,
+    "players": [
+      "AI 1",
+      "AI 2",
+      "AI 3",
+      "AI 4"
+    ],
+    "winner": "AI 3",
+    "finalScores": [
+      5,
+      145,
+      0,
+      25
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "AI 3",
+        "turnsInRound": 66,
+        "shanghaiVictims": [
+          "AI 2"
+        ],
+        "scores": {
+          "AI 1": 5,
+          "AI 2": 145,
+          "AI 3": 0,
+          "AI 4": 25
+        },
+        "playerStats": {
+          "AI 1": {
+            "drewFromDiscard": 7,
+            "drewFromPile": 9,
+            "buysMade": 3,
+            "buysOffered": 30,
+            "turnLaidDown": 56,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          },
+          "AI 2": {
+            "drewFromDiscard": 8,
+            "drewFromPile": 9,
+            "buysMade": 2,
+            "buysOffered": 30,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 16,
+            "finalHandValue": 145,
+            "wasShanghaied": true
+          },
+          "AI 3": {
+            "drewFromDiscard": 6,
+            "drewFromPile": 11,
+            "buysMade": 3,
+            "buysOffered": 29,
+            "turnLaidDown": 42,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 3,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          },
+          "AI 4": {
+            "drewFromDiscard": 2,
+            "drewFromPile": 14,
+            "buysMade": 4,
+            "buysOffered": 28,
+            "turnLaidDown": 51,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 5,
+            "finalHandValue": 25,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 1
+      }
+    ],
+    "totalTurns": 66,
+    "totalBuys": 12,
+    "duration": 75,
+    "playerPersonalities": [
+      "the-shark",
+      "the-shark",
+      "the-shark",
+      "the-shark"
+    ]
+  },
+  {
+    "gameId": 19,
+    "players": [
+      "AI 1",
+      "AI 2",
+      "AI 3",
+      "AI 4"
+    ],
+    "winner": "AI 1",
+    "finalScores": [
+      0,
+      10,
+      35,
+      185
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "AI 1",
+        "turnsInRound": 60,
+        "shanghaiVictims": [
+          "AI 4"
+        ],
+        "scores": {
+          "AI 1": 0,
+          "AI 2": 10,
+          "AI 3": 35,
+          "AI 4": 185
+        },
+        "playerStats": {
+          "AI 1": {
+            "drewFromDiscard": 6,
+            "drewFromPile": 9,
+            "buysMade": 1,
+            "buysOffered": 20,
+            "turnLaidDown": 52,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 1,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          },
+          "AI 2": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 11,
+            "buysMade": 4,
+            "buysOffered": 23,
+            "turnLaidDown": 53,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          },
+          "AI 3": {
+            "drewFromDiscard": 6,
+            "drewFromPile": 9,
+            "buysMade": 4,
+            "buysOffered": 23,
+            "turnLaidDown": 54,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 5,
+            "finalHandValue": 35,
+            "wasShanghaied": false
+          },
+          "AI 4": {
+            "drewFromDiscard": 8,
+            "drewFromPile": 7,
+            "buysMade": 5,
+            "buysOffered": 14,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 22,
+            "finalHandValue": 185,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      }
+    ],
+    "totalTurns": 60,
+    "totalBuys": 14,
+    "duration": 92,
     "playerPersonalities": [
       "the-shark",
       "the-shark",
@@ -3263,12 +3264,12 @@
       "AI 3",
       "AI 4"
     ],
-    "winner": "AI 3",
+    "winner": "AI 1",
     "finalScores": [
-      25,
-      110,
       0,
-      115
+      125,
+      80,
+      140
     ],
     "rounds": [
       {
@@ -3346,51 +3347,26 @@
       {
         "roundNumber": 7,
         "requirement": "3 Runs",
-        "wentOut": "AI 3",
-        "turnsInRound": 78,
+        "wentOut": "AI 1",
+        "turnsInRound": 32,
         "shanghaiVictims": [
           "AI 2",
+          "AI 3",
           "AI 4"
         ],
         "scores": {
-          "AI 1": 25,
-          "AI 2": 110,
-          "AI 3": 0,
-          "AI 4": 115
+          "AI 1": 0,
+          "AI 2": 125,
+          "AI 3": 80,
+          "AI 4": 140
         },
         "playerStats": {
           "AI 1": {
-            "drewFromDiscard": 7,
-            "drewFromPile": 12,
-            "buysMade": 1,
-            "buysOffered": 34,
-            "turnLaidDown": 68,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 1,
-            "finalHandValue": 25,
-            "wasShanghaied": false
-          },
-          "AI 2": {
-            "drewFromDiscard": 10,
-            "drewFromPile": 10,
-            "buysMade": 1,
-            "buysOffered": 38,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 14,
-            "finalHandValue": 110,
-            "wasShanghaied": true
-          },
-          "AI 3": {
-            "drewFromDiscard": 2,
-            "drewFromPile": 18,
-            "buysMade": 1,
-            "buysOffered": 30,
-            "turnLaidDown": 26,
+            "drewFromDiscard": 0,
+            "drewFromPile": 8,
+            "buysMade": 0,
+            "buysOffered": 10,
+            "turnLaidDown": 16,
             "meldsLaidDown": 3,
             "cardsLaidOff": 2,
             "jokerSwaps": 0,
@@ -3398,28 +3374,54 @@
             "finalHandValue": 0,
             "wasShanghaied": false
           },
-          "AI 4": {
-            "drewFromDiscard": 9,
-            "drewFromPile": 10,
-            "buysMade": 4,
-            "buysOffered": 40,
+          "AI 2": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 3,
+            "buysMade": 2,
+            "buysOffered": 18,
             "turnLaidDown": 0,
             "meldsLaidDown": 0,
             "cardsLaidOff": 0,
             "jokerSwaps": 0,
-            "finalHandSize": 20,
-            "finalHandValue": 115,
+            "finalHandSize": 16,
+            "finalHandValue": 125,
+            "wasShanghaied": true
+          },
+          "AI 3": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 4,
+            "buysMade": 1,
+            "buysOffered": 15,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 14,
+            "finalHandValue": 80,
+            "wasShanghaied": true
+          },
+          "AI 4": {
+            "drewFromDiscard": 2,
+            "drewFromPile": 6,
+            "buysMade": 2,
+            "buysOffered": 13,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 16,
+            "finalHandValue": 140,
             "wasShanghaied": true
           }
         },
         "stalemate": false,
-        "jokersDealt": 1,
+        "jokersDealt": 3,
         "jokersStuckInHand": 1
       }
     ],
-    "totalTurns": 78,
-    "totalBuys": 7,
-    "duration": 83,
+    "totalTurns": 32,
+    "totalBuys": 5,
+    "duration": 42,
     "playerPersonalities": [
       "the-shark",
       "the-shark",
@@ -3435,696 +3437,11 @@
       "AI 3",
       "AI 4"
     ],
-    "winner": "AI 3",
-    "finalScores": [
-      5,
-      5,
-      0,
-      155
-    ],
-    "rounds": [
-      {
-        "roundNumber": 1,
-        "requirement": "2 Sets",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 2,
-        "requirement": "1 Set + 1 Run",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 3,
-        "requirement": "2 Runs",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 4,
-        "requirement": "3 Sets",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 5,
-        "requirement": "2 Sets + 1 Run",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 6,
-        "requirement": "1 Set + 2 Runs",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 7,
-        "requirement": "3 Runs",
-        "wentOut": "AI 3",
-        "turnsInRound": 38,
-        "shanghaiVictims": [
-          "AI 4"
-        ],
-        "scores": {
-          "AI 1": 5,
-          "AI 2": 5,
-          "AI 3": 0,
-          "AI 4": 155
-        },
-        "playerStats": {
-          "AI 1": {
-            "drewFromDiscard": 3,
-            "drewFromPile": 6,
-            "buysMade": 2,
-            "buysOffered": 14,
-            "turnLaidDown": 28,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 1,
-            "finalHandValue": 5,
-            "wasShanghaied": false
-          },
-          "AI 2": {
-            "drewFromDiscard": 4,
-            "drewFromPile": 6,
-            "buysMade": 2,
-            "buysOffered": 14,
-            "turnLaidDown": 29,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 1,
-            "finalHandSize": 1,
-            "finalHandValue": 5,
-            "wasShanghaied": false
-          },
-          "AI 3": {
-            "drewFromDiscard": 4,
-            "drewFromPile": 6,
-            "buysMade": 2,
-            "buysOffered": 13,
-            "turnLaidDown": 26,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 2,
-            "jokerSwaps": 1,
-            "finalHandSize": 0,
-            "finalHandValue": 0,
-            "wasShanghaied": false
-          },
-          "AI 4": {
-            "drewFromDiscard": 5,
-            "drewFromPile": 4,
-            "buysMade": 2,
-            "buysOffered": 16,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 16,
-            "finalHandValue": 155,
-            "wasShanghaied": true
-          }
-        },
-        "stalemate": false,
-        "jokersDealt": 2,
-        "jokersStuckInHand": 1
-      }
-    ],
-    "totalTurns": 38,
-    "totalBuys": 8,
-    "duration": 32,
-    "playerPersonalities": [
-      "the-shark",
-      "the-shark",
-      "the-shark",
-      "the-shark"
-    ]
-  },
-  {
-    "gameId": 22,
-    "players": [
-      "AI 1",
-      "AI 2",
-      "AI 3",
-      "AI 4"
-    ],
-    "winner": "AI 4",
-    "finalScores": [
-      120,
-      5,
-      5,
-      0
-    ],
-    "rounds": [
-      {
-        "roundNumber": 1,
-        "requirement": "2 Sets",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 2,
-        "requirement": "1 Set + 1 Run",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 3,
-        "requirement": "2 Runs",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 4,
-        "requirement": "3 Sets",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 5,
-        "requirement": "2 Sets + 1 Run",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 6,
-        "requirement": "1 Set + 2 Runs",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 7,
-        "requirement": "3 Runs",
-        "wentOut": "AI 4",
-        "turnsInRound": 91,
-        "shanghaiVictims": [
-          "AI 1"
-        ],
-        "scores": {
-          "AI 1": 120,
-          "AI 2": 5,
-          "AI 3": 5,
-          "AI 4": 0
-        },
-        "playerStats": {
-          "AI 1": {
-            "drewFromDiscard": 10,
-            "drewFromPile": 12,
-            "buysMade": 3,
-            "buysOffered": 40,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 18,
-            "finalHandValue": 120,
-            "wasShanghaied": true
-          },
-          "AI 2": {
-            "drewFromDiscard": 4,
-            "drewFromPile": 19,
-            "buysMade": 2,
-            "buysOffered": 36,
-            "turnLaidDown": 85,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 1,
-            "finalHandSize": 1,
-            "finalHandValue": 5,
-            "wasShanghaied": false
-          },
-          "AI 3": {
-            "drewFromDiscard": 11,
-            "drewFromPile": 12,
-            "buysMade": 4,
-            "buysOffered": 42,
-            "turnLaidDown": 82,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 1,
-            "finalHandSize": 1,
-            "finalHandValue": 5,
-            "wasShanghaied": false
-          },
-          "AI 4": {
-            "drewFromDiscard": 8,
-            "drewFromPile": 15,
-            "buysMade": 4,
-            "buysOffered": 40,
-            "turnLaidDown": 75,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 2,
-            "jokerSwaps": 1,
-            "finalHandSize": 0,
-            "finalHandValue": 0,
-            "wasShanghaied": false
-          }
-        },
-        "stalemate": false,
-        "jokersDealt": 4,
-        "jokersStuckInHand": 0
-      }
-    ],
-    "totalTurns": 91,
-    "totalBuys": 13,
-    "duration": 172,
-    "playerPersonalities": [
-      "the-shark",
-      "the-shark",
-      "the-shark",
-      "the-shark"
-    ]
-  },
-  {
-    "gameId": 23,
-    "players": [
-      "AI 1",
-      "AI 2",
-      "AI 3",
-      "AI 4"
-    ],
-    "winner": "AI 4",
-    "finalScores": [
-      35,
-      145,
-      120,
-      0
-    ],
-    "rounds": [
-      {
-        "roundNumber": 1,
-        "requirement": "2 Sets",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 2,
-        "requirement": "1 Set + 1 Run",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 3,
-        "requirement": "2 Runs",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 4,
-        "requirement": "3 Sets",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 5,
-        "requirement": "2 Sets + 1 Run",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 6,
-        "requirement": "1 Set + 2 Runs",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 7,
-        "requirement": "3 Runs",
-        "wentOut": "AI 4",
-        "turnsInRound": 63,
-        "shanghaiVictims": [
-          "AI 2",
-          "AI 3"
-        ],
-        "scores": {
-          "AI 1": 35,
-          "AI 2": 145,
-          "AI 3": 120,
-          "AI 4": 0
-        },
-        "playerStats": {
-          "AI 1": {
-            "drewFromDiscard": 5,
-            "drewFromPile": 10,
-            "buysMade": 4,
-            "buysOffered": 28,
-            "turnLaidDown": 44,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 6,
-            "finalHandValue": 35,
-            "wasShanghaied": false
-          },
-          "AI 2": {
-            "drewFromDiscard": 5,
-            "drewFromPile": 11,
-            "buysMade": 2,
-            "buysOffered": 25,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 16,
-            "finalHandValue": 145,
-            "wasShanghaied": true
-          },
-          "AI 3": {
-            "drewFromDiscard": 6,
-            "drewFromPile": 10,
-            "buysMade": 1,
-            "buysOffered": 28,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 14,
-            "finalHandValue": 120,
-            "wasShanghaied": true
-          },
-          "AI 4": {
-            "drewFromDiscard": 5,
-            "drewFromPile": 11,
-            "buysMade": 4,
-            "buysOffered": 29,
-            "turnLaidDown": 47,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 2,
-            "jokerSwaps": 2,
-            "finalHandSize": 0,
-            "finalHandValue": 0,
-            "wasShanghaied": false
-          }
-        },
-        "stalemate": false,
-        "jokersDealt": 3,
-        "jokersStuckInHand": 2
-      }
-    ],
-    "totalTurns": 63,
-    "totalBuys": 11,
-    "duration": 97,
-    "playerPersonalities": [
-      "the-shark",
-      "the-shark",
-      "the-shark",
-      "the-shark"
-    ]
-  },
-  {
-    "gameId": 24,
-    "players": [
-      "AI 1",
-      "AI 2",
-      "AI 3",
-      "AI 4"
-    ],
-    "winner": "AI 3",
-    "finalScores": [
-      5,
-      10,
-      0,
-      95
-    ],
-    "rounds": [
-      {
-        "roundNumber": 1,
-        "requirement": "2 Sets",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 2,
-        "requirement": "1 Set + 1 Run",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 3,
-        "requirement": "2 Runs",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 4,
-        "requirement": "3 Sets",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 5,
-        "requirement": "2 Sets + 1 Run",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 6,
-        "requirement": "1 Set + 2 Runs",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 7,
-        "requirement": "3 Runs",
-        "wentOut": "AI 3",
-        "turnsInRound": 130,
-        "shanghaiVictims": [
-          "AI 4"
-        ],
-        "scores": {
-          "AI 1": 5,
-          "AI 2": 10,
-          "AI 3": 0,
-          "AI 4": 95
-        },
-        "playerStats": {
-          "AI 1": {
-            "drewFromDiscard": 11,
-            "drewFromPile": 21,
-            "buysMade": 3,
-            "buysOffered": 53,
-            "turnLaidDown": 120,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 2,
-            "finalHandSize": 1,
-            "finalHandValue": 5,
-            "wasShanghaied": false
-          },
-          "AI 2": {
-            "drewFromDiscard": 10,
-            "drewFromPile": 23,
-            "buysMade": 3,
-            "buysOffered": 52,
-            "turnLaidDown": 61,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 2,
-            "finalHandValue": 10,
-            "wasShanghaied": false
-          },
-          "AI 3": {
-            "drewFromDiscard": 17,
-            "drewFromPile": 16,
-            "buysMade": 5,
-            "buysOffered": 32,
-            "turnLaidDown": 126,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 2,
-            "jokerSwaps": 3,
-            "finalHandSize": 0,
-            "finalHandValue": 0,
-            "wasShanghaied": false
-          },
-          "AI 4": {
-            "drewFromDiscard": 14,
-            "drewFromPile": 18,
-            "buysMade": 3,
-            "buysOffered": 54,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 18,
-            "finalHandValue": 95,
-            "wasShanghaied": true
-          }
-        },
-        "stalemate": false,
-        "jokersDealt": 4,
-        "jokersStuckInHand": 0
-      }
-    ],
-    "totalTurns": 130,
-    "totalBuys": 14,
-    "duration": 234,
-    "playerPersonalities": [
-      "the-shark",
-      "the-shark",
-      "the-shark",
-      "the-shark"
-    ]
-  },
-  {
-    "gameId": 25,
-    "players": [
-      "AI 1",
-      "AI 2",
-      "AI 3",
-      "AI 4"
-    ],
     "winner": "AI 2",
     "finalScores": [
-      5,
+      130,
       0,
-      170,
+      5,
       5
     ],
     "rounds": [
@@ -4206,63 +3523,63 @@
         "wentOut": "AI 2",
         "turnsInRound": 77,
         "shanghaiVictims": [
-          "AI 3"
+          "AI 1"
         ],
         "scores": {
-          "AI 1": 5,
+          "AI 1": 130,
           "AI 2": 0,
-          "AI 3": 170,
+          "AI 3": 5,
           "AI 4": 5
         },
         "playerStats": {
           "AI 1": {
-            "drewFromDiscard": 7,
-            "drewFromPile": 12,
-            "buysMade": 3,
-            "buysOffered": 28,
-            "turnLaidDown": 64,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 3,
-            "finalHandSize": 1,
-            "finalHandValue": 5,
-            "wasShanghaied": false
-          },
-          "AI 2": {
-            "drewFromDiscard": 7,
-            "drewFromPile": 13,
-            "buysMade": 2,
-            "buysOffered": 28,
-            "turnLaidDown": 65,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 2,
-            "jokerSwaps": 1,
-            "finalHandSize": 0,
-            "finalHandValue": 0,
-            "wasShanghaied": false
-          },
-          "AI 3": {
             "drewFromDiscard": 9,
             "drewFromPile": 10,
             "buysMade": 4,
-            "buysOffered": 32,
+            "buysOffered": 34,
             "turnLaidDown": 0,
             "meldsLaidDown": 0,
             "cardsLaidOff": 0,
             "jokerSwaps": 0,
             "finalHandSize": 20,
-            "finalHandValue": 170,
+            "finalHandValue": 130,
             "wasShanghaied": true
           },
-          "AI 4": {
-            "drewFromDiscard": 9,
-            "drewFromPile": 10,
+          "AI 2": {
+            "drewFromDiscard": 6,
+            "drewFromPile": 14,
             "buysMade": 3,
-            "buysOffered": 30,
-            "turnLaidDown": 71,
+            "buysOffered": 31,
+            "turnLaidDown": 57,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 3,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          },
+          "AI 3": {
+            "drewFromDiscard": 6,
+            "drewFromPile": 13,
+            "buysMade": 4,
+            "buysOffered": 33,
+            "turnLaidDown": 58,
             "meldsLaidDown": 3,
             "cardsLaidOff": 0,
-            "jokerSwaps": 1,
+            "jokerSwaps": 0,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          },
+          "AI 4": {
+            "drewFromDiscard": 7,
+            "drewFromPile": 12,
+            "buysMade": 3,
+            "buysOffered": 32,
+            "turnLaidDown": 55,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
             "finalHandSize": 1,
             "finalHandValue": 5,
             "wasShanghaied": false
@@ -4274,8 +3591,8 @@
       }
     ],
     "totalTurns": 77,
-    "totalBuys": 12,
-    "duration": 106,
+    "totalBuys": 14,
+    "duration": 82,
     "playerPersonalities": [
       "the-shark",
       "the-shark",
@@ -4284,349 +3601,7 @@
     ]
   },
   {
-    "gameId": 26,
-    "players": [
-      "AI 1",
-      "AI 2",
-      "AI 3",
-      "AI 4"
-    ],
-    "winner": "AI 3",
-    "finalScores": [
-      5,
-      185,
-      0,
-      10
-    ],
-    "rounds": [
-      {
-        "roundNumber": 1,
-        "requirement": "2 Sets",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 2,
-        "requirement": "1 Set + 1 Run",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 3,
-        "requirement": "2 Runs",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 4,
-        "requirement": "3 Sets",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 5,
-        "requirement": "2 Sets + 1 Run",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 6,
-        "requirement": "1 Set + 2 Runs",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 7,
-        "requirement": "3 Runs",
-        "wentOut": "AI 3",
-        "turnsInRound": 154,
-        "shanghaiVictims": [
-          "AI 2"
-        ],
-        "scores": {
-          "AI 1": 5,
-          "AI 2": 185,
-          "AI 3": 0,
-          "AI 4": 10
-        },
-        "playerStats": {
-          "AI 1": {
-            "drewFromDiscard": 14,
-            "drewFromPile": 24,
-            "buysMade": 2,
-            "buysOffered": 70,
-            "turnLaidDown": 132,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 1,
-            "finalHandSize": 1,
-            "finalHandValue": 5,
-            "wasShanghaied": false
-          },
-          "AI 2": {
-            "drewFromDiscard": 19,
-            "drewFromPile": 20,
-            "buysMade": 3,
-            "buysOffered": 75,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 18,
-            "finalHandValue": 185,
-            "wasShanghaied": true
-          },
-          "AI 3": {
-            "drewFromDiscard": 3,
-            "drewFromPile": 36,
-            "buysMade": 2,
-            "buysOffered": 57,
-            "turnLaidDown": 26,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 2,
-            "jokerSwaps": 2,
-            "finalHandSize": 0,
-            "finalHandValue": 0,
-            "wasShanghaied": false
-          },
-          "AI 4": {
-            "drewFromDiscard": 21,
-            "drewFromPile": 17,
-            "buysMade": 3,
-            "buysOffered": 77,
-            "turnLaidDown": 139,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 1,
-            "finalHandSize": 2,
-            "finalHandValue": 10,
-            "wasShanghaied": false
-          }
-        },
-        "stalemate": false,
-        "jokersDealt": 1,
-        "jokersStuckInHand": 0
-      }
-    ],
-    "totalTurns": 154,
-    "totalBuys": 10,
-    "duration": 174,
-    "playerPersonalities": [
-      "the-shark",
-      "the-shark",
-      "the-shark",
-      "the-shark"
-    ]
-  },
-  {
-    "gameId": 27,
-    "players": [
-      "AI 1",
-      "AI 2",
-      "AI 3",
-      "AI 4"
-    ],
-    "winner": "AI 1",
-    "finalScores": [
-      0,
-      160,
-      10,
-      10
-    ],
-    "rounds": [
-      {
-        "roundNumber": 1,
-        "requirement": "2 Sets",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 2,
-        "requirement": "1 Set + 1 Run",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 3,
-        "requirement": "2 Runs",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 4,
-        "requirement": "3 Sets",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 5,
-        "requirement": "2 Sets + 1 Run",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 6,
-        "requirement": "1 Set + 2 Runs",
-        "wentOut": "(skipped)",
-        "turnsInRound": 0,
-        "shanghaiVictims": [],
-        "scores": {},
-        "playerStats": {},
-        "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
-      },
-      {
-        "roundNumber": 7,
-        "requirement": "3 Runs",
-        "wentOut": "AI 1",
-        "turnsInRound": 44,
-        "shanghaiVictims": [
-          "AI 2"
-        ],
-        "scores": {
-          "AI 1": 0,
-          "AI 2": 160,
-          "AI 3": 10,
-          "AI 4": 10
-        },
-        "playerStats": {
-          "AI 1": {
-            "drewFromDiscard": 3,
-            "drewFromPile": 8,
-            "buysMade": 1,
-            "buysOffered": 20,
-            "turnLaidDown": 36,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 2,
-            "jokerSwaps": 2,
-            "finalHandSize": 0,
-            "finalHandValue": 0,
-            "wasShanghaied": false
-          },
-          "AI 2": {
-            "drewFromDiscard": 2,
-            "drewFromPile": 9,
-            "buysMade": 3,
-            "buysOffered": 22,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 18,
-            "finalHandValue": 160,
-            "wasShanghaied": true
-          },
-          "AI 3": {
-            "drewFromDiscard": 5,
-            "drewFromPile": 6,
-            "buysMade": 4,
-            "buysOffered": 24,
-            "turnLaidDown": 34,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 2,
-            "finalHandSize": 2,
-            "finalHandValue": 10,
-            "wasShanghaied": false
-          },
-          "AI 4": {
-            "drewFromDiscard": 1,
-            "drewFromPile": 10,
-            "buysMade": 4,
-            "buysOffered": 20,
-            "turnLaidDown": 31,
-            "meldsLaidDown": 3,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 1,
-            "finalHandSize": 2,
-            "finalHandValue": 10,
-            "wasShanghaied": false
-          }
-        },
-        "stalemate": false,
-        "jokersDealt": 2,
-        "jokersStuckInHand": 1
-      }
-    ],
-    "totalTurns": 44,
-    "totalBuys": 12,
-    "duration": 48,
-    "playerPersonalities": [
-      "the-shark",
-      "the-shark",
-      "the-shark",
-      "the-shark"
-    ]
-  },
-  {
-    "gameId": 28,
+    "gameId": 22,
     "players": [
       "AI 1",
       "AI 2",
@@ -4635,10 +3610,10 @@
     ],
     "winner": "AI 2",
     "finalScores": [
-      10,
+      125,
       0,
-      25,
-      5
+      20,
+      40
     ],
     "rounds": [
       {
@@ -4717,76 +3692,78 @@
         "roundNumber": 7,
         "requirement": "3 Runs",
         "wentOut": "AI 2",
-        "turnsInRound": 65,
-        "shanghaiVictims": [],
+        "turnsInRound": 57,
+        "shanghaiVictims": [
+          "AI 1"
+        ],
         "scores": {
-          "AI 1": 10,
+          "AI 1": 125,
           "AI 2": 0,
-          "AI 3": 25,
-          "AI 4": 5
+          "AI 3": 20,
+          "AI 4": 40
         },
         "playerStats": {
           "AI 1": {
             "drewFromDiscard": 7,
-            "drewFromPile": 9,
-            "buysMade": 4,
-            "buysOffered": 32,
-            "turnLaidDown": 60,
-            "meldsLaidDown": 3,
+            "drewFromPile": 7,
+            "buysMade": 3,
+            "buysOffered": 24,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
             "cardsLaidOff": 0,
-            "jokerSwaps": 1,
-            "finalHandSize": 1,
-            "finalHandValue": 10,
-            "wasShanghaied": false
+            "jokerSwaps": 0,
+            "finalHandSize": 18,
+            "finalHandValue": 125,
+            "wasShanghaied": true
           },
           "AI 2": {
-            "drewFromDiscard": 3,
-            "drewFromPile": 14,
-            "buysMade": 3,
-            "buysOffered": 25,
-            "turnLaidDown": 41,
+            "drewFromDiscard": 6,
+            "drewFromPile": 9,
+            "buysMade": 2,
+            "buysOffered": 21,
+            "turnLaidDown": 45,
             "meldsLaidDown": 3,
             "cardsLaidOff": 2,
-            "jokerSwaps": 2,
+            "jokerSwaps": 1,
             "finalHandSize": 0,
             "finalHandValue": 0,
             "wasShanghaied": false
           },
           "AI 3": {
-            "drewFromDiscard": 9,
-            "drewFromPile": 7,
-            "buysMade": 4,
-            "buysOffered": 32,
-            "turnLaidDown": 58,
+            "drewFromDiscard": 4,
+            "drewFromPile": 10,
+            "buysMade": 3,
+            "buysOffered": 23,
+            "turnLaidDown": 46,
             "meldsLaidDown": 3,
             "cardsLaidOff": 0,
             "jokerSwaps": 1,
-            "finalHandSize": 1,
-            "finalHandValue": 25,
+            "finalHandSize": 4,
+            "finalHandValue": 20,
             "wasShanghaied": false
           },
           "AI 4": {
-            "drewFromDiscard": 2,
-            "drewFromPile": 14,
-            "buysMade": 2,
-            "buysOffered": 26,
-            "turnLaidDown": 59,
+            "drewFromDiscard": 4,
+            "drewFromPile": 10,
+            "buysMade": 5,
+            "buysOffered": 11,
+            "turnLaidDown": 43,
             "meldsLaidDown": 3,
             "cardsLaidOff": 0,
-            "jokerSwaps": 1,
-            "finalHandSize": 1,
-            "finalHandValue": 5,
+            "jokerSwaps": 0,
+            "finalHandSize": 6,
+            "finalHandValue": 40,
             "wasShanghaied": false
           }
         },
         "stalemate": false,
         "jokersDealt": 2,
-        "jokersStuckInHand": 1
+        "jokersStuckInHand": 0
       }
     ],
-    "totalTurns": 65,
+    "totalTurns": 57,
     "totalBuys": 13,
-    "duration": 82,
+    "duration": 63,
     "playerPersonalities": [
       "the-shark",
       "the-shark",
@@ -4795,7 +3772,178 @@
     ]
   },
   {
-    "gameId": 29,
+    "gameId": 23,
+    "players": [
+      "AI 1",
+      "AI 2",
+      "AI 3",
+      "AI 4"
+    ],
+    "winner": "AI 1",
+    "finalScores": [
+      0,
+      35,
+      110,
+      15
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "AI 1",
+        "turnsInRound": 72,
+        "shanghaiVictims": [
+          "AI 3"
+        ],
+        "scores": {
+          "AI 1": 0,
+          "AI 2": 35,
+          "AI 3": 110,
+          "AI 4": 15
+        },
+        "playerStats": {
+          "AI 1": {
+            "drewFromDiscard": 8,
+            "drewFromPile": 10,
+            "buysMade": 2,
+            "buysOffered": 24,
+            "turnLaidDown": 64,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 2,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          },
+          "AI 2": {
+            "drewFromDiscard": 9,
+            "drewFromPile": 9,
+            "buysMade": 4,
+            "buysOffered": 27,
+            "turnLaidDown": 69,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 5,
+            "finalHandValue": 35,
+            "wasShanghaied": false
+          },
+          "AI 3": {
+            "drewFromDiscard": 7,
+            "drewFromPile": 11,
+            "buysMade": 3,
+            "buysOffered": 26,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 18,
+            "finalHandValue": 110,
+            "wasShanghaied": true
+          },
+          "AI 4": {
+            "drewFromDiscard": 7,
+            "drewFromPile": 11,
+            "buysMade": 5,
+            "buysOffered": 7,
+            "turnLaidDown": 71,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 2,
+            "finalHandValue": 15,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 1
+      }
+    ],
+    "totalTurns": 72,
+    "totalBuys": 14,
+    "duration": 105,
+    "playerPersonalities": [
+      "the-shark",
+      "the-shark",
+      "the-shark",
+      "the-shark"
+    ]
+  },
+  {
+    "gameId": 24,
     "players": [
       "AI 1",
       "AI 2",
@@ -4804,10 +3952,10 @@
     ],
     "winner": "AI 3",
     "finalScores": [
-      25,
-      35,
+      10,
+      70,
       0,
-      10
+      110
     ],
     "rounds": [
       {
@@ -4886,75 +4034,932 @@
         "roundNumber": 7,
         "requirement": "3 Runs",
         "wentOut": "AI 3",
-        "turnsInRound": 74,
-        "shanghaiVictims": [],
+        "turnsInRound": 42,
+        "shanghaiVictims": [
+          "AI 2",
+          "AI 4"
+        ],
         "scores": {
-          "AI 1": 25,
-          "AI 2": 35,
+          "AI 1": 10,
+          "AI 2": 70,
           "AI 3": 0,
-          "AI 4": 10
+          "AI 4": 110
         },
         "playerStats": {
           "AI 1": {
-            "drewFromDiscard": 8,
-            "drewFromPile": 10,
-            "buysMade": 3,
-            "buysOffered": 33,
-            "turnLaidDown": 72,
+            "drewFromDiscard": 3,
+            "drewFromPile": 7,
+            "buysMade": 2,
+            "buysOffered": 16,
+            "turnLaidDown": 24,
             "meldsLaidDown": 3,
             "cardsLaidOff": 0,
-            "jokerSwaps": 1,
-            "finalHandSize": 3,
-            "finalHandValue": 25,
+            "jokerSwaps": 0,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
             "wasShanghaied": false
           },
           "AI 2": {
-            "drewFromDiscard": 7,
-            "drewFromPile": 12,
-            "buysMade": 4,
-            "buysOffered": 33,
-            "turnLaidDown": 69,
-            "meldsLaidDown": 3,
+            "drewFromDiscard": 5,
+            "drewFromPile": 6,
+            "buysMade": 0,
+            "buysOffered": 16,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
             "cardsLaidOff": 0,
-            "jokerSwaps": 1,
-            "finalHandSize": 4,
-            "finalHandValue": 35,
-            "wasShanghaied": false
+            "jokerSwaps": 0,
+            "finalHandSize": 12,
+            "finalHandValue": 70,
+            "wasShanghaied": true
           },
           "AI 3": {
-            "drewFromDiscard": 6,
-            "drewFromPile": 13,
-            "buysMade": 3,
-            "buysOffered": 30,
-            "turnLaidDown": 50,
+            "drewFromDiscard": 4,
+            "drewFromPile": 7,
+            "buysMade": 2,
+            "buysOffered": 17,
+            "turnLaidDown": 30,
             "meldsLaidDown": 3,
             "cardsLaidOff": 2,
-            "jokerSwaps": 0,
+            "jokerSwaps": 1,
             "finalHandSize": 0,
             "finalHandValue": 0,
             "wasShanghaied": false
           },
           "AI 4": {
             "drewFromDiscard": 5,
-            "drewFromPile": 13,
-            "buysMade": 4,
+            "drewFromPile": 5,
+            "buysMade": 2,
+            "buysOffered": 19,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 16,
+            "finalHandValue": 110,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      }
+    ],
+    "totalTurns": 42,
+    "totalBuys": 6,
+    "duration": 34,
+    "playerPersonalities": [
+      "the-shark",
+      "the-shark",
+      "the-shark",
+      "the-shark"
+    ]
+  },
+  {
+    "gameId": 25,
+    "players": [
+      "AI 1",
+      "AI 2",
+      "AI 3",
+      "AI 4"
+    ],
+    "winner": "AI 3",
+    "finalScores": [
+      5,
+      135,
+      0,
+      15
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "AI 3",
+        "turnsInRound": 62,
+        "shanghaiVictims": [
+          "AI 2"
+        ],
+        "scores": {
+          "AI 1": 5,
+          "AI 2": 135,
+          "AI 3": 0,
+          "AI 4": 15
+        },
+        "playerStats": {
+          "AI 1": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 12,
+            "buysMade": 2,
+            "buysOffered": 27,
+            "turnLaidDown": 40,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          },
+          "AI 2": {
+            "drewFromDiscard": 8,
+            "drewFromPile": 8,
+            "buysMade": 2,
             "buysOffered": 30,
-            "turnLaidDown": 51,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 16,
+            "finalHandValue": 135,
+            "wasShanghaied": true
+          },
+          "AI 3": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 11,
+            "buysMade": 3,
+            "buysOffered": 28,
+            "turnLaidDown": 58,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 1,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          },
+          "AI 4": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 11,
+            "buysMade": 3,
+            "buysOffered": 28,
+            "turnLaidDown": 59,
             "meldsLaidDown": 3,
             "cardsLaidOff": 0,
             "jokerSwaps": 2,
             "finalHandSize": 2,
-            "finalHandValue": 10,
+            "finalHandValue": 15,
             "wasShanghaied": false
           }
         },
         "stalemate": false,
-        "jokersDealt": 0,
+        "jokersDealt": 1,
         "jokersStuckInHand": 0
       }
     ],
-    "totalTurns": 74,
-    "totalBuys": 14,
+    "totalTurns": 62,
+    "totalBuys": 10,
+    "duration": 86,
+    "playerPersonalities": [
+      "the-shark",
+      "the-shark",
+      "the-shark",
+      "the-shark"
+    ]
+  },
+  {
+    "gameId": 26,
+    "players": [
+      "AI 1",
+      "AI 2",
+      "AI 3",
+      "AI 4"
+    ],
+    "winner": "AI 4",
+    "finalScores": [
+      5,
+      10,
+      145,
+      0
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "AI 4",
+        "turnsInRound": 95,
+        "shanghaiVictims": [
+          "AI 3"
+        ],
+        "scores": {
+          "AI 1": 5,
+          "AI 2": 10,
+          "AI 3": 145,
+          "AI 4": 0
+        },
+        "playerStats": {
+          "AI 1": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 18,
+            "buysMade": 3,
+            "buysOffered": 49,
+            "turnLaidDown": 60,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          },
+          "AI 2": {
+            "drewFromDiscard": 7,
+            "drewFromPile": 17,
+            "buysMade": 4,
+            "buysOffered": 49,
+            "turnLaidDown": 81,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          },
+          "AI 3": {
+            "drewFromDiscard": 10,
+            "drewFromPile": 14,
+            "buysMade": 3,
+            "buysOffered": 50,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 18,
+            "finalHandValue": 145,
+            "wasShanghaied": true
+          },
+          "AI 4": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 20,
+            "buysMade": 1,
+            "buysOffered": 43,
+            "turnLaidDown": 43,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 1,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 2
+      }
+    ],
+    "totalTurns": 95,
+    "totalBuys": 11,
+    "duration": 151,
+    "playerPersonalities": [
+      "the-shark",
+      "the-shark",
+      "the-shark",
+      "the-shark"
+    ]
+  },
+  {
+    "gameId": 27,
+    "players": [
+      "AI 1",
+      "AI 2",
+      "AI 3",
+      "AI 4"
+    ],
+    "winner": "AI 4",
+    "finalScores": [
+      15,
+      100,
+      5,
+      0
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "AI 4",
+        "turnsInRound": 155,
+        "shanghaiVictims": [
+          "AI 2"
+        ],
+        "scores": {
+          "AI 1": 15,
+          "AI 2": 100,
+          "AI 3": 5,
+          "AI 4": 0
+        },
+        "playerStats": {
+          "AI 1": {
+            "drewFromDiscard": 15,
+            "drewFromPile": 23,
+            "buysMade": 4,
+            "buysOffered": 66,
+            "turnLaidDown": 144,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 3,
+            "finalHandValue": 15,
+            "wasShanghaied": false
+          },
+          "AI 2": {
+            "drewFromDiscard": 19,
+            "drewFromPile": 20,
+            "buysMade": 2,
+            "buysOffered": 68,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 16,
+            "finalHandValue": 100,
+            "wasShanghaied": true
+          },
+          "AI 3": {
+            "drewFromDiscard": 15,
+            "drewFromPile": 24,
+            "buysMade": 3,
+            "buysOffered": 67,
+            "turnLaidDown": 138,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          },
+          "AI 4": {
+            "drewFromDiscard": 13,
+            "drewFromPile": 26,
+            "buysMade": 4,
+            "buysOffered": 64,
+            "turnLaidDown": 147,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 1,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      }
+    ],
+    "totalTurns": 155,
+    "totalBuys": 13,
+    "duration": 258,
+    "playerPersonalities": [
+      "the-shark",
+      "the-shark",
+      "the-shark",
+      "the-shark"
+    ]
+  },
+  {
+    "gameId": 28,
+    "players": [
+      "AI 1",
+      "AI 2",
+      "AI 3",
+      "AI 4"
+    ],
+    "winner": "AI 3",
+    "finalScores": [
+      15,
+      155,
+      0,
+      110
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "AI 3",
+        "turnsInRound": 54,
+        "shanghaiVictims": [
+          "AI 2",
+          "AI 4"
+        ],
+        "scores": {
+          "AI 1": 15,
+          "AI 2": 155,
+          "AI 3": 0,
+          "AI 4": 110
+        },
+        "playerStats": {
+          "AI 1": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 8,
+            "buysMade": 2,
+            "buysOffered": 17,
+            "turnLaidDown": 40,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 3,
+            "finalHandValue": 15,
+            "wasShanghaied": false
+          },
+          "AI 2": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 9,
+            "buysMade": 2,
+            "buysOffered": 16,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 16,
+            "finalHandValue": 155,
+            "wasShanghaied": true
+          },
+          "AI 3": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 9,
+            "buysMade": 3,
+            "buysOffered": 17,
+            "turnLaidDown": 38,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 2,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          },
+          "AI 4": {
+            "drewFromDiscard": 10,
+            "drewFromPile": 3,
+            "buysMade": 3,
+            "buysOffered": 23,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 18,
+            "finalHandValue": 110,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 1
+      }
+    ],
+    "totalTurns": 54,
+    "totalBuys": 10,
+    "duration": 50,
+    "playerPersonalities": [
+      "the-shark",
+      "the-shark",
+      "the-shark",
+      "the-shark"
+    ]
+  },
+  {
+    "gameId": 29,
+    "players": [
+      "AI 1",
+      "AI 2",
+      "AI 3",
+      "AI 4"
+    ],
+    "winner": "AI 1",
+    "finalScores": [
+      0,
+      10,
+      10,
+      15
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "(skipped)",
+        "turnsInRound": 0,
+        "shanghaiVictims": [],
+        "scores": {},
+        "playerStats": {},
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "AI 1",
+        "turnsInRound": 68,
+        "shanghaiVictims": [],
+        "scores": {
+          "AI 1": 0,
+          "AI 2": 10,
+          "AI 3": 10,
+          "AI 4": 15
+        },
+        "playerStats": {
+          "AI 1": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 12,
+            "buysMade": 2,
+            "buysOffered": 24,
+            "turnLaidDown": 60,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 3,
+            "jokerSwaps": 1,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          },
+          "AI 2": {
+            "drewFromDiscard": 8,
+            "drewFromPile": 9,
+            "buysMade": 2,
+            "buysOffered": 30,
+            "turnLaidDown": 65,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          },
+          "AI 3": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 13,
+            "buysMade": 2,
+            "buysOffered": 27,
+            "turnLaidDown": 62,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          },
+          "AI 4": {
+            "drewFromDiscard": 10,
+            "drewFromPile": 7,
+            "buysMade": 3,
+            "buysOffered": 31,
+            "turnLaidDown": 67,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 2,
+            "finalHandValue": 15,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 0
+      }
+    ],
+    "totalTurns": 68,
+    "totalBuys": 9,
     "duration": 79,
     "playerPersonalities": [
       "the-shark",
@@ -4971,12 +4976,12 @@
       "AI 3",
       "AI 4"
     ],
-    "winner": "AI 3",
+    "winner": "AI 1",
     "finalScores": [
-      115,
-      125,
       0,
-      10
+      120,
+      130,
+      95
     ],
     "rounds": [
       {
@@ -5054,51 +5059,26 @@
       {
         "roundNumber": 7,
         "requirement": "3 Runs",
-        "wentOut": "AI 3",
-        "turnsInRound": 70,
+        "wentOut": "AI 1",
+        "turnsInRound": 64,
         "shanghaiVictims": [
-          "AI 1",
-          "AI 2"
+          "AI 2",
+          "AI 3",
+          "AI 4"
         ],
         "scores": {
-          "AI 1": 115,
-          "AI 2": 125,
-          "AI 3": 0,
-          "AI 4": 10
+          "AI 1": 0,
+          "AI 2": 120,
+          "AI 3": 130,
+          "AI 4": 95
         },
         "playerStats": {
           "AI 1": {
-            "drewFromDiscard": 7,
-            "drewFromPile": 10,
-            "buysMade": 2,
-            "buysOffered": 33,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 16,
-            "finalHandValue": 115,
-            "wasShanghaied": true
-          },
-          "AI 2": {
-            "drewFromDiscard": 9,
-            "drewFromPile": 9,
-            "buysMade": 1,
-            "buysOffered": 35,
-            "turnLaidDown": 0,
-            "meldsLaidDown": 0,
-            "cardsLaidOff": 0,
-            "jokerSwaps": 0,
-            "finalHandSize": 14,
-            "finalHandValue": 125,
-            "wasShanghaied": true
-          },
-          "AI 3": {
-            "drewFromDiscard": 5,
-            "drewFromPile": 13,
-            "buysMade": 2,
-            "buysOffered": 31,
-            "turnLaidDown": 30,
+            "drewFromDiscard": 4,
+            "drewFromPile": 12,
+            "buysMade": 3,
+            "buysOffered": 25,
+            "turnLaidDown": 24,
             "meldsLaidDown": 3,
             "cardsLaidOff": 2,
             "jokerSwaps": 2,
@@ -5106,28 +5086,54 @@
             "finalHandValue": 0,
             "wasShanghaied": false
           },
-          "AI 4": {
-            "drewFromDiscard": 3,
-            "drewFromPile": 14,
+          "AI 2": {
+            "drewFromDiscard": 8,
+            "drewFromPile": 8,
             "buysMade": 3,
             "buysOffered": 30,
-            "turnLaidDown": 23,
-            "meldsLaidDown": 3,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
             "cardsLaidOff": 0,
             "jokerSwaps": 0,
-            "finalHandSize": 2,
-            "finalHandValue": 10,
-            "wasShanghaied": false
+            "finalHandSize": 18,
+            "finalHandValue": 120,
+            "wasShanghaied": true
+          },
+          "AI 3": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 11,
+            "buysMade": 2,
+            "buysOffered": 23,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 16,
+            "finalHandValue": 130,
+            "wasShanghaied": true
+          },
+          "AI 4": {
+            "drewFromDiscard": 7,
+            "drewFromPile": 9,
+            "buysMade": 2,
+            "buysOffered": 27,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 16,
+            "finalHandValue": 95,
+            "wasShanghaied": true
           }
         },
         "stalemate": false,
-        "jokersDealt": 0,
-        "jokersStuckInHand": 0
+        "jokersDealt": 2,
+        "jokersStuckInHand": 1
       }
     ],
-    "totalTurns": 70,
-    "totalBuys": 8,
-    "duration": 55,
+    "totalTurns": 64,
+    "totalBuys": 10,
+    "duration": 89,
     "playerPersonalities": [
       "the-shark",
       "the-shark",

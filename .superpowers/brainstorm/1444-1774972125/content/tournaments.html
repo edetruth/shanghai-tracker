@@ -1,0 +1,155 @@
+<h2>Feature 9: Online Tournament Brackets</h2>
+<p class="subtitle">Multi-room competitive play with bracket progression</p>
+
+<div class="section">
+  <h3>Tournament Flow</h3>
+  <div class="mockup">
+    <div class="mockup-header">Tournament Lifecycle</div>
+    <div class="mockup-body" style="padding: 24px; font-family: monospace; font-size: 12px;">
+      <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center;">
+        <!-- Step 1 -->
+        <div style="background: #1e4a2e; border: 1px solid #2d5a3a; border-radius: 8px; padding: 10px 14px; text-align: center; min-width: 100px;">
+          <div style="color: #e2b858; font-weight: 700; font-size: 10px;">1. CREATE</div>
+          <div style="color: #a8d0a8; font-size: 10px; margin-top: 4px;">Host sets format<br/>4/8/16 players<br/>Best-of-1 or Best-of-3</div>
+        </div>
+        <div style="color: #e2b858; font-size: 18px;">&#10132;</div>
+
+        <!-- Step 2 -->
+        <div style="background: #1e4a2e; border: 1px solid #2d5a3a; border-radius: 8px; padding: 10px 14px; text-align: center; min-width: 100px;">
+          <div style="color: #e2b858; font-weight: 700; font-size: 10px;">2. LOBBY</div>
+          <div style="color: #a8d0a8; font-size: 10px; margin-top: 4px;">Players join via<br/>tournament code<br/>TRNY-XXXX</div>
+        </div>
+        <div style="color: #e2b858; font-size: 18px;">&#10132;</div>
+
+        <!-- Step 3 -->
+        <div style="background: #1e4a2e; border: 1px solid #e2b858; border-radius: 8px; padding: 10px 14px; text-align: center; min-width: 100px;">
+          <div style="color: #e2b858; font-weight: 700; font-size: 10px;">3. BRACKET</div>
+          <div style="color: #a8d0a8; font-size: 10px; margin-top: 4px;">Auto-generate<br/>matchups<br/>Seeded or random</div>
+        </div>
+        <div style="color: #e2b858; font-size: 18px;">&#10132;</div>
+
+        <!-- Step 4 -->
+        <div style="background: #1e4a2e; border: 1px solid #2d5a3a; border-radius: 8px; padding: 10px 14px; text-align: center; min-width: 100px;">
+          <div style="color: #e2b858; font-weight: 700; font-size: 10px;">4. PLAY</div>
+          <div style="color: #a8d0a8; font-size: 10px; margin-top: 4px;">Each match =<br/>separate game room<br/>Auto-created</div>
+        </div>
+        <div style="color: #e2b858; font-size: 18px;">&#10132;</div>
+
+        <!-- Step 5 -->
+        <div style="background: #1e4a2e; border: 1px solid #2d5a3a; border-radius: 8px; padding: 10px 14px; text-align: center; min-width: 100px;">
+          <div style="color: #e2b858; font-weight: 700; font-size: 10px;">5. ADVANCE</div>
+          <div style="color: #a8d0a8; font-size: 10px; margin-top: 4px;">Winners auto-<br/>progress to<br/>next round</div>
+        </div>
+        <div style="color: #e2b858; font-size: 18px;">&#10132;</div>
+
+        <!-- Step 6 -->
+        <div style="background: #2e2a1a; border: 1px solid #e2b858; border-radius: 8px; padding: 10px 14px; text-align: center; min-width: 100px;">
+          <div style="color: #e2b858; font-weight: 700; font-size: 10px;">6. FINALS</div>
+          <div style="color: #e2b858; font-size: 10px; margin-top: 4px;">Champion<br/>crowned<br/>🏆</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Bracket Visualization</h3>
+  <div class="mockup">
+    <div class="mockup-header">8-Player Single Elimination Bracket</div>
+    <div class="mockup-body" style="padding: 24px; overflow-x: auto;">
+      <div style="display: flex; gap: 32px; align-items: center; min-width: 600px;">
+        <!-- Quarter Finals -->
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          <div style="color: #8b7355; font-size: 10px; text-align: center; margin-bottom: 4px;">QUARTER FINALS</div>
+          <div style="background: #0f2218; border: 1px solid #2d5a3a; border-radius: 6px; padding: 6px 10px; font-size: 11px; min-width: 110px;">
+            <div style="color: #6aad7a; font-weight: 600;">Alice <span style="color: #e2b858; float: right;">142</span></div>
+            <div style="color: #a8d0a8; border-top: 1px solid #1a3a2a; padding-top: 2px; margin-top: 2px;">Bob <span style="color: #8b7355; float: right;">198</span></div>
+          </div>
+          <div style="background: #0f2218; border: 1px solid #2d5a3a; border-radius: 6px; padding: 6px 10px; font-size: 11px;">
+            <div style="color: #a8d0a8;">Carol <span style="color: #8b7355; float: right;">210</span></div>
+            <div style="color: #6aad7a; font-weight: 600; border-top: 1px solid #1a3a2a; padding-top: 2px; margin-top: 2px;">Dave <span style="color: #e2b858; float: right;">95</span></div>
+          </div>
+          <div style="background: #0f2218; border: 1px solid #e2b858; border-radius: 6px; padding: 6px 10px; font-size: 11px;">
+            <div style="color: #e2b858; font-weight: 700;">⏳ In Progress</div>
+            <div style="color: #a8d0a8;">Eve vs Frank</div>
+          </div>
+          <div style="background: #0f2218; border: 1px solid #2d5a3a; border-radius: 6px; padding: 6px 10px; font-size: 11px; opacity: 0.5;">
+            <div style="color: #8b7355;">Grace vs Hank</div>
+            <div style="color: #3a5a3a; font-size: 9px;">Waiting...</div>
+          </div>
+        </div>
+
+        <!-- Connector lines -->
+        <div style="display: flex; flex-direction: column; gap: 64px; color: #2d5a3a; font-size: 20px;">
+          <div>&#10132;</div>
+          <div>&#10132;</div>
+        </div>
+
+        <!-- Semi Finals -->
+        <div style="display: flex; flex-direction: column; gap: 48px;">
+          <div style="color: #8b7355; font-size: 10px; text-align: center; margin-bottom: 4px;">SEMI FINALS</div>
+          <div style="background: #0f2218; border: 1px solid #2d5a3a; border-radius: 6px; padding: 6px 10px; font-size: 11px; min-width: 110px; opacity: 0.5;">
+            <div style="color: #a8d0a8;">Alice</div>
+            <div style="color: #a8d0a8; border-top: 1px solid #1a3a2a; padding-top: 2px; margin-top: 2px;">Dave</div>
+            <div style="color: #3a5a3a; font-size: 9px;">Waiting...</div>
+          </div>
+          <div style="background: #0f2218; border: 1px solid #2d5a3a; border-radius: 6px; padding: 6px 10px; font-size: 11px; opacity: 0.3;">
+            <div style="color: #3a5a3a;">TBD</div>
+            <div style="color: #3a5a3a; border-top: 1px solid #1a3a2a; padding-top: 2px; margin-top: 2px;">TBD</div>
+          </div>
+        </div>
+
+        <!-- Connector -->
+        <div style="color: #2d5a3a; font-size: 20px;">&#10132;</div>
+
+        <!-- Finals -->
+        <div style="display: flex; flex-direction: column;">
+          <div style="color: #e2b858; font-size: 10px; text-align: center; margin-bottom: 4px;">FINALS</div>
+          <div style="background: #2e2a1a; border: 2px solid #e2b858; border-radius: 8px; padding: 8px 12px; font-size: 11px; min-width: 110px; opacity: 0.3;">
+            <div style="color: #3a5a3a;">🏆 TBD</div>
+            <div style="color: #3a5a3a; border-top: 1px solid #2d5a3a; padding-top: 2px; margin-top: 2px;">TBD</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Architecture</h3>
+  <div style="background: #1a1a2e; border: 1px solid #2d5a3a; border-radius: 10px; padding: 16px; font-size: 12px; color: #a8d0a8; line-height: 1.8;">
+    <p><strong>New DB tables:</strong></p>
+    <p style="margin-left: 12px; color: #6aad7a;"><code>tournaments</code> — id, code (TRNY-XXXX), host_name, format, player_count, status, created_at</p>
+    <p style="margin-left: 12px; color: #6aad7a;"><code>tournament_matches</code> — id, tournament_id, round_number, match_index, player_names[], winner, room_code, status</p>
+
+    <p style="margin-top: 10px;"><strong>New files:</strong></p>
+    <p style="margin-left: 12px; color: #6aad7a;"><code>src/lib/tournamentStore.ts</code> — CRUD for tournaments + matches</p>
+    <p style="margin-left: 12px; color: #6aad7a;"><code>src/components/play/TournamentLobby.tsx</code> — join + bracket view</p>
+    <p style="margin-left: 12px; color: #6aad7a;"><code>src/components/play/BracketView.tsx</code> — visual bracket with live status</p>
+    <p style="margin-left: 12px; color: #6aad7a;"><code>src/components/play/TournamentResults.tsx</code> — final standings + champion</p>
+    <p style="margin-left: 12px; color: #6aad7a;"><code>src/hooks/useTournamentChannel.ts</code> — Supabase Realtime for bracket updates</p>
+
+    <p style="margin-top: 10px;"><strong>Flow:</strong> Host creates tournament &rarr; players join lobby &rarr; host starts &rarr; bracket auto-generated &rarr; each match creates a game room &rarr; winners reported back &rarr; next round seeded &rarr; finals &rarr; champion</p>
+
+    <p style="margin-top: 10px;"><strong>Formats:</strong> 4-player (2 rounds), 8-player (3 rounds). Single elimination only to start. Swiss/round-robin later.</p>
+  </div>
+</div>
+
+<div class="section">
+  <div class="options">
+    <div class="option" data-choice="approve-all" onclick="toggleSelect(this)">
+      <div class="letter">&#10003;</div>
+      <div class="content">
+        <h3>All features look good</h3>
+        <p>Ready to write the full spec document</p>
+      </div>
+    </div>
+    <div class="option" data-choice="revisit" onclick="toggleSelect(this)">
+      <div class="letter">&#8635;</div>
+      <div class="content">
+        <h3>Want to revisit some features</h3>
+        <p>Changes needed before writing spec</p>
+      </div>
+    </div>
+  </div>
+</div>

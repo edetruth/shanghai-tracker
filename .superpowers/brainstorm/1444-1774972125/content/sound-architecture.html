@@ -1,0 +1,150 @@
+<h2>Sound Design System — Architecture</h2>
+<p class="subtitle">How sounds flow from game events to the speaker</p>
+
+<div class="section">
+  <h3>System Overview</h3>
+  <div class="mockup">
+    <div class="mockup-header">Architecture: Event → Sound Pipeline</div>
+    <div class="mockup-body" style="padding: 24px; font-family: monospace; font-size: 13px; line-height: 2;">
+      <div style="display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap;">
+        <!-- Column 1: Sources -->
+        <div style="flex: 1; min-width: 160px;">
+          <div style="background: #2d5a3a; color: #a8d0a8; padding: 8px 12px; border-radius: 8px; text-align: center; font-weight: bold; margin-bottom: 8px;">Game Events</div>
+          <div style="background: #1a3a2a; color: #6aad7a; padding: 6px 10px; border-radius: 6px; margin: 4px 0; font-size: 11px;">handleDrawFromPile()</div>
+          <div style="background: #1a3a2a; color: #6aad7a; padding: 6px 10px; border-radius: 6px; margin: 4px 0; font-size: 11px;">handleDiscard()</div>
+          <div style="background: #1a3a2a; color: #6aad7a; padding: 6px 10px; border-radius: 6px; margin: 4px 0; font-size: 11px;">handleMeldConfirm()</div>
+          <div style="background: #1a3a2a; color: #6aad7a; padding: 6px 10px; border-radius: 6px; margin: 4px 0; font-size: 11px;">handleBuyDecision()</div>
+          <div style="background: #1a3a2a; color: #6aad7a; padding: 6px 10px; border-radius: 6px; margin: 4px 0; font-size: 11px;">triggerGoingOut()</div>
+          <div style="background: #1a3a2a; color: #6aad7a; padding: 6px 10px; border-radius: 6px; margin: 4px 0; font-size: 11px;">queueToast()</div>
+        </div>
+
+        <!-- Arrow -->
+        <div style="display: flex; align-items: center; font-size: 24px; color: #e2b858; padding-top: 40px;">&#10132;</div>
+
+        <!-- Column 2: Sound Engine -->
+        <div style="flex: 1; min-width: 200px;">
+          <div style="background: #8b6914; color: #fff; padding: 8px 12px; border-radius: 8px; text-align: center; font-weight: bold; margin-bottom: 8px;">src/lib/sounds.ts</div>
+          <div style="background: #2e2a1a; color: #e2b858; padding: 10px 12px; border-radius: 6px; font-size: 11px; line-height: 1.8;">
+            <div><strong>playSound(name, opts?)</strong></div>
+            <div style="color: #a08c6e;">&#8226; Checks volume settings</div>
+            <div style="color: #a08c6e;">&#8226; Loads from sprite sheet</div>
+            <div style="color: #a08c6e;">&#8226; Web Audio API playback</div>
+            <div style="color: #a08c6e;">&#8226; Concurrent sound limit</div>
+            <div style="margin-top: 8px;"><strong>SFX_VOLUME</strong> &middot; <strong>NOTIF_VOLUME</strong></div>
+            <div style="color: #a08c6e;">&#8226; localStorage persisted</div>
+          </div>
+        </div>
+
+        <!-- Arrow -->
+        <div style="display: flex; align-items: center; font-size: 24px; color: #e2b858; padding-top: 40px;">&#10132;</div>
+
+        <!-- Column 3: Output -->
+        <div style="flex: 1; min-width: 140px;">
+          <div style="background: #1d7ea8; color: #fff; padding: 8px 12px; border-radius: 8px; text-align: center; font-weight: bold; margin-bottom: 8px;">Web Audio API</div>
+          <div style="background: #1a2f3a; color: #5b9bd5; padding: 10px 12px; border-radius: 6px; font-size: 11px; line-height: 1.8;">
+            <div>AudioContext (single)</div>
+            <div>GainNode &times; 2</div>
+            <div style="color: #a08c6e;">&#8226; SFX gain</div>
+            <div style="color: #a08c6e;">&#8226; Notification gain</div>
+            <div>AudioBufferSourceNode</div>
+            <div style="color: #a08c6e;">&#8226; per-sound playback</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Multiplayer row -->
+      <div style="margin-top: 20px; border-top: 1px solid #2d5a3a; padding-top: 16px;">
+        <div style="display: flex; gap: 16px; align-items: center; flex-wrap: wrap;">
+          <div style="background: #3a1a24; color: #e07a5f; padding: 8px 12px; border-radius: 8px; font-weight: bold; font-size: 12px;">Multiplayer</div>
+          <div style="color: #a08c6e; font-size: 11px; flex: 1;">
+            Remote sounds triggered by existing broadcast data: <code>view.lastEvent</code>, <code>view.toast</code>, <code>view.goingOutSequence</code>, <code>view.buyingCinematicPhase</code> — no new broadcast events needed
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Sound Event Map — 15 Sounds</h3>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+    <!-- Card Actions -->
+    <div style="background: #1a1a2e; border: 1px solid #2d5a3a; border-radius: 10px; padding: 14px;">
+      <div style="color: #e2b858; font-weight: 700; font-size: 13px; margin-bottom: 8px;">Card Actions (SFX)</div>
+      <div style="font-size: 11px; line-height: 2; color: #a8d0a8;">
+        <div><span style="color:#6aad7a;">&#9834;</span> <strong>card-draw</strong> — draw from pile</div>
+        <div><span style="color:#6aad7a;">&#9834;</span> <strong>card-snap</strong> — discard / take</div>
+        <div><span style="color:#6aad7a;">&#9834;</span> <strong>card-deal</strong> — dealing sequence (rapid)</div>
+        <div><span style="color:#6aad7a;">&#9834;</span> <strong>card-shuffle</strong> — deck reshuffle</div>
+      </div>
+    </div>
+
+    <!-- Meld Actions -->
+    <div style="background: #1a1a2e; border: 1px solid #2d5a3a; border-radius: 10px; padding: 14px;">
+      <div style="color: #e2b858; font-weight: 700; font-size: 13px; margin-bottom: 8px;">Meld Actions (SFX)</div>
+      <div style="font-size: 11px; line-height: 2; color: #a8d0a8;">
+        <div><span style="color:#6aad7a;">&#9834;</span> <strong>meld-slam</strong> — lay down melds</div>
+        <div><span style="color:#6aad7a;">&#9834;</span> <strong>lay-off</strong> — card onto table meld</div>
+        <div><span style="color:#6aad7a;">&#9834;</span> <strong>joker-swap</strong> — "the heist" sound</div>
+      </div>
+    </div>
+
+    <!-- Game Moments -->
+    <div style="background: #1a1a2e; border: 1px solid #2d5a3a; border-radius: 10px; padding: 14px;">
+      <div style="color: #e2b858; font-weight: 700; font-size: 13px; margin-bottom: 8px;">Cinematics (SFX)</div>
+      <div style="font-size: 11px; line-height: 2; color: #a8d0a8;">
+        <div><span style="color:#6aad7a;">&#9834;</span> <strong>going-out</strong> — boom + fanfare</div>
+        <div><span style="color:#6aad7a;">&#9834;</span> <strong>shanghai-sting</strong> — penalty reveal</div>
+        <div><span style="color:#6aad7a;">&#9834;</span> <strong>buy-ding</strong> — card purchased</div>
+        <div><span style="color:#6aad7a;">&#9834;</span> <strong>round-fanfare</strong> — round start</div>
+        <div><span style="color:#6aad7a;">&#9834;</span> <strong>win-celebration</strong> — game winner</div>
+      </div>
+    </div>
+
+    <!-- UI Sounds -->
+    <div style="background: #1a1a2e; border: 1px solid #2d5a3a; border-radius: 10px; padding: 14px;">
+      <div style="color: #e2b858; font-weight: 700; font-size: 13px; margin-bottom: 8px;">UI + Notifications</div>
+      <div style="font-size: 11px; line-height: 2; color: #a8d0a8;">
+        <div><span style="color:#5b9bd5;">&#9834;</span> <strong>turn-notify</strong> — it's your turn (Notif vol)</div>
+        <div><span style="color:#6aad7a;">&#9834;</span> <strong>button-tap</strong> — UI button press</div>
+        <div><span style="color:#e07a5f;">&#9834;</span> <strong>error-buzz</strong> — invalid action</div>
+        <div><span style="color:#6aad7a;">&#9834;</span> <strong>countdown-tick</strong> — 3-2-1 ticks</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Does this architecture look right?</h3>
+  <p class="subtitle">Single module, two volume channels, 15 sounds triggered from existing game events</p>
+  <div class="options">
+    <div class="option" data-choice="approve" onclick="toggleSelect(this)">
+      <div class="letter">&#10003;</div>
+      <div class="content">
+        <h3>Looks good — move on</h3>
+        <p>Architecture and sound map are solid</p>
+      </div>
+    </div>
+    <div class="option" data-choice="more-sounds" onclick="toggleSelect(this)">
+      <div class="letter">+</div>
+      <div class="content">
+        <h3>Need more sounds</h3>
+        <p>Missing important game moments</p>
+      </div>
+    </div>
+    <div class="option" data-choice="fewer-sounds" onclick="toggleSelect(this)">
+      <div class="letter">-</div>
+      <div class="content">
+        <h3>Too many sounds</h3>
+        <p>Trim it down</p>
+      </div>
+    </div>
+    <div class="option" data-choice="change-arch" onclick="toggleSelect(this)">
+      <div class="letter">&#8635;</div>
+      <div class="content">
+        <h3>Architecture needs changes</h3>
+        <p>Different approach to the pipeline</p>
+      </div>
+    </div>
+  </div>
+</div>
