@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { createPlayedGame, saveGameEvents, saveAIDecisions, backfillDecisionOutcomes, savePlayerRoundStats, savePlayerGameStats, saveAchievement, getPlayerAchievements } from '../../lib/gameStore'
-import { checkAchievements, ACHIEVEMENTS } from '../../lib/achievements'
+import { createPlayedGame, saveGameEvents, saveAIDecisions, backfillDecisionOutcomes, savePlayerRoundStats, savePlayerGameStats } from '../../lib/gameStore'
 import type { AIDecision, PlayerRoundStats, PlayerGameStats } from '../../game/types'
-import { Pause, Wifi } from 'lucide-react'
 import type { GameState, Player, Card as CardType, Meld, PlayerConfig, AIDifficulty, AIPersonality, OpponentHistory } from '../../game/types'
 import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, MAX_BUYS, cardPoints } from '../../game/rules'
 import { createDecks, shuffle, dealHands } from '../../game/deck'
@@ -11,7 +9,7 @@ import { scoreRound } from '../../game/scoring'
 import { aiFindBestMelds } from '../../game/ai'
 import { SUIT_ORDER } from './HandDisplay'
 import { haptic } from '../../lib/haptics'
-import { playSound, preloadSounds, getSfxVolume, getNotifVolume, setSfxVolume, setNotifVolume } from '../../lib/sounds'
+import { playSound } from '../../lib/sounds'
 import PrivacyScreen from './PrivacyScreen'
 import MeldBuilder, { type MeldBuilderHandle } from './MeldBuilder'
 // MeldModal replaced by inline MeldBuilder; LayOffModal removed — lay-offs happen inline via TableMelds
@@ -24,11 +22,13 @@ import BuyingCinematic, { BuyBottomSheet, FreeTakeBottomSheet, type BuyingPhase 
 import GameToast, { type QueuedToast } from './GameToast'
 import RoundAnnouncement, { type AnnouncementStage } from './RoundAnnouncement'
 import { useMultiplayerSync } from '../../hooks/useMultiplayerSync'
-import EmoteBar from './EmoteBar'
 import EmoteBubble from './EmoteBubble'
-import { logAction, loadActionLog } from '../../lib/actionLog'
+import TopBar from './TopBar'
 import { loadOpponentModel, saveOpponentModel, updateOpponentModel } from '../../game/opponent-model'
 import { useAIAutomation } from '../../hooks/useAIAutomation'
+import { useGameAudio } from '../../hooks/useGameAudio'
+import { useGameAchievements } from '../../hooks/useGameAchievements'
+import { useActionLogger } from '../../hooks/useActionLogger'
 import { reportMatchResult, advanceWinner } from '../../lib/tournamentStore'
 
 interface Props {
@@ -204,13 +204,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const aiDifficulty: AIDifficulty = aiDifficultyProp
 
   const [gameState, setGameState] = useState<GameState>(() => initGame(initialPlayers, buyLimit))
-  const [gameLogId] = useState(() => {
-    const id = crypto.randomUUID()
-    // Log round 1 start with seed for replay reconstruction (fire-and-forget)
-    logAction(id, 1, -1, 'round_start', { round: 1, seed: gameState.seed, deckCount: gameState.deckCount, playerCount: gameState.players.length })
-    return id
-  })
-  const actionSeqRef = useRef(1) // starts at 1 because round_start is seq 1
+  const { gameLogId, log: logActionHook, getLog: getActionLog } = useActionLogger(
+    { round: 1, seed: gameState.seed, deckCount: gameState.deckCount, playerCount: gameState.players.length }
+  )
   const [uiPhase, setUiPhase] = useState<UIPhase>('round-start')
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set())
   const selectedCardOrderRef = useRef<string[]>([])
@@ -279,8 +275,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const aiTurnsCouldGoDownRef = useRef<Map<string, number>>(new Map())
   // Panic mode: total turns elapsed per AI player per round (resets each round)
   const aiTurnsElapsedRef = useRef<Map<string, number>>(new Map())
-  // Achievements: track already-unlocked to avoid duplicate toasts
-  const unlockedAchievementsRef = useRef<Set<string>>(new Set())
+  const { checkAndShow: checkAndShowAchievementsHook, unlockInline: unlockAchievement, setToastFn: setAchievementToastFn } = useGameAchievements(initialPlayers)
   const [yourTurnPulse, setYourTurnPulse] = useState(false)
   const [perfectDrawActive, setPerfectDrawActive] = useState(false)
   const perfectDrawTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -307,8 +302,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     faceDown: boolean
   } | null>(null)
   const [reduceAnimations, setReduceAnimations] = useState(false)
-  const [sfxVol, setSfxVol] = useState(getSfxVolume)
-  const [notifVol, setNotifVol] = useState(getNotifVolume)
+  const { sfxVol, notifVol, updateSfxVol, updateNotifVol } = useGameAudio()
   const drawPileRef = useRef<HTMLDivElement>(null)
   const handAreaRef = useRef<HTMLDivElement>(null)
   const discardPileRef = useRef<HTMLDivElement>(null)
@@ -530,18 +524,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   useEffect(() => { pendingBuyDiscardRef.current = pendingBuyDiscard }, [pendingBuyDiscard])
   useEffect(() => { freeOfferDeclinedRef.current = freeOfferDeclined }, [freeOfferDeclined])
   useEffect(() => { buyingPhaseRef.current = buyingPhase }, [buyingPhase])
-
-  // Load already-unlocked achievements for the first human player on mount
-  useEffect(() => {
-    const humanPlayers = initialPlayers.filter(p => !p.isAI)
-    if (humanPlayers.length > 0) {
-      getPlayerAchievements(humanPlayers[0].name).then(ids => {
-        unlockedAchievementsRef.current = new Set(ids)
-      })
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => { preloadSounds() }, [])
 
   // ── Flying card animation helpers ─────────────────────────────────────────
   function getRefCenter(ref: React.RefObject<HTMLDivElement | null>): { x: number, y: number } | null {
@@ -824,32 +806,11 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     if (!activeToastRef.current) showNextToast()
   }
 
+  // Wire achievement toasts to the queue
+  setAchievementToastFn(queueToast)
+
   function checkAndShowAchievements(isGameEnd: boolean) {
-    const gs = gameStateRef.current
-    gs.players.forEach((player, idx) => {
-      if (player.isAI) return
-      const ctx = {
-        gameState: gs,
-        playerName: player.name,
-        playerIndex: idx,
-        roundResults: roundResults ?? undefined,
-        isGameEnd,
-      }
-      const newIds = checkAchievements(ctx, unlockedAchievementsRef.current)
-      newIds.forEach(id => {
-        unlockedAchievementsRef.current.add(id)
-        saveAchievement(player.name, id)
-        const achievement = ACHIEVEMENTS.find(a => a.id === id)
-        if (achievement) {
-          queueToast({
-            message: `${achievement.icon} ${achievement.name}`,
-            subtext: achievement.description,
-            style: 'celebration',
-            duration: 4000,
-          })
-        }
-      })
-    })
+    checkAndShowAchievementsHook(gameStateRef, roundResults, isGameEnd)
   }
 
   const rs = gameState.roundState
@@ -1035,7 +996,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       }
       setGameState(updatedState)
       playSound('card-draw')
-      logAction(gameLogId, ++actionSeqRef.current, gameState.roundState.currentPlayerIndex, 'draw_pile')
+      logActionHook(gameState.roundState.currentPlayerIndex, 'draw_pile')
 
       // Perfect Draw detection: did this card unlock the round requirement?
       const handBefore = gameState.players[gameState.roundState.currentPlayerIndex].hand
@@ -1150,7 +1111,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       return { ...prev, players, roundState: { ...prev.roundState, discardPile } }
     })
     playSound('card-snap')
-    logAction(gameLogId, ++actionSeqRef.current, gameState.roundState.currentPlayerIndex, 'take_discard', { cardId: card.id, suit: card.suit, rank: card.rank })
+    logActionHook(gameState.roundState.currentPlayerIndex, 'take_discard', { cardId: card.id, suit: card.suit, rank: card.rank })
     setUiPhase('action')
   }
 
@@ -1212,7 +1173,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   // ── Going-out cinematic ──────────────────────────────────────────────────
   function triggerGoingOut(playerName: string, stateToEnd: GameState) {
     playSound('going-out')
-    logAction(gameLogId, ++actionSeqRef.current, stateToEnd.players.findIndex(p => p.name === playerName), 'going_out')
+    logActionHook(stateToEnd.players.findIndex(p => p.name === playerName), 'going_out')
     setGoOutPlayerName(playerName)
     setGoingOutSequence('flash')
     haptic('success')
@@ -1257,7 +1218,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     })
     setGameState({ ...state, players })
     setRoundResults(results)
-    logAction(gameLogId, ++actionSeqRef.current, -1, 'round_end', { round: state.currentRound })
+    logActionHook(-1, 'round_end', { round: state.currentRound })
     setShowDarkBeat(true)
     setTimeout(() => {
       setShowDarkBeat(false)
@@ -1442,7 +1403,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     clearSelection() // always reset selection after meld
     haptic(wentOut ? 'success' : 'heavy')
     playSound('meld-slam')
-    logAction(gameLogId, ++actionSeqRef.current, gameState.roundState.currentPlayerIndex, 'meld_confirm')
+    logActionHook(gameState.roundState.currentPlayerIndex, 'meld_confirm')
 
     if (wentOut) {
       // Round ends immediately — no buying window, no further actions
@@ -1584,7 +1545,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     clearSelection()
     setLayOffError(null)
     playSound('lay-off')
-    logAction(gameLogId, ++actionSeqRef.current, gameState.roundState.currentPlayerIndex, 'lay_off', { cardId: card.id, meldId: meld.id })
+    logActionHook(gameState.roundState.currentPlayerIndex, 'lay_off', { cardId: card.id, meldId: meld.id })
 
     // Undo window for human lay-offs (not going out, not AI)
     if (!wentOut && !player.isAI) {
@@ -1654,7 +1615,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     })
     haptic('heavy')
     playSound('joker-swap')
-    logAction(gameLogId, ++actionSeqRef.current, gameState.roundState.currentPlayerIndex, 'joker_swap', { cardId: naturalCard.id, meldId: meld.id })
+    logActionHook(gameState.roundState.currentPlayerIndex, 'joker_swap', { cardId: naturalCard.id, meldId: meld.id })
     // Broadcast event to remote players
     setRemoteEvent(`${swapPlayer.name} swapped a joker!`)
     setRemoteToast({ message: isFromOtherMeld ? 'The heist!' : 'Joker reclaimed!', style: 'taunt', icon: '🃏' })
@@ -1667,12 +1628,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     setGameState(prev => computeJokerSwap(prev, naturalCard, meld) ?? prev)
     clearSelection()
     // Achievement: The Heist (joker swap by human)
-    if (!swapPlayer.isAI && !unlockedAchievementsRef.current.has('the-heist')) {
-      unlockedAchievementsRef.current.add('the-heist')
-      saveAchievement(swapPlayer.name, 'the-heist')
-      const ach = ACHIEVEMENTS.find(a => a.id === 'the-heist')!
-      queueToast({ message: `${ach.icon} ${ach.name}`, subtext: ach.description, style: 'celebration', duration: 4000 })
-    }
+    if (!swapPlayer.isAI) unlockAchievement(swapPlayer.name, 'the-heist')
     // Fix D: flash the meld that just had its joker swapped
     setFlashMeldId(meld.id)
     setFlashIsHeist(isFromOtherMeld)
@@ -1833,7 +1789,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     clearSelection()
     haptic('heavy')
     playSound('card-snap')
-    logAction(gameLogId, ++actionSeqRef.current, playerIdx, 'discard', { cardId: card.id, suit: card.suit, rank: card.rank, cardLabel: formatCard(card) })
+    logActionHook(playerIdx, 'discard', { cardId: card.id, suit: card.suit, rank: card.rank, cardLabel: formatCard(card) })
 
     turnCountRef.current += 1
 
@@ -1922,7 +1878,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       const buyer = gameState.players[buyerIdx]
       if (!buyingDiscard || buyer.buysRemaining <= 0) return
       playSound('buy-ding')
-      logAction(gameLogId, ++actionSeqRef.current, buyerIdx, 'buy', { wantsToBuy: true })
+      logActionHook(buyerIdx, 'buy', { wantsToBuy: true })
       setLeavingCardId(null) // clear any in-progress exit animation for the discarded card
 
       let drawPile = [...gameState.roundState.drawPile]
@@ -1966,12 +1922,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       btc.buyOpportunities++
 
       // Achievement: Buyer's Market (first buy by human)
-      if (!buyer.isAI && !unlockedAchievementsRef.current.has('buyers-market')) {
-        unlockedAchievementsRef.current.add('buyers-market')
-        saveAchievement(buyer.name, 'buyers-market')
-        const ach = ACHIEVEMENTS.find(a => a.id === 'buyers-market')!
-        queueToast({ message: `${ach.icon} ${ach.name}`, subtext: ach.description, style: 'celebration', duration: 4000 })
-      }
+      if (!buyer.isAI) unlockAchievement(buyer.name, 'buyers-market')
 
       // Highlight newly received buy cards
       const buyNewIds = new Set<string>()
@@ -2026,7 +1977,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         ptc.buyOpportunities++
       }
 
-      logAction(gameLogId, ++actionSeqRef.current, passerIdx ?? -1, 'buy', { wantsToBuy: false })
+      logActionHook(passerIdx ?? -1, 'buy', { wantsToBuy: false })
       addBuyLog({
         turn: turnCountRef.current,
         round: gameState.currentRound,
@@ -2224,7 +2175,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
           if (player.isAI) return
           // Delay to let fire-and-forget log writes flush to Supabase
           setTimeout(() => {
-          loadActionLog(gameLogId).then(log => {
+          getActionLog().then(log => {
             try {
               updateOpponentModel(player.name, idx, log, gameState.currentRound)
             } catch { /* silent */ }
@@ -2301,7 +2252,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
         const next = setupRound(gameState, nextRound)
         setGameState(next)
-        logAction(gameLogId, ++actionSeqRef.current, -1, 'round_start', { round: nextRound, seed: next.seed, deckCount: next.deckCount, playerCount: next.players.length })
+        logActionHook(-1, 'round_start', { round: nextRound, seed: next.seed, deckCount: next.deckCount, playerCount: next.players.length })
         setRoundResults(null)
         clearSelection()
         setPendingBuyDiscard(null)
@@ -2714,59 +2665,17 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         className="bg-[#0f2218]"
         style={{ flexShrink: 0, paddingTop: 'max(8px, env(safe-area-inset-top))' }}
       >
-        {/* Top bar: round badge | requirement badge | pause */}
-        <div
-          className="flex items-center justify-between px-3 pb-2"
-          style={{ borderBottom: '1px solid #2d5a3a', minHeight: 30 }}
-        >
-          {/* Round badge */}
-          <div style={{
-            background: '#0f2218', color: '#a8d0a8',
-            border: '1px solid #2d5a3a', borderRadius: 20,
-            padding: '4px 10px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
-          }}>
-            Round {gameState.currentRound}/{TOTAL_ROUNDS}
-          </div>
-
-          {/* Requirement badge */}
-          <div style={{
-            background: '#0f2218', color: '#e2b858',
-            border: '1px solid #8b6914', borderRadius: 20,
-            padding: '4px 10px', fontSize: 11, fontWeight: 600,
-            textAlign: 'center', flex: '0 1 auto', margin: '0 8px',
-          }}>
-            {rs.requirement.description}
-          </div>
-
-          {/* Pause button + Emote bar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-            {mode === 'host' && remoteSeatIndices.length > 0 && (
-              <EmoteBar onSend={handleEmoteSend} disabled={!mpChannel.isConnected} />
-            )}
-            <button
-              onClick={() => setShowPauseModal(true)}
-              aria-label="Pause game"
-              style={{
-                background: '#0f2218', border: '1px solid #2d5a3a', borderRadius: 8,
-                color: '#a8d0a8', minWidth: 40, minHeight: 40,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', flexShrink: 0,
-              }}
-            >
-              <Pause size={18} />
-            </button>
-          </div>
-        </div>
-
-        {/* Host multiplayer connection indicator */}
-        {mode === 'host' && remoteSeatIndices.length > 0 && (
-          <div className="flex items-center justify-center gap-1 px-3 py-1" style={{ borderBottom: '1px solid #2d5a3a' }}>
-            <Wifi size={12} style={{ color: mpChannel.isConnected ? '#6aad7a' : '#e07a5f' }} />
-            <span style={{ fontSize: 10, color: '#6aad7a' }}>
-              {mpChannel.connectedPlayerCount}/{remoteSeatIndices.length + 1} players connected
-            </span>
-          </div>
-        )}
+        <TopBar
+          currentRound={gameState.currentRound}
+          totalRounds={TOTAL_ROUNDS}
+          requirementDescription={rs.requirement.description}
+          onPause={() => setShowPauseModal(true)}
+          mode={mode}
+          remoteSeatCount={remoteSeatIndices.length}
+          onEmoteSend={handleEmoteSend}
+          isConnected={mpChannel.isConnected}
+          connectedPlayerCount={mpChannel.connectedPlayerCount}
+        />
 
         {/* Compressed opponent strip — single-line ticker, tap to expand */}
         <div
@@ -3614,7 +3523,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
                 <input
                   type="range" min="0" max="1" step="0.1"
                   value={sfxVol}
-                  onChange={e => { const v = Number(e.target.value); setSfxVol(v); setSfxVolume(v) }}
+                  onChange={e => updateSfxVol(Number(e.target.value))}
                   aria-label="Game sounds volume"
                   style={{ flex: 1, accentColor: '#e2b858' }}
                 />
@@ -3624,7 +3533,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
                 <input
                   type="range" min="0" max="1" step="0.1"
                   value={notifVol}
-                  onChange={e => { const v = Number(e.target.value); setNotifVol(v); setNotifVolume(v) }}
+                  onChange={e => updateNotifVol(Number(e.target.value))}
                   aria-label="Notification volume"
                   style={{ flex: 1, accentColor: '#e2b858' }}
                 />
