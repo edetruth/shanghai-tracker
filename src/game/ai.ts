@@ -163,6 +163,88 @@ const DEFAULT_EVAL_CONFIG: AIEvalConfig = {
   opponentAware: false, denialTake: false, dangerWeight: 0,
 }
 
+// ── Live Opponent Profiling ──────────────────────────────────────────────────
+
+/** Live in-game opponent profiling — updates every turn based on observations */
+interface LiveOpponentProfile {
+  suitStrength: Record<string, number>  // 0-1 confidence that opponent is building in this suit
+  rankInterest: Record<number, number>  // 0-1 confidence that opponent wants this rank
+  aggressiveness: number                 // 0-1 how aggressively they're playing (pick rate)
+  estimatedProgress: number              // 0-1 how close to laying down (based on hand size)
+  turnsObserved: number
+}
+
+/**
+ * Build a live opponent profile from their observable history this game.
+ * Confidence increases with more observations — early-game signals carry less weight.
+ */
+function buildLiveProfile(
+  history: OpponentHistory,
+  handSize: number,
+  hasLaidDown: boolean,
+  expectedHandSize: number,
+): LiveOpponentProfile {
+  const profile: LiveOpponentProfile = {
+    suitStrength: { hearts: 0, diamonds: 0, clubs: 0, spades: 0 },
+    rankInterest: {},
+    aggressiveness: 0,
+    estimatedProgress: 0,
+    turnsObserved: 0,
+  }
+
+  // Count suit picks and discards
+  const suitPicks = new Map<string, number>()
+  const suitDiscards = new Map<string, number>()
+  const rankPicks = new Map<number, number>()
+  let totalPicks = 0
+
+  for (const c of history.picked) {
+    if (c.suit !== 'joker') {
+      suitPicks.set(c.suit, (suitPicks.get(c.suit) ?? 0) + 1)
+      rankPicks.set(c.rank, (rankPicks.get(c.rank) ?? 0) + 1)
+      totalPicks++
+    }
+  }
+  for (const c of history.discarded) {
+    if (c.suit !== 'joker') {
+      suitDiscards.set(c.suit, (suitDiscards.get(c.suit) ?? 0) + 1)
+    }
+  }
+
+  // Suit strength: picks minus discards (discounts), normalized
+  if (totalPicks > 0) {
+    for (const suit of ['hearts', 'diamonds', 'clubs', 'spades']) {
+      const picks = suitPicks.get(suit) ?? 0
+      const discards = suitDiscards.get(suit) ?? 0
+      const net = picks - discards * 0.5
+      profile.suitStrength[suit] = Math.min(1, Math.max(0, net / Math.max(totalPicks, 1)))
+    }
+  }
+
+  // Rank interest: based on picked ranks, 3 picks = full confidence
+  for (const [rank, count] of rankPicks) {
+    profile.rankInterest[rank] = Math.min(1, count / 3)
+  }
+
+  // Turns observed: total observable actions (picks + discards)
+  profile.turnsObserved = totalPicks + history.discarded.filter(c => c.suit !== 'joker').length
+
+  // Aggressiveness: pick rate relative to total observations
+  if (profile.turnsObserved > 0) {
+    profile.aggressiveness = Math.min(1, totalPicks / Math.max(profile.turnsObserved, 1))
+  }
+
+  // Estimated progress: already laid down = 1, otherwise infer from hand size shrinkage
+  if (hasLaidDown) {
+    profile.estimatedProgress = 1
+  } else {
+    // Smaller hand relative to expected = closer to ready
+    profile.estimatedProgress = Math.min(1, Math.max(0, (expectedHandSize - handSize + 4) / 8))
+  }
+
+  return profile
+}
+
 // ── Opponent Danger Scoring ───────────────────────────────────────────────────
 
 /**
@@ -226,6 +308,40 @@ function cardDanger(
             if (card.rank === lo - 1 || card.rank === hi + 1) d += 30
           }
         }
+      }
+    }
+  }
+
+  // Live profile-based danger: confidence-weighted scoring from accumulated observations.
+  // Adds nuance beyond the raw pick/discard checks above — net suit strength (picks minus
+  // discards), rank interest scaling, and progress-based danger amplification.
+  if (opponents && opponentHistory) {
+    for (const opp of opponents) {
+      const hist = opponentHistory.get(opp.id)
+      if (!hist) continue
+      // Derive expected hand size from whether opponent is in a 10-card or 12-card round
+      // (we don't have roundNumber here, but hand sizes > 11 imply 12-card rounds)
+      const expectedSize = opp.hand.length > 11 || opp.melds.length > 0 ? 12 : 10
+      const profile = buildLiveProfile(hist, opp.hand.length, opp.hasLaidDown, expectedSize)
+      // Require minimum observations before trusting the profile
+      const confidence = Math.min(1, profile.turnsObserved / 6)
+      if (confidence < 0.15) continue
+
+      // Suit danger: high confidence that opponent is building in this suit
+      const suitDanger = profile.suitStrength[card.suit] ?? 0
+      if (suitDanger > 0.3) {
+        d += Math.round(suitDanger * 40 * confidence)
+      }
+
+      // Rank danger: opponent has shown repeated interest in this rank
+      const rankDanger = profile.rankInterest[card.rank] ?? 0
+      if (rankDanger > 0.3) {
+        d += Math.round(rankDanger * 25 * confidence)
+      }
+
+      // Progress danger: opponent close to going down makes all discards riskier
+      if (profile.estimatedProgress > 0.7 && !opp.hasLaidDown) {
+        d += Math.round(profile.estimatedProgress * 15 * confidence)
       }
     }
   }
