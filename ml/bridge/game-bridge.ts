@@ -41,6 +41,7 @@ interface BridgeGameState {
   roundSeeds: number[]
   gameOver: boolean
   scores: number[][] // roundScores per player
+  turnCount: number  // turns this round — force end at 200
 }
 
 interface BridgePlayer {
@@ -86,6 +87,7 @@ function initGame(playerCount: number, seed: number): BridgeGameState {
     roundSeeds: [roundSeed],
     gameOver: false,
     scores: players.map(() => []),
+    turnCount: 0,
   }
 }
 
@@ -192,6 +194,13 @@ function takeAction(g: BridgeGameState, action: string): { reward: number; done:
     // Advance to next player
     g.currentPlayerIndex = (g.currentPlayerIndex + 1) % g.players.length
     g.phase = 'draw'
+    g.turnCount++
+
+    // Force round end after 200 turns (stalemate prevention)
+    if (g.turnCount >= 200) {
+      return endRound(g)
+    }
+
     return { reward: 0, done: false }
   }
 
@@ -238,6 +247,7 @@ function endRound(g: BridgeGameState): { reward: number; done: boolean } {
   g.tableMelds = []
   g.currentPlayerIndex = 0
   g.phase = 'draw'
+  g.turnCount = 0
 
   for (let i = 0; i < g.players.length; i++) {
     g.players[i].hand = hands[i]

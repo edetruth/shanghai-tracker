@@ -42,7 +42,9 @@ def collect_trajectory(env: ShanghaiEnv, net: ShanghaiNet, temperature=1.0):
     states, actions, rewards = [], [], []
     done = False
     step_count = 0
-    max_steps = 5000  # Safety limit
+    max_steps = 3000  # Safety limit — bridge forces round-end at 200 turns per round
+
+    prev_scores = [0] * env.player_count  # track cumulative scores to compute per-round delta
 
     while not done and step_count < max_steps:
         valid_actions, current_player = env.get_valid_actions()
@@ -68,11 +70,27 @@ def collect_trajectory(env: ShanghaiEnv, net: ShanghaiNet, temperature=1.0):
             actions.append(action_idx)
 
             state, reward, done, info = env.step(action_str)
-            rewards.append(reward)
+
+            # Compute intermediate reward from score changes
+            step_reward = reward  # final game reward (non-zero only at game end)
+            if info.get("scores"):
+                current_score = info["scores"][0] if info["scores"] else 0
+                delta = current_score - prev_scores[0]
+                if delta != 0:
+                    step_reward = -delta  # negative score delta = reward (lower score is better)
+                    prev_scores[0] = current_score
+
+            rewards.append(step_reward)
         else:
             # Opponent's turn — random valid action
             action = random.choice(valid_actions)
             state, reward, done, info = env.step(action)
+
+            # If opponent's action ended the game, attribute final reward to agent
+            if done and states:
+                final_scores = info.get("scores", [0])
+                agent_score = final_scores[0] if final_scores else 0
+                rewards[-1] += -agent_score  # add final score penalty to last agent step
 
         step_count += 1
 
