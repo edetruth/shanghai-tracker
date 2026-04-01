@@ -413,10 +413,11 @@ export function evaluateHand(hand: Card[], requirement: RoundRequirement): numbe
     }).length
     // Bonus scales with how many runs we need vs how many suits we're building
     const coverage = Math.min(suitsWithProgress, requirement.runs)
-    score += coverage * 12  // each covered suit is worth 12 points
+    const coverageBonus = requirement.runs >= 3 ? 20 : 15  // R7 gets highest bonus
+    score += coverage * coverageBonus
     // Penalty if we don't have enough suits started for the required runs
     const deficit = requirement.runs - suitsWithProgress
-    if (deficit > 0) score -= deficit * 8
+    if (deficit > 0) score -= deficit * (requirement.runs >= 3 ? 15 : 10)  // Harsh penalty for missing suits in R7
   }
 
   // === PENALTY: ISOLATED HIGH CARDS ===
@@ -547,9 +548,10 @@ export function evaluateHandFast(hand: Card[], requirement: RoundRequirement, ca
       return w.cards.length >= 2
     }).length
     const coverage = Math.min(suitsWithProgress, requirement.runs)
-    score += coverage * 12
+    const coverageBonus = requirement.runs >= 3 ? 20 : 15
+    score += coverage * coverageBonus
     const deficit = requirement.runs - suitsWithProgress
-    if (deficit > 0) score -= deficit * 8
+    if (deficit > 0) score -= deficit * (requirement.runs >= 3 ? 15 : 10)
   }
 
   const usefulIds = new Set<string>()
@@ -973,6 +975,17 @@ export function aiShouldTakeDiscard(
     if (extendsRunWindow) {
       improvement += requirement.runs >= 3 ? 6 : 4
     }
+
+    // R7 boost: if the discard card extends a 3+ card run window to 4+, take it aggressively
+    if (requirement.runs >= 3) {
+      const withCard = [...sameSuitCards, discardCard]
+      const windowBefore = findBestRunWindow(sameSuitCards)
+      const windowAfter = findBestRunWindow(withCard)
+      if (windowAfter.cards.length >= 4 && windowBefore.cards.length < 4) {
+        // This card completes a run requirement! Strong take signal.
+        improvement += 15
+      }
+    }
   }
 
   // Threshold scales with hand size — larger hands are riskier to add to
@@ -1084,6 +1097,12 @@ export function aiShouldBuy(
     if (isRunNeighbor) {
       runBuyBonus = requirement.runs >= 3 ? 8 : 5
     }
+  }
+
+  // R7 dampening: in 3-run rounds, buying becomes risky as hands grow
+  // Each card over 13 adds increasing risk
+  if (requirement.runs >= 3 && hand.length >= 14) {
+    risk += (hand.length - 13) * 5
   }
 
   // === DECISION ===
@@ -1243,6 +1262,15 @@ export function aiChooseDiscard(
             score -= isPureRunHeavy ? 8 : 5
           }
         }
+      }
+    }
+
+    // R7 suit pivot: bonus for shedding cards from weak suits (poor run coverage)
+    if (isPureRunHeavy && !isJoker(card)) {
+      const suitCards = hand.filter(c => c.suit === card.suit && !isJoker(c) && c.id !== card.id)
+      if (suitCards.length <= 1) {
+        // Discarding from a suit where we have 0-1 other cards = shedding dead weight
+        score += 5
       }
     }
 
