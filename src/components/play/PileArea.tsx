@@ -53,7 +53,7 @@ export default function PileArea({
       }}
     >
       {/* Draw pile */}
-      <div ref={drawPileRef} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+      <div ref={drawPileRef} data-tutorial-zone="draw-pile" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
         <p style={{
           color: isHumanDraw ? '#ffffff' : '#6aad7a',
           fontSize: isHumanDraw ? 10 : 9,
@@ -117,7 +117,7 @@ export default function PileArea({
       </div>
 
       {/* Discard pile */}
-      <div ref={discardPileRef} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+      <div ref={discardPileRef} data-tutorial-zone="discard-pile" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
         <p style={{
           color: isHumanDraw ? '#e2b858' : isHumanBuyerTurn ? '#e2b858' : '#6aad7a',
           fontSize: isHumanDraw ? 10 : 9,

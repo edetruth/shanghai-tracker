@@ -2689,6 +2689,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         {/* Close race indicator — replaced by tension system overlays above */}
         <div
           ref={zone2ScrollRef}
+          data-tutorial-zone="table-melds"
           className="px-3 py-3"
           style={{ height: '100%', overflowY: 'auto' }}
         >

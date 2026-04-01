@@ -193,6 +193,7 @@ export default function ActionBar({
                     </button>
                   )}
                   <button
+                    data-tutorial-zone="lay-down-button"
                     onClick={onLayDown}
                     style={{
                       flex: 1, minHeight: 38, borderRadius: 10, border: 'none',

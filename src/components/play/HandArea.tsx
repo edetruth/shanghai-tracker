@@ -76,7 +76,7 @@ const HandArea = forwardRef<HTMLDivElement, HandAreaProps>(function HandArea({
       )}
 
       {/* Player hand — sort toggle + fan layout */}
-      <div ref={ref} style={{
+      <div ref={ref} data-tutorial-zone="hand" style={{
         position: 'relative',
         border: yourTurnPulse ? '2px solid transparent' : '2px solid transparent',
         borderRadius: 8,

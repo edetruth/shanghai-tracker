@@ -9,12 +9,14 @@ import RemoteGameBoard from './play/RemoteGameBoard'
 import SpectatorBoard from './play/SpectatorBoard'
 import ReplayViewer from './play/ReplayViewer'
 import TournamentLobby from './play/TournamentLobby'
+import TutorialGame from './play/TutorialGame'
+import { hasCompletedTutorial } from './play/TutorialOverlay'
 import ErrorBoundary from './ErrorBoundary'
 import type { PlayerConfig, Player, AIPersonality, TournamentState, TournamentGameResult, TournamentPlayerStats } from '../game/types'
 import type { GameRoomConfig, GameRoomPlayer } from '../game/multiplayer-types'
 import { loadGameStateSnapshot, getGameRoomPlayers } from '../lib/gameStore'
 
-type PlayView = 'landing' | 'setup' | 'game' | 'lobby-host' | 'lobby-join' | 'remote-game' | 'spectator' | 'replay' | 'tournament-gameover' | 'tournament-trophy' | 'tournament-lobby-create' | 'tournament-lobby-join'
+type PlayView = 'landing' | 'setup' | 'game' | 'lobby-host' | 'lobby-join' | 'remote-game' | 'spectator' | 'replay' | 'tournament-gameover' | 'tournament-trophy' | 'tournament-lobby-create' | 'tournament-lobby-join' | 'tutorial'
 
 const ROUNDS = [
   { num: 1, req: '2 Sets of 3+',    cards: 10 },
@@ -409,6 +411,17 @@ export default function PlayTab({ onBack }: Props) {
     }
   }
 
+  if (view === 'tutorial') {
+    return (
+      <ErrorBoundary fallbackMessage="Tutorial encountered an error." onReset={() => setView('landing')}>
+        <TutorialGame
+          onComplete={() => setView('landing')}
+          onSkip={() => setView('landing')}
+        />
+      </ErrorBoundary>
+    )
+  }
+
   if (view === 'tournament-lobby-create') {
     return (
       <ErrorBoundary fallbackMessage="Tournament lobby encountered an error." onReset={() => setView('landing')}>
@@ -769,6 +782,31 @@ export default function PlayTab({ onBack }: Props) {
         flexDirection: 'column',
         gap: 8,
       }}>
+        {!hasCompletedTutorial() && (
+          <button
+            onClick={() => setView('tutorial')}
+            style={{
+              width: '100%',
+              background: 'linear-gradient(135deg, #e2b858, #d4a843)',
+              border: 'none',
+              borderRadius: 12,
+              padding: 16,
+              color: '#2c1810',
+              fontSize: 16,
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              boxShadow: '0 4px 16px rgba(226,184,88,0.3)',
+              marginBottom: 8,
+              minHeight: 44,
+            }}
+          >
+            Learn to Play
+          </button>
+        )}
         <button
           onClick={() => setView('setup')}
           style={{
@@ -844,6 +882,20 @@ export default function PlayTab({ onBack }: Props) {
           }}
         >
           <Trophy size={14} /> Join Tournament
+        </button>
+        <button
+          onClick={() => setView('tutorial')}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: '#8b7355',
+            fontSize: 12,
+            cursor: 'pointer',
+            padding: 8,
+            width: '100%',
+          }}
+        >
+          Replay Tutorial
         </button>
       </div>
 
