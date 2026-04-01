@@ -1554,6 +1554,7 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
                   type="range" min="0" max="1" step="0.1"
                   value={sfxVol}
                   onChange={e => { const v = Number(e.target.value); setSfxVol(v); setSfxVolume(v) }}
+                  aria-label="Game sounds volume"
                   style={{ flex: 1, accentColor: '#e2b858' }}
                 />
               </div>
@@ -1563,6 +1564,7 @@ export default function RemoteGameBoard({ roomCode, mySeatIndex, onExit }: Props
                   type="range" min="0" max="1" step="0.1"
                   value={notifVol}
                   onChange={e => { const v = Number(e.target.value); setNotifVol(v); setNotifVolume(v) }}
+                  aria-label="Notification volume"
                   style={{ flex: 1, accentColor: '#e2b858' }}
                 />
               </div>

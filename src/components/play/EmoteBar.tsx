@@ -66,6 +66,7 @@ export default function EmoteBar({ onSend, disabled }: Props) {
                 transition: 'transform 0.1s',
               }}
               title={e.label}
+              aria-label={e.label}
             >
               {e.emoji}
             </button>
@@ -76,6 +77,7 @@ export default function EmoteBar({ onSend, disabled }: Props) {
       <button
         onClick={() => setOpen(o => !o)}
         disabled={disabled}
+        aria-label="Open reactions"
         style={{
           background: open ? '#1e4a2e' : 'transparent',
           border: '1px solid #2d5a3a',

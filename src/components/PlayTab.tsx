@@ -9,6 +9,7 @@ import RemoteGameBoard from './play/RemoteGameBoard'
 import SpectatorBoard from './play/SpectatorBoard'
 import ReplayViewer from './play/ReplayViewer'
 import TournamentLobby from './play/TournamentLobby'
+import ErrorBoundary from './ErrorBoundary'
 import type { PlayerConfig, Player, AIPersonality, TournamentState, TournamentGameResult, TournamentPlayerStats } from '../game/types'
 import type { GameRoomConfig, GameRoomPlayer } from '../game/multiplayer-types'
 import { loadGameStateSnapshot, getGameRoomPlayers } from '../lib/gameStore'
@@ -410,45 +411,53 @@ export default function PlayTab({ onBack }: Props) {
 
   if (view === 'tournament-lobby-create') {
     return (
-      <TournamentLobby
-        mode="create"
-        hostName={tournamentHostName}
-        onMatchStart={handleTournamentMatchStart}
-        onBack={() => { setTournamentCode(null); setView('landing') }}
-      />
+      <ErrorBoundary fallbackMessage="Tournament lobby encountered an error." onReset={() => setView('landing')}>
+        <TournamentLobby
+          mode="create"
+          hostName={tournamentHostName}
+          onMatchStart={handleTournamentMatchStart}
+          onBack={() => { setTournamentCode(null); setView('landing') }}
+        />
+      </ErrorBoundary>
     )
   }
 
   if (view === 'tournament-lobby-join') {
     return (
-      <TournamentLobby
-        mode="join"
-        onMatchStart={handleTournamentMatchStart}
-        onBack={() => { setTournamentCode(null); setView('landing') }}
-      />
+      <ErrorBoundary fallbackMessage="Tournament lobby encountered an error." onReset={() => setView('landing')}>
+        <TournamentLobby
+          mode="join"
+          onMatchStart={handleTournamentMatchStart}
+          onBack={() => { setTournamentCode(null); setView('landing') }}
+        />
+      </ErrorBoundary>
     )
   }
 
   if (view === 'spectator' && roomCode) {
     return (
-      <SpectatorBoard
-        roomCode={roomCode}
-        onExit={() => {
-          setRoomCode(null)
-          sessionStorage.removeItem('shanghai_active_game')
-          setView('landing')
-        }}
-      />
+      <ErrorBoundary fallbackMessage="Spectator mode encountered an error." onReset={() => setView('landing')}>
+        <SpectatorBoard
+          roomCode={roomCode}
+          onExit={() => {
+            setRoomCode(null)
+            sessionStorage.removeItem('shanghai_active_game')
+            setView('landing')
+          }}
+        />
+      </ErrorBoundary>
     )
   }
 
   if (view === 'replay' && replayGameId) {
     return (
-      <ReplayViewer
-        gameId={replayGameId}
-        playerNames={replayPlayerNames}
-        onExit={() => { setReplayGameId(null); setView('landing') }}
-      />
+      <ErrorBoundary fallbackMessage="Replay encountered an error." onReset={() => setView('landing')}>
+        <ReplayViewer
+          gameId={replayGameId}
+          playerNames={replayPlayerNames}
+          onExit={() => { setReplayGameId(null); setView('landing') }}
+        />
+      </ErrorBoundary>
     )
   }
 
@@ -551,26 +560,28 @@ export default function PlayTab({ onBack }: Props) {
 
   if (view === 'game') {
     return (
-      <GameBoard
-        key={gameKey}
-        initialPlayers={playerConfigs}
-        aiPersonality={aiPersonality}
-        buyLimit={buyLimit}
-        mode={roomCode ? 'host' : 'local'}
-        roomCode={roomCode ?? undefined}
-        hostSeatIndex={mySeatIndex}
-        remoteSeatIndices={roomCode ? remotePlayers.filter(p => !p.is_host && !p.is_ai).map(p => p.seat_index) : undefined}
-        onExit={() => {
-          setTournamentState(null)
-          setRoomCode(null)
-          sessionStorage.removeItem('shanghai_active_game')
-          setView('landing')
-        }}
-        onGameComplete={tournamentState ? handleTournamentGameComplete : undefined}
-        onReplay={handleStartReplay}
-        tournamentGameNumber={tournamentState?.currentGameNumber}
-        tournamentMatchId={tournamentMatchId ?? undefined}
-      />
+      <ErrorBoundary fallbackMessage="The game encountered an error." onReset={() => setView('landing')}>
+        <GameBoard
+          key={gameKey}
+          initialPlayers={playerConfigs}
+          aiPersonality={aiPersonality}
+          buyLimit={buyLimit}
+          mode={roomCode ? 'host' : 'local'}
+          roomCode={roomCode ?? undefined}
+          hostSeatIndex={mySeatIndex}
+          remoteSeatIndices={roomCode ? remotePlayers.filter(p => !p.is_host && !p.is_ai).map(p => p.seat_index) : undefined}
+          onExit={() => {
+            setTournamentState(null)
+            setRoomCode(null)
+            sessionStorage.removeItem('shanghai_active_game')
+            setView('landing')
+          }}
+          onGameComplete={tournamentState ? handleTournamentGameComplete : undefined}
+          onReplay={handleStartReplay}
+          tournamentGameNumber={tournamentState?.currentGameNumber}
+          tournamentMatchId={tournamentMatchId ?? undefined}
+        />
+      </ErrorBoundary>
     )
   }
 

@@ -202,6 +202,7 @@ export default function ReplayViewer({ gameId, playerNames, onExit }: Props) {
         <input
           type="range" min="0" max={Math.max(0, allStates.length - 1)} value={currentStep}
           onChange={e => { setCurrentStep(Number(e.target.value)); setPlaying(false) }}
+          aria-label="Playback position"
           style={{ width: '100%', accentColor: '#e2b858' }}
         />
         {/* Controls row */}
@@ -209,12 +210,14 @@ export default function ReplayViewer({ gameId, playerNames, onExit }: Props) {
           <button
             onClick={() => setCurrentStep(s => Math.max(0, s - 1))}
             disabled={currentStep === 0}
+            aria-label="Step back"
             style={{ background: 'transparent', border: 'none', color: currentStep === 0 ? '#2d5a3a' : '#6aad7a', cursor: 'pointer', padding: 4 }}
           >
             <SkipBack size={18} />
           </button>
           <button
             onClick={() => setPlaying(p => !p)}
+            aria-label={playing ? 'Pause' : 'Play'}
             style={{
               background: playing ? '#e07a5f' : '#e2b858', border: 'none', borderRadius: '50%',
               width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -226,6 +229,7 @@ export default function ReplayViewer({ gameId, playerNames, onExit }: Props) {
           <button
             onClick={() => setCurrentStep(s => Math.min(allStates.length - 1, s + 1))}
             disabled={currentStep >= allStates.length - 1}
+            aria-label="Step forward"
             style={{ background: 'transparent', border: 'none', color: currentStep >= allStates.length - 1 ? '#2d5a3a' : '#6aad7a', cursor: 'pointer', padding: 4 }}
           >
             <SkipForward size={18} />

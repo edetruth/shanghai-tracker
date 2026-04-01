@@ -13,7 +13,7 @@ export default function BracketView({ matches, playerCount, currentPlayerName }:
     : ['Semi Finals', 'Finals']
 
   return (
-    <div style={{ overflowX: 'auto', padding: '12px' }}>
+    <div style={{ overflowX: 'auto', padding: '12px' }} role="list" aria-label="Tournament bracket">
       <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', minWidth: totalRounds * 160 }}>
         {Array.from({ length: totalRounds }, (_, roundIdx) => {
           const round = roundIdx + 1
@@ -36,7 +36,7 @@ export default function BracketView({ matches, playerCount, currentPlayerName }:
                 const isFinal = round === totalRounds
 
                 return (
-                  <div key={match.id ?? `${match.round_number}-${match.match_index}`} style={{
+                  <div key={match.id ?? `${match.round_number}-${match.match_index}`} aria-label={`Match: ${match.player_names.length > 0 ? match.player_names.join(' vs ') : 'TBD'}${isActive ? ' (in progress)' : isFinished && match.winner_name ? ` — winner: ${match.winner_name}` : ''}`} style={{
                     background: '#0f2218',
                     border: isActive ? '2px solid #e2b858' : isFinal ? '2px solid #e2b858' : '1px solid #2d5a3a',
                     borderRadius: 8,

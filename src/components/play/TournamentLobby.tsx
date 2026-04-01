@@ -267,6 +267,7 @@ export default function TournamentLobby({ mode, hostName, onMatchStart, onBack }
             value={playerName}
             onChange={e => setPlayerName(e.target.value)}
             placeholder="Your name"
+            aria-label="Your name"
             style={{
               background: '#fff', border: '1px solid #e2ddd2', borderRadius: 10,
               padding: '12px', fontSize: 14, color: '#2c1810',
@@ -276,6 +277,7 @@ export default function TournamentLobby({ mode, hostName, onMatchStart, onBack }
             value={joinCode}
             onChange={e => setJoinCode(e.target.value.toUpperCase())}
             placeholder="TRNY-XXXX"
+            aria-label="Tournament code"
             maxLength={9}
             style={{
               background: '#fff', border: '1px solid #e2ddd2', borderRadius: 10,
