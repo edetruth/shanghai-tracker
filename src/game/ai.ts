@@ -209,10 +209,90 @@ function cardDanger(
       // Check 4: opponent discarded same suit/rank → safer to discard
       if (hist.discarded.some(c => c.suit === card.suit)) d -= 15
       if (hist.discarded.some(c => c.rank === card.rank)) d -= 10
+
+      // Check 5: Run window detection — if opponent picked 2+ same-suit cards
+      // with near-adjacent ranks, they're likely building a run. Discarding a card
+      // that fills a gap in that sequence is extremely dangerous.
+      const suitPicks = hist.picked.filter(c => c.suit === card.suit && !isJoker(c))
+      if (suitPicks.length >= 2) {
+        const pickedRanks = suitPicks.map(c => c.rank).sort((a, b) => a - b)
+        for (let i = 0; i < pickedRanks.length - 1; i++) {
+          const lo = pickedRanks[i]
+          const hi = pickedRanks[i + 1]
+          // Card fills an exact gap between two picked cards (e.g. picked 5,7 and discarding 6)
+          if (hi - lo === 2 && card.rank === lo + 1) d += 60
+          // Card is adjacent to a picked pair forming a tight sequence
+          else if (hi - lo <= 2) {
+            if (card.rank === lo - 1 || card.rank === hi + 1) d += 30
+          }
+        }
+      }
     }
   }
 
   return d
+}
+
+// ── Opponent Hand Reading ─────────────────────────────────────────────────────
+
+/**
+ * Infer what suits and ranks an opponent likely needs based on their pick/discard history.
+ * Used by Shark/Mastermind to avoid feeding opponents.
+ */
+function inferOpponentNeeds(
+  opponentHistory: Map<string, OpponentHistory>,
+  _tableMelds: Meld[],
+): Map<string, { likelySuits: Set<string>; likelyRanks: Set<number> }> {
+  const needs = new Map<string, { likelySuits: Set<string>; likelyRanks: Set<number> }>()
+  for (const [oppId, hist] of opponentHistory) {
+    const likelySuits = new Set<string>()
+    const likelyRanks = new Set<number>()
+    // Cards they picked are strong signals of what they need
+    for (const c of hist.picked) {
+      if (!isJoker(c)) {
+        likelySuits.add(c.suit)
+        likelyRanks.add(c.rank)
+      }
+    }
+    // Cards they discarded are negative signals — remove from likely needs
+    const discardedSuits = new Set<string>()
+    const discardedRanks = new Set<number>()
+    for (const c of hist.discarded) {
+      if (!isJoker(c)) {
+        discardedSuits.add(c.suit)
+        discardedRanks.add(c.rank)
+      }
+    }
+    // A suit they discarded multiple times is unlikely to be needed
+    const suitDiscardCounts = new Map<string, number>()
+    for (const c of hist.discarded) {
+      if (!isJoker(c)) suitDiscardCounts.set(c.suit, (suitDiscardCounts.get(c.suit) ?? 0) + 1)
+    }
+    for (const [suit, count] of suitDiscardCounts) {
+      if (count >= 2) likelySuits.delete(suit)
+    }
+    // A rank they discarded is unlikely to be needed
+    for (const r of discardedRanks) likelyRanks.delete(r)
+
+    needs.set(oppId, { likelySuits, likelyRanks })
+  }
+  return needs
+}
+
+// ── Round-Aware Strategy ─────────────────────────────────────────────────────
+
+/**
+ * Returns strategy weights based on the round requirement type.
+ * Used by Shark/Mastermind to adjust discard scoring.
+ */
+function getRoundStrategy(requirement: RoundRequirement): {
+  suitWeight: number    // how much to value same-suit cards (0-1)
+  rankWeight: number    // how much to value same-rank cards (0-1)
+  holdJokersLonger: boolean
+} {
+  if (requirement.runs === 0) return { suitWeight: 0.2, rankWeight: 0.9, holdJokersLonger: false }
+  if (requirement.sets === 0) return { suitWeight: 0.9, rankWeight: 0.2, holdJokersLonger: true }
+  return { suitWeight: 0.5, rankWeight: 0.5, holdJokersLonger: requirement.runs > requirement.sets }
 }
 
 // ── Hand Evaluation System ────────────────────────────────────────────────────
@@ -1059,6 +1139,16 @@ export function aiChooseDiscard(
     )
 
     if (cantLayOff.length > 0) {
+      // ── Race mode: abandon cooperation when opponents are close to going out ──
+      // If any opponent has laid down and has ≤3 cards, it's a race to shed points.
+      // Skip cooperative scoring — just discard highest points as fast as possible.
+      const inRaceMode = opponents?.some(o => o.hasLaidDown && o.hand.length <= 3)
+      if (inRaceMode) {
+        return cantLayOff.reduce((worst, c) =>
+          cardPoints(c.rank) > cardPoints(worst.rank) ? c : worst
+        )
+      }
+
       // ── Cooperative post-down discarding ──────────────────────────────
       // Among dead-weight cards (can't lay off), prefer discarding cards
       // that downed opponents CAN use (extends their melds) — this keeps
@@ -1166,6 +1256,45 @@ export function aiChooseDiscard(
     if (useOpponentAwareness) {
       const danger = cardDanger(card, tablesMelds, opponents, opponentHistory)
       score -= danger * config.dangerWeight
+
+      // Upgrade 2: Hand reading — penalize cards matching inferred opponent needs
+      if (opponentHistory && opponentHistory.size > 0) {
+        const oppNeeds = inferOpponentNeeds(opponentHistory, tablesMelds)
+        for (const [, needs] of oppNeeds) {
+          if (needs.likelySuits.has(card.suit) && needs.likelyRanks.has(card.rank)) {
+            score -= 25 * config.dangerWeight  // strong match — both suit AND rank
+          } else if (needs.likelySuits.has(card.suit)) {
+            score -= 10 * config.dangerWeight  // suit match only
+          } else if (needs.likelyRanks.has(card.rank)) {
+            score -= 8 * config.dangerWeight   // rank match only
+          }
+        }
+      }
+
+      // Upgrade 5: Round-aware discard adjustment
+      const strategy = getRoundStrategy(requirement)
+      // In pure-set rounds, suited neighbors are less valuable — safe to discard
+      if (strategy.rankWeight > strategy.suitWeight) {
+        // Set-heavy: reduce penalty for discarding cards that only have suit connections
+        const sameRankCount = hand.filter(c => c.id !== card.id && c.rank === card.rank && !isJoker(c)).length
+        if (sameRankCount === 0) {
+          // No rank match — this card is less useful in a set-heavy round
+          score += 3
+        }
+      }
+      // In pure-run rounds, same-rank duplicates are less valuable — safe to discard
+      if (strategy.suitWeight > strategy.rankWeight) {
+        const sameRankCount = hand.filter(c => c.id !== card.id && c.rank === card.rank && !isJoker(c)).length
+        if (sameRankCount >= 1) {
+          // Duplicate rank in a run-heavy round — one copy is expendable
+          score += 4
+        }
+        // Off-suit isolated cards are cheaper to discard in run rounds
+        const sameSuitCount = hand.filter(c => c.id !== card.id && c.suit === card.suit && !isJoker(c)).length
+        if (sameSuitCount === 0) {
+          score += 3  // isolated suit — no run potential
+        }
+      }
     }
 
     // Add random noise for weaker personalities
@@ -1376,10 +1505,21 @@ export function aiChooseJokerLayOffPosition(meld: Meld): 'low' | 'high' {
 //   - Runs over sets (runs extend further, creating more future lay-off positions)
 //   - Runs matching remaining hand cards' suit (enables future lay-offs for those cards)
 //   - Own melds over opponent melds (avoid helping opponents go out)
-export function aiFindLayOff(hand: Card[], tablesMelds: Meld[], currentPlayerId?: string): { card: Card; meld: Meld; jokerPosition?: 'low' | 'high' } | null {
+export function aiFindLayOff(hand: Card[], tablesMelds: Meld[], currentPlayerId?: string, opponents?: Player[]): { card: Card; meld: Meld; jokerPosition?: 'low' | 'high' } | null {
   const jokers = hand.filter(c => c.suit === 'joker')
   const nonJokers = hand.filter(c => c.suit !== 'joker')
-  const prioritisedHand = [...jokers, ...nonJokers]
+
+  // Upgrade 4: Race mode — when opponents are close to going out, prioritize laying off
+  // highest-point cards first to minimize Shanghai exposure (instead of jokers-first).
+  const inRaceMode = opponents?.some(o => o.hasLaidDown && o.hand.length <= 3)
+  let prioritisedHand: Card[]
+  if (inRaceMode) {
+    // Sort non-jokers by points descending, then jokers at the end
+    const sortedNonJokers = [...nonJokers].sort((a, b) => cardPoints(b.rank) - cardPoints(a.rank))
+    prioritisedHand = [...sortedNonJokers, ...jokers]
+  } else {
+    prioritisedHand = [...jokers, ...nonJokers]
+  }
 
   for (const card of prioritisedHand) {
     // Collect all valid lay-off targets for this card
@@ -1478,8 +1618,19 @@ export function aiShouldGoDownHard(
   // Always go down: any opponent has 4 or fewer cards
   if (players.some((p, i) => i !== currentPlayerIndex && p.hand.length <= 4)) return true
 
-  // Consider waiting
+  // Upgrade 3: Shanghai risk — if multiple opponents have laid down and are close
+  // to going out, the risk of being Shanghaied is extreme. Go down NOW.
+  const opponents = players.filter((_, i) => i !== currentPlayerIndex)
+  const downOpponents = opponents.filter(o => o.hasLaidDown)
+  const closeToOut = downOpponents.filter(o => o.hand.length <= 3)
+  if (closeToOut.length >= 2) return true
+
+  // Upgrade 3: Point exposure — if holding 80+ points worth of remaining cards
+  // while any opponent has laid down, the Shanghai risk is too high. Go down immediately.
   const stuckPoints = remaining.reduce((sum, c) => sum + cardPoints(c.rank), 0)
+  if (stuckPoints >= 80 && downOpponents.length > 0) return true
+
+  // Consider waiting
   const allOpponentsHaveMany = players.every((p, i) =>
     i === currentPlayerIndex || p.hand.length >= 7
   )
