@@ -43,8 +43,9 @@ export function isValidRun(cards: Card[]): boolean {
   // Try ace-high (ace = 14) — only if there's an ace
   if (ranks.includes(1)) {
     const hiRanks = ranks.map(r => (r === 1 ? 14 : r)).sort((a, b) => a - b)
-    // No wrap: if ace is high, all other naturals must be >= 10 for it to make sense
-    if (hiRanks[0] >= 10 && canFormRun(hiRanks, jokers.length)) return true
+    // canFormRun validates contiguity — no extra guard needed.
+    // A run like 9-10-J-Q-K-A is valid (ace-high, span of 6).
+    if (canFormRun(hiRanks, jokers.length)) return true
   }
 
   return false
@@ -209,12 +210,16 @@ export function buildMeld(cards: Card[], type: 'set' | 'run', ownerId: string, o
     runSuit = suit
     const ranks = naturals.map(c => c.rank).sort((a, b) => a - b)
 
-    // Determine if ace-high
+    // Determine if ace-high — try both interpretations, pick the one that forms a valid run
     let useRanks = ranks
     let aceHigh = false
     if (ranks.includes(1)) {
       const hiRanks = ranks.map(r => (r === 1 ? 14 : r)).sort((a, b) => a - b)
-      if (hiRanks[0] >= 10 && canFormRun(hiRanks, jokers.length)) {
+      // Prefer ace-high if it forms a contiguous run (e.g., 9-10-J-Q-K-A)
+      // and ace-low doesn't work OR ace-high produces a tighter span
+      const lowWorks = canFormRun(ranks, jokers.length)
+      const highWorks = canFormRun(hiRanks, jokers.length)
+      if (highWorks && (!lowWorks || hiRanks[hiRanks.length - 1] - hiRanks[0] < ranks[ranks.length - 1] - ranks[0])) {
         useRanks = hiRanks
         aceHigh = true
       }

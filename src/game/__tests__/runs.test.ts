@@ -103,6 +103,18 @@ describe('isValidRun — ace handling', () => {
     ])).toBe(true)
   })
 
+  it('accepts 9-10-J-Q-K-A ace-high run', () => {
+    expect(isValidRun([
+      c('spades', 9), c('spades', 10), c('spades', 11), c('spades', 12), c('spades', 13), c('spades', 1)
+    ])).toBe(true)
+  })
+
+  it('accepts 8-9-10-J-Q-K-A ace-high run', () => {
+    expect(isValidRun([
+      c('diamonds', 8), c('diamonds', 9), c('diamonds', 10), c('diamonds', 11), c('diamonds', 12), c('diamonds', 13), c('diamonds', 1)
+    ])).toBe(true)
+  })
+
   it('rejects wrap-around run (Q-K-A-2)', () => {
     expect(isValidRun([
       c('hearts', 12), c('hearts', 13), c('hearts', 1), c('hearts', 2)
