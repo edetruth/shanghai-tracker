@@ -547,7 +547,7 @@ function simExecuteAIAction(
     // Easy: 1 lay-off per turn (jokers exempt from cap)
     const hasJoker = player.hand.some(c => c.suit === 'joker')
     if (player.hasLaidDown && tablesMelds.length > 0 && (!layOffDoneThisTurn || hasJoker)) {
-      const layOff = aiFindLayOff(player.hand, tablesMelds, player.id)
+      const layOff = aiFindLayOff(player.hand, tablesMelds, player.id, state.players)
       if (layOff) {
         const newState = simLayOff(state, layOff.card, layOff.meld, layOff.jokerPosition)
         if (newState) {
@@ -608,7 +608,7 @@ function simExecuteAIAction(
   const hasJokerInHand = player.hand.some(c => c.suit === 'joker')
   if (player.hasLaidDown && tablesMelds.length > 0 &&
       (isHard || !layOffDoneThisTurn || player.hand.length === 1 || hasJokerInHand)) {
-    const layOff = aiFindLayOff(player.hand, tablesMelds)
+    const layOff = aiFindLayOff(player.hand, tablesMelds, player.id, state.players)
     if (layOff) {
       const newState = simLayOff(state, layOff.card, layOff.meld, layOff.jokerPosition)
       if (newState) {

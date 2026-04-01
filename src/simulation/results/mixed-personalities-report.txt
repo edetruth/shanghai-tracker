@@ -3,123 +3,120 @@
 ═══════════════════════════════════════════════════════
 
 OVERALL:
-  Average winner score:      107.8 pts
-  Average player score:      207.9 pts
-  Average turns per round:   60.0
-  Average turns per game:    420.3
-  Longest round:             166 turns (Round 7)
-  Shortest round:            13 turns (Round 4)
-  Total Shanghai events:     106 across 30 games
+  Average winner score:      112.3 pts
+  Average player score:      220.7 pts
+  Average turns per round:   52.5
+  Average turns per game:    367.7
+  Longest round:             158 turns (Round 7)
+  Shortest round:            12 turns (Round 1)
+  Total Shanghai events:     177 across 30 games
 
 WIN DISTRIBUTION:
-  The Shark:   13 wins (43.3%)
+  The Shark:   12 wins (40.0%)
   The Mastermind: 8 wins (26.7%)
-  Patient Pat: 7 wins (23.3%)
-  Lucky Lou:   2 wins (6.7%)
-  ⚠️  Imbalanced! Max deviation from expected: 18.3%
+  Patient Pat: 5 wins (16.7%)
+  Lucky Lou:   5 wins (16.7%)
+  ⚠️  Imbalanced! Max deviation from expected: 15.0%
 
 ROUND-BY-ROUND:
-  Round 1 (2 Sets):             avg 54.2  turns | 5%    Shanghai rate ⚠️ (21 stalemates)
-  Round 2 (1 Set + 1 Run):      avg 53.2  turns | 7%    Shanghai rate ⚠️ (24 stalemates)
-  Round 3 (2 Runs):             avg 61.6  turns | 7%    Shanghai rate ⚠️ (12 stalemates)
-  Round 4 (3 Sets):             avg 52.0  turns | 23%   Shanghai rate ⚠️ (3 stalemates)
-  Round 5 (2 Sets + 1 Run):     avg 49.6  turns | 16%   Shanghai rate (16 stalemates)
-  Round 6 (1 Set + 2 Runs):     avg 64.5  turns | 8%    Shanghai rate ⚠️ (11 stalemates)
-  Round 7 (3 Runs):             avg 85.3  turns | 23%   Shanghai rate ⚠️ (4 stalemates)
+  Round 1 (2 Sets):             avg 34.7  turns | 18%   Shanghai rate (6 stalemates)
+  Round 2 (1 Set + 1 Run):      avg 43.7  turns | 13%   Shanghai rate (14 stalemates)
+  Round 3 (2 Runs):             avg 60.7  turns | 17%   Shanghai rate ⚠️ (8 stalemates)
+  Round 4 (3 Sets):             avg 45.2  turns | 34%   Shanghai rate (1 stalemates)
+  Round 5 (2 Sets + 1 Run):     avg 45.3  turns | 23%   Shanghai rate (3 stalemates)
+  Round 6 (1 Set + 2 Runs):     avg 62.2  turns | 15%   Shanghai rate ⚠️ (7 stalemates)
+  Round 7 (3 Runs):             avg 76.0  turns | 28%   Shanghai rate ⚠️ (1 stalemates)
 
 DRAW DECISIONS:
-  Drew from discard: 32.5% of the time
-  Drew from pile:    67.5% of the time
+  Drew from discard: 37.6% of the time
+  Drew from pile:    62.4% of the time
   ✓ In target range (30-40% discard takes)
 
 BUYING:
-  Total buys across all games:           3009
-  Total buy offers:                      15505
-  Average buys per round per player:     3.58
-  Buy accept rate (offered → taken):     19.4%
-  ⚠️  HIGH BUY RATE: AI may be buying too aggressively
+  Total buys across all games:           1594
+  Total buy offers:                      17892
+  Average buys per round per player:     1.90
+  Buy accept rate (offered → taken):     8.9%
+  ✓ Buy rate in reasonable range
 
 MELD TIMING (avg turn to first lay-down):
-  Round 1 (2 Sets): turn 17.4
-  Round 2 (1 Set + 1 Run): turn 23.1
-  Round 3 (2 Runs): turn 35.5
-  Round 4 (3 Sets): turn 27.9
-  Round 5 (2 Sets + 1 Run): turn 23.3
-  Round 6 (1 Set + 2 Runs): turn 41.5
-  Round 7 (3 Runs): turn 60.9
+  Round 1 (2 Sets): turn 12.3
+  Round 2 (1 Set + 1 Run): turn 20.7
+  Round 3 (2 Runs): turn 36.2
+  Round 4 (3 Sets): turn 26.6
+  Round 5 (2 Sets + 1 Run): turn 25.1
+  Round 6 (1 Set + 2 Runs): turn 43.5
+  Round 7 (3 Runs): turn 58.0
 
 JOKER ANALYSIS:
-  Total jokers dealt:           340
-  Jokers stuck in hand at end:  39 (11.5%)
+  Total jokers dealt:           307
+  Jokers stuck in hand at end:  65 (21.2%)
   ⚠️  HIGH JOKER WASTE: AI is failing to use jokers
 
 PERSONALITY BREAKDOWN:
-  the-shark:      13  wins (43.3% ) | avg score 167.5  | avg round 23.9  | lay-down turn 30.9 | shanghai 11.9%  | went out 26.7%
-  the-mastermind: 8   wins (26.7% ) | avg score 233.2  | avg round 33.3  | lay-down turn 32.4 | shanghai 15.2%  | went out 11.4%
-  patient-pat:    7   wins (23.3% ) | avg score 208.7  | avg round 29.8  | lay-down turn 32.3 | shanghai 14.3%  | went out 13.8%
-  lucky-lou:      2   wins (6.7%  ) | avg score 222.3  | avg round 31.8  | lay-down turn 33.4 | shanghai 9.0%   | went out 4.8%
+  the-shark:      12  wins (40.0% ) | avg score 184.0  | avg round 26.3  | lay-down turn 29.6 | shanghai 19.5%  | went out 30.0%
+  the-mastermind: 8   wins (26.7% ) | avg score 186.2  | avg round 26.6  | lay-down turn 31.8 | shanghai 18.6%  | went out 21.4%
+  patient-pat:    5   wins (16.7% ) | avg score 226.2  | avg round 32.3  | lay-down turn 31.9 | shanghai 21.9%  | went out 18.1%
+  lucky-lou:      5   wins (16.7% ) | avg score 286.3  | avg round 40.9  | lay-down turn 32.7 | shanghai 24.3%  | went out 11.4%
 
 PER-ROUND PERSONALITY BREAKDOWN:
   Round 1 (2 Sets):
-    the-shark:      avg 20.3   | went out 20.0%  | shanghai 0.0%   | lay-down turn 12.7
-    the-mastermind: avg 39.7   | went out 6.7%   | shanghai 10.0%  | lay-down turn 20.4
-    patient-pat:    avg 31.7   | went out 3.3%   | shanghai 6.7%   | lay-down turn 19.1
-    lucky-lou:      avg 34.3   | went out 0.0%   | shanghai 3.3%   | lay-down turn 17.7
+    the-shark:      avg 21.0   | went out 23.3%  | shanghai 13.3%  | lay-down turn 9.9
+    the-mastermind: avg 30.8   | went out 20.0%  | shanghai 30.0%  | lay-down turn 11.3
+    patient-pat:    avg 19.7   | went out 16.7%  | shanghai 10.0%  | lay-down turn 12.9
+    lucky-lou:      avg 32.7   | went out 20.0%  | shanghai 20.0%  | lay-down turn 15.2
   Round 2 (1 Set + 1 Run):
-    the-shark:      avg 23.0   | went out 6.7%   | shanghai 6.7%   | lay-down turn 22.1
-    the-mastermind: avg 19.8   | went out 6.7%   | shanghai 0.0%   | lay-down turn 22.8
-    patient-pat:    avg 30.2   | went out 6.7%   | shanghai 13.3%  | lay-down turn 24.8
-    lucky-lou:      avg 33.2   | went out 0.0%   | shanghai 6.7%   | lay-down turn 22.9
+    the-shark:      avg 15.7   | went out 20.0%  | shanghai 6.7%   | lay-down turn 19.0
+    the-mastermind: avg 19.0   | went out 16.7%  | shanghai 10.0%  | lay-down turn 20.4
+    patient-pat:    avg 24.2   | went out 13.3%  | shanghai 13.3%  | lay-down turn 19.8
+    lucky-lou:      avg 36.7   | went out 3.3%   | shanghai 20.0%  | lay-down turn 24.0
   Round 3 (2 Runs):
-    the-shark:      avg 12.5   | went out 26.7%  | shanghai 6.7%   | lay-down turn 37.4
-    the-mastermind: avg 17.8   | went out 16.7%  | shanghai 6.7%   | lay-down turn 33.6
-    patient-pat:    avg 22.3   | went out 16.7%  | shanghai 6.7%   | lay-down turn 34.9
-    lucky-lou:      avg 28.3   | went out 0.0%   | shanghai 6.7%   | lay-down turn 36.1
+    the-shark:      avg 19.3   | went out 36.7%  | shanghai 16.7%  | lay-down turn 36.1
+    the-mastermind: avg 17.2   | went out 13.3%  | shanghai 10.0%  | lay-down turn 38.3
+    patient-pat:    avg 28.7   | went out 10.0%  | shanghai 20.0%  | lay-down turn 34.2
+    lucky-lou:      avg 35.8   | went out 13.3%  | shanghai 20.0%  | lay-down turn 36.2
   Round 4 (3 Sets):
-    the-shark:      avg 30.3   | went out 43.3%  | shanghai 26.7%  | lay-down turn 23.4
-    the-mastermind: avg 41.8   | went out 13.3%  | shanghai 33.3%  | lay-down turn 30.0
-    patient-pat:    avg 23.2   | went out 16.7%  | shanghai 16.7%  | lay-down turn 30.2
-    lucky-lou:      avg 35.5   | went out 16.7%  | shanghai 16.7%  | lay-down turn 27.8
+    the-shark:      avg 51.3   | went out 10.0%  | shanghai 50.0%  | lay-down turn 26.1
+    the-mastermind: avg 34.3   | went out 36.7%  | shanghai 26.7%  | lay-down turn 24.5
+    patient-pat:    avg 27.0   | went out 36.7%  | shanghai 20.0%  | lay-down turn 26.8
+    lucky-lou:      avg 44.2   | went out 13.3%  | shanghai 40.0%  | lay-down turn 29.1
   Round 5 (2 Sets + 1 Run):
-    the-shark:      avg 18.3   | went out 16.7%  | shanghai 6.7%   | lay-down turn 22.9
-    the-mastermind: avg 42.0   | went out 6.7%   | shanghai 23.3%  | lay-down turn 21.5
-    patient-pat:    avg 34.2   | went out 20.0%  | shanghai 20.0%  | lay-down turn 22.2
-    lucky-lou:      avg 31.5   | went out 3.3%   | shanghai 13.3%  | lay-down turn 26.5
+    the-shark:      avg 25.5   | went out 26.7%  | shanghai 13.3%  | lay-down turn 24.9
+    the-mastermind: avg 27.0   | went out 16.7%  | shanghai 20.0%  | lay-down turn 25.3
+    patient-pat:    avg 43.8   | went out 23.3%  | shanghai 36.7%  | lay-down turn 26.6
+    lucky-lou:      avg 32.5   | went out 23.3%  | shanghai 20.0%  | lay-down turn 23.8
   Round 6 (1 Set + 2 Runs):
-    the-shark:      avg 19.7   | went out 36.7%  | shanghai 10.0%  | lay-down turn 42.3
-    the-mastermind: avg 34.2   | went out 10.0%  | shanghai 13.3%  | lay-down turn 41.2
-    patient-pat:    avg 20.0   | went out 13.3%  | shanghai 3.3%   | lay-down turn 40.7
-    lucky-lou:      avg 27.2   | went out 3.3%   | shanghai 3.3%   | lay-down turn 41.9
+    the-shark:      avg 14.0   | went out 36.7%  | shanghai 6.7%   | lay-down turn 38.9
+    the-mastermind: avg 24.5   | went out 16.7%  | shanghai 13.3%  | lay-down turn 44.5
+    patient-pat:    avg 44.0   | went out 16.7%  | shanghai 26.7%  | lay-down turn 46.8
+    lucky-lou:      avg 37.2   | went out 6.7%   | shanghai 13.3%  | lay-down turn 44.9
   Round 7 (3 Runs):
-    the-shark:      avg 43.3   | went out 36.7%  | shanghai 26.7%  | lay-down turn 62.5
-    the-mastermind: avg 37.8   | went out 20.0%  | shanghai 20.0%  | lay-down turn 59.5
-    patient-pat:    avg 47.2   | went out 20.0%  | shanghai 33.3%  | lay-down turn 59.6
-    lucky-lou:      avg 32.3   | went out 10.0%  | shanghai 13.3%  | lay-down turn 61.8
+    the-shark:      avg 37.2   | went out 56.7%  | shanghai 30.0%  | lay-down turn 56.7
+    the-mastermind: avg 33.3   | went out 30.0%  | shanghai 20.0%  | lay-down turn 54.5
+    patient-pat:    avg 38.8   | went out 10.0%  | shanghai 26.7%  | lay-down turn 62.0
+    lucky-lou:      avg 67.3   | went out 0.0%   | shanghai 36.7%  | lay-down turn 59.3
 
 PROBLEM DETECTION:
-  ⚠️  Rounds exceeding 30 turns: 199
-  ⚠️  Players never laying down in a round: 80 occurrences
+  ⚠️  Rounds exceeding 30 turns: 181
+  ⚠️  Players never laying down in a round: 157 occurrences
   ✓ At least one buy occurred in every game
 
 ═══════════════════════════════════════════════════════
   AUTO-DIAGNOSIS
 ═══════════════════════════════════════════════════════
 
-  1. SLOW GAMES: Avg turns/round = 60.0. Target < 50. AI is not building melds efficiently.
-  2. JOKER WASTE: 11.5% of jokers end up stuck in hand at round end. AI should lay off jokers after laying down.
-  3. ROUND 1 TOO SLOW: avg 54.2 turns (2 Sets). Target < 50.
-  4. ROUND 2 TOO SLOW: avg 53.2 turns (1 Set + 1 Run). Target < 50.
-  5. ROUND 3 TOO SLOW: avg 61.6 turns (2 Runs). Target < 50.
-  6. ROUND 4 TOO SLOW: avg 52.0 turns (3 Sets). Target < 50.
-  7. ROUND 6 TOO SLOW: avg 64.5 turns (1 Set + 2 Runs). Target < 50.
-  8. ROUND 7 TOO SLOW: avg 85.3 turns (3 Runs). Target < 50.
+  1. SLOW GAMES: Avg turns/round = 52.5. Target < 50. AI is not building melds efficiently.
+  2. JOKER WASTE: 21.2% of jokers end up stuck in hand at round end. AI should lay off jokers after laying down.
+  3. ROUND 3 TOO SLOW: avg 60.7 turns (2 Runs). Target < 50.
+  4. ROUND 6 TOO SLOW: avg 62.2 turns (1 Set + 2 Runs). Target < 50.
+  5. ROUND 7 TOO SLOW: avg 76.0 turns (3 Runs). Target < 50.
 
 TARGET SCORECARD:
-  ✗ Avg turns/round < 50           (60.0)
-  ✓ Shanghai rate < 35%            (12.6%)
-  ✓ Buy rate > 0.5/round/player    (3.58)
-  ✓ Discard take 25-45%            (32.5%)
-  ✗ Joker stuck rate < 5%          (11.5%)
+  ✗ Avg turns/round < 50           (52.5)
+  ✓ Shanghai rate < 35%            (21.1%)
+  ✓ Buy rate > 0.5/round/player    (1.90)
+  ✓ Discard take 25-45%            (37.6%)
+  ✗ Joker stuck rate < 5%          (21.2%)
 
   3/5 targets met
 
