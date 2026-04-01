@@ -58,8 +58,13 @@ src/
 │   ├── useHeartbeat.ts      # Connection heartbeat system — send/receive, detect disconnections
 │   └── useActionAck.ts      # Action acknowledgment system — pending state, timeout retries
 ├── hooks/
-│   ├── useRealtimeScores.ts # Supabase Realtime subscriptions for score tracker multiplayer
-│   └── useTournamentChannel.ts # Supabase Realtime subscription for live tournament bracket updates
+│   ├── useRealtimeScores.ts   # Supabase Realtime subscriptions for score tracker multiplayer
+│   ├── useTournamentChannel.ts # Supabase Realtime subscription for live tournament bracket updates
+│   ├── useMultiplayerSync.ts  # Extracted from GameBoard: broadcast, action receiving, heartbeat, emotes, snapshots
+│   ├── useAIAutomation.ts     # Extracted from GameBoard: AI turn execution, eval config, Nemesis overrides
+│   ├── useGameAudio.ts        # Sound preload + volume state (SFX/notification)
+│   ├── useGameAchievements.ts # Achievement detection at round/game end + inline unlock helpers
+│   └── useActionLogger.ts     # Game action logging with sequence tracking
 └── components/
     ├── HomePage.tsx          # Landing screen: 4 nav cards (Play, Score Tracker, Stats, Analytics) + HelpCircle tutorial button
     ├── AnalyticsPage.tsx     # Telemetry dashboard: Overview / AI Quality / Rounds / Decisions tabs
@@ -78,7 +83,8 @@ src/
     ├── TutorialOverlay.tsx   # 4-slide first-run tutorial + useTutorial hook (localStorage gate)
     └── play/                 # Digital game UI
         ├── GameSetup.tsx     # 2–8 players, Human/AI toggle per slot, name autocomplete, difficulty selector
-        ├── GameBoard.tsx     # Main game board: hand, melds, piles, AI automation, pause
+        ├── GameBoard.tsx     # Main game board orchestrator — delegates to hooks for AI, multiplayer, audio, achievements, logging
+        ├── TopBar.tsx        # Zone 1: round badge, requirement, pause button, emote bar, connection indicator
         ├── GameOver.tsx      # End-of-game results + auto-save badge
         ├── GameToast.tsx     # Queued toast overlay: 5 styles (celebration/pressure/neutral/drama/taunt)
         ├── Card.tsx          # Card component: suit tints, haptic on tap, shimmer/edgeGlow/buyRelevance props
@@ -154,9 +160,17 @@ Play mode (`section === 'play'`) runs entirely in `PlayTab` → `GameBoard`. Sta
 
 ```
 GameSetup (PlayerConfig[] configured)
-  → GameBoard (full game engine, AI automation)
+  → GameBoard (orchestrator — delegates to hooks)
     → GameOver (auto-save → savePlayedGame())
 ```
+
+**GameBoard architecture** — GameBoard.tsx (~3,700 lines) is the orchestrator. Heavy logic is extracted into focused hooks:
+- `useAIAutomation` — AI turn execution (draw/action phases), personality config, Nemesis overrides, timing
+- `useMultiplayerSync` — broadcast throttling, action receiving, heartbeat, emotes, snapshots, buy timeout
+- `useGameAudio` — sound preload, SFX/notification volume state
+- `useGameAchievements` — detection at round/game end, inline unlock helpers
+- `useActionLogger` — fire-and-forget action logging with sequence tracking
+- Zone UI: `TopBar.tsx` (round badge, requirement, pause, emotes, connection indicator)
 
 - **`PlayerConfig`** — `{ name: string; isAI: boolean }` — in `src/game/types.ts`
 - **`AIDifficulty`** — `'easy' | 'medium' | 'hard'` — exported from `src/game/types.ts`; passed from `GameSetup` → `PlayTab` → `GameBoard` prop (`aiDifficulty?: AIDifficulty`, default `'medium'`)
