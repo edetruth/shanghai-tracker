@@ -64,7 +64,7 @@ export default function ReplayViewer({ gameId, playerNames, onExit }: Props) {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100dvh', background: '#1a3a2a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ height: '100dvh', background: '#1a3a2a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <span style={{ color: '#6aad7a', fontSize: 14 }}>Loading replay...</span>
       </div>
     )
@@ -72,7 +72,7 @@ export default function ReplayViewer({ gameId, playerNames, onExit }: Props) {
 
   if (error || allStates.length === 0) {
     return (
-      <div style={{ minHeight: '100dvh', background: '#1a3a2a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+      <div style={{ height: '100dvh', background: '#1a3a2a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
         <span style={{ color: '#a8d0a8', fontSize: 14 }}>{error ?? 'Could not reconstruct game (no seed in action log).'}</span>
         <span style={{ color: '#3a5a3a', fontSize: 11 }}>Games started before the replay update don't have seeds.</span>
         <button onClick={onExit} style={{ background: '#1e4a2e', border: '1px solid #2d5a3a', borderRadius: 8, padding: '8px 20px', color: '#6aad7a', cursor: 'pointer' }}>Back</button>
@@ -81,11 +81,11 @@ export default function ReplayViewer({ gameId, playerNames, onExit }: Props) {
   }
 
   return (
-    <div style={{ minHeight: '100dvh', background: feltBg, display: 'flex', flexDirection: 'column', transition: 'background 1s ease' }}>
+    <div style={{ height: '100dvh', background: feltBg, display: 'flex', flexDirection: 'column', overflow: 'hidden', transition: 'background 1s ease' }}>
       {/* Header */}
-      <div style={{ background: '#0f2218', paddingTop: 'env(safe-area-inset-top, 44px)', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-        <button onClick={onExit} style={{ background: 'transparent', border: 'none', color: '#6aad7a', cursor: 'pointer', padding: 4 }}>
-          <ChevronLeft size={20} />
+      <div style={{ background: '#0f2218', paddingTop: 'max(8px, env(safe-area-inset-top, 44px))', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        <button onClick={onExit} style={{ background: 'transparent', border: 'none', color: '#6aad7a', cursor: 'pointer', padding: 8, minWidth: 44, minHeight: 44, display: 'flex', alignItems: 'center', justifyContent: 'center' }} aria-label="Back">
+          <ChevronLeft size={24} />
         </button>
         <span style={{ color: '#e2b858', fontSize: 13, fontWeight: 700, flex: 1 }}>
           Replay — Round {state?.currentRound ?? 1}/7
