@@ -91,6 +91,9 @@ src/
         ├── PileArea.tsx      # Zone 3: draw/discard piles with stacked depth, active states, labels
         ├── ActionBar.tsx     # Zone 5: action buttons, undo toasts, joker prompt, stuck state
         ├── PauseMenu.tsx     # Pause modal: game speed, animations toggle, volume, resume/exit
+        ├── OpponentStrip.tsx # Zone 2: collapsible player strip (compact + expanded modes)
+        ├── HandArea.tsx      # Zone 4: hand display wrapper with edge glow, perfect draw, match labels
+        ├── CinematicOverlays.tsx # Fixed overlays: going-out flash, turn banner, joker swap, flying card
         ├── GameOver.tsx      # End-of-game results + auto-save badge
         ├── GameToast.tsx     # Queued toast overlay: 5 styles (celebration/pressure/neutral/drama/taunt)
         ├── Card.tsx          # Card component: suit tints, haptic on tap, shimmer/edgeGlow/buyRelevance props
@@ -170,13 +173,10 @@ GameSetup (PlayerConfig[] configured)
     → GameOver (auto-save → savePlayedGame())
 ```
 
-**GameBoard architecture** — GameBoard.tsx (~3,700 lines) is the orchestrator. Heavy logic is extracted into focused hooks:
-- `useAIAutomation` — AI turn execution (draw/action phases), personality config, Nemesis overrides, timing
-- `useMultiplayerSync` — broadcast throttling, action receiving, heartbeat, emotes, snapshots, buy timeout
-- `useGameAudio` — sound preload, SFX/notification volume state
-- `useGameAchievements` — detection at round/game end, inline unlock helpers
-- `useActionLogger` — fire-and-forget action logging with sequence tracking
-- Zone UI: `TopBar.tsx` (round badge, requirement, pause, emotes, connection indicator)
+**GameBoard architecture** — GameBoard.tsx (~3,000 lines) is the orchestrator. Logic and UI extracted into focused modules:
+- **Zustand store** (`src/stores/gameStore.ts`) — core game state, buying state machine actions
+- **Hooks**: `useAIAutomation` (AI turn phases), `useMultiplayerSync` (broadcast/receive), `useGameAudio` (volume), `useGameAchievements` (badges), `useActionLogger` (action log)
+- **Zone components**: `TopBar` (Zone 1), `OpponentStrip` (Zone 2), `PileArea` (Zone 3), `HandArea` (Zone 4), `ActionBar` (Zone 5), `PauseMenu`, `CinematicOverlays`
 
 - **`PlayerConfig`** — `{ name: string; isAI: boolean }` — in `src/game/types.ts`
 - **`AIDifficulty`** — `'easy' | 'medium' | 'hard'` — exported from `src/game/types.ts`; passed from `GameSetup` → `PlayTab` → `GameBoard` prop (`aiDifficulty?: AIDifficulty`, default `'medium'`)
