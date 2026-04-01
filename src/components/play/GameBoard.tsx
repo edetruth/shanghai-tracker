@@ -3,18 +3,12 @@ import { createPlayedGame, saveGameEvents, saveAIDecisions, backfillDecisionOutc
 import { checkAchievements, ACHIEVEMENTS } from '../../lib/achievements'
 import type { AIDecision, PlayerRoundStats, PlayerGameStats } from '../../game/types'
 import { Pause, Wifi } from 'lucide-react'
-import type { GameState, Player, Card as CardType, Meld, PlayerConfig, AIDifficulty, AIPersonality, PersonalityConfig, OpponentHistory } from '../../game/types'
-import { PERSONALITIES } from '../../game/types'
+import type { GameState, Player, Card as CardType, Meld, PlayerConfig, AIDifficulty, AIPersonality, OpponentHistory } from '../../game/types'
 import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, MAX_BUYS, cardPoints } from '../../game/rules'
 import { createDecks, shuffle, dealHands } from '../../game/deck'
-import { buildMeld, isValidSet, canLayOff, findSwappableJoker, getNextJokerOptions, isLegalDiscard, evaluateLayOffReversal, canGoOutViaChainLayOff } from '../../game/meld-validator'
+import { buildMeld, isValidSet, canLayOff, findSwappableJoker, isLegalDiscard, evaluateLayOffReversal } from '../../game/meld-validator'
 import { scoreRound } from '../../game/scoring'
-import {
-  aiFindBestMelds, aiFindBestMeldsForLayOff, aiShouldTakeDiscard, aiChooseDiscard, aiShouldBuy,
-  aiFindLayOff, aiFindJokerSwap, aiFindPreLayDownJokerSwap,
-  aiShouldGoDownHard, getAIEvalConfig,
-  type AIEvalConfig,
-} from '../../game/ai'
+import { aiFindBestMelds } from '../../game/ai'
 import { SUIT_ORDER } from './HandDisplay'
 import { haptic } from '../../lib/haptics'
 import { playSound, preloadSounds, getSfxVolume, getNotifVolume, setSfxVolume, setNotifVolume } from '../../lib/sounds'
@@ -33,7 +27,8 @@ import { useMultiplayerSync } from '../../hooks/useMultiplayerSync'
 import EmoteBar from './EmoteBar'
 import EmoteBubble from './EmoteBubble'
 import { logAction, loadActionLog } from '../../lib/actionLog'
-import { loadOpponentModel, saveOpponentModel, buildNemesisOverrides, updateOpponentModel } from '../../game/opponent-model'
+import { loadOpponentModel, saveOpponentModel, updateOpponentModel } from '../../game/opponent-model'
+import { useAIAutomation } from '../../hooks/useAIAutomation'
 import { reportMatchResult, advanceWinner } from '../../lib/tournamentStore'
 
 interface Props {
@@ -203,51 +198,10 @@ function advancePlayer(state: GameState): GameState {
 
 // (nextPhaseForPlayer is defined inside GameBoard to account for solo-human games)
 
-function getAIDelay(speed: GameSpeed): number {
-  if (speed === 'fast') return 200 + Math.random() * 200
-  if (speed === 'slow') return 2000 + Math.random() * 1000
-  return 700 + Math.random() * 500
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyProp = 'medium', aiPersonality, buyLimit = 5, onExit, onGameComplete, tournamentGameNumber, tournamentMatchId, mode = 'local', roomCode, hostSeatIndex = 0, remoteSeatIndices = [], onReplay }: Props) {
-  // Resolve personality config — if personality is set, use it; otherwise fall back to legacy difficulty
-  const personalityConfig: PersonalityConfig | null = aiPersonality
-    ? (PERSONALITIES.find(p => p.id === aiPersonality) ?? PERSONALITIES[0])
-    : null
   const aiDifficulty: AIDifficulty = aiDifficultyProp
-
-  // Helper to get the active personality config (falls back to a config derived from legacy difficulty)
-  function getPersonalityConfig(): PersonalityConfig {
-    if (personalityConfig) return personalityConfig
-    // Map legacy difficulty to the closest personality
-    if (aiDifficultyProp === 'easy') return PERSONALITIES.find(p => p.id === 'rookie-riley')!
-    if (aiDifficultyProp === 'hard') return PERSONALITIES.find(p => p.id === 'the-shark')!
-    return PERSONALITIES.find(p => p.id === 'steady-sam')!
-  }
-
-  // Get the AI evaluation config for the current personality
-  // For The Nemesis: blend in opponent model overrides
-  const nemesisOverridesRef = useRef<ReturnType<typeof buildNemesisOverrides> | null>(null)
-  function getEvalConfig(): AIEvalConfig {
-    const cfg = getPersonalityConfig()
-    const base = getAIEvalConfig(cfg.id)
-    if (cfg.id !== 'the-nemesis') return base
-    // Load overrides once (cached in ref)
-    if (!nemesisOverridesRef.current) {
-      const humanPlayer = initialPlayers.find(p => !p.isAI)
-      const model = humanPlayer ? loadOpponentModel(humanPlayer.name) : null
-      nemesisOverridesRef.current = buildNemesisOverrides(model)
-    }
-    const ov = nemesisOverridesRef.current
-    return {
-      ...base,
-      buyRiskTolerance: base.buyRiskTolerance + ov.buyAggression,
-      dangerWeight: Math.min(1, base.dangerWeight + (Object.values(ov.suitDenial).reduce((s, v) => s + v, 0) / 400)),
-      goDownStyle: ov.goDownTiming === 'rush' ? 'immediate' : ov.goDownTiming === 'hold' ? 'strategic' : base.goDownStyle,
-    }
-  }
 
   const [gameState, setGameState] = useState<GameState>(() => initGame(initialPlayers, buyLimit))
   const [gameLogId] = useState(() => {
@@ -277,7 +231,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const [newCardIds, setNewCardIds] = useState<Set<string>>(new Set())
   const [leavingCardId, setLeavingCardId] = useState<string | null>(null)
   const [dealFlipPhase, setDealFlipPhase] = useState<'facedown' | 'flipping' | null>(null)
-  const [aiActionTick, setAiActionTick] = useState(0)
   const [gameSpeed, setGameSpeed] = useState<GameSpeed>('normal')
   const [buyLog, setBuyLog] = useState<BuyLogEntry[]>([])
   const [gameId, setGameId] = useState<string | null>(null)
@@ -814,9 +767,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       detail: `buys: ${buyer.buysRemaining}/${gameState.buyLimit >= 999 ? '∞' : gameState.buyLimit}`,
     }])
   }, [uiPhase, buyerStep]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Medium AI: max 2 lay-offs per turn
-  const aiLayOffCountRef = useRef(0)
 
   // Zone 2 scroll container — used to auto-scroll to matching melds when a card is selected
   const zone2ScrollRef = useRef<HTMLDivElement>(null)
@@ -2364,319 +2314,40 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     }, 300)
   }
 
-  // ── AI: execute action phase turn ─────────────────────────────────────────
-  function executeAIAction() {
-    const state = gameStateRef.current
-    const player = getCurrentPlayer(state)
-    const { tablesMelds, requirement } = state.roundState
-    const config = getPersonalityConfig()
-
-    // Track turns elapsed for panic mode
-    const turnsElapsed = (aiTurnsElapsedRef.current.get(player.id) ?? 0) + 1
-    aiTurnsElapsedRef.current.set(player.id, turnsElapsed)
-
-    // Build joker positions for AI runs: place extra jokers at the low end
-    function aiJokerPositions(meldGroups: CardType[][]): Map<string, number> {
-      const positions = new Map<string, number>()
-      for (const cards of meldGroups) {
-        if (isValidSet(cards)) continue
-        let placed = new Map<string, number>()
-        for (;;) {
-          const placement = getNextJokerOptions(cards, placed)
-          if (!placement) break
-          const choice = placement.options[0]
-          placed.set(placement.joker.id, choice.rank)
-        }
-        placed.forEach((rank, id) => positions.set(id, rank))
-      }
-      return positions
-    }
-
-    // ── Go-down decision helper (personality-aware) ──
-    function shouldGoDownNow(melds: CardType[][]): boolean {
-      const style = config.goDownStyle
-      if (style === 'immediate') return true
-
-      if (style === 'immediate-random-hold') {
-        // Lucky Lou: 25% chance to hold one extra turn
-        if (config.randomFactor > 0 && Math.random() < 0.25) {
-          const turnsWaited = aiTurnsCouldGoDownRef.current.get(player.id) ?? 0
-          if (turnsWaited === 0) {
-            aiTurnsCouldGoDownRef.current.set(player.id, 1)
-            turnsHeldRef.current.set(player.id, (turnsHeldRef.current.get(player.id) ?? 0) + 1)
-            recordDecision(player, 'go_down', 'held', null, 'random hold')
-            return false
-          }
-        }
-        return true
-      }
-
-      if (style === 'hold-for-out') {
-        // The Mastermind: go down if going out, can go out soon, or panic
-        const meldedIds = new Set(melds.flatMap(m => m.map(c => c.id)))
-        const remaining = player.hand.filter(c => !meldedIds.has(c.id))
-        if (remaining.length === 0) return true // going out!
-
-        // Can go out via chain lay-offs on existing table melds
-        if (remaining.length <= 4 && tablesMelds.length > 0) {
-          if (canGoOutViaChainLayOff(remaining, tablesMelds)) return true
-        }
-
-        // Near go-out: remaining <= 2 and at least one can lay off
-        if (remaining.length <= 2 && tablesMelds.length > 0) {
-          const canLayOffSome = remaining.some(c => tablesMelds.some(m => canLayOff(c, m)))
-          if (canLayOffSome) return true
-        }
-
-        // Shanghai risk: held 3+ turns with high hand points — bail out
-        const turnsHeldSoFar = aiTurnsCouldGoDownRef.current.get(player.id) ?? 0
-        if (turnsHeldSoFar >= 3) {
-          const handPoints = remaining.reduce((sum, c) => sum + cardPoints(c.rank), 0)
-          if (handPoints > 60) return true
-        }
-
-        // Check panic threshold
-        if (turnsElapsed >= config.panicThreshold) return true
-        // Check opponent pressure
-        const someoneClose = state.players.some(p => p.id !== player.id && p.hand.length <= 3 && p.hasLaidDown)
-        if (someoneClose) return true
-        aiTurnsCouldGoDownRef.current.set(player.id, (aiTurnsCouldGoDownRef.current.get(player.id) ?? 0) + 1)
-        turnsHeldRef.current.set(player.id, (turnsHeldRef.current.get(player.id) ?? 0) + 1)
-        recordDecision(player, 'go_down', 'held', null, 'hold-for-out')
-        return false
-      }
-
-      // 'strategic' — use existing hard AI logic
-      const turnsWaited = aiTurnsCouldGoDownRef.current.get(player.id) ?? 0
-      const shouldGoDown = aiShouldGoDownHard(
-        player.hand, melds, requirement, tablesMelds,
-        state.players, state.roundState.currentPlayerIndex, turnsWaited,
-      )
-      if (!shouldGoDown) {
-        aiTurnsCouldGoDownRef.current.set(player.id, turnsWaited + 1)
-        turnsHeldRef.current.set(player.id, (turnsHeldRef.current.get(player.id) ?? 0) + 1)
-        recordDecision(player, 'go_down', 'held', null, 'strategic hold')
-      }
-      return shouldGoDown
-    }
-
-    // Lay-off style: never / capped-1 / unlimited
-    const layOffCap = config.layOffStyle === 'never' ? 0
-      : config.layOffStyle === 'capped-1' ? 1
-      : Infinity
-
-    // ── Basic/Easy personality: lay down required melds only, simple discard ──
-    if (config.discardStyle === 'random' && config.layOffStyle === 'never') {
-      if (!player.hasLaidDown) {
-        const melds = aiFindBestMeldsForLayOff(player.hand, requirement, tablesMelds)
-        if (melds && melds.length > 0) {
-          aiLayOffCountRef.current = 0
-          handleMeldConfirm(melds, aiJokerPositions(melds))
-          return
-        }
-      }
-      aiLayOffCountRef.current = 0
-      const card = aiChooseDiscard(player.hand, requirement, getEvalConfig(), tablesMelds, undefined, undefined, player.hasLaidDown)
-      handleDiscard(card.id)
-      return
-    }
-
-    // ── Pre-lay-down joker swap (medium+ personalities) ──
-    if (config.jokerSwapStyle !== 'never' && !player.hasLaidDown && tablesMelds.length > 0) {
-      const swap = aiFindPreLayDownJokerSwap(player.hand, tablesMelds, requirement)
-      if (swap) {
-        // Random personality: 50% chance to skip the swap
-        if (config.jokerSwapStyle === 'random' && Math.random() < 0.5) {
-          // skip
-        } else {
-          handleJokerSwap(swap.card, swap.meld)
-          setAiActionTick(t => t + 1)
-          return
-        }
-      }
-    }
-
-    // ── Try to lay down (required melds only) ──
-    if (!player.hasLaidDown) {
-      const melds = aiFindBestMeldsForLayOff(player.hand, requirement, tablesMelds)
-      if (melds && melds.length > 0) {
-        if (shouldGoDownNow(melds)) {
-          aiTurnsCouldGoDownRef.current.delete(player.id)
-          aiLayOffCountRef.current = 0
-          noProgressTurnsRef.current = 0
-          handleMeldConfirm(melds, aiJokerPositions(melds))
-          return
-        } else {
-          // Fall through to discard
-        }
-      }
-    }
-
-    // ── Joker swap after laying down (beneficial/optimal/random personalities) ──
-    if (config.jokerSwapStyle !== 'never' && player.hasLaidDown && tablesMelds.length > 0) {
-      const swap = aiFindJokerSwap(player.hand, tablesMelds)
-      if (swap) {
-        if (config.jokerSwapStyle === 'random' && Math.random() < 0.5) {
-          // skip
-        } else {
-          handleJokerSwap(swap.card, swap.meld)
-          setAiActionTick(t => t + 1)
-          return
-        }
-      }
-    }
-
-    // ── Try to lay off ──
-    const hasJokerInHand = player.hand.some(c => c.suit === 'joker')
-    if (layOffCap > 0 && player.hasLaidDown && tablesMelds.length > 0 &&
-        (aiLayOffCountRef.current < layOffCap || player.hand.length === 1 || hasJokerInHand)) {
-      const layOff = aiFindLayOff(player.hand, tablesMelds, player.id, gameState.players)
-      if (layOff) {
-        if (layOff.card.suit !== 'joker') aiLayOffCountRef.current++
-        handleLayOff(layOff.card, layOff.meld, layOff.jokerPosition)
-        return
-      }
-    }
-
-    // ── Discard ──
-    if (player.hand.length > 0) {
-      aiLayOffCountRef.current = 0
-
-      // Panic mode: stuck too long without laying down
-      let card: CardType
-      if (!player.hasLaidDown && turnsElapsed >= config.panicThreshold) {
-        const nonJokers = player.hand.filter(c => c.suit !== 'joker')
-        const pool = nonJokers.length > 0 ? nonJokers : player.hand
-        card = pool.reduce((worst, c) => cardPoints(c.rank) > cardPoints(worst.rank) ? c : worst)
-      } else {
-        const evalCfg = getEvalConfig()
-        card = aiChooseDiscard(player.hand, requirement, evalCfg, tablesMelds,
-            state.players.filter(p => p.id !== player.id), opponentHistoryRef.current, player.hasLaidDown)
-        // Lucky Lou: 15% chance to pick a random card instead
-        if (config.randomFactor > 0 && Math.random() < 0.15 && player.hand.length > 1) {
-          const randomIdx = Math.floor(Math.random() * player.hand.length)
-          card = player.hand[randomIdx]
-        }
-      }
-      console.log(`[Buy] AI ${player.name} discarded [${card.rank === 0 ? 'Joker' : `${card.rank}${card.suit}`}]`)
-      handleDiscard(card.id)
-    }
-  }
-
-  // ── AI turn automation (draw + action) ───────────────────────────────────
-  const handLen = currentPlayer.hand.length
-  useEffect(() => {
-    if (!currentPlayer.isAI) return
-    if (uiPhase !== 'draw' && uiPhase !== 'action') return
-    // BAIL if someone has gone out — round is over
-    if (gameState.roundState.goOutPlayerId) return
-    // BAIL if stalemate prompt is showing — wait for user decision
-    if (stalematePhase === 'prompt') return
-
-    const delay = getAIDelay(gameSpeed)
-    const timerId = setTimeout(() => {
-      // Re-check goOutPlayerId inside the timeout (state may have changed)
-      if (gameStateRef.current.roundState.goOutPlayerId) return
-      if (uiPhaseRef.current === 'draw') {
-        const state = gameStateRef.current
-        const player = getCurrentPlayer(state)
-        const top = state.roundState.discardPile[state.roundState.discardPile.length - 1] ?? null
-
-        const cfg = getPersonalityConfig()
-        const evalCfg = getEvalConfig()
-        let shouldTake = false
-        if (top !== null) {
-          shouldTake = aiShouldTakeDiscard(player.hand, top, state.roundState.requirement, player.hasLaidDown, evalCfg,
-              state.roundState.tablesMelds, state.players.filter(p => p.id !== player.id))
-          // Lucky Lou random factor: 20% chance to take any discard, 10% chance to decline a good one
-          if (cfg.randomFactor > 0) {
-            if (!shouldTake && Math.random() < 0.2) shouldTake = true
-            else if (shouldTake && Math.random() < 0.1) shouldTake = false
-          }
-        }
-
-        // If AI has laid down and top discard can be laid off, take it
-        if (!shouldTake && top !== null && player.hasLaidDown) {
-          const melds = state.roundState.tablesMelds
-          if (melds.some(m => canLayOff(top, m))) {
-            shouldTake = true
-          }
-          // Post-down joker-swap take: if the discard replaces a joker in a
-          // table run, taking it frees the joker which can then lay off anywhere
-          if (!shouldTake && melds.some(m => findSwappableJoker(top, m) !== null)) {
-            shouldTake = true
-          }
-        }
-
-        if (shouldTake) handleTakeDiscard()
-        else handleDrawFromPile()
-      } else if (uiPhaseRef.current === 'action') {
-        executeAIAction()
-      }
-    }, delay)
-
-    return () => clearTimeout(timerId)
-  }, [uiPhase, currentPlayer.isAI, handLen, rs.currentPlayerIndex, aiActionTick, stalematePhase]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── AI buying automation ──────────────────────────────────────────────────
-  useEffect(() => {
-    if (uiPhase !== 'buying') return
-    // BAIL if someone has gone out — round is over
-    if (gameState.roundState.goOutPlayerId) return
-    // Only process AI decisions during the ai-deciding phase.
-    // Bail during reveal (card rising), snatched (buy animation), unclaimed (sinking),
-    // human-turn, free-offer — prevents re-entrant duplicate timers that cause
-    // double handleBuyDecision calls and skip the drawing player's action phase.
-    if (buyingPhase !== 'ai-deciding') return
-    const buyerIdx = buyerOrder[buyerStep]
-    if (buyerIdx === undefined) return
-    const buyer = gameState.players[buyerIdx]
-    if (!buyer?.isAI) return
-
-    const delay = 300 // fast AI decisions during cinematic
-    const timerId = setTimeout(() => {
-      // Re-check goOutPlayerId inside the timeout
-      if (gameStateRef.current.roundState.goOutPlayerId) return
-      const state = gameStateRef.current
-      const currentBuyer = state.players[buyerOrderRef.current[buyerStepRef.current]]
-      const disc = buyingDiscard
-      const req = state.roundState.requirement
-      if (!disc || !currentBuyer) {
-        handleBuyDecision(false)
-        return
-      }
-      const buyConfig = getPersonalityConfig()
-      const buyEvalCfg = getEvalConfig()
-      // Enforce personality buy self limit
-      const personalityBuysUsed = (state.buyLimit >= 999 ? 999 : state.buyLimit) - currentBuyer.buysRemaining
-      const atPersonalityLimit = buyConfig.buySelfLimit > 0 && personalityBuysUsed >= buyConfig.buySelfLimit
-
-      let shouldBuy = false
-      if (atPersonalityLimit || buyConfig.buyStyle === 'never') {
-        shouldBuy = false
-      } else {
-        const opponents = state.players.filter(p => p.id !== currentBuyer.id)
-          .map(p => ({ hand: { length: p.hand.length }, hasLaidDown: p.hasLaidDown }))
-        shouldBuy = aiShouldBuy(currentBuyer.hand, disc, req, currentBuyer.buysRemaining, buyEvalCfg, opponents, state.roundState.tablesMelds, currentBuyer.hasLaidDown)
-      }
-
-      if (shouldBuy) {
-        // AI buys — show snatched cinematic, then process
-        setBuyingSnatcherName(currentBuyer.name)
-        setBuyingPhase('snatched')
-        setTimeout(() => {
-          setBuyingPhase('hidden')
-          handleBuyDecision(true)
-        }, 800)
-      } else {
-        // AI passes silently — track for human display
-        setBuyingPassedPlayers(prev => [...prev, currentBuyer.name])
-        handleBuyDecision(false)
-      }
-    }, delay)
-
-    return () => clearTimeout(timerId)
-  }, [uiPhase, buyerStep, buyerOrder, buyingPhase]) // eslint-disable-line react-hooks/exhaustive-deps
+  // ── AI automation hook (draw/action/buying phases, personality & eval config) ──
+  const { aiLayOffCountRef } = useAIAutomation({
+    initialPlayers,
+    aiDifficultyProp,
+    aiPersonality,
+    gameState,
+    uiPhase,
+    gameSpeed,
+    stalematePhase,
+    buyingPhase,
+    buyerOrder,
+    buyerStep,
+    buyingDiscard,
+    gameStateRef,
+    uiPhaseRef,
+    buyerOrderRef,
+    buyerStepRef,
+    opponentHistoryRef,
+    aiTurnsCouldGoDownRef,
+    aiTurnsElapsedRef,
+    turnsHeldRef,
+    noProgressTurnsRef,
+    handleTakeDiscard,
+    handleDrawFromPile,
+    handleMeldConfirm,
+    handleLayOff,
+    handleJokerSwap,
+    handleDiscard,
+    handleBuyDecision,
+    recordDecision,
+    setBuyingSnatcherName,
+    setBuyingPhase,
+    setBuyingPassedPlayers,
+  })
 
   // ── Determine display for buying phase ────────────────────────────────────
   const buyerIdx = buyerOrder[buyerStep]
