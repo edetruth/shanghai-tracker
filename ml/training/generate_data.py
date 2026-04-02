@@ -169,7 +169,7 @@ def generate_games(args):
             })
 
         games_completed += 1
-        if games_completed % 100 == 0 or games_completed == args.games:
+        if games_completed % 10 == 0 or games_completed == args.games:
             elapsed = time.time() - start
             print(
                 f"  Game {games_completed:5d}/{args.games} | "
