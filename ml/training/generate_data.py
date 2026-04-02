@@ -54,11 +54,12 @@ def generate_games(args):
         meld_turn = None  # turn within this round when player 0 melded
 
         while not done and step_count < max_steps:
-            valid_actions, current_player = env.get_valid_actions()
+            valid_actions, _ = env.get_valid_actions()
             if not valid_actions:
                 break
 
-            # Get full state for player 0 data capture
+            # Bridge auto-plays AI opponents after each step — get_valid_actions
+            # always returns current_player=0 when opponent_ai is set.
             full_state = env.get_full_state(player=0)
             state_vec = full_state["state"]
             phase = full_state["phase"]
@@ -68,7 +69,6 @@ def generate_games(args):
 
             # Detect round change — flush snapshots with meld outcome
             if game_round != current_round:
-                # Label all snapshots from the previous round
                 for snap_state, snap_round, snap_turn in round_snapshots:
                     if meld_turn is not None:
                         turns_to_meld = meld_turn - snap_turn
@@ -85,55 +85,50 @@ def generate_games(args):
                 round_turn = 0
                 meld_turn = None
 
-            if current_player == 0:
-                round_turn += 1
-                action = None
+            round_turn += 1
+            action = None
 
-                # Snapshot hand state every turn for hand evaluator training
-                if phase in ("draw", "action") and not has_laid_down:
-                    round_snapshots.append((state_vec, game_round, round_turn))
+            # Snapshot hand state every turn for hand evaluator training
+            if phase in ("draw", "action") and not has_laid_down:
+                round_snapshots.append((state_vec, game_round, round_turn))
 
-                # Capture discard decisions
-                discard_actions = [a for a in valid_actions if a.startswith("discard:")]
-                if phase == "action" and discard_actions and len(hand) > 1:
-                    action = random.choice(valid_actions)
-                    if action.startswith("discard:"):
-                        card_idx = int(action.split(":")[1])
-                        all_discard_samples.append({
-                            "state": state_vec,
-                            "hand": hand,
-                            "round": game_round,
-                            "discarded_idx": card_idx,
-                            "hand_size": len(hand),
-                        })
-
-                # Capture buy decisions
-                if phase == "buy-window":
-                    offered = full_state.get("discardTop")
-                    action = random.choice(valid_actions)
-                    is_buy = action == "buy"
-                    if offered:
-                        all_buy_samples.append({
-                            "state": state_vec,
-                            "hand": hand,
-                            "round": game_round,
-                            "offered_card": offered,
-                            "bought": is_buy,
-                        })
-
-                # Default: pick random action if not already chosen
-                if action is None:
-                    action = random.choice(valid_actions)
-
-                # Track meld detection
-                state_vec_after, _, done, info = env.step(action)
-                after_state = env.get_full_state(player=0)
-                if not has_laid_down and after_state["hasLaidDown"]:
-                    meld_turn = round_turn
-
-            else:
+            # Capture discard decisions
+            discard_actions = [a for a in valid_actions if a.startswith("discard:")]
+            if phase == "action" and discard_actions and len(hand) > 1:
                 action = random.choice(valid_actions)
-                _, _, done, info = env.step(action)
+                if action.startswith("discard:"):
+                    card_idx = int(action.split(":")[1])
+                    all_discard_samples.append({
+                        "state": state_vec,
+                        "hand": hand,
+                        "round": game_round,
+                        "discarded_idx": card_idx,
+                        "hand_size": len(hand),
+                    })
+
+            # Capture buy decisions
+            if phase == "buy-window":
+                offered = full_state.get("discardTop")
+                action = random.choice(valid_actions)
+                is_buy = action == "buy"
+                if offered:
+                    all_buy_samples.append({
+                        "state": state_vec,
+                        "hand": hand,
+                        "round": game_round,
+                        "offered_card": offered,
+                        "bought": is_buy,
+                    })
+
+            # Default: pick random action if not already chosen
+            if action is None:
+                action = random.choice(valid_actions)
+
+            # Track meld detection
+            _, _, done, info = env.step(action)
+            after_state = env.get_full_state(player=0)
+            if not has_laid_down and after_state["hasLaidDown"]:
+                meld_turn = round_turn
 
             step_count += 1
 

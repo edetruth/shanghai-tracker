@@ -11,7 +11,6 @@ Usage:
 
 import argparse
 import json
-import random
 import time
 from pathlib import Path
 
@@ -151,18 +150,17 @@ def evaluate(args):
         info = {}
 
         while not done and step_count < max_steps:
-            valid_actions, current_player = env.get_valid_actions()
+            valid_actions, _ = env.get_valid_actions()
             if not valid_actions:
                 break
 
-            if current_player == 0:
-                full_state = env.get_full_state(player=0)
-                action = hybrid_action(
-                    full_state["state"], valid_actions, full_state["phase"],
-                    hand_eval, discard_net, buy_net, full_state,
-                )
-            else:
-                action = random.choice(valid_actions)
+            # Bridge auto-plays AI opponents after each step — get_valid_actions
+            # always returns current_player=0 when opponent_ai is set.
+            full_state = env.get_full_state(player=0)
+            action = hybrid_action(
+                full_state["state"], valid_actions, full_state["phase"],
+                hand_eval, discard_net, buy_net, full_state,
+            )
 
             _, _, done, info = env.step(action)
             step_count += 1
