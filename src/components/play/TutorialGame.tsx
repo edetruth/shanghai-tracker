@@ -24,7 +24,12 @@ export default function TutorialGame({ onComplete, onSkip }: Props) {
   const stepIndexRef = useRef(stepIndex)
   stepIndexRef.current = stepIndex
 
+  // Ref to hold dismiss callback — assigned after handleDismiss is defined below
+  const dismissRef = useRef<(() => void) | null>(null)
+
   // Subscribe to game state changes to trigger tutorial steps
+  // Two jobs: (1) auto-dismiss the current requireAction step when the
+  // player completes the action, (2) trigger the next step.
   useEffect(() => {
     const unsub = useGameStore.subscribe((state) => {
       const prev = prevStateRef.current
@@ -33,11 +38,62 @@ export default function TutorialGame({ onComplete, onSkip }: Props) {
       const hasLaidDown = player?.hasLaidDown ?? false
       const round = state.gameState.currentRound
       const gameOver = state.gameState.gameOver
+      const phaseChanged = uiPhase !== prev.uiPhase
 
       const currentIdx = stepIndexRef.current
-      if (currentIdx >= TUTORIAL_STEPS.length) return
+      if (currentIdx >= TUTORIAL_STEPS.length) {
+        prevStateRef.current = { uiPhase, hasLaidDown, round, gameOver }
+        return
+      }
+
+      const currentStep = TUTORIAL_STEPS[currentIdx]
+
+      // ── Auto-dismiss requireAction steps when the action is done ──
+      // If the current step is interactive and the phase just changed,
+      // the player took their action — advance to the next step.
+      if (currentStep?.requireAction && phaseChanged) {
+        let actionDone = false
+        switch (currentStep.trigger) {
+          case 'draw-phase':
+            // Player was in draw phase, now moved to action (drew a card)
+            // or to buy-window or round-end
+            actionDone = uiPhase !== 'draw'
+            break
+          case 'after-draw':
+            // Player was in action phase, now moved to draw (discarded)
+            // or round-end, or back to draw via opponent turn
+            actionDone = uiPhase !== 'action' || prev.uiPhase === 'draw'
+            break
+          case 'has-melds':
+            // Player laid down
+            actionDone = hasLaidDown
+            break
+          case 'after-meld':
+            // Player discarded after melding
+            actionDone = uiPhase === 'draw' || uiPhase === 'round-end'
+            break
+          case 'buy-opportunity':
+            // Buy window closed
+            actionDone = state.buyingPhase === 'hidden'
+            break
+          default:
+            // Generic: any phase change means the action was taken
+            actionDone = true
+        }
+
+        if (actionDone) {
+          prevStateRef.current = { uiPhase, hasLaidDown, round, gameOver }
+          dismissRef.current?.()
+          return
+        }
+      }
+
+      // ── Trigger the next step ──
       const nextStep = TUTORIAL_STEPS[currentIdx]
-      if (!nextStep) return
+      if (!nextStep) {
+        prevStateRef.current = { uiPhase, hasLaidDown, round, gameOver }
+        return
+      }
 
       let shouldTrigger = false
 
@@ -100,6 +156,7 @@ export default function TutorialGame({ onComplete, onSkip }: Props) {
       }
     }
   }, [onComplete])
+  dismissRef.current = handleDismiss
 
   const handleSkip = useCallback(() => {
     markTutorialComplete()
