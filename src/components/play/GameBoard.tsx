@@ -985,6 +985,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
   // ── Draw from pile (with reshuffle if empty) ──────────────────────────────
   function handleDrawFromPile() {
+    // Guard against rapid double-taps: only allow drawing during the draw phase
+    if (uiPhaseRef.current !== 'draw') return
+
     // Use BOTH the ref and the React state value for wasExplicitlyDeclined.
     // freeOfferDeclinedRef.current covers the AI stale-closure case.
     // freeOfferDeclined (state) covers the human case where the ref may not yet be
@@ -1102,6 +1105,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
   // ── Take top discard ──────────────────────────────────────────────────────
   function handleTakeDiscard() {
+    // Guard against rapid double-taps: only allow taking during the draw phase
+    if (uiPhaseRef.current !== 'draw') return
+
     const card = gameState.roundState.discardPile[gameState.roundState.discardPile.length - 1]
     if (!card) return
     if (pendingBuyDiscardRef.current !== null) {
@@ -1385,6 +1391,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
   // ── Meld confirmation ─────────────────────────────────────────────────────
   function handleMeldConfirm(meldGroups: CardType[][], jokerPositions?: Map<string, number>) {
+    // Guard against rapid double-taps: only allow melding during the action phase
+    if (uiPhaseRef.current !== 'action') return
     const prev = gameState
     let counter = prev.roundState.meldIdCounter
     const playerIdx = prev.roundState.currentPlayerIndex
@@ -1763,6 +1771,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
   // ── Discard (with undo support for human players) ─────────────────────────
   function handleDiscard(overrideCardId?: string) {
+    // Guard against rapid double-taps: only allow discarding during the action phase
+    if (uiPhaseRef.current !== 'action') return
     clearLayOffUndo()  // commit any pending lay-off
     const cardId = overrideCardId ?? [...selectedCardIds][0]
     if (!cardId) return
@@ -1912,6 +1922,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
   // ── Buy decision ──────────────────────────────────────────────────────────
   function handleBuyDecision(wantsToBuy: boolean) {
+    // Guard against rapid double-taps: only allow buy decisions during the buying phase
+    if (uiPhaseRef.current !== 'buying') return
     const isPostDraw = buyingIsPostDrawRef.current
 
     if (wantsToBuy) {
@@ -2196,6 +2208,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
   // ── Next round / game over ────────────────────────────────────────────────
   function handleNextRound() {
+    // Guard against rapid double-taps
+    if (uiPhaseRef.current !== 'round-end') return
     setRoundSummaryExiting(true)
     setTimeout(() => {
       setRoundSummaryExiting(false)
