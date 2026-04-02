@@ -109,7 +109,8 @@ def evaluate_game(
     state = env.reset(seed=seed)
     done = False
     step_count = 0
-    max_steps = 3000
+    max_steps = 3000 * max(1, env.player_count // 2)
+    info = {}
 
     while not done and step_count < max_steps:
         valid_actions, current_player = env.get_valid_actions()
@@ -127,8 +128,7 @@ def evaluate_game(
         step_count += 1
 
     # Extract final scores from the last info payload
-    scores = info.get("scores") if "info" not in dir() else []
-    # Re-query scores after loop (last `info` holds final game state)
+    scores = info.get("scores", [])
     my_score = scores[0] if scores and len(scores) > 0 else 0
     opp_scores = scores[1:] if scores and len(scores) > 1 else []
     best_opp_score = min(opp_scores) if opp_scores else float("inf")
