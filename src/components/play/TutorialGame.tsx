@@ -3,7 +3,7 @@ import GameBoard from './GameBoard'
 import TutorialOverlay, { markTutorialComplete } from './TutorialOverlay'
 import {
   type TutorialStep,
-  WELCOME, ROUND_GOAL, ROUND_COMPLETE, ROUND_2_INTRO, TUTORIAL_COMPLETE,
+  WELCOME, ROUND_GOAL, TUTORIAL_COMPLETE,
   HINT_DRAW, HINT_DRAW_TAKE_DISCARD, HINT_DISCARD, HINT_LAY_DOWN, HINT_CLEAR_HAND, HINT_BUY,
 } from '../../game/tutorial-script'
 import { useGameStore } from '../../stores/gameStore'
@@ -73,15 +73,11 @@ export default function TutorialGame({ onComplete, onSkip }: Props) {
         return
       }
 
-      // ── Round milestones ──
+      // ── Round 1 complete = tutorial done ──
+      // One round teaches the full loop: draw → discard → meld → clear → score.
+      // No need to drag through 7 rounds.
       if (uiPhase === 'round-end' && prev.uiPhase !== 'round-end') {
-        showOnce(ROUND_COMPLETE)
-        prevRef.current = { uiPhase, hasLaidDown, round, gameOver, buyingPhase }
-        return
-      }
-
-      if (uiPhase === 'round-start' && round === 2 && round > prev.round) {
-        showOnce(ROUND_2_INTRO)
+        showOnce(TUTORIAL_COMPLETE)
         prevRef.current = { uiPhase, hasLaidDown, round, gameOver, buyingPhase }
         return
       }

@@ -40,7 +40,7 @@ export const ROUND_2_INTRO: TutorialStep = {
 export const TUTORIAL_COMPLETE: TutorialStep = {
   id: 'game-end',
   title: 'Tutorial Complete!',
-  message: 'You\'ve got the basics. Try a real game!',
+  message: 'Draw, meld, discard — you\'ve got it. Try a real game!',
   autoAdvanceMs: 5000,
 }
 
