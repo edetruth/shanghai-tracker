@@ -20,5 +20,15 @@ Thumbs.db
 npm-debug.log*
 *.log
 
+# Python
+__pycache__/
+*.pyc
+
+# ML model checkpoints (large binaries)
+ml/models/*.pt
+
+# ML training logs (generated per run)
+ml/training/logs/
+
 # Claude Code
 .claude/

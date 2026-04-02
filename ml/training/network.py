@@ -15,10 +15,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 # Maximum number of discrete actions the network can output.
-# draw_pile(1) + take_discard(1) + discard:0..15(16) + meld(1) + layoff:ci:mi(16*20=320) = ~339
+# draw_pile(1) + take_discard(1) + meld(1) + discard:0..15(16) + layoff:ci:mi(16*20=320) + buy(1) + decline_buy(1) = ~341
 # We'll use a fixed size and mask invalid actions.
 MAX_ACTIONS = 350
-STATE_SIZE = 65  # Must match bridge encoder output
+STATE_SIZE = 66  # Must match bridge encoder output (65 base + 1 buy-window indicator)
 
 
 class ShanghaiNet(nn.Module):
@@ -79,6 +79,10 @@ def encode_action(action: str) -> int:
         parts = action.split(":")
         ci, mi = int(parts[1]), int(parts[2])
         return 19 + ci * 20 + mi  # 19..339
+    if action == "buy":
+        return 339
+    if action == "decline_buy":
+        return 340
     return 0  # fallback
 
 

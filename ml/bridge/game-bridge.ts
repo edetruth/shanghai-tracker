@@ -18,11 +18,20 @@
  */
 
 import { createDecks, shuffle, dealHands } from '../../src/game/deck'
-import { isValidRun, isValidSet, buildMeld, canLayOff, findSwappableJoker } from '../../src/game/meld-validator'
+import { isValidRun, isValidSet, buildMeld, canLayOff, findSwappableJoker, evaluateLayOffReversal } from '../../src/game/meld-validator'
 import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, cardPoints } from '../../src/game/rules'
 import { scoreRound } from '../../src/game/scoring'
-import { aiFindBestMelds } from '../../src/game/ai'
-import type { Card, Meld, RoundRequirement } from '../../src/game/types'
+import {
+  aiFindBestMelds,
+  aiShouldTakeDiscard,
+  aiChooseDiscard,
+  aiShouldBuy,
+  aiFindLayOff,
+  aiFindJokerSwap,
+  aiShouldBuy,
+  getAIEvalConfig,
+} from '../../src/game/ai'
+import type { Card, Meld, RoundRequirement, AIPersonality } from '../../src/game/types'
 import * as readline from 'readline'
 
 // ── Game State ──────────────────────────────────────────────────────────────
@@ -35,13 +44,21 @@ interface BridgeGameState {
   discardPile: Card[]
   tableMelds: Meld[]
   requirement: RoundRequirement
-  phase: 'draw' | 'action' | 'round-end' | 'game-over'
+  phase: 'draw' | 'action' | 'buy-window' | 'round-end' | 'game-over'
   deckCount: number
   seed: number
   roundSeeds: number[]
   gameOver: boolean
   scores: number[][] // roundScores per player
   turnCount: number  // turns this round — force end at 200
+  opponentAI: AIPersonality | null  // null = random opponents (legacy), string = AI personality
+  useRichState: boolean  // if true, encodeRichState() is used instead of encodeState()
+  lastDiscarderIndex: number  // who discarded last (for buy window exclusion)
+  buyWindowState: {
+    offeredCard: Card     // the discard being offered for buying
+    queue: number[]       // remaining player indices to ask about buying
+    drawPlayerIndex: number // the next-in-turn player who declined free take
+  } | null
 }
 
 interface BridgePlayer {
@@ -55,7 +72,7 @@ let game: BridgeGameState | null = null
 
 // ── Game Logic ──────────────────────────────────────────────────────────────
 
-function initGame(playerCount: number, seed: number): BridgeGameState {
+function initGame(playerCount: number, seed: number, opponentAI: AIPersonality | null = null): BridgeGameState {
   const deckCount = playerCount <= 4 ? 2 : 3
   const roundSeed = seed
   const deck = shuffle(createDecks(deckCount), roundSeed)
@@ -88,6 +105,10 @@ function initGame(playerCount: number, seed: number): BridgeGameState {
     gameOver: false,
     scores: players.map(() => []),
     turnCount: 0,
+    opponentAI: opponentAI,
+    useRichState: false,
+    lastDiscarderIndex: -1,
+    buyWindowState: null,
   }
 }
 
@@ -95,13 +116,18 @@ function getValidActions(g: BridgeGameState): string[] {
   const player = g.players[g.currentPlayerIndex]
   const actions: string[] = []
 
-  if (g.phase === 'draw') {
+  if (g.phase === 'buy-window') {
+    actions.push('buy')
+    actions.push('decline_buy')
+  } else if (g.phase === 'draw') {
     actions.push('draw_pile')
     if (g.discardPile.length > 0) actions.push('take_discard')
   } else if (g.phase === 'action') {
-    // Can always discard (one card selected by index)
-    for (let i = 0; i < player.hand.length; i++) {
-      actions.push(`discard:${i}`)
+    // Can discard unless it's your last card (can't go out by discarding)
+    if (player.hand.length > 1) {
+      for (let i = 0; i < player.hand.length; i++) {
+        actions.push(`discard:${i}`)
+      }
     }
     // Can lay down if not already and has valid melds
     if (!player.hasLaidDown) {
@@ -118,6 +144,10 @@ function getValidActions(g: BridgeGameState): string[] {
         }
       }
     }
+    // Deadlock prevention: if player has 1 card and no actions available, force discard
+    if (actions.length === 0 && player.hand.length === 1) {
+      actions.push('discard:0')
+    }
   }
 
   return actions
@@ -126,22 +156,61 @@ function getValidActions(g: BridgeGameState): string[] {
 function takeAction(g: BridgeGameState, action: string): { reward: number; done: boolean } {
   const player = g.players[g.currentPlayerIndex]
 
+  // ── Buy / Decline Buy ────────────────────────────────────────────────────
+  if (action === 'buy') {
+    if (!g.buyWindowState) return { reward: 0, done: false }
+    const bws = g.buyWindowState
+    // Player buys: gets the offered discard + 1 penalty card from pile
+    ensureDrawPile(g)
+    const penaltyCard = g.drawPile.shift()!
+    player.hand.push(bws.offeredCard)
+    player.hand.push(penaltyCard)
+    player.buysRemaining--
+    // Remove the offered card from discard pile
+    const discIdx = g.discardPile.findIndex(c => c.id === bws.offeredCard.id)
+    if (discIdx >= 0) g.discardPile.splice(discIdx, 1)
+    // Buy resolved — next-in-turn player now draws from pile
+    g.currentPlayerIndex = bws.drawPlayerIndex
+    g.phase = 'draw'
+    g.buyWindowState = null
+    return { reward: 0, done: false }
+  }
+
+  if (action === 'decline_buy') {
+    if (!g.buyWindowState) return { reward: 0, done: false }
+    const bws = g.buyWindowState
+    // Player 0 declined — continue asking remaining AI players in queue
+    const resolved = processBuyQueueAI(g, bws)
+    if (resolved) return { reward: 0, done: false } // an AI bought, state already updated
+    // Nobody bought — next-in-turn player draws from pile
+    g.currentPlayerIndex = bws.drawPlayerIndex
+    g.phase = 'draw'
+    g.buyWindowState = null
+    return { reward: 0, done: false }
+  }
+
+  // ── Draw from pile (= decline free take → may open buy window) ──────────
   if (action === 'draw_pile') {
-    if (g.drawPile.length === 0) {
-      // Reshuffle
-      const top = g.discardPile.pop()
-      g.drawPile = shuffle([...g.discardPile])
-      g.discardPile = top ? [top] : []
-      if (g.drawPile.length === 0) {
-        g.drawPile = shuffle(createDecks(1))
+    const topDiscard = g.discardPile.length > 0 ? g.discardPile[g.discardPile.length - 1] : null
+
+    // Check if this is a "decline free take" — open buy window for other players
+    if (topDiscard && g.players.length > 2 && g.lastDiscarderIndex >= 0) {
+      const buyResult = openBuyWindow(g, topDiscard)
+      if (buyResult === 'paused') {
+        // Buy window paused for player 0's decision — don't draw yet
+        return { reward: 0, done: false }
       }
+      // buyResult === 'resolved' or 'nobody' — continue with draw
     }
+
+    ensureDrawPile(g)
     const card = g.drawPile.shift()!
     player.hand.push(card)
     g.phase = 'action'
     return { reward: 0, done: false }
   }
 
+  // ── Take discard (= free take under Rule 9A) ───────────────────────────
   if (action === 'take_discard') {
     const card = g.discardPile.pop()!
     player.hand.push(card)
@@ -177,6 +246,21 @@ function takeAction(g: BridgeGameState, action: string): { reward: number; done:
     const card = player.hand[ci]
     const meld = g.tableMelds[mi]
     if (card && meld && canLayOff(card, meld)) {
+      // Scenario C: check if lay-off would leave exactly 1 unplayable card
+      const reversal = evaluateLayOffReversal(card, meld, player.hand, g.tableMelds)
+      if (reversal.outcome === 'reversed' && reversal.discardCard) {
+        // Reverse: don't lay off, force discard the stuck card instead
+        const stuckIdx = player.hand.findIndex(c => c.id === reversal.discardCard!.id)
+        if (stuckIdx >= 0) {
+          g.discardPile.push(player.hand.splice(stuckIdx, 1)[0])
+          g.currentPlayerIndex = (g.currentPlayerIndex + 1) % g.players.length
+          g.phase = 'draw'
+          g.turnCount++
+          if (g.turnCount >= 200) return endRound(g)
+          return { reward: 0, done: false }
+        }
+      }
+      // Normal lay-off
       player.hand.splice(ci, 1)
       meld.cards.push(card)
       if (player.hand.length === 0) {
@@ -187,9 +271,14 @@ function takeAction(g: BridgeGameState, action: string): { reward: number; done:
   }
 
   if (action.startsWith('discard:')) {
+    // Can't go out by discarding last card — must meld or lay off
+    if (player.hand.length <= 1) return { reward: 0, done: false }
     const idx = parseInt(action.split(':')[1])
     const card = player.hand.splice(idx, 1)[0]
     g.discardPile.push(card)
+
+    // Track who discarded (for buy window exclusion)
+    g.lastDiscarderIndex = g.currentPlayerIndex
 
     // Advance to next player
     g.currentPlayerIndex = (g.currentPlayerIndex + 1) % g.players.length
@@ -207,6 +296,111 @@ function takeAction(g: BridgeGameState, action: string): { reward: number; done:
   return { reward: 0, done: false }
 }
 
+// ── Buy Window Helpers ────────────────────────────────────────────────────
+
+function ensureDrawPile(g: BridgeGameState) {
+  if (g.drawPile.length === 0) {
+    const top = g.discardPile.pop()
+    g.drawPile = shuffle([...g.discardPile])
+    g.discardPile = top ? [top] : []
+    if (g.drawPile.length === 0) {
+      g.drawPile = shuffle(createDecks(1))
+    }
+  }
+}
+
+/**
+ * Open a buy window after the next-in-turn player declines the free take.
+ * Returns 'paused' if player 0 has a buy decision, 'resolved' if an AI bought,
+ * or 'nobody' if no one wanted to buy.
+ */
+function openBuyWindow(g: BridgeGameState, offeredCard: Card): 'paused' | 'resolved' | 'nobody' {
+  const drawPlayerIndex = g.currentPlayerIndex  // the player who declined free take
+  const discarderIndex = g.lastDiscarderIndex
+
+  // Build buy queue: all players except discarder and next-in-turn, with buys remaining
+  const queue: number[] = []
+  for (let offset = 1; offset < g.players.length; offset++) {
+    const pi = (drawPlayerIndex + offset) % g.players.length
+    if (pi === discarderIndex) continue
+    if (g.players[pi].buysRemaining <= 0) continue
+    queue.push(pi)
+  }
+
+  if (queue.length === 0) return 'nobody'
+
+  // Process AI players before player 0
+  for (let i = 0; i < queue.length; i++) {
+    const pi = queue[i]
+    if (pi === 0) {
+      // Player 0's turn to decide — pause for RL agent
+      g.buyWindowState = {
+        offeredCard,
+        queue: queue.slice(i + 1), // remaining AI players after player 0
+        drawPlayerIndex,
+      }
+      g.currentPlayerIndex = 0
+      g.phase = 'buy-window'
+      return 'paused'
+    }
+
+    // AI player decides
+    if (g.opponentAI) {
+      const config = getAIEvalConfig(g.opponentAI)
+      const aiPlayer = g.players[pi]
+      const shouldBuy = aiShouldBuy(
+        aiPlayer.hand, offeredCard, g.requirement, aiPlayer.buysRemaining, config
+      )
+      if (shouldBuy) {
+        // AI buys: gets discard + penalty card
+        ensureDrawPile(g)
+        const penaltyCard = g.drawPile.shift()!
+        aiPlayer.hand.push(offeredCard)
+        aiPlayer.hand.push(penaltyCard)
+        aiPlayer.buysRemaining--
+        // Remove offered card from discard pile
+        const discIdx = g.discardPile.findIndex(c => c.id === offeredCard.id)
+        if (discIdx >= 0) g.discardPile.splice(discIdx, 1)
+        return 'resolved'
+      }
+    }
+  }
+
+  return 'nobody'
+}
+
+/**
+ * Continue processing the buy queue after player 0 declined.
+ * Returns true if an AI player bought (state updated), false if nobody bought.
+ */
+function processBuyQueueAI(g: BridgeGameState, bws: NonNullable<BridgeGameState['buyWindowState']>): boolean {
+  if (!g.opponentAI) return false
+
+  const config = getAIEvalConfig(g.opponentAI)
+  for (const pi of bws.queue) {
+    const aiPlayer = g.players[pi]
+    if (aiPlayer.buysRemaining <= 0) continue
+    const shouldBuy = aiShouldBuy(
+      aiPlayer.hand, bws.offeredCard, g.requirement, aiPlayer.buysRemaining, config
+    )
+    if (shouldBuy) {
+      ensureDrawPile(g)
+      const penaltyCard = g.drawPile.shift()!
+      aiPlayer.hand.push(bws.offeredCard)
+      aiPlayer.hand.push(penaltyCard)
+      aiPlayer.buysRemaining--
+      const discIdx = g.discardPile.findIndex(c => c.id === bws.offeredCard.id)
+      if (discIdx >= 0) g.discardPile.splice(discIdx, 1)
+      // Next-in-turn player draws
+      g.currentPlayerIndex = bws.drawPlayerIndex
+      g.phase = 'draw'
+      g.buyWindowState = null
+      return true
+    }
+  }
+  return false
+}
+
 function endRound(g: BridgeGameState): { reward: number; done: boolean } {
   // Score each player
   for (let i = 0; i < g.players.length; i++) {
@@ -214,9 +408,9 @@ function endRound(g: BridgeGameState): { reward: number; done: boolean } {
     if (p.hand.length === 0) {
       g.scores[i].push(0) // went out
     } else if (!p.hasLaidDown) {
-      // Shanghaied — double penalty
+      // Shanghaied — normal hand score (no multiplier; flag is just metadata)
       const pts = p.hand.reduce((sum, c) => sum + cardPoints(c.rank), 0)
-      g.scores[i].push(pts) // In real game this would be shanghaied scoring
+      g.scores[i].push(pts)
     } else {
       const pts = p.hand.reduce((sum, c) => sum + cardPoints(c.rank), 0)
       g.scores[i].push(pts)
@@ -248,6 +442,8 @@ function endRound(g: BridgeGameState): { reward: number; done: boolean } {
   g.currentPlayerIndex = 0
   g.phase = 'draw'
   g.turnCount = 0
+  g.lastDiscarderIndex = -1
+  g.buyWindowState = null
 
   for (let i = 0; i < g.players.length; i++) {
     g.players[i].hand = hands[i]
@@ -257,6 +453,109 @@ function endRound(g: BridgeGameState): { reward: number; done: boolean } {
   }
 
   return { reward: 0, done: false }
+}
+
+// ── AI Opponent Logic ──────────────────────────────────────────────────────
+
+/** Play one full turn for an AI opponent (draw → actions → discard). */
+function playAITurn(g: BridgeGameState): { reward: number; done: boolean } {
+  const personality = g.opponentAI!
+  const config = getAIEvalConfig(personality)
+  const player = g.players[g.currentPlayerIndex]
+
+  // Phase: draw — decide whether to take discard or draw from pile
+  if (g.phase === 'draw') {
+    const topDiscard = g.discardPile[g.discardPile.length - 1]
+    let shouldTake = false
+    if (topDiscard) {
+      shouldTake = aiShouldTakeDiscard(
+        player.hand, topDiscard, g.requirement, player.hasLaidDown,
+        config, g.tableMelds
+      )
+    }
+    const drawResult = takeAction(g, shouldTake ? 'take_discard' : 'draw_pile')
+    if (drawResult.done) return drawResult
+    // If draw_pile opened a buy window for player 0, stop here
+    if (g.phase === 'buy-window') return { reward: 0, done: false }
+  }
+
+  // Phase: action — meld if possible, then lay off, then discard
+  if (g.phase === 'action') {
+    // Try to meld
+    if (!player.hasLaidDown) {
+      const melds = aiFindBestMelds(player.hand, g.requirement)
+      if (melds) {
+        const meldResult = takeAction(g, 'meld')
+        if (meldResult.done) return meldResult
+      }
+    }
+
+    // Try joker swaps
+    if (player.hasLaidDown) {
+      const swap = aiFindJokerSwap(player.hand, g.tableMelds)
+      if (swap) {
+        // Find matching card and meld indices
+        const ci = player.hand.findIndex(c => c.id === swap.card.id)
+        const mi = g.tableMelds.findIndex(m => m.id === swap.meld.id)
+        if (ci >= 0 && mi >= 0) {
+          // Joker swap: replace joker in meld with natural card, take joker
+          const meld = g.tableMelds[mi]
+          const jokerIdx = meld.cards.findIndex(c => c.suit === 'joker')
+          if (jokerIdx >= 0) {
+            const joker = meld.cards[jokerIdx]
+            meld.cards[jokerIdx] = player.hand[ci]
+            player.hand.splice(ci, 1)
+            player.hand.push(joker)
+          }
+        }
+      }
+    }
+
+    // Try lay offs
+    if (player.hasLaidDown) {
+      let layoff = aiFindLayOff(player.hand, g.tableMelds)
+      let maxLayoffs = 10 // safety limit
+      while (layoff && maxLayoffs-- > 0) {
+        const ci = player.hand.findIndex(c => c.id === layoff!.card.id)
+        const mi = g.tableMelds.findIndex(m => m.id === layoff!.meld.id)
+        if (ci >= 0 && mi >= 0) {
+          const result = takeAction(g, `layoff:${ci}:${mi}`)
+          if (result.done) return result
+        } else {
+          break
+        }
+        layoff = aiFindLayOff(player.hand, g.tableMelds)
+      }
+    }
+
+    // Discard
+    if (g.phase === 'action' && player.hand.length > 0) {
+      const discardCard = aiChooseDiscard(player.hand, g.requirement, config, g.tableMelds)
+      const discardIdx = player.hand.findIndex(c => c.id === discardCard.id)
+      if (discardIdx >= 0) {
+        return takeAction(g, `discard:${discardIdx}`)
+      }
+      // Fallback: discard last card
+      return takeAction(g, `discard:${player.hand.length - 1}`)
+    }
+  }
+
+  return { reward: 0, done: false }
+}
+
+/** Auto-play all opponent turns until it's player 0's turn, a buy window opens, or game ends. */
+function autoPlayOpponents(g: BridgeGameState): { reward: number; done: boolean } {
+  let result = { reward: 0, done: false }
+  let safety = 500 // prevent infinite loops
+
+  while (g.currentPlayerIndex !== 0 && !g.gameOver && g.phase !== 'buy-window' && safety-- > 0) {
+    result = playAITurn(g)
+    if (result.done) return result
+    // If a buy window opened for player 0 during AI play, stop
+    if (g.phase === 'buy-window') return result
+  }
+
+  return result
 }
 
 // ── Encode state for the neural network ─────────────────────────────────────
@@ -331,7 +630,150 @@ function encodeState(g: BridgeGameState, playerIdx: number): number[] {
     features.push(0, 0, 0) // empty
   }
 
-  return features // Total: ~65 features
+  // Buy window indicator (1 feature)
+  features.push(g.phase === 'buy-window' ? 1 : 0)
+
+  return features // Total: ~66 features
+}
+
+/**
+ * Encode a single card into 6 features:
+ *   [rank/13, hearts?, diamonds?, clubs?, spades?, is_joker?]
+ * Suit encoding is one-hot: hearts=[1,0,0,0], diamonds=[0,1,0,0],
+ *   clubs=[0,0,1,0], spades=[0,0,0,1], joker=[0,0,0,0] (is_joker=1).
+ */
+function encodeCard(card: Card): number[] {
+  if (card.suit === 'joker') {
+    return [0, 0, 0, 0, 0, 1]
+  }
+  const suitVec = [
+    card.suit === 'hearts'   ? 1 : 0,
+    card.suit === 'diamonds' ? 1 : 0,
+    card.suit === 'clubs'    ? 1 : 0,
+    card.suit === 'spades'   ? 1 : 0,
+  ]
+  return [card.rank / 13, ...suitVec, 0]
+}
+
+/**
+ * Rich state encoding — 237 features total.
+ *
+ * Layout:
+ *   Hand cards      132 (22 slots × 6 features, zero-padded, sorted by suit then rank)
+ *   Discard history 60  (10 slots × 6 features, zero-padded)
+ *   Table melds     60  (12 slots × 5 features, zero-padded)
+ *   Game context    21
+ *                  ---
+ *   Total          273
+ */
+function encodeRichState(g: BridgeGameState, playerIdx: number): number[] {
+  const p = g.players[playerIdx]
+  const features: number[] = []
+
+  // ── Hand cards (132 features: 22 × 6) ────────────────────────────────────
+  // Sort hand by suit then rank for deterministic encoding
+  const suitOrder: Record<string, number> = { hearts: 0, diamonds: 1, clubs: 2, spades: 3, joker: 4 }
+  const sortedHand = [...p.hand].sort((a, b) => {
+    const suitDiff = suitOrder[a.suit] - suitOrder[b.suit]
+    if (suitDiff !== 0) return suitDiff
+    return a.rank - b.rank
+  })
+  const MAX_HAND = 22
+  for (let i = 0; i < MAX_HAND; i++) {
+    if (i < sortedHand.length) {
+      features.push(...encodeCard(sortedHand[i]))
+    } else {
+      features.push(0, 0, 0, 0, 0, 0) // padding
+    }
+  }
+
+  // ── Discard history (60 features: 10 × 6) ────────────────────────────────
+  // Take the last 10 cards from the discard pile (most recent last)
+  const MAX_DISCARD = 10
+  const discardSlice = g.discardPile.slice(-MAX_DISCARD)
+  for (let i = 0; i < MAX_DISCARD; i++) {
+    if (i < discardSlice.length) {
+      features.push(...encodeCard(discardSlice[i]))
+    } else {
+      features.push(0, 0, 0, 0, 0, 0) // padding
+    }
+  }
+
+  // ── Table melds (60 features: 12 × 5) ────────────────────────────────────
+  // Per meld: [type_is_run, card_count/8, min_rank/13, max_rank/13, has_joker]
+  const MAX_MELDS = 12
+  for (let i = 0; i < MAX_MELDS; i++) {
+    if (i < g.tableMelds.length) {
+      const meld = g.tableMelds[i]
+      const isRun = meld.type === 'run' ? 1 : 0
+      const cardCount = meld.cards.length / 8
+      const hasJoker = meld.cards.some(c => c.suit === 'joker') ? 1 : 0
+      let minRank: number
+      let maxRank: number
+      if (meld.type === 'run') {
+        // Use runMin/runMax if available, otherwise compute from cards
+        const naturalRanks = meld.cards
+          .filter(c => c.suit !== 'joker')
+          .map(c => c.rank)
+        minRank = meld.runMin !== undefined
+          ? meld.runMin
+          : (naturalRanks.length > 0 ? Math.min(...naturalRanks) : 0)
+        maxRank = meld.runMax !== undefined
+          ? meld.runMax
+          : (naturalRanks.length > 0 ? Math.max(...naturalRanks) : 0)
+      } else {
+        // Set: all cards share the same rank
+        const setRank = meld.cards.find(c => c.suit !== 'joker')?.rank ?? 0
+        minRank = setRank
+        maxRank = setRank
+      }
+      features.push(isRun, cardCount, minRank / 13, maxRank / 13, hasJoker)
+    } else {
+      features.push(0, 0, 0, 0, 0) // padding
+    }
+  }
+
+  // ── Game context (21 features) ────────────────────────────────────────────
+  // Basic round info (8 features)
+  features.push(g.currentRound / 7)
+  features.push(g.requirement.sets / 3)
+  features.push(g.requirement.runs / 3)
+  features.push(g.drawPile.length / 108)
+  features.push(g.discardPile.length / 108)
+  features.push(p.buysRemaining / 5)
+  features.push(p.hasLaidDown ? 1 : 0)
+  const handPoints = p.hand.reduce((s, c) => s + cardPoints(c.rank), 0)
+  features.push(handPoints / 200)
+
+  // Turn info + buy window (2 features)
+  features.push(g.turnCount / 200)
+  features.push(g.phase === 'buy-window' ? 1 : 0)
+
+  // Per opponent (3 slots × 3 features = 9 features)
+  // Slots are filled for opponents only (up to 3), skipping playerIdx
+  const MAX_OPPONENTS = 3
+  let oppSlot = 0
+  for (let i = 0; i < g.players.length && oppSlot < MAX_OPPONENTS; i++) {
+    if (i === playerIdx) continue
+    const opp = g.players[i]
+    const oppScore = g.scores[i].reduce((a, b) => a + b, 0)
+    features.push(opp.hand.length / 16)
+    features.push(opp.hasLaidDown ? 1 : 0)
+    features.push(oppScore / 300)
+    oppSlot++
+  }
+  // Pad remaining opponent slots
+  while (oppSlot < MAX_OPPONENTS) {
+    features.push(0, 0, 0)
+    oppSlot++
+  }
+
+  // Own cumulative score + player count (2 features)
+  const ownScore = g.scores[playerIdx].reduce((a, b) => a + b, 0)
+  features.push(ownScore / 300)
+  features.push(g.players.length / 8)
+
+  return features // Total: 96 + 60 + 60 + 21 = 237 features
 }
 
 // ── STDIO Bridge ────────────────────────────────────────────────────────────
@@ -348,8 +790,15 @@ rl.on('line', (line) => {
 
     switch (cmd.cmd) {
       case 'new_game': {
-        game = initGame(cmd.players ?? 2, cmd.seed ?? Math.floor(Math.random() * 2147483647))
-        respond({ ok: true, state: encodeState(game, 0), raw_phase: game.phase, round: game.currentRound })
+        const ai = cmd.opponent_ai ?? null  // e.g., "the-shark", "the-nemesis"
+        game = initGame(cmd.players ?? 2, cmd.seed ?? Math.floor(Math.random() * 2147483647), ai)
+        game.useRichState = cmd.rich_state === true
+        // If player 0 doesn't go first, auto-play opponents up to player 0
+        if (game.opponentAI && game.currentPlayerIndex !== 0) {
+          autoPlayOpponents(game)
+        }
+        const stateVec = game.useRichState ? encodeRichState(game, 0) : encodeState(game, 0)
+        respond({ ok: true, state: stateVec, raw_phase: game.phase, round: game.currentRound })
         break
       }
 
@@ -361,10 +810,21 @@ rl.on('line', (line) => {
 
       case 'take_action': {
         if (!game) { respond({ ok: false, error: 'No game' }); break }
-        const { reward, done } = takeAction(game, cmd.action)
+        let { reward, done } = takeAction(game, cmd.action)
+
+        // Auto-play AI opponents after the agent's action (unless buy-window is pending)
+        if (!done && game.opponentAI && game.currentPlayerIndex !== 0 && game.phase !== 'buy-window') {
+          const oppResult = autoPlayOpponents(game)
+          if (oppResult.done) {
+            done = true
+            reward = oppResult.reward
+          }
+        }
+
+        const stateVec = game.useRichState ? encodeRichState(game, 0) : encodeState(game, 0)
         respond({
           ok: true,
-          state: encodeState(game, 0),
+          state: stateVec,
           reward,
           done,
           phase: game.phase,
