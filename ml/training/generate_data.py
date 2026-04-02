@@ -87,20 +87,15 @@ def generate_games(args):
 
             if current_player == 0:
                 round_turn += 1
+                action = None
 
                 # Snapshot hand state every turn for hand evaluator training
                 if phase in ("draw", "action") and not has_laid_down:
                     round_snapshots.append((state_vec, game_round, round_turn))
 
-                # Detect melding
-                if not has_laid_down and "meld" in valid_actions:
-                    # Check after action if they melded
-                    pass  # we detect via has_laid_down changing
-
                 # Capture discard decisions
                 discard_actions = [a for a in valid_actions if a.startswith("discard:")]
                 if phase == "action" and discard_actions and len(hand) > 1:
-                    # Choose action (use AI's choice via bridge)
                     action = random.choice(valid_actions)
                     if action.startswith("discard:"):
                         card_idx = int(action.split(":")[1])
@@ -114,7 +109,6 @@ def generate_games(args):
 
                 # Capture buy decisions
                 if phase == "buy-window":
-                    bought = "buy" in valid_actions
                     offered = full_state.get("discardTop")
                     action = random.choice(valid_actions)
                     is_buy = action == "buy"
@@ -126,7 +120,9 @@ def generate_games(args):
                             "offered_card": offered,
                             "bought": is_buy,
                         })
-                else:
+
+                # Default: pick random action if not already chosen
+                if action is None:
                     action = random.choice(valid_actions)
 
                 # Track meld detection

@@ -7,7 +7,6 @@ Eval:   python hand_evaluator.py --evaluate --model hand_evaluator.pt
 
 import argparse
 import json
-import time
 from pathlib import Path
 
 import torch
