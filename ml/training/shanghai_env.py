@@ -89,6 +89,13 @@ class ShanghaiEnv:
             },
         )
 
+    def get_full_state(self, player: int = 0) -> dict:
+        """Get the full state including raw hand data for data generation."""
+        result = self._send({"cmd": "get_full_state", "player": player})
+        if not result.get("ok"):
+            raise RuntimeError(f"get_full_state failed: {result}")
+        return result
+
     def close(self):
         """Shut down the bridge."""
         if self.proc:
