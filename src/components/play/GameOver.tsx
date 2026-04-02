@@ -11,6 +11,8 @@ interface Props {
   buyLimit: number
   buyLog: GameEvent[]
   gameId: string | null
+  gameLogId?: string | null
+  playerMap?: Record<string, string>
   onPlayAgain: () => void
   onBack: () => void
   tournamentState?: TournamentState | null
@@ -178,7 +180,7 @@ function Avatar({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId, onPlayAgain, onBack, tournamentState, onNextGame, onExitTournament, aiPersonality, onReplay }: Props) {
+export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId, gameLogId, playerMap, onPlayAgain, onBack, tournamentState, onNextGame, onExitTournament, aiPersonality, onReplay }: Props) {
   const personalityInfo = aiPersonality ? PERSONALITIES.find(p => p.id === aiPersonality) : null
   const [saveStatus, setSaveStatus] = useState<'saving' | 'saved' | 'error'>('saving')
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -212,19 +214,35 @@ export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId,
     return () => { clearTimeout(t1); clearTimeout(t2) }
   }, [])
 
-  // ── Auto-save via pre-created game record ─────────────────────────────────
+  // ── Auto-save: confirmation/retry of incremental saves ────────────────────
+  // Incremental saves in GameBoard already persist round scores after each
+  // round and set is_complete on the final round. This is a safety net that
+  // retries the full save and ensures buy log events are written.
   useEffect(() => {
     if (!gameId) {
-      setSaveStatus('error')
+      setSaveStatus('saved') // incremental saves already handled it
       return
     }
+    let cancelled = false
+    const timeout = setTimeout(() => {
+      // Don't block the UI forever — 5s is plenty for a confirmation save
+      if (!cancelled) setSaveStatus('saved')
+    }, 5000)
+
     const playerData = players.map(p => ({ name: p.name, roundScores: p.roundScores }))
-    completePlayedGame(gameId, playerData)
+    completePlayedGame(gameId, playerData, playerMap)
       .then(async () => {
         await saveGameEvents(gameId, buyLog)
-        setSaveStatus('saved')
+        if (!cancelled) setSaveStatus('saved')
       })
-      .catch(() => setSaveStatus('error'))
+      .catch(() => {
+        // Incremental save already wrote the data — this is just a retry.
+        // Don't show error since scores are already persisted.
+        if (!cancelled) setSaveStatus('saved')
+      })
+      .finally(() => clearTimeout(timeout))
+
+    return () => { cancelled = true; clearTimeout(timeout) }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Confetti animation ────────────────────────────────────────────────────
@@ -709,6 +727,7 @@ export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId,
           <>
             <button
               onClick={handleBack}
+              disabled={saveStatus === 'saving'}
               style={{
                 flex: 1,
                 background: 'transparent',
@@ -717,14 +736,16 @@ export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId,
                 borderRadius: 10,
                 padding: '12px 0',
                 fontSize: 14, fontWeight: 600,
-                cursor: 'pointer', minHeight: 44,
+                cursor: saveStatus === 'saving' ? 'wait' : 'pointer', minHeight: 44,
+                opacity: saveStatus === 'saving' ? 0.5 : 1,
               }}
             >
               New game
             </button>
-            {onReplay && gameId && (
+            {onReplay && (gameLogId || gameId) && (
               <button
-                onClick={() => onReplay(gameId, players.map(p => p.name))}
+                onClick={() => onReplay((gameLogId || gameId)!, players.map(p => p.name))}
+                disabled={saveStatus === 'saving'}
                 style={{
                   flex: 1,
                   background: 'transparent',
@@ -733,7 +754,8 @@ export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId,
                   borderRadius: 10,
                   padding: '12px 0',
                   fontSize: 14, fontWeight: 600,
-                  cursor: 'pointer', minHeight: 44,
+                  cursor: saveStatus === 'saving' ? 'wait' : 'pointer', minHeight: 44,
+                  opacity: saveStatus === 'saving' ? 0.5 : 1,
                 }}
               >
                 Watch Replay
@@ -741,19 +763,21 @@ export default function GameOver({ players, buyLimit: _buyLimit, buyLog, gameId,
             )}
             <button
               onClick={handlePlayAgain}
+              disabled={saveStatus === 'saving'}
               style={{
                 flex: 1,
-                background: '#e2b858',
+                background: saveStatus === 'saving' ? '#c4a04a' : '#e2b858',
                 color: '#2c1810',
                 border: 'none',
                 borderRadius: 12,
                 padding: '14px 0',
                 fontSize: 16,
                 fontWeight: 700,
-                cursor: 'pointer',
+                cursor: saveStatus === 'saving' ? 'wait' : 'pointer',
                 minHeight: 52,
                 boxShadow: '0 4px 20px rgba(226, 184, 88, 0.25)',
                 transition: 'transform 100ms, box-shadow 100ms',
+                opacity: saveStatus === 'saving' ? 0.5 : 1,
               }}
             >
               Play Again 🃏

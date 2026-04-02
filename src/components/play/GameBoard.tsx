@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { createPlayedGame, saveGameEvents, saveAIDecisions, backfillDecisionOutcomes, savePlayerRoundStats, savePlayerGameStats } from '../../lib/gameStore'
+import { createPlayedGame, saveGameEvents, saveAIDecisions, backfillDecisionOutcomes, savePlayerRoundStats, savePlayerGameStats, saveRoundScores } from '../../lib/gameStore'
 import type { AIDecision, PlayerRoundStats, PlayerGameStats } from '../../game/types'
 import type { GameState, Player, Card as CardType, Meld, PlayerConfig, AIDifficulty, AIPersonality, OpponentHistory } from '../../game/types'
 import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, MAX_BUYS, cardPoints } from '../../game/rules'
@@ -250,6 +250,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const [dealFlipPhase, setDealFlipPhase] = useState<'facedown' | 'flipping' | null>(null)
   const [buyLog, setBuyLog] = useState<BuyLogEntry[]>([])
   const [gameId, setGameId] = useState<string | null>(null)
+  const [playerMap, setPlayerMap] = useState<Record<string, string>>({})
+  // Ref for beforeunload: always holds latest save-worthy state
+  const unloadSaveRef = useRef<{ gameId: string; players: { name: string; roundScores: number[] }[]; isFinal: boolean } | null>(null)
   const buyingPhaseRef = useRef<BuyingPhase>('hidden')
   const [stripExpanded, setStripExpanded] = useState(false)
   const turnCountRef = useRef(0)
@@ -536,6 +539,35 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   useEffect(() => { freeOfferDeclinedRef.current = freeOfferDeclined }, [freeOfferDeclined])
   useEffect(() => { buyingPhaseRef.current = buyingPhase }, [buyingPhase])
 
+  // ── Flush pending saves on tab close / refresh ────────────────────────────
+  useEffect(() => {
+    const handleUnload = () => {
+      const pending = unloadSaveRef.current
+      if (!pending) return
+      // navigator.sendBeacon isn't available for Supabase, so use
+      // a synchronous-ish fetch via keepalive to maximise delivery odds.
+      // This is best-effort — the incremental save already ran, so this
+      // only matters if it was still in-flight when the tab closed.
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/games?id=eq.${pending.gameId}`
+      const key = import.meta.env.VITE_SUPABASE_ANON_KEY
+      try {
+        fetch(url, {
+          method: 'PATCH',
+          headers: {
+            'apikey': key,
+            'Authorization': `Bearer ${key}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal',
+          },
+          body: JSON.stringify({ is_complete: pending.isFinal }),
+          keepalive: true,
+        })
+      } catch { /* best effort */ }
+    }
+    window.addEventListener('beforeunload', handleUnload)
+    return () => window.removeEventListener('beforeunload', handleUnload)
+  }, [])
+
   // ── Flying card animation helpers ─────────────────────────────────────────
   function getRefCenter(ref: React.RefObject<HTMLDivElement | null>): { x: number, y: number } | null {
     if (!ref.current) return null
@@ -700,7 +732,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     const gameType = mode === 'host' ? 'online' : initialPlayers.some(p => p.isAI) ? 'ai' : 'pass-and-play'
     const effectiveBuyLimit = buyLimit === -1 ? 999 : buyLimit
     createPlayedGame(playerNames, date, gameType, effectiveBuyLimit)
-      .then(id => setGameId(id))
+      .then(({ gameId: id, playerMap: pm }) => { setGameId(id); setPlayerMap(pm) })
       .catch(() => {}) // silent fail — telemetry must never break the game
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1231,6 +1263,17 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       setUiPhase('round-end')
     }, 500)
     flushTelemetry(buyLog) // fire-and-forget — telemetry must never block game flow
+
+    // Incremental save: persist round scores to Supabase after every round.
+    // On the final round, also mark the game as complete so the DB is
+    // always up-to-date even if the user closes the app before GameOver.
+    if (gameId) {
+      const isFinal = state.currentRound >= TOTAL_ROUNDS
+      const playerData = players.map(p => ({ name: p.name, roundScores: p.roundScores }))
+      void saveRoundScores(gameId, playerData, isFinal, playerMap)
+      // Keep unload ref current so beforeunload can flush if needed
+      unloadSaveRef.current = { gameId, players: playerData, isFinal }
+    }
 
     // Telemetry: flush remaining decisions, backfill outcomes, save round stats
     flushDecisions()
@@ -2049,8 +2092,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     const gameType = mode === 'host' ? 'online' : initialPlayers.some(p => p.isAI) ? 'ai' : 'pass-and-play'
     const effectiveBuyLimit = buyLimit === -1 ? 999 : buyLimit
     try {
-      const id = await createPlayedGame(playerNames, date, gameType, effectiveBuyLimit)
-      setGameId(id)
+      const result = await createPlayedGame(playerNames, date, gameType, effectiveBuyLimit)
+      setGameId(result.gameId)
+      setPlayerMap(result.playerMap)
     } catch {
       // silent fail — telemetry must never break the game
     }
@@ -2536,7 +2580,9 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
         players={gameState.players}
         buyLimit={gameState.buyLimit}
         buyLog={buyLog}
-        gameId={gameLogId}
+        gameId={gameId}
+        gameLogId={gameLogId}
+        playerMap={playerMap}
         onPlayAgain={startNewGame}
         onBack={onExit}
         aiPersonality={aiPersonality}

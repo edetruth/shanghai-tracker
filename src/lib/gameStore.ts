@@ -231,10 +231,13 @@ export async function createPlayedGame(
   date: string,
   gameType: string,
   buyLimit: number = 5,
-): Promise<string> {
-  const playerIds = await Promise.all(
-    playerNames.map(name => upsertPlayer(name).then(p => p.id))
+): Promise<{ gameId: string; playerMap: Record<string, string> }> {
+  const players = await Promise.all(
+    playerNames.map(async name => ({ name, id: (await upsertPlayer(name)).id }))
   )
+  const playerMap: Record<string, string> = {}
+  for (const p of players) playerMap[p.name] = p.id
+
   const { data: game, error } = await supabase
     .from('games')
     .insert({
@@ -248,36 +251,73 @@ export async function createPlayedGame(
     .single()
   if (error || !game) throw error
   await supabase.from('game_scores').insert(
-    playerIds.map(playerId => ({
+    players.map(p => ({
       game_id: game.id,
-      player_id: playerId,
+      player_id: p.id,
       round_scores: [],
     }))
   )
-  return game.id
+  return { gameId: game.id, playerMap }
 }
 
+/**
+ * Incrementally save current round scores for all players.
+ * Called after each round ends so data is persisted immediately.
+ * If isFinal is true, also marks the game as complete.
+ *
+ * Uses playerMap (name→supabase ID) when available to avoid
+ * ambiguous name lookups (e.g. multiple "AI 2" records).
+ */
+export async function saveRoundScores(
+  gameId: string,
+  players: { name: string; roundScores: number[] }[],
+  isFinal: boolean = false,
+  playerMap?: Record<string, string>,
+): Promise<void> {
+  try {
+    await Promise.all(
+      players.map(async (player) => {
+        let playerId = playerMap?.[player.name]
+        if (!playerId) {
+          // Fallback: lookup by name (less reliable for duplicate names)
+          const { data: p } = await supabase
+            .from('players')
+            .select('id')
+            .eq('name', player.name)
+            .limit(1)
+            .single()
+          if (!p) return
+          playerId = p.id
+        }
+        await supabase
+          .from('game_scores')
+          .update({ round_scores: player.roundScores })
+          .eq('game_id', gameId)
+          .eq('player_id', playerId)
+      })
+    )
+    if (isFinal) {
+      await supabase
+        .from('games')
+        .update({ is_complete: true })
+        .eq('id', gameId)
+    }
+  } catch (err) {
+    console.error('saveRoundScores failed:', err)
+  }
+}
+
+/**
+ * Complete a played game — saves final scores and marks complete.
+ * Now acts as a confirmation/retry of data already persisted by
+ * incremental saveRoundScores() calls during gameplay.
+ */
 export async function completePlayedGame(
   gameId: string,
-  players: { name: string; roundScores: number[] }[]
+  players: { name: string; roundScores: number[] }[],
+  playerMap?: Record<string, string>,
 ): Promise<void> {
-  for (const player of players) {
-    const { data: p } = await supabase
-      .from('players')
-      .select('id')
-      .eq('name', player.name)
-      .single()
-    if (!p) continue
-    await supabase
-      .from('game_scores')
-      .update({ round_scores: player.roundScores })
-      .eq('game_id', gameId)
-      .eq('player_id', p.id)
-  }
-  await supabase
-    .from('games')
-    .update({ is_complete: true })
-    .eq('id', gameId)
+  await saveRoundScores(gameId, players, true, playerMap)
 }
 
 export async function updateGame(
