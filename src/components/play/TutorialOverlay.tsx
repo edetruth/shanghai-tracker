@@ -7,8 +7,8 @@ interface Props {
   onSkip: () => void
 }
 
-// Zones that live in the bottom half of the screen — hint goes to top
-const BOTTOM_ZONES = new Set(['hand', 'lay-down-button', 'discard-button', 'table-melds', 'buy-button'])
+// Interactive steps always show at top so they never cover the hand or action area.
+// Auto-advance info steps (no player action needed) show at bottom.
 
 export default function TutorialOverlay({ step, onDismiss, onSkip }: Props) {
   const [visible, setVisible] = useState(false)
@@ -30,8 +30,9 @@ export default function TutorialOverlay({ step, onDismiss, onSkip }: Props) {
 
   if (!step) return null
 
-  // Position hint at the top when highlighting bottom zones, bottom otherwise
-  const hintAtTop = step.highlightZone ? BOTTOM_ZONES.has(step.highlightZone) : false
+  // Interactive steps → top (never cover hand/piles/buttons)
+  // Auto-advance info → bottom (out of the way)
+  const hintAtTop = !!step.requireAction
 
   const positionStyle: React.CSSProperties = hintAtTop
     ? { top: 'max(52px, env(safe-area-inset-top, 8px))', bottom: 'auto' }
