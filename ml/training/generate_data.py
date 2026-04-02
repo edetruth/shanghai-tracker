@@ -20,6 +20,29 @@ DATA_DIR = Path(__file__).parent.parent / "data" / "hybrid_training"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
+SAVE_INTERVAL = 500  # save checkpoint every N games
+
+
+def save_data(hand_snapshots, discard_samples, buy_samples, tag=""):
+    """Save all three datasets to JSON. Returns the paths."""
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    suffix = f"_{tag}" if tag else ""
+
+    hand_path = DATA_DIR / f"hand_eval_{timestamp}{suffix}.json"
+    with open(hand_path, "w") as f:
+        json.dump({"count": len(hand_snapshots), "samples": hand_snapshots}, f)
+
+    discard_path = DATA_DIR / f"discard_{timestamp}{suffix}.json"
+    with open(discard_path, "w") as f:
+        json.dump({"count": len(discard_samples), "samples": discard_samples}, f)
+
+    buy_path = DATA_DIR / f"buy_{timestamp}{suffix}.json"
+    with open(buy_path, "w") as f:
+        json.dump({"count": len(buy_samples), "samples": buy_samples}, f)
+
+    return hand_path, discard_path, buy_path
+
+
 def generate_games(args):
     print(f"Generating training data")
     print(f"  Games:    {args.games}")
@@ -156,25 +179,19 @@ def generate_games(args):
                 f"Time: {elapsed:.1f}s"
             )
 
+        # Periodic checkpoint save
+        if games_completed % SAVE_INTERVAL == 0 and games_completed < args.games:
+            hp, dp, bp = save_data(all_hand_snapshots, all_discard_samples, all_buy_samples,
+                                   tag=f"{games_completed}games")
+            print(f"  ** Checkpoint saved ({games_completed} games) -> {hp.parent}")
+
     env.close()
 
-    # Save data
-    timestamp = time.strftime("%Y%m%d_%H%M%S")
-
-    hand_path = DATA_DIR / f"hand_eval_{timestamp}.json"
-    with open(hand_path, "w") as f:
-        json.dump({"count": len(all_hand_snapshots), "samples": all_hand_snapshots}, f)
-    print(f"\nHand evaluator data: {len(all_hand_snapshots)} samples -> {hand_path}")
-
-    discard_path = DATA_DIR / f"discard_{timestamp}.json"
-    with open(discard_path, "w") as f:
-        json.dump({"count": len(all_discard_samples), "samples": all_discard_samples}, f)
-    print(f"Discard policy data: {len(all_discard_samples)} samples -> {discard_path}")
-
-    buy_path = DATA_DIR / f"buy_{timestamp}.json"
-    with open(buy_path, "w") as f:
-        json.dump({"count": len(all_buy_samples), "samples": all_buy_samples}, f)
-    print(f"Buy evaluator data:  {len(all_buy_samples)} samples -> {buy_path}")
+    # Final save (overwrites nothing — unique timestamp)
+    hp, dp, bp = save_data(all_hand_snapshots, all_discard_samples, all_buy_samples)
+    print(f"\nHand evaluator data: {len(all_hand_snapshots)} samples -> {hp}")
+    print(f"Discard policy data: {len(all_discard_samples)} samples -> {dp}")
+    print(f"Buy evaluator data:  {len(all_buy_samples)} samples -> {bp}")
 
 
 if __name__ == "__main__":
