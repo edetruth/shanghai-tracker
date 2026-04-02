@@ -841,6 +841,30 @@ rl.on('line', (line) => {
         break
       }
 
+      case 'get_full_state': {
+        if (!game) { respond({ ok: false, error: 'No game' }); break }
+        const pi = cmd.player ?? 0
+        const p = game.players[pi]
+        const stateVec = game.useRichState ? encodeRichState(game, pi) : encodeState(game, pi)
+        respond({
+          ok: true,
+          state: stateVec,
+          hand: p.hand.map(c => ({ rank: c.rank, suit: c.suit, id: c.id })),
+          handSize: p.hand.length,
+          hasLaidDown: p.hasLaidDown,
+          buysRemaining: p.buysRemaining,
+          phase: game.phase,
+          round: game.currentRound,
+          requirement: game.requirement,
+          discardTop: game.discardPile.length > 0
+            ? { rank: game.discardPile[game.discardPile.length - 1].rank, suit: game.discardPile[game.discardPile.length - 1].suit }
+            : null,
+          scores: game.scores.map(rs => rs.reduce((a, b) => a + b, 0)),
+          tableMeldCount: game.tableMelds.length,
+        })
+        break
+      }
+
       case 'quit': {
         process.exit(0)
       }
