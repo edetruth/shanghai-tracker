@@ -124,4 +124,26 @@ describe('Shanghai AI Simulations', () => {
     }, 'mixed-personalities')
   })
 
+  it('Test 7: Nemesis showdown — 4 nemesis players, 30 games', { timeout: 120_000 }, () => {
+    const personalities: AIPersonality[] = ['the-nemesis', 'the-nemesis', 'the-nemesis', 'the-nemesis']
+    runAndAnalyze('Nemesis Showdown', {
+      numGames: 30,
+      numPlayers: 4,
+      difficulty: 'hard',
+      logLevel: 'summary',
+      personalities,
+    }, 'nemesis-showdown')
+  })
+
+  it('Test 8: Nemesis vs Best — nemesis vs shark vs mastermind vs patient-pat', { timeout: 120_000 }, () => {
+    const personalities: AIPersonality[] = ['the-nemesis', 'the-shark', 'the-mastermind', 'patient-pat']
+    runAndAnalyze('Nemesis vs Best', {
+      numGames: 30,
+      numPlayers: 4,
+      difficulty: 'hard',
+      logLevel: 'summary',
+      personalities,
+    }, 'nemesis-vs-best')
+  })
+
 })

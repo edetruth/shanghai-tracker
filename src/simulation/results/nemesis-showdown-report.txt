@@ -1,0 +1,100 @@
+═══════════════════════════════════════════════════════
+  SHANGHAI AI SIMULATION — 30 Games, 4 Players, hard
+═══════════════════════════════════════════════════════
+
+OVERALL:
+  Average winner score:      108.7 pts
+  Average player score:      222.1 pts
+  Average turns per round:   55.3
+  Average turns per game:    387.4
+  Longest round:             226 turns (Round 7)
+  Shortest round:            17 turns (Round 1)
+  Total Shanghai events:     171 across 30 games
+
+WIN DISTRIBUTION:
+  The Nemesis: 30 wins (100.0%)
+  The Nemesis: 30 wins (100.0%)
+  The Nemesis: 30 wins (100.0%)
+  The Nemesis: 30 wins (100.0%)
+  ⚠️  Imbalanced! Max deviation from expected: 75.0%
+
+ROUND-BY-ROUND:
+  Round 1 (2 Sets):             avg 37.5  turns | 13%   Shanghai rate (14 stalemates)
+  Round 2 (1 Set + 1 Run):      avg 53.0  turns | 11%   Shanghai rate ⚠️ (13 stalemates)
+  Round 3 (2 Runs):             avg 51.3  turns | 9%    Shanghai rate ⚠️ (3 stalemates)
+  Round 4 (3 Sets):             avg 41.4  turns | 32%   Shanghai rate
+  Round 5 (2 Sets + 1 Run):     avg 45.1  turns | 21%   Shanghai rate (7 stalemates)
+  Round 6 (1 Set + 2 Runs):     avg 63.3  turns | 9%    Shanghai rate ⚠️ (5 stalemates)
+  Round 7 (3 Runs):             avg 95.7  turns | 48%   Shanghai rate ⚠️ (4 stalemates)
+
+DRAW DECISIONS:
+  Drew from discard: 35.1% of the time
+  Drew from pile:    64.9% of the time
+  ✓ In target range (30-40% discard takes)
+
+BUYING:
+  Total buys across all games:           396
+  Total buy offers:                      5106
+  Average buys per round per player:     0.47
+  Buy accept rate (offered → taken):     7.8%
+  ✓ Buy rate in reasonable range
+
+MELD TIMING (avg turn to first lay-down):
+  Round 1 (2 Sets): turn 17.0
+  Round 2 (1 Set + 1 Run): turn 30.0
+  Round 3 (2 Runs): turn 32.1
+  Round 4 (3 Sets): turn 21.2
+  Round 5 (2 Sets + 1 Run): turn 27.2
+  Round 6 (1 Set + 2 Runs): turn 44.7
+  Round 7 (3 Runs): turn 70.9
+
+JOKER ANALYSIS:
+  Total jokers dealt:           316
+  Jokers stuck in hand at end:  84 (26.6%)
+  ⚠️  HIGH JOKER WASTE: AI is failing to use jokers
+
+PERSONALITY BREAKDOWN:
+  the-nemesis: 30  wins (100.0%) | avg score 222.1  | avg round 29.4  | lay-down turn 33.3 | shanghai 18.1%  | went out 22.9%
+
+PER-ROUND PERSONALITY BREAKDOWN:
+  Round 1 (2 Sets):
+    the-nemesis: avg 15.3   | went out 20.0%  | shanghai 6.7%   | lay-down turn 17.0
+  Round 2 (1 Set + 1 Run):
+    the-nemesis: avg 24.7   | went out 16.7%  | shanghai 10.0%  | lay-down turn 30.0
+  Round 3 (2 Runs):
+    the-nemesis: avg 12.0   | went out 26.7%  | shanghai 0.0%   | lay-down turn 32.1
+  Round 4 (3 Sets):
+    the-nemesis: avg 37.2   | went out 26.7%  | shanghai 33.3%  | lay-down turn 21.2
+  Round 5 (2 Sets + 1 Run):
+    the-nemesis: avg 36.0   | went out 20.0%  | shanghai 26.7%  | lay-down turn 27.2
+  Round 6 (1 Set + 2 Runs):
+    the-nemesis: avg 18.7   | went out 30.0%  | shanghai 6.7%   | lay-down turn 44.7
+  Round 7 (3 Runs):
+    the-nemesis: avg 62.2   | went out 20.0%  | shanghai 43.3%  | lay-down turn 70.9
+
+PROBLEM DETECTION:
+  ⚠️  Rounds exceeding 30 turns: 188
+  ⚠️  Players never laying down in a round: 32 occurrences
+  ✓ At least one buy occurred in every game
+
+═══════════════════════════════════════════════════════
+  AUTO-DIAGNOSIS
+═══════════════════════════════════════════════════════
+
+  1. SLOW GAMES: Avg turns/round = 55.3. Target < 50. AI is not building melds efficiently.
+  2. JOKER WASTE: 26.6% of jokers end up stuck in hand at round end. AI should lay off jokers after laying down.
+  3. ROUND 2 TOO SLOW: avg 53.0 turns (1 Set + 1 Run). Target < 50.
+  4. ROUND 3 TOO SLOW: avg 51.3 turns (2 Runs). Target < 50.
+  5. ROUND 6 TOO SLOW: avg 63.3 turns (1 Set + 2 Runs). Target < 50.
+  6. ROUND 7 TOO SLOW: avg 95.7 turns (3 Runs). Target < 50.
+
+TARGET SCORECARD:
+  ✗ Avg turns/round < 50           (55.3)
+  ✓ Shanghai rate < 35%            (20.4%)
+  ✗ Buy rate > 0.5/round/player    (0.47)
+  ✓ Discard take 25-45%            (35.1%)
+  ✗ Joker stuck rate < 5%          (26.6%)
+
+  2/5 targets met
+
+═══════════════════════════════════════════════════════

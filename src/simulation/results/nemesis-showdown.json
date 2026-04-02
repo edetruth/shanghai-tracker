@@ -1,0 +1,6982 @@
+[
+  {
+    "gameId": 1,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      195,
+      205,
+      305,
+      185
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 42,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 15
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 0,
+            "drewFromPile": 10,
+            "buysMade": 1,
+            "buysOffered": 24,
+            "turnLaidDown": 4,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 3,
+            "finalHandValue": 15,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 63,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 12,
+            "buysMade": 1,
+            "buysOffered": 28,
+            "turnLaidDown": 26,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 47,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 10
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 7,
+            "buysMade": 3,
+            "buysOffered": 26,
+            "turnLaidDown": 25,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 37,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 4,
+            "buysMade": 1,
+            "buysOffered": 11,
+            "turnLaidDown": 24,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 20,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 120
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 1,
+            "buysMade": 1,
+            "buysOffered": 7,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 14,
+            "finalHandValue": 120,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 65,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 25
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 6,
+            "drewFromPile": 10,
+            "buysMade": 3,
+            "buysOffered": 21,
+            "turnLaidDown": 38,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 1,
+            "finalHandValue": 25,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 95,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 9,
+            "drewFromPile": 15,
+            "buysMade": 2,
+            "buysOffered": 32,
+            "turnLaidDown": 89,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      }
+    ],
+    "totalTurns": 369,
+    "totalBuys": 12,
+    "duration": 488,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 2,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      35,
+      295,
+      155,
+      55
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 29,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 10
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 1,
+            "drewFromPile": 6,
+            "buysMade": 2,
+            "buysOffered": 17,
+            "turnLaidDown": 12,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 57,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 2,
+            "drewFromPile": 12,
+            "buysMade": 0,
+            "buysOffered": 33,
+            "turnLaidDown": 34,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 34,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 20
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 5,
+            "buysMade": 4,
+            "buysOffered": 16,
+            "turnLaidDown": 29,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 4,
+            "finalHandValue": 20,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 48,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 0,
+            "drewFromPile": 12,
+            "buysMade": 2,
+            "buysOffered": 24,
+            "turnLaidDown": 8,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 0,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 44,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 15
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 7,
+            "buysMade": 4,
+            "buysOffered": 20,
+            "turnLaidDown": 27,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 3,
+            "finalHandValue": 15,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 74,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 7,
+            "drewFromPile": 12,
+            "buysMade": 5,
+            "buysOffered": 11,
+            "turnLaidDown": 54,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 3,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 226,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 27,
+            "drewFromPile": 30,
+            "buysMade": 3,
+            "buysOffered": 111,
+            "turnLaidDown": 221,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 1
+      }
+    ],
+    "totalTurns": 512,
+    "totalBuys": 20,
+    "duration": 657,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 3,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      130,
+      165,
+      175,
+      300
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 45,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 20
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 6,
+            "buysMade": 1,
+            "buysOffered": 28,
+            "turnLaidDown": 36,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 2,
+            "finalHandValue": 20,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 84,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 30
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 11,
+            "drewFromPile": 10,
+            "buysMade": 3,
+            "buysOffered": 47,
+            "turnLaidDown": 70,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 6,
+            "finalHandValue": 30,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 40,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 10
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 7,
+            "buysMade": 1,
+            "buysOffered": 20,
+            "turnLaidDown": 25,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 24,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 0,
+            "drewFromPile": 6,
+            "buysMade": 1,
+            "buysOffered": 11,
+            "turnLaidDown": 8,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 0,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 42,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 100
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 6,
+            "drewFromPile": 4,
+            "buysMade": 0,
+            "buysOffered": 21,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 12,
+            "finalHandValue": 100,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 60,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 15
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 11,
+            "buysMade": 3,
+            "buysOffered": 24,
+            "turnLaidDown": 30,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 3,
+            "finalHandValue": 15,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 74,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 125
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 8,
+            "drewFromPile": 11,
+            "buysMade": 2,
+            "buysOffered": 35,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 16,
+            "finalHandValue": 125,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 4,
+        "jokersStuckInHand": 1
+      }
+    ],
+    "totalTurns": 369,
+    "totalBuys": 11,
+    "duration": 241,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 4,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      65,
+      215,
+      235,
+      55
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 30,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 10
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 0,
+            "drewFromPile": 7,
+            "buysMade": 1,
+            "buysOffered": 17,
+            "turnLaidDown": 4,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 53,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 15
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 6,
+            "drewFromPile": 7,
+            "buysMade": 2,
+            "buysOffered": 24,
+            "turnLaidDown": 34,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 2,
+            "finalHandSize": 3,
+            "finalHandValue": 15,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 67,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 6,
+            "drewFromPile": 11,
+            "buysMade": 1,
+            "buysOffered": 36,
+            "turnLaidDown": 57,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 47,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 1,
+            "drewFromPile": 10,
+            "buysMade": 4,
+            "buysOffered": 20,
+            "turnLaidDown": 16,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 55,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 2,
+            "drewFromPile": 12,
+            "buysMade": 1,
+            "buysOffered": 26,
+            "turnLaidDown": 19,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 0,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 59,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 11,
+            "buysMade": 2,
+            "buysOffered": 22,
+            "turnLaidDown": 18,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 74,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 15
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 9,
+            "drewFromPile": 10,
+            "buysMade": 3,
+            "buysOffered": 33,
+            "turnLaidDown": 65,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 1,
+            "finalHandValue": 15,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 1
+      }
+    ],
+    "totalTurns": 385,
+    "totalBuys": 14,
+    "duration": 294,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 5,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      375,
+      190,
+      380,
+      165
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 33,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 30
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 1,
+            "drewFromPile": 7,
+            "buysMade": 2,
+            "buysOffered": 19,
+            "turnLaidDown": 8,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 5,
+            "finalHandValue": 30,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 42,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 15
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 2,
+            "drewFromPile": 9,
+            "buysMade": 2,
+            "buysOffered": 17,
+            "turnLaidDown": 18,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 3,
+            "finalHandValue": 15,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 63,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 10
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 2,
+            "drewFromPile": 14,
+            "buysMade": 1,
+            "buysOffered": 28,
+            "turnLaidDown": 13,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 2,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 49,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 100
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 7,
+            "drewFromPile": 5,
+            "buysMade": 2,
+            "buysOffered": 26,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 14,
+            "finalHandValue": 100,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 91,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 9,
+            "drewFromPile": 14,
+            "buysMade": 3,
+            "buysOffered": 47,
+            "turnLaidDown": 71,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 1,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 33,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 10
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 1,
+            "drewFromPile": 7,
+            "buysMade": 1,
+            "buysOffered": 12,
+            "turnLaidDown": 10,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 97,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 21,
+            "buysMade": 2,
+            "buysOffered": 40,
+            "turnLaidDown": 33,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 0,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      }
+    ],
+    "totalTurns": 408,
+    "totalBuys": 13,
+    "duration": 300,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 6,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      210,
+      215,
+      360,
+      185
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 41,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 1,
+            "drewFromPile": 9,
+            "buysMade": 0,
+            "buysOffered": 19,
+            "turnLaidDown": 20,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 42,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 2,
+            "drewFromPile": 9,
+            "buysMade": 0,
+            "buysOffered": 19,
+            "turnLaidDown": 6,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 1,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 49,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 1,
+            "drewFromPile": 12,
+            "buysMade": 3,
+            "buysOffered": 23,
+            "turnLaidDown": 17,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 2,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 24,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 2,
+            "buysMade": 0,
+            "buysOffered": 5,
+            "turnLaidDown": 24,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 0,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 41,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 10
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 6,
+            "drewFromPile": 4,
+            "buysMade": 2,
+            "buysOffered": 18,
+            "turnLaidDown": 31,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 2,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 54,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 10,
+            "buysMade": 1,
+            "buysOffered": 15,
+            "turnLaidDown": 22,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 2,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 153,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 170
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 17,
+            "drewFromPile": 22,
+            "buysMade": 3,
+            "buysOffered": 63,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 18,
+            "finalHandValue": 170,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 3
+      }
+    ],
+    "totalTurns": 404,
+    "totalBuys": 9,
+    "duration": 377,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 7,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      115,
+      165,
+      285,
+      315
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 30,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 20
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 4,
+            "buysMade": 1,
+            "buysOffered": 16,
+            "turnLaidDown": 16,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 4,
+            "finalHandValue": 20,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 56,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 55
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 9,
+            "drewFromPile": 5,
+            "buysMade": 3,
+            "buysOffered": 26,
+            "turnLaidDown": 50,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 8,
+            "finalHandValue": 55,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 68,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 15
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 6,
+            "drewFromPile": 11,
+            "buysMade": 4,
+            "buysOffered": 35,
+            "turnLaidDown": 57,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 3,
+            "finalHandSize": 2,
+            "finalHandValue": 15,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 34,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 60
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 3,
+            "buysMade": 0,
+            "buysOffered": 13,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 10,
+            "finalHandValue": 60,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 52,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 150
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 10,
+            "drewFromPile": 3,
+            "buysMade": 3,
+            "buysOffered": 20,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 18,
+            "finalHandValue": 150,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 67,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 15
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 7,
+            "drewFromPile": 10,
+            "buysMade": 2,
+            "buysOffered": 16,
+            "turnLaidDown": 54,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 2,
+            "finalHandSize": 1,
+            "finalHandValue": 15,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 65,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 6,
+            "drewFromPile": 11,
+            "buysMade": 2,
+            "buysOffered": 29,
+            "turnLaidDown": 53,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 1,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      }
+    ],
+    "totalTurns": 372,
+    "totalBuys": 15,
+    "duration": 290,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 8,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      290,
+      160,
+      275,
+      335
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 57,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 11,
+            "buysMade": 2,
+            "buysOffered": 31,
+            "turnLaidDown": 36,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 65,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 15
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 9,
+            "drewFromPile": 7,
+            "buysMade": 3,
+            "buysOffered": 27,
+            "turnLaidDown": 46,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 3,
+            "finalHandValue": 15,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 44,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 10
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 2,
+            "drewFromPile": 9,
+            "buysMade": 1,
+            "buysOffered": 24,
+            "turnLaidDown": 9,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 57,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 90
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 7,
+            "drewFromPile": 7,
+            "buysMade": 1,
+            "buysOffered": 31,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 12,
+            "finalHandValue": 90,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 33,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 90
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 7,
+            "drewFromPile": 1,
+            "buysMade": 1,
+            "buysOffered": 14,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 14,
+            "finalHandValue": 90,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 54,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 6,
+            "drewFromPile": 8,
+            "buysMade": 2,
+            "buysOffered": 12,
+            "turnLaidDown": 22,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 2,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 143,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 125
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 18,
+            "drewFromPile": 18,
+            "buysMade": 3,
+            "buysOffered": 71,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 18,
+            "finalHandValue": 125,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 1
+      }
+    ],
+    "totalTurns": 453,
+    "totalBuys": 13,
+    "duration": 391,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 9,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      195,
+      350,
+      105,
+      130
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 35,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 0,
+            "drewFromPile": 8,
+            "buysMade": 0,
+            "buysOffered": 15,
+            "turnLaidDown": 4,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 50,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 15
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 6,
+            "drewFromPile": 7,
+            "buysMade": 3,
+            "buysOffered": 24,
+            "turnLaidDown": 34,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 3,
+            "finalHandValue": 15,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 41,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 1,
+            "drewFromPile": 10,
+            "buysMade": 0,
+            "buysOffered": 19,
+            "turnLaidDown": 5,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 1,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 51,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 100
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 7,
+            "buysMade": 1,
+            "buysOffered": 24,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 12,
+            "finalHandValue": 100,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 37,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 1,
+            "drewFromPile": 8,
+            "buysMade": 1,
+            "buysOffered": 16,
+            "turnLaidDown": 15,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 2,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 66,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 11,
+            "drewFromPile": 6,
+            "buysMade": 1,
+            "buysOffered": 24,
+            "turnLaidDown": 66,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 4,
+            "jokerSwaps": 1,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 90,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 9,
+            "drewFromPile": 14,
+            "buysMade": 3,
+            "buysOffered": 38,
+            "turnLaidDown": 65,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 1
+      }
+    ],
+    "totalTurns": 370,
+    "totalBuys": 9,
+    "duration": 253,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 10,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      290,
+      235,
+      125,
+      190
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 37,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 75
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 6,
+            "buysMade": 0,
+            "buysOffered": 23,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 10,
+            "finalHandValue": 75,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 84,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 10
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 9,
+            "drewFromPile": 12,
+            "buysMade": 3,
+            "buysOffered": 29,
+            "turnLaidDown": 42,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 54,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 25
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 9,
+            "buysMade": 4,
+            "buysOffered": 28,
+            "turnLaidDown": 49,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 5,
+            "finalHandValue": 25,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 55,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 65
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 8,
+            "buysMade": 0,
+            "buysOffered": 28,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 10,
+            "finalHandValue": 65,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 34,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 1,
+            "drewFromPile": 7,
+            "buysMade": 2,
+            "buysOffered": 15,
+            "turnLaidDown": 23,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 66,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 12,
+            "buysMade": 4,
+            "buysOffered": 27,
+            "turnLaidDown": 26,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 1,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 156,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 10
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 35,
+            "buysMade": 1,
+            "buysOffered": 57,
+            "turnLaidDown": 57,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 1,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 2
+      }
+    ],
+    "totalTurns": 486,
+    "totalBuys": 14,
+    "duration": 416,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 11,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      175,
+      310,
+      470,
+      130
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 43,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 15
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 1,
+            "drewFromPile": 9,
+            "buysMade": 2,
+            "buysOffered": 28,
+            "turnLaidDown": 12,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 3,
+            "finalHandValue": 15,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 54,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 10,
+            "buysMade": 1,
+            "buysOffered": 26,
+            "turnLaidDown": 46,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 2,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 33,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 2,
+            "drewFromPile": 7,
+            "buysMade": 1,
+            "buysOffered": 9,
+            "turnLaidDown": 25,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 1,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 44,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 8,
+            "buysMade": 1,
+            "buysOffered": 12,
+            "turnLaidDown": 20,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 0,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 31,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 2,
+            "drewFromPile": 6,
+            "buysMade": 2,
+            "buysOffered": 14,
+            "turnLaidDown": 11,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 2,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 4,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 82,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 7,
+            "drewFromPile": 14,
+            "buysMade": 2,
+            "buysOffered": 19,
+            "turnLaidDown": 62,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 1,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 67,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 115
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 12,
+            "drewFromPile": 5,
+            "buysMade": 2,
+            "buysOffered": 27,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 16,
+            "finalHandValue": 115,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 2
+      }
+    ],
+    "totalTurns": 354,
+    "totalBuys": 11,
+    "duration": 301,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 12,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      200,
+      30,
+      225,
+      120
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 38,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 25
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 5,
+            "buysMade": 1,
+            "buysOffered": 24,
+            "turnLaidDown": 24,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 3,
+            "finalHandValue": 25,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 48,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 40
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 7,
+            "drewFromPile": 5,
+            "buysMade": 2,
+            "buysOffered": 25,
+            "turnLaidDown": 42,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 4,
+            "finalHandValue": 40,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 66,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 25
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 12,
+            "buysMade": 3,
+            "buysOffered": 38,
+            "turnLaidDown": 49,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 3,
+            "finalHandSize": 1,
+            "finalHandValue": 25,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 30,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 4,
+            "buysMade": 2,
+            "buysOffered": 13,
+            "turnLaidDown": 20,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 55,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 2,
+            "drewFromPile": 12,
+            "buysMade": 3,
+            "buysOffered": 28,
+            "turnLaidDown": 31,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 1,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 58,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 10,
+            "buysMade": 3,
+            "buysOffered": 27,
+            "turnLaidDown": 42,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 2,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 44,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 20
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 7,
+            "buysMade": 2,
+            "buysOffered": 16,
+            "turnLaidDown": 37,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 2,
+            "finalHandValue": 20,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      }
+    ],
+    "totalTurns": 339,
+    "totalBuys": 16,
+    "duration": 235,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 13,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      265,
+      350,
+      345,
+      300
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 17,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 25
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 2,
+            "drewFromPile": 2,
+            "buysMade": 1,
+            "buysOffered": 9,
+            "turnLaidDown": 16,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 4,
+            "finalHandValue": 25,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 55,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 95
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 10,
+            "drewFromPile": 4,
+            "buysMade": 1,
+            "buysOffered": 31,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 12,
+            "finalHandValue": 95,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 52,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 20
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 10,
+            "buysMade": 1,
+            "buysOffered": 20,
+            "turnLaidDown": 45,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 3,
+            "finalHandValue": 20,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 33,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 25
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 5,
+            "buysMade": 1,
+            "buysOffered": 12,
+            "turnLaidDown": 24,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 1,
+            "finalHandValue": 25,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 3
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 25,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 10
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 2,
+            "drewFromPile": 4,
+            "buysMade": 1,
+            "buysOffered": 9,
+            "turnLaidDown": 15,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 2,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 68,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 8,
+            "drewFromPile": 9,
+            "buysMade": 3,
+            "buysOffered": 22,
+            "turnLaidDown": 50,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 169,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis",
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 120
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 18,
+            "drewFromPile": 25,
+            "buysMade": 2,
+            "buysOffered": 60,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 16,
+            "finalHandValue": 120,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 4
+      }
+    ],
+    "totalTurns": 419,
+    "totalBuys": 10,
+    "duration": 450,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 14,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      300,
+      355,
+      405,
+      105
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 30,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 15
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 1,
+            "drewFromPile": 6,
+            "buysMade": 0,
+            "buysOffered": 17,
+            "turnLaidDown": 8,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 3,
+            "finalHandValue": 15,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 24,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 25
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 3,
+            "buysMade": 1,
+            "buysOffered": 13,
+            "turnLaidDown": 14,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 5,
+            "finalHandValue": 25,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 62,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 35
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 11,
+            "buysMade": 3,
+            "buysOffered": 27,
+            "turnLaidDown": 45,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 6,
+            "finalHandValue": 35,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 52,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 9,
+            "buysMade": 0,
+            "buysOffered": 13,
+            "turnLaidDown": 28,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 0,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 43,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 8,
+            "buysMade": 2,
+            "buysOffered": 19,
+            "turnLaidDown": 27,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 62,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 11,
+            "drewFromPile": 5,
+            "buysMade": 1,
+            "buysOffered": 24,
+            "turnLaidDown": 62,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 4,
+            "jokerSwaps": 1,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 138,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 25
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 18,
+            "drewFromPile": 17,
+            "buysMade": 3,
+            "buysOffered": 65,
+            "turnLaidDown": 117,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 3,
+            "finalHandSize": 1,
+            "finalHandValue": 25,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 2
+      }
+    ],
+    "totalTurns": 411,
+    "totalBuys": 10,
+    "duration": 336,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 15,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      85,
+      425,
+      360,
+      145
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 20,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 1,
+            "drewFromPile": 4,
+            "buysMade": 1,
+            "buysOffered": 7,
+            "turnLaidDown": 8,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 0,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 49,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 20
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 2,
+            "drewFromPile": 10,
+            "buysMade": 2,
+            "buysOffered": 24,
+            "turnLaidDown": 10,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 4,
+            "finalHandValue": 20,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 53,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 11,
+            "buysMade": 2,
+            "buysOffered": 21,
+            "turnLaidDown": 25,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 1,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 47,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 6,
+            "buysMade": 2,
+            "buysOffered": 20,
+            "turnLaidDown": 28,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 44,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 115
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 8,
+            "drewFromPile": 3,
+            "buysMade": 2,
+            "buysOffered": 14,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 16,
+            "finalHandValue": 115,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 53,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 7,
+            "drewFromPile": 6,
+            "buysMade": 1,
+            "buysOffered": 18,
+            "turnLaidDown": 34,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 73,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 15,
+            "buysMade": 3,
+            "buysOffered": 31,
+            "turnLaidDown": 49,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 2,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      }
+    ],
+    "totalTurns": 339,
+    "totalBuys": 13,
+    "duration": 254,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 16,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      325,
+      210,
+      65,
+      180
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 32,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 1,
+            "drewFromPile": 7,
+            "buysMade": 0,
+            "buysOffered": 14,
+            "turnLaidDown": 8,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 0,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 69,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 25
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 6,
+            "drewFromPile": 11,
+            "buysMade": 1,
+            "buysOffered": 35,
+            "turnLaidDown": 30,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 3,
+            "finalHandSize": 1,
+            "finalHandValue": 25,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 2
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 41,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 6,
+            "buysMade": 1,
+            "buysOffered": 20,
+            "turnLaidDown": 37,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 1,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 36,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 5,
+            "buysMade": 2,
+            "buysOffered": 10,
+            "turnLaidDown": 24,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 3,
+            "jokerSwaps": 0,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 54,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 10,
+            "buysMade": 2,
+            "buysOffered": 25,
+            "turnLaidDown": 23,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 64,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 25
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 10,
+            "drewFromPile": 6,
+            "buysMade": 4,
+            "buysOffered": 21,
+            "turnLaidDown": 62,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 5,
+            "finalHandValue": 25,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 68,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 125
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 13,
+            "buysMade": 1,
+            "buysOffered": 36,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 14,
+            "finalHandValue": 125,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 2
+      }
+    ],
+    "totalTurns": 364,
+    "totalBuys": 11,
+    "duration": 261,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 17,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      235,
+      220,
+      65,
+      60
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 32,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 2,
+            "drewFromPile": 6,
+            "buysMade": 0,
+            "buysOffered": 19,
+            "turnLaidDown": 16,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 0,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 61,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 30
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 11,
+            "buysMade": 3,
+            "buysOffered": 26,
+            "turnLaidDown": 22,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 6,
+            "finalHandValue": 30,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 55,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 1,
+            "drewFromPile": 13,
+            "buysMade": 2,
+            "buysOffered": 26,
+            "turnLaidDown": 17,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 56,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 10,
+            "buysMade": 2,
+            "buysOffered": 23,
+            "turnLaidDown": 28,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 0,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 47,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 8,
+            "buysMade": 2,
+            "buysOffered": 20,
+            "turnLaidDown": 31,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 1,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 51,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 25
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 7,
+            "drewFromPile": 6,
+            "buysMade": 2,
+            "buysOffered": 18,
+            "turnLaidDown": 30,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 3,
+            "finalHandSize": 1,
+            "finalHandValue": 25,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 85,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 17,
+            "buysMade": 3,
+            "buysOffered": 33,
+            "turnLaidDown": 49,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 0,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      }
+    ],
+    "totalTurns": 387,
+    "totalBuys": 14,
+    "duration": 247,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 18,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      230,
+      110,
+      90,
+      270
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 35,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 20
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 1,
+            "drewFromPile": 7,
+            "buysMade": 2,
+            "buysOffered": 19,
+            "turnLaidDown": 12,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 4,
+            "finalHandValue": 20,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 52,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 100
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 8,
+            "drewFromPile": 5,
+            "buysMade": 1,
+            "buysOffered": 29,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 12,
+            "finalHandValue": 100,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 55,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 1,
+            "drewFromPile": 13,
+            "buysMade": 1,
+            "buysOffered": 29,
+            "turnLaidDown": 37,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 30,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 120
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 4,
+            "buysMade": 2,
+            "buysOffered": 14,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 14,
+            "finalHandValue": 120,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 32,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 1,
+            "drewFromPile": 7,
+            "buysMade": 1,
+            "buysOffered": 18,
+            "turnLaidDown": 7,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 75,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 10
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 9,
+            "drewFromPile": 10,
+            "buysMade": 3,
+            "buysOffered": 25,
+            "turnLaidDown": 58,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 127,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 10
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 6,
+            "drewFromPile": 26,
+            "buysMade": 3,
+            "buysOffered": 61,
+            "turnLaidDown": 113,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 1,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      }
+    ],
+    "totalTurns": 406,
+    "totalBuys": 13,
+    "duration": 555,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 19,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      380,
+      45,
+      165,
+      195
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 30,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 2,
+            "drewFromPile": 5,
+            "buysMade": 0,
+            "buysOffered": 20,
+            "turnLaidDown": 20,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 38,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 7,
+            "buysMade": 0,
+            "buysOffered": 14,
+            "turnLaidDown": 18,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 0,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 48,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 2,
+            "drewFromPile": 10,
+            "buysMade": 2,
+            "buysOffered": 26,
+            "turnLaidDown": 29,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 47,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 15
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 1,
+            "drewFromPile": 10,
+            "buysMade": 3,
+            "buysOffered": 17,
+            "turnLaidDown": 16,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 3,
+            "finalHandValue": 15,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 45,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 30
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 7,
+            "buysMade": 4,
+            "buysOffered": 20,
+            "turnLaidDown": 31,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 5,
+            "finalHandValue": 30,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 46,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 7,
+            "buysMade": 1,
+            "buysOffered": 13,
+            "turnLaidDown": 42,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 1,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 55,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 140
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 9,
+            "buysMade": 2,
+            "buysOffered": 21,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 16,
+            "finalHandValue": 140,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 4,
+        "jokersStuckInHand": 0
+      }
+    ],
+    "totalTurns": 309,
+    "totalBuys": 12,
+    "duration": 204,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 20,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      430,
+      265,
+      120,
+      360
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 25,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 1,
+            "drewFromPile": 5,
+            "buysMade": 2,
+            "buysOffered": 16,
+            "turnLaidDown": 8,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 54,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 11,
+            "buysMade": 1,
+            "buysOffered": 20,
+            "turnLaidDown": 14,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 0,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 57,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 1,
+            "drewFromPile": 14,
+            "buysMade": 1,
+            "buysOffered": 27,
+            "turnLaidDown": 5,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 2,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 30,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 130
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 3,
+            "buysMade": 4,
+            "buysOffered": 10,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 18,
+            "finalHandValue": 130,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 2
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 48,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 10
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 2,
+            "drewFromPile": 10,
+            "buysMade": 3,
+            "buysOffered": 26,
+            "turnLaidDown": 27,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 40,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 40
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 6,
+            "drewFromPile": 4,
+            "buysMade": 4,
+            "buysOffered": 17,
+            "turnLaidDown": 34,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 2,
+            "finalHandSize": 6,
+            "finalHandValue": 40,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 168,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 175
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 17,
+            "drewFromPile": 25,
+            "buysMade": 3,
+            "buysOffered": 77,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 18,
+            "finalHandValue": 175,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 3
+      }
+    ],
+    "totalTurns": 422,
+    "totalBuys": 18,
+    "duration": 499,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 21,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      235,
+      170,
+      345,
+      490
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 57,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 0,
+            "drewFromPile": 14,
+            "buysMade": 1,
+            "buysOffered": 29,
+            "turnLaidDown": 4,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 62,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 25
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 11,
+            "buysMade": 2,
+            "buysOffered": 33,
+            "turnLaidDown": 46,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 1,
+            "finalHandValue": 25,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 39,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 25
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 7,
+            "buysMade": 4,
+            "buysOffered": 19,
+            "turnLaidDown": 29,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 3,
+            "finalHandValue": 25,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 42,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 120
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 6,
+            "buysMade": 1,
+            "buysOffered": 21,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 12,
+            "finalHandValue": 120,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 3
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 38,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 130
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 6,
+            "drewFromPile": 3,
+            "buysMade": 1,
+            "buysOffered": 13,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 14,
+            "finalHandValue": 130,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 55,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 10
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 9,
+            "buysMade": 1,
+            "buysOffered": 18,
+            "turnLaidDown": 50,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 107,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 175
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 13,
+            "drewFromPile": 14,
+            "buysMade": 3,
+            "buysOffered": 57,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 18,
+            "finalHandValue": 175,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 3
+      }
+    ],
+    "totalTurns": 400,
+    "totalBuys": 13,
+    "duration": 309,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 22,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      95,
+      340,
+      325,
+      250
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 45,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 25
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 8,
+            "buysMade": 1,
+            "buysOffered": 22,
+            "turnLaidDown": 36,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 1,
+            "finalHandValue": 25,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 32,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 10
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 2,
+            "drewFromPile": 6,
+            "buysMade": 1,
+            "buysOffered": 17,
+            "turnLaidDown": 10,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 1,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 30,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 15
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 3,
+            "buysMade": 2,
+            "buysOffered": 12,
+            "turnLaidDown": 25,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 3,
+            "finalHandValue": 15,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 35,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 90
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 3,
+            "buysMade": 1,
+            "buysOffered": 20,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 12,
+            "finalHandValue": 90,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 56,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 105
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 9,
+            "drewFromPile": 5,
+            "buysMade": 1,
+            "buysOffered": 27,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 14,
+            "finalHandValue": 105,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 59,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 10,
+            "buysMade": 2,
+            "buysOffered": 18,
+            "turnLaidDown": 34,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 3,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 33,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 6,
+            "buysMade": 1,
+            "buysOffered": 13,
+            "turnLaidDown": 25,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 1,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 1
+      }
+    ],
+    "totalTurns": 290,
+    "totalBuys": 9,
+    "duration": 192,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 23,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      345,
+      190,
+      285,
+      145
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 48,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 10
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 9,
+            "buysMade": 2,
+            "buysOffered": 25,
+            "turnLaidDown": 32,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 38,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 20
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 7,
+            "buysMade": 1,
+            "buysOffered": 17,
+            "turnLaidDown": 22,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 2,
+            "finalHandSize": 2,
+            "finalHandValue": 20,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 33,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 1,
+            "drewFromPile": 8,
+            "buysMade": 1,
+            "buysOffered": 19,
+            "turnLaidDown": 21,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 1,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 50,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 10
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 7,
+            "buysMade": 2,
+            "buysOffered": 22,
+            "turnLaidDown": 40,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 55,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 10,
+            "buysMade": 2,
+            "buysOffered": 23,
+            "turnLaidDown": 31,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 2,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 59,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 20
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 6,
+            "drewFromPile": 9,
+            "buysMade": 4,
+            "buysOffered": 26,
+            "turnLaidDown": 38,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 4,
+            "finalHandValue": 20,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 47,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 80
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 7,
+            "buysMade": 1,
+            "buysOffered": 13,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 14,
+            "finalHandValue": 80,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 2
+      }
+    ],
+    "totalTurns": 330,
+    "totalBuys": 13,
+    "duration": 185,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 24,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      190,
+      250,
+      40,
+      415
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 40,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 7,
+            "buysMade": 1,
+            "buysOffered": 22,
+            "turnLaidDown": 16,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 39,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 10
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 2,
+            "drewFromPile": 8,
+            "buysMade": 2,
+            "buysOffered": 19,
+            "turnLaidDown": 18,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 38,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 6,
+            "buysMade": 0,
+            "buysOffered": 21,
+            "turnLaidDown": 33,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 35,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 115
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 7,
+            "drewFromPile": 1,
+            "buysMade": 3,
+            "buysOffered": 19,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 16,
+            "finalHandValue": 115,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 34,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 15
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 2,
+            "drewFromPile": 6,
+            "buysMade": 2,
+            "buysOffered": 11,
+            "turnLaidDown": 19,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 3,
+            "finalHandValue": 15,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 55,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 110
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 8,
+            "drewFromPile": 6,
+            "buysMade": 1,
+            "buysOffered": 25,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 14,
+            "finalHandValue": 110,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 75,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 155
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 7,
+            "drewFromPile": 12,
+            "buysMade": 2,
+            "buysOffered": 36,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 16,
+            "finalHandValue": 155,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 1
+      }
+    ],
+    "totalTurns": 316,
+    "totalBuys": 11,
+    "duration": 215,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 25,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      205,
+      415,
+      140,
+      320
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 28,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 1,
+            "drewFromPile": 6,
+            "buysMade": 0,
+            "buysOffered": 16,
+            "turnLaidDown": 12,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 0,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 17,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 95
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 0,
+            "buysMade": 1,
+            "buysOffered": 7,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 12,
+            "finalHandValue": 95,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 44,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 40
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 8,
+            "buysMade": 3,
+            "buysOffered": 21,
+            "turnLaidDown": 41,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 8,
+            "finalHandValue": 40,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 24,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 1,
+            "drewFromPile": 5,
+            "buysMade": 0,
+            "buysOffered": 6,
+            "turnLaidDown": 8,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 0,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 60,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 10,
+            "buysMade": 1,
+            "buysOffered": 21,
+            "turnLaidDown": 35,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 90,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 35
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 8,
+            "drewFromPile": 15,
+            "buysMade": 5,
+            "buysOffered": 15,
+            "turnLaidDown": 74,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 7,
+            "finalHandValue": 35,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 26,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 145
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 4,
+            "buysMade": 2,
+            "buysOffered": 9,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 16,
+            "finalHandValue": 145,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 1
+      }
+    ],
+    "totalTurns": 289,
+    "totalBuys": 12,
+    "duration": 206,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 26,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      430,
+      190,
+      120,
+      120
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 32,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 2,
+            "drewFromPile": 6,
+            "buysMade": 0,
+            "buysOffered": 14,
+            "turnLaidDown": 12,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 0,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 78,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 17,
+            "buysMade": 3,
+            "buysOffered": 32,
+            "turnLaidDown": 18,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 2,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 65,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 13,
+            "buysMade": 3,
+            "buysOffered": 35,
+            "turnLaidDown": 25,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 1,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 46,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 10
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 1,
+            "drewFromPile": 10,
+            "buysMade": 3,
+            "buysOffered": 26,
+            "turnLaidDown": 28,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 51,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 9,
+            "buysMade": 1,
+            "buysOffered": 22,
+            "turnLaidDown": 43,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 0,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 83,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 15
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 10,
+            "drewFromPile": 11,
+            "buysMade": 3,
+            "buysOffered": 31,
+            "turnLaidDown": 82,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 3,
+            "finalHandValue": 15,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 79,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 95
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 11,
+            "drewFromPile": 9,
+            "buysMade": 3,
+            "buysOffered": 36,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 18,
+            "finalHandValue": 95,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 3
+      }
+    ],
+    "totalTurns": 434,
+    "totalBuys": 16,
+    "duration": 328,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 27,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      275,
+      175,
+      170,
+      50
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 60,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 7,
+            "drewFromPile": 8,
+            "buysMade": 0,
+            "buysOffered": 32,
+            "turnLaidDown": 52,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 0,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 52,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 10
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 6,
+            "drewFromPile": 7,
+            "buysMade": 2,
+            "buysOffered": 27,
+            "turnLaidDown": 34,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 2,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 42,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 20
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 6,
+            "drewFromPile": 5,
+            "buysMade": 4,
+            "buysOffered": 18,
+            "turnLaidDown": 33,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 3,
+            "finalHandValue": 20,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 35,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 2,
+            "drewFromPile": 6,
+            "buysMade": 2,
+            "buysOffered": 10,
+            "turnLaidDown": 12,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 2
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 33,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 1,
+            "drewFromPile": 7,
+            "buysMade": 1,
+            "buysOffered": 8,
+            "turnLaidDown": 15,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 129,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 11,
+            "drewFromPile": 21,
+            "buysMade": 2,
+            "buysOffered": 76,
+            "turnLaidDown": 110,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 82,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 7,
+            "drewFromPile": 14,
+            "buysMade": 2,
+            "buysOffered": 44,
+            "turnLaidDown": 61,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 3,
+        "jokersStuckInHand": 0
+      }
+    ],
+    "totalTurns": 433,
+    "totalBuys": 13,
+    "duration": 334,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 28,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      75,
+      200,
+      155,
+      240
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 48,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 10
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 9,
+            "buysMade": 1,
+            "buysOffered": 28,
+            "turnLaidDown": 24,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 4,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 57,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 20
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 11,
+            "buysMade": 3,
+            "buysOffered": 25,
+            "turnLaidDown": 22,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 4,
+            "finalHandValue": 20,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 64,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 10
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 6,
+            "drewFromPile": 10,
+            "buysMade": 4,
+            "buysOffered": 31,
+            "turnLaidDown": 41,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 1,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 58,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 1,
+            "drewFromPile": 13,
+            "buysMade": 1,
+            "buysOffered": 28,
+            "turnLaidDown": 12,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 61,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 25
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 5,
+            "drewFromPile": 10,
+            "buysMade": 3,
+            "buysOffered": 21,
+            "turnLaidDown": 35,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 5,
+            "finalHandValue": 25,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 75,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 160
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 8,
+            "drewFromPile": 11,
+            "buysMade": 2,
+            "buysOffered": 32,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 16,
+            "finalHandValue": 160,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 59,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 10
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 2,
+            "drewFromPile": 13,
+            "buysMade": 2,
+            "buysOffered": 19,
+            "turnLaidDown": 25,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      }
+    ],
+    "totalTurns": 422,
+    "totalBuys": 16,
+    "duration": 278,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 29,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      170,
+      500,
+      60,
+      185
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 45,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 1,
+            "drewFromPile": 10,
+            "buysMade": 0,
+            "buysOffered": 23,
+            "turnLaidDown": 16,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 69,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 30
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 11,
+            "drewFromPile": 6,
+            "buysMade": 5,
+            "buysOffered": 12,
+            "turnLaidDown": 54,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 6,
+            "finalHandValue": 30,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 57,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 30
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 7,
+            "drewFromPile": 8,
+            "buysMade": 4,
+            "buysOffered": 32,
+            "turnLaidDown": 33,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 6,
+            "finalHandValue": 30,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 29,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 10
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 3,
+            "buysMade": 1,
+            "buysOffered": 11,
+            "turnLaidDown": 24,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 38,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 110
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 5,
+            "buysMade": 1,
+            "buysOffered": 20,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 14,
+            "finalHandValue": 110,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 34,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 2,
+            "drewFromPile": 7,
+            "buysMade": 2,
+            "buysOffered": 11,
+            "turnLaidDown": 10,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 3,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 77,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 0
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 8,
+            "drewFromPile": 12,
+            "buysMade": 2,
+            "buysOffered": 36,
+            "turnLaidDown": 69,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 2,
+            "jokerSwaps": 3,
+            "finalHandSize": 0,
+            "finalHandValue": 0,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 2,
+        "jokersStuckInHand": 1
+      }
+    ],
+    "totalTurns": 349,
+    "totalBuys": 15,
+    "duration": 210,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  },
+  {
+    "gameId": 30,
+    "players": [
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis",
+      "The Nemesis"
+    ],
+    "winner": "The Nemesis",
+    "finalScores": [
+      335,
+      185,
+      110,
+      185
+    ],
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "requirement": "2 Sets",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 42,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 95
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 4,
+            "drewFromPile": 6,
+            "buysMade": 0,
+            "buysOffered": 26,
+            "turnLaidDown": 0,
+            "meldsLaidDown": 0,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 10,
+            "finalHandValue": 95,
+            "wasShanghaied": true
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 1
+      },
+      {
+        "roundNumber": 2,
+        "requirement": "1 Set + 1 Run",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 46,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 20
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 2,
+            "drewFromPile": 10,
+            "buysMade": 3,
+            "buysOffered": 24,
+            "turnLaidDown": 30,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 4,
+            "finalHandValue": 20,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 3,
+        "requirement": "2 Runs",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 97,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 15
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 11,
+            "drewFromPile": 14,
+            "buysMade": 4,
+            "buysOffered": 41,
+            "turnLaidDown": 81,
+            "meldsLaidDown": 2,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 2,
+            "finalHandSize": 3,
+            "finalHandValue": 15,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 4,
+        "requirement": "3 Sets",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 58,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 25
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 11,
+            "buysMade": 4,
+            "buysOffered": 29,
+            "turnLaidDown": 32,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 5,
+            "finalHandValue": 25,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 5,
+        "requirement": "2 Sets + 1 Run",
+        "wentOut": "(stalemate)",
+        "turnsInRound": 55,
+        "shanghaiVictims": [
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 5
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 3,
+            "drewFromPile": 11,
+            "buysMade": 2,
+            "buysOffered": 22,
+            "turnLaidDown": 31,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 2,
+            "finalHandSize": 1,
+            "finalHandValue": 5,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": true,
+        "jokersDealt": 1,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 6,
+        "requirement": "1 Set + 2 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 64,
+        "shanghaiVictims": [],
+        "scores": {
+          "The Nemesis": 15
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 7,
+            "drewFromPile": 9,
+            "buysMade": 5,
+            "buysOffered": 13,
+            "turnLaidDown": 38,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 0,
+            "finalHandSize": 3,
+            "finalHandValue": 15,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 0
+      },
+      {
+        "roundNumber": 7,
+        "requirement": "3 Runs",
+        "wentOut": "The Nemesis",
+        "turnsInRound": 120,
+        "shanghaiVictims": [
+          "The Nemesis",
+          "The Nemesis"
+        ],
+        "scores": {
+          "The Nemesis": 10
+        },
+        "playerStats": {
+          "The Nemesis": {
+            "drewFromDiscard": 7,
+            "drewFromPile": 23,
+            "buysMade": 2,
+            "buysOffered": 44,
+            "turnLaidDown": 77,
+            "meldsLaidDown": 3,
+            "cardsLaidOff": 0,
+            "jokerSwaps": 1,
+            "finalHandSize": 2,
+            "finalHandValue": 10,
+            "wasShanghaied": false
+          }
+        },
+        "stalemate": false,
+        "jokersDealt": 0,
+        "jokersStuckInHand": 2
+      }
+    ],
+    "totalTurns": 482,
+    "totalBuys": 20,
+    "duration": 434,
+    "playerPersonalities": [
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis",
+      "the-nemesis"
+    ]
+  }
+]
