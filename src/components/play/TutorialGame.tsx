@@ -1,8 +1,14 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import GameBoard from './GameBoard'
 import TutorialOverlay, { markTutorialComplete } from './TutorialOverlay'
-import { TUTORIAL_STEPS, type TutorialStep } from '../../game/tutorial-script'
+import {
+  type TutorialStep,
+  WELCOME, ROUND_GOAL, ROUND_COMPLETE, ROUND_2_INTRO, TUTORIAL_COMPLETE,
+  HINT_DRAW, HINT_DRAW_TAKE_DISCARD, HINT_DISCARD, HINT_LAY_DOWN, HINT_CLEAR_HAND, HINT_BUY,
+} from '../../game/tutorial-script'
 import { useGameStore } from '../../stores/gameStore'
+import { aiFindBestMelds } from '../../game/ai'
+import { ROUND_REQUIREMENTS } from '../../game/rules'
 import type { PlayerConfig } from '../../game/types'
 
 interface Props {
@@ -15,148 +21,154 @@ const TUTORIAL_PLAYERS: PlayerConfig[] = [
   { name: 'Tutorial Bot', isAI: true },
 ]
 
+/**
+ * State-driven tutorial — evaluates the game state and shows the right
+ * hint for what the player should do next. No fixed step index.
+ *
+ * Milestones (shown once): welcome, round goal, round complete, round 2, game end
+ * Action hints (contextual): draw, discard, lay down, clear hand, buy
+ */
 export default function TutorialGame({ onComplete, onSkip }: Props) {
-  const [stepIndex, setStepIndex] = useState(0)
-  const [activeStep, setActiveStep] = useState<TutorialStep | null>(TUTORIAL_STEPS[0])
-  const prevStateRef = useRef<{ uiPhase: string; hasLaidDown: boolean; round: number; gameOver: boolean }>({
-    uiPhase: 'round-start', hasLaidDown: false, round: 1, gameOver: false,
-  })
-  const stepIndexRef = useRef(stepIndex)
-  stepIndexRef.current = stepIndex
+  const [activeStep, setActiveStep] = useState<TutorialStep | null>(WELCOME)
 
-  // Ref to hold dismiss callback — assigned after handleDismiss is defined below
-  const dismissRef = useRef<(() => void) | null>(null)
+  // Track which one-time milestones have been shown
+  const shownRef = useRef(new Set<string>(['welcome']))
+  // Track previous state for edge detection
+  const prevRef = useRef({ uiPhase: 'round-start', hasLaidDown: false, round: 1, gameOver: false, buyingPhase: 'hidden' })
+  // Track how many draw phases the player has seen (for progressive hints)
+  const drawCountRef = useRef(0)
+  // Prevent re-entrancy during dismiss
+  const dismissingRef = useRef(false)
 
-  // Subscribe to game state changes to trigger tutorial steps
-  // Two jobs: (1) auto-dismiss the current requireAction step when the
-  // player completes the action, (2) trigger the next step.
   useEffect(() => {
     const unsub = useGameStore.subscribe((state) => {
-      const prev = prevStateRef.current
+      if (dismissingRef.current) return
+
+      const prev = prevRef.current
       const uiPhase = state.uiPhase
-      const player = state.gameState.players[0] // Human player is always index 0
-      const hasLaidDown = player?.hasLaidDown ?? false
+      const player = state.gameState.players[0]
+      if (!player) return
+      const hasLaidDown = player.hasLaidDown ?? false
       const round = state.gameState.currentRound
       const gameOver = state.gameState.gameOver
-      const phaseChanged = uiPhase !== prev.uiPhase
+      const buyingPhase = state.buyingPhase as string
 
-      const currentIdx = stepIndexRef.current
-      if (currentIdx >= TUTORIAL_STEPS.length) {
-        prevStateRef.current = { uiPhase, hasLaidDown, round, gameOver }
-        return
+      // Helper: show a step if not already showing the same one
+      const show = (step: TutorialStep) => {
+        setActiveStep(current => current?.id === step.id ? current : step)
       }
 
-      const currentStep = TUTORIAL_STEPS[currentIdx]
-
-      // ── Auto-dismiss requireAction steps when the action is done ──
-      // If the current step is interactive and the phase just changed,
-      // the player took their action — advance to the next step.
-      if (currentStep?.requireAction && phaseChanged) {
-        let actionDone = false
-        switch (currentStep.trigger) {
-          case 'draw-phase':
-            // Player was in draw phase, now moved to action (drew a card)
-            // or to buy-window or round-end
-            actionDone = uiPhase !== 'draw'
-            break
-          case 'after-draw':
-            // Player was in action phase, now moved to draw (discarded)
-            // or round-end, or back to draw via opponent turn
-            actionDone = uiPhase !== 'action' || prev.uiPhase === 'draw'
-            break
-          case 'has-melds':
-            // Player laid down
-            actionDone = hasLaidDown
-            break
-          case 'after-meld':
-            // Player discarded after melding
-            actionDone = uiPhase === 'draw' || uiPhase === 'round-end'
-            break
-          case 'buy-opportunity':
-            // Buy window closed
-            actionDone = state.buyingPhase === 'hidden'
-            break
-          default:
-            // Generic: any phase change means the action was taken
-            actionDone = true
-        }
-
-        if (actionDone) {
-          prevStateRef.current = { uiPhase, hasLaidDown, round, gameOver }
-          dismissRef.current?.()
-          return
+      // Helper: show a milestone once
+      const showOnce = (step: TutorialStep) => {
+        if (!shownRef.current.has(step.id)) {
+          shownRef.current.add(step.id)
+          show(step)
         }
       }
 
-      // ── Trigger the next step ──
-      const nextStep = TUTORIAL_STEPS[currentIdx]
-      if (!nextStep) {
-        prevStateRef.current = { uiPhase, hasLaidDown, round, gameOver }
+      // ── Game end ──
+      if (gameOver && !prev.gameOver) {
+        showOnce(TUTORIAL_COMPLETE)
+        prevRef.current = { uiPhase, hasLaidDown, round, gameOver, buyingPhase }
         return
       }
 
-      let shouldTrigger = false
-
-      switch (nextStep.trigger) {
-        case 'draw-phase':
-          shouldTrigger = uiPhase === 'draw' && prev.uiPhase !== 'draw'
-          break
-        case 'after-draw':
-          shouldTrigger = uiPhase === 'action' && prev.uiPhase === 'draw'
-          break
-        case 'action-phase':
-          shouldTrigger = uiPhase === 'action'
-          break
-        case 'has-melds':
-          shouldTrigger = uiPhase === 'action' && !hasLaidDown && player && player.hand.length >= 6
-          break
-        case 'after-meld':
-          shouldTrigger = hasLaidDown && !prev.hasLaidDown
-          break
-        case 'after-discard':
-          shouldTrigger = uiPhase === 'draw' && prev.uiPhase === 'action'
-          break
-        case 'round-end':
-          shouldTrigger = uiPhase === 'round-end' && prev.uiPhase !== 'round-end'
-          break
-        case 'round-start':
-          shouldTrigger = uiPhase === 'round-start' && round > prev.round
-          break
-        case 'buy-opportunity':
-          shouldTrigger = state.buyingPhase !== 'hidden'
-          break
-        case 'game-end':
-          shouldTrigger = gameOver && !prev.gameOver
-          break
+      // ── Round milestones ──
+      if (uiPhase === 'round-end' && prev.uiPhase !== 'round-end') {
+        showOnce(ROUND_COMPLETE)
+        prevRef.current = { uiPhase, hasLaidDown, round, gameOver, buyingPhase }
+        return
       }
 
-      if (shouldTrigger) {
-        setActiveStep(nextStep)
+      if (uiPhase === 'round-start' && round === 2 && round > prev.round) {
+        showOnce(ROUND_2_INTRO)
+        prevRef.current = { uiPhase, hasLaidDown, round, gameOver, buyingPhase }
+        return
       }
 
-      prevStateRef.current = { uiPhase, hasLaidDown, round, gameOver }
+      // ── Buy window ──
+      if (buyingPhase !== 'hidden' && prev.buyingPhase === 'hidden') {
+        showOnce(HINT_BUY)
+        prevRef.current = { uiPhase, hasLaidDown, round, gameOver, buyingPhase }
+        return
+      }
+
+      // ── Draw phase — player needs to draw ──
+      if (uiPhase === 'draw' && prev.uiPhase !== 'draw') {
+        drawCountRef.current++
+        const count = drawCountRef.current
+
+        if (count === 1) {
+          // First draw: basic instruction
+          show(HINT_DRAW)
+        } else if (count === 2) {
+          // Second draw: hint about the discard pile
+          show(HINT_DRAW_TAKE_DISCARD)
+        } else {
+          // After that: no more draw hints, they know the loop
+          setActiveStep(null)
+        }
+        prevRef.current = { uiPhase, hasLaidDown, round, gameOver, buyingPhase }
+        return
+      }
+
+      // ── Action phase — player drew, now what? ──
+      if (uiPhase === 'action' && prev.uiPhase === 'draw') {
+        // Check if player can lay down melds
+        const requirement = ROUND_REQUIREMENTS[round - 1]
+        const canMeld = !hasLaidDown && requirement && !!aiFindBestMelds(player.hand, requirement)
+
+        if (canMeld) {
+          show(HINT_LAY_DOWN)
+        } else if (hasLaidDown) {
+          show(HINT_CLEAR_HAND)
+        } else {
+          // First couple of times: show discard hint. After that: silence.
+          if (drawCountRef.current <= 2) {
+            show(HINT_DISCARD)
+          } else {
+            setActiveStep(null)
+          }
+        }
+        prevRef.current = { uiPhase, hasLaidDown, round, gameOver, buyingPhase }
+        return
+      }
+
+      // ── Just laid down melds — guide to clear hand ──
+      if (hasLaidDown && !prev.hasLaidDown) {
+        show(HINT_CLEAR_HAND)
+        prevRef.current = { uiPhase, hasLaidDown, round, gameOver, buyingPhase }
+        return
+      }
+
+      prevRef.current = { uiPhase, hasLaidDown, round, gameOver, buyingPhase }
     })
     return unsub
   }, [])
 
   const handleDismiss = useCallback(() => {
-    const nextIdx = stepIndexRef.current + 1
-    setStepIndex(nextIdx)
-    stepIndexRef.current = nextIdx
-    if (nextIdx >= TUTORIAL_STEPS.length) {
-      markTutorialComplete()
-      onComplete()
-    } else {
-      const next = TUTORIAL_STEPS[nextIdx]
-      // If next step triggers immediately, show it
-      if (next.trigger === 'immediate') {
-        setActiveStep(next)
-      } else {
-        setActiveStep(null) // Wait for trigger
+    dismissingRef.current = true
+    setActiveStep(null)
+    // Allow subscription to fire again after a tick
+    setTimeout(() => { dismissingRef.current = false }, 50)
+  }, [])
+
+  const handleAutoComplete = useCallback(() => {
+    // Called when auto-advance steps finish.
+    // Chain: welcome → round goal → wait for game state.
+    // Game end → complete tutorial.
+    setActiveStep(current => {
+      if (current?.id === 'welcome') {
+        shownRef.current.add('round-goal')
+        return ROUND_GOAL
       }
-    }
+      if (current?.id === 'game-end') {
+        markTutorialComplete()
+        setTimeout(() => onComplete(), 100)
+      }
+      return null
+    })
   }, [onComplete])
-  dismissRef.current = handleDismiss
 
   const handleSkip = useCallback(() => {
     markTutorialComplete()
@@ -173,7 +185,7 @@ export default function TutorialGame({ onComplete, onSkip }: Props) {
       />
       <TutorialOverlay
         step={activeStep}
-        onDismiss={handleDismiss}
+        onDismiss={activeStep?.autoAdvanceMs ? handleAutoComplete : handleDismiss}
         onSkip={handleSkip}
       />
     </div>
