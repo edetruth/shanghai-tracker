@@ -96,6 +96,13 @@ class ShanghaiEnv:
             raise RuntimeError(f"get_full_state failed: {result}")
         return result
 
+    def get_ai_action(self) -> str:
+        """Get the AI personality's recommended action for the current state."""
+        result = self._send({"cmd": "get_ai_action"})
+        if not result.get("ok"):
+            raise RuntimeError(f"get_ai_action failed: {result}")
+        return result["action"]
+
     def close(self):
         """Shut down the bridge."""
         if self.proc:

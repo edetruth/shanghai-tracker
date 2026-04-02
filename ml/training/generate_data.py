@@ -10,7 +10,6 @@ Usage:
 
 import argparse
 import json
-import random
 import time
 from pathlib import Path
 
@@ -115,37 +114,31 @@ def generate_games(args):
             if phase in ("draw", "action") and not has_laid_down:
                 round_snapshots.append((state_vec, game_round, round_turn))
 
+            # Use AI personality for all decisions (realistic game trajectories)
+            action = env.get_ai_action()
+
             # Capture discard decisions
-            discard_actions = [a for a in valid_actions if a.startswith("discard:")]
-            if phase == "action" and discard_actions and len(hand) > 1:
-                action = random.choice(valid_actions)
-                if action.startswith("discard:"):
-                    card_idx = int(action.split(":")[1])
-                    all_discard_samples.append({
-                        "state": state_vec,
-                        "hand": hand,
-                        "round": game_round,
-                        "discarded_idx": card_idx,
-                        "hand_size": len(hand),
-                    })
+            if phase == "action" and action.startswith("discard:") and len(hand) > 1:
+                card_idx = int(action.split(":")[1])
+                all_discard_samples.append({
+                    "state": state_vec,
+                    "hand": hand,
+                    "round": game_round,
+                    "discarded_idx": card_idx,
+                    "hand_size": len(hand),
+                })
 
             # Capture buy decisions
             if phase == "buy-window":
                 offered = full_state.get("discardTop")
-                action = random.choice(valid_actions)
-                is_buy = action == "buy"
                 if offered:
                     all_buy_samples.append({
                         "state": state_vec,
                         "hand": hand,
                         "round": game_round,
                         "offered_card": offered,
-                        "bought": is_buy,
+                        "bought": action == "buy",
                     })
-
-            # Default: pick random action if not already chosen
-            if action is None:
-                action = random.choice(valid_actions)
 
             # Track meld detection
             _, _, done, info = env.step(action)

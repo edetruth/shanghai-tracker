@@ -173,6 +173,7 @@ function takeAction(g: BridgeGameState, action: string): { reward: number; done:
     g.currentPlayerIndex = bws.drawPlayerIndex
     g.phase = 'draw'
     g.buyWindowState = null
+    g.lastDiscarderIndex = -1
     return { reward: 0, done: false }
   }
 
@@ -186,6 +187,8 @@ function takeAction(g: BridgeGameState, action: string): { reward: number; done:
     g.currentPlayerIndex = bws.drawPlayerIndex
     g.phase = 'draw'
     g.buyWindowState = null
+    // Clear lastDiscarderIndex so the subsequent draw_pile doesn't re-open the same buy window
+    g.lastDiscarderIndex = -1
     return { reward: 0, done: false }
   }
 
@@ -543,6 +546,64 @@ function playAITurn(g: BridgeGameState): { reward: number; done: boolean } {
   return { reward: 0, done: false }
 }
 
+/** Return the AI's recommended action for the current player/phase without executing it. */
+function getAIRecommendedAction(g: BridgeGameState): string {
+  const personality = g.opponentAI ?? 'the-shark'
+  const config = getAIEvalConfig(personality as AIPersonality)
+  const player = g.players[g.currentPlayerIndex]
+
+  if (g.phase === 'buy-window') {
+    const offered = g.buyWindowState?.offeredCard
+    if (offered) {
+      const shouldBuy = aiShouldBuy(
+        player.hand, offered, g.requirement, player.buysRemaining, config
+      )
+      return shouldBuy ? 'buy' : 'decline_buy'
+    }
+    return 'decline_buy'
+  }
+
+  if (g.phase === 'draw') {
+    const topDiscard = g.discardPile[g.discardPile.length - 1]
+    if (topDiscard) {
+      const shouldTake = aiShouldTakeDiscard(
+        player.hand, topDiscard, g.requirement, player.hasLaidDown,
+        config, g.tableMelds
+      )
+      if (shouldTake) return 'take_discard'
+    }
+    return 'draw_pile'
+  }
+
+  if (g.phase === 'action') {
+    // Meld if possible
+    if (!player.hasLaidDown) {
+      const melds = aiFindBestMelds(player.hand, g.requirement)
+      if (melds) return 'meld'
+    }
+
+    // Layoff if possible
+    if (player.hasLaidDown) {
+      const layoff = aiFindLayOff(player.hand, g.tableMelds)
+      if (layoff) {
+        const ci = player.hand.findIndex(c => c.id === layoff.card.id)
+        const mi = g.tableMelds.findIndex(m => m.id === layoff.meld.id)
+        if (ci >= 0 && mi >= 0) return `layoff:${ci}:${mi}`
+      }
+    }
+
+    // Discard
+    if (player.hand.length > 0) {
+      const discardCard = aiChooseDiscard(player.hand, g.requirement, config, g.tableMelds)
+      const discardIdx = player.hand.findIndex(c => c.id === discardCard.id)
+      if (discardIdx >= 0) return `discard:${discardIdx}`
+      return `discard:${player.hand.length - 1}`
+    }
+  }
+
+  return 'draw_pile'
+}
+
 /** Auto-play all opponent turns until it's player 0's turn, a buy window opens, or game ends. */
 function autoPlayOpponents(g: BridgeGameState): { reward: number; done: boolean } {
   let result = { reward: 0, done: false }
@@ -862,6 +923,13 @@ rl.on('line', (line) => {
           scores: game.scores.map(rs => rs.reduce((a, b) => a + b, 0)),
           tableMeldCount: game.tableMelds.length,
         })
+        break
+      }
+
+      case 'get_ai_action': {
+        if (!game) { respond({ ok: false, error: 'No game' }); break }
+        const action = getAIRecommendedAction(game)
+        respond({ ok: true, action })
         break
       }
 
