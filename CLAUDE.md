@@ -151,6 +151,17 @@ Light "warm cream" theme. **Do not reintroduce dark backgrounds** outside the ga
 - **Tournaments** — `src/lib/tournamentStore.ts`, single elimination, `TRNY-XXXX` codes.
 - **Notifications** — Browser Notification API (local only). `src/lib/notifications.ts`.
 
+## Bug Fix SOP
+
+When working on GitHub issues or bugs, follow this workflow:
+
+1. **Diagnose** — investigate the root cause, identify affected code
+2. **Propose** — present findings and fix plan to the user; **do not implement until approved**
+3. **Implement** — make the changes, run `npx tsc --noEmit` and `npx vitest run` to verify
+4. **Comment on the issue** — add a comment summarizing: root cause, what changed, and manual test steps
+5. **Hand off for testing** — provide specific reproduction steps so the user can verify the fix on-device
+6. **User tests and closes** — user confirms the fix; issue is closed after verification
+
 ## Deployment
 
 Deployed on Vercel. `vercel.json` rewrites all routes to `index.html` for SPA routing. PWA manifest via `vite-plugin-pwa` with Workbox caching.
