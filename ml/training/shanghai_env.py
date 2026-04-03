@@ -19,10 +19,11 @@ from pathlib import Path
 BRIDGE_DIR = Path(__file__).parent.parent / "bridge"
 
 class ShanghaiEnv:
-    def __init__(self, player_count=2, opponent_ai=None, rich_state=False):
+    def __init__(self, player_count=2, opponent_ai=None, rich_state=False, rich_state_v2=False):
         self.player_count = player_count
         self.opponent_ai = opponent_ai  # e.g., "the-shark", "the-nemesis", None for random
         self.rich_state = rich_state
+        self.rich_state_v2 = rich_state_v2
         self.proc = None
         self._start_bridge()
 
@@ -62,6 +63,8 @@ class ShanghaiEnv:
             cmd["opponent_ai"] = self.opponent_ai
         if self.rich_state:
             cmd["rich_state"] = True
+        if self.rich_state_v2:
+            cmd["rich_state_v2"] = True
         result = self._send(cmd)
         if not result.get("ok"):
             raise RuntimeError(f"Failed to start game: {result}")
