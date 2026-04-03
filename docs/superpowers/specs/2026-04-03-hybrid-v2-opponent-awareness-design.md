@@ -90,7 +90,7 @@ All networks consume the enriched 312-feature state (with opponent embeddings):
 3. **BuyEvalNet** — needs trained hand eval for labels (improvement > 0.1 threshold)
 4. **DiscardPolicyNet** — needs trained hand eval for brute-force optimal discard labels
 
-Opponent encoder weights are frozen (or fine-tuned with lower LR) during steps 2-4.
+Opponent encoder weights are fine-tuned with 0.1x base learning rate during steps 2-4 (allows slight adaptation to each downstream task without catastrophic forgetting of learned opponent representations).
 
 ## Data Generation Pipeline
 
