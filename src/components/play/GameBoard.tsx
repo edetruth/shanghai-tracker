@@ -514,6 +514,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
   // Stable refs so AI callbacks always have current values
   const gameStateRef = useRef(gameState)
+  const drawInProgressRef = useRef(false)
   const uiPhaseRef = useRef(uiPhase)
   const buyerOrderRef = useRef(buyerOrder)
   const buyerStepRef = useRef(buyerStep)
@@ -525,7 +526,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   // buying window even if pendingBuyDiscardRef.current has been cleared
   const declinedPendingCardRef = useRef<CardType | null>(null)
   useEffect(() => { gameStateRef.current = gameState }, [gameState])
-  useEffect(() => { uiPhaseRef.current = uiPhase }, [uiPhase])
+  useEffect(() => {
+    uiPhaseRef.current = uiPhase
+    if (uiPhase !== 'draw') drawInProgressRef.current = false
+  }, [uiPhase])
   useEffect(() => { if (uiPhase !== 'action') setJokerPositionPrompt(null) }, [uiPhase])
   useEffect(() => {
     if (uiPhase !== 'action') {
@@ -987,6 +991,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   function handleDrawFromPile() {
     // Guard against rapid double-taps: only allow drawing during the draw phase
     if (uiPhaseRef.current !== 'draw') return
+    if (drawInProgressRef.current) return
+    drawInProgressRef.current = true
 
     // Use BOTH the ref and the React state value for wasExplicitlyDeclined.
     // freeOfferDeclinedRef.current covers the AI stale-closure case.
@@ -1107,6 +1113,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   function handleTakeDiscard() {
     // Guard against rapid double-taps: only allow taking during the draw phase
     if (uiPhaseRef.current !== 'draw') return
+    if (drawInProgressRef.current) return
+    drawInProgressRef.current = true
 
     const card = gameState.roundState.discardPile[gameState.roundState.discardPile.length - 1]
     if (!card) return
@@ -1477,6 +1485,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
   // ── Lay off ───────────────────────────────────────────────────────────────
   function handleLayOff(card: CardType, meld: Meld, jokerPosition?: 'low' | 'high') {
+    // Bug fix: prevent lay-offs after discarding — turn is over once you discard
+    if (pendingUndo) return
     const prev = gameState
     const playerIdx = prev.roundState.currentPlayerIndex
     const player = prev.players[playerIdx]
@@ -1620,10 +1630,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       useGameStore.getState().cancelBuyingOnGoOut()
       pendingBuyDiscardRef.current = null
       freeOfferDeclinedRef.current = false
-      if (pendingUndo) {
-        clearTimeout(pendingUndo.timerId)
-        setPendingUndo(null)
-      }
       triggerGoingOut(player.name, updated)
     }
   }
@@ -1748,6 +1754,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
 
   // ── Inline lay-off (from TableMelds tap) ─────────────────────────────────
   function handleInlineLayOff(card: CardType, meld: Meld) {
+    // Bug fix: prevent lay-offs after discarding — turn is over once you discard
+    if (pendingUndo) return
     if (card.suit === 'joker' && meld.type === 'run') {
       const canLow = (meld.runMin ?? 1) > 1
       const canHigh = (meld.runMax ?? 13) < 14
