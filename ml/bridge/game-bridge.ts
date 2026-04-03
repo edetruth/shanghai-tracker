@@ -36,6 +36,12 @@ import * as readline from 'readline'
 
 // ── Game State ──────────────────────────────────────────────────────────────
 
+interface OpponentHistory {
+  discards: Card[]    // rolling last 10 discards by this player
+  pickups: Card[]     // rolling last 5 cards this player took from discard pile
+  layoffCount: number // number of cards laid off this round
+}
+
 interface BridgeGameState {
   players: BridgePlayer[]
   currentPlayerIndex: number
@@ -59,6 +65,7 @@ interface BridgeGameState {
     queue: number[]       // remaining player indices to ask about buying
     drawPlayerIndex: number // the next-in-turn player who declined free take
   } | null
+  opponentHistory: OpponentHistory[]
 }
 
 interface BridgePlayer {
@@ -90,6 +97,11 @@ function initGame(playerCount: number, seed: number, opponentAI: AIPersonality |
     })
   }
 
+  const opponentHistory: OpponentHistory[] = []
+  for (let i = 0; i < playerCount; i++) {
+    opponentHistory.push({ discards: [], pickups: [], layoffCount: 0 })
+  }
+
   return {
     players,
     currentPlayerIndex: 0,
@@ -109,6 +121,7 @@ function initGame(playerCount: number, seed: number, opponentAI: AIPersonality |
     useRichState: false,
     lastDiscarderIndex: -1,
     buyWindowState: null,
+    opponentHistory,
   }
 }
 
@@ -166,6 +179,11 @@ function takeAction(g: BridgeGameState, action: string): { reward: number; done:
     player.hand.push(bws.offeredCard)
     player.hand.push(penaltyCard)
     player.buysRemaining--
+    // Track the pickup (buying = picking up from discard)
+    g.opponentHistory[g.currentPlayerIndex].pickups.push(bws.offeredCard)
+    if (g.opponentHistory[g.currentPlayerIndex].pickups.length > 5) {
+      g.opponentHistory[g.currentPlayerIndex].pickups.shift()
+    }
     // Remove the offered card from discard pile
     const discIdx = g.discardPile.findIndex(c => c.id === bws.offeredCard.id)
     if (discIdx >= 0) g.discardPile.splice(discIdx, 1)
@@ -217,6 +235,10 @@ function takeAction(g: BridgeGameState, action: string): { reward: number; done:
   if (action === 'take_discard') {
     const card = g.discardPile.pop()!
     player.hand.push(card)
+    g.opponentHistory[g.currentPlayerIndex].pickups.push(card)
+    if (g.opponentHistory[g.currentPlayerIndex].pickups.length > 5) {
+      g.opponentHistory[g.currentPlayerIndex].pickups.shift()
+    }
     g.phase = 'action'
     return { reward: 0, done: false }
   }
@@ -255,7 +277,13 @@ function takeAction(g: BridgeGameState, action: string): { reward: number; done:
         // Reverse: don't lay off, force discard the stuck card instead
         const stuckIdx = player.hand.findIndex(c => c.id === reversal.discardCard!.id)
         if (stuckIdx >= 0) {
-          g.discardPile.push(player.hand.splice(stuckIdx, 1)[0])
+          const reversedCard = player.hand.splice(stuckIdx, 1)[0]
+          g.discardPile.push(reversedCard)
+          // Track the discard from reversal
+          g.opponentHistory[g.currentPlayerIndex].discards.push(reversedCard)
+          if (g.opponentHistory[g.currentPlayerIndex].discards.length > 10) {
+            g.opponentHistory[g.currentPlayerIndex].discards.shift()
+          }
           g.currentPlayerIndex = (g.currentPlayerIndex + 1) % g.players.length
           g.phase = 'draw'
           g.turnCount++
@@ -266,6 +294,7 @@ function takeAction(g: BridgeGameState, action: string): { reward: number; done:
       // Normal lay-off
       player.hand.splice(ci, 1)
       meld.cards.push(card)
+      g.opponentHistory[g.currentPlayerIndex].layoffCount++
       if (player.hand.length === 0) {
         return endRound(g)
       }
@@ -279,6 +308,12 @@ function takeAction(g: BridgeGameState, action: string): { reward: number; done:
     const idx = parseInt(action.split(':')[1])
     const card = player.hand.splice(idx, 1)[0]
     g.discardPile.push(card)
+
+    // Track the discard in opponent history
+    g.opponentHistory[g.currentPlayerIndex].discards.push(card)
+    if (g.opponentHistory[g.currentPlayerIndex].discards.length > 10) {
+      g.opponentHistory[g.currentPlayerIndex].discards.shift()
+    }
 
     // Track who discarded (for buy window exclusion)
     g.lastDiscarderIndex = g.currentPlayerIndex
@@ -361,6 +396,11 @@ function openBuyWindow(g: BridgeGameState, offeredCard: Card): 'paused' | 'resol
         aiPlayer.hand.push(offeredCard)
         aiPlayer.hand.push(penaltyCard)
         aiPlayer.buysRemaining--
+        // Track the pickup (AI buying from discard)
+        g.opponentHistory[pi].pickups.push(offeredCard)
+        if (g.opponentHistory[pi].pickups.length > 5) {
+          g.opponentHistory[pi].pickups.shift()
+        }
         // Remove offered card from discard pile
         const discIdx = g.discardPile.findIndex(c => c.id === offeredCard.id)
         if (discIdx >= 0) g.discardPile.splice(discIdx, 1)
@@ -392,6 +432,11 @@ function processBuyQueueAI(g: BridgeGameState, bws: NonNullable<BridgeGameState[
       aiPlayer.hand.push(bws.offeredCard)
       aiPlayer.hand.push(penaltyCard)
       aiPlayer.buysRemaining--
+      // Track the pickup (AI buying from discard)
+      g.opponentHistory[pi].pickups.push(bws.offeredCard)
+      if (g.opponentHistory[pi].pickups.length > 5) {
+        g.opponentHistory[pi].pickups.shift()
+      }
       const discIdx = g.discardPile.findIndex(c => c.id === bws.offeredCard.id)
       if (discIdx >= 0) g.discardPile.splice(discIdx, 1)
       // Next-in-turn player draws
@@ -453,6 +498,7 @@ function endRound(g: BridgeGameState): { reward: number; done: boolean } {
     g.players[i].hasLaidDown = false
     g.players[i].buysRemaining = 5
     g.players[i].melds = []
+    g.opponentHistory[i].layoffCount = 0
   }
 
   return { reward: 0, done: false }
