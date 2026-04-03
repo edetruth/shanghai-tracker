@@ -59,6 +59,7 @@ interface BridgeGameState {
   turnCount: number  // turns this round — force end at 200
   opponentAI: AIPersonality | null  // null = random opponents (legacy), string = AI personality
   useRichState: boolean  // if true, encodeRichState() is used instead of encodeState()
+  useRichStateV2: boolean  // if true, encodeRichStateV2() is used (separate opponent raw)
   lastDiscarderIndex: number  // who discarded last (for buy window exclusion)
   buyWindowState: {
     offeredCard: Card     // the discard being offered for buying
@@ -119,6 +120,7 @@ function initGame(playerCount: number, seed: number, opponentAI: AIPersonality |
     turnCount: 0,
     opponentAI: opponentAI,
     useRichState: false,
+    useRichStateV2: false,
     lastDiscarderIndex: -1,
     buyWindowState: null,
     opponentHistory,
@@ -763,6 +765,187 @@ function encodeCard(card: Card): number[] {
 }
 
 /**
+ * Encode raw observable data for a single opponent — 126 features.
+ *
+ * Layout:
+ *   Discard history  60 (10 × 6 card features)
+ *   Pickup history   30 (5 × 6 card features)
+ *   Meld composition 30 (6 × 5 meld features)
+ *   Scalar stats      6
+ *                   ---
+ *   Total           126
+ */
+function encodeOpponentRaw(
+  g: BridgeGameState,
+  oppIdx: number,
+  playerIdx: number,
+): number[] {
+  const opp = g.players[oppIdx]
+  const hist = g.opponentHistory[oppIdx]
+  const features: number[] = []
+
+  // ── Discard history (60 features: 10 × 6) ──
+  const MAX_OPP_DISCARDS = 10
+  for (let i = 0; i < MAX_OPP_DISCARDS; i++) {
+    if (i < hist.discards.length) {
+      features.push(...encodeCard(hist.discards[i]))
+    } else {
+      features.push(0, 0, 0, 0, 0, 0)
+    }
+  }
+
+  // ── Pickup history (30 features: 5 × 6) ──
+  const MAX_OPP_PICKUPS = 5
+  for (let i = 0; i < MAX_OPP_PICKUPS; i++) {
+    if (i < hist.pickups.length) {
+      features.push(...encodeCard(hist.pickups[i]))
+    } else {
+      features.push(0, 0, 0, 0, 0, 0)
+    }
+  }
+
+  // ── Meld composition (30 features: 6 × 5) ──
+  const MAX_OPP_MELDS = 6
+  for (let i = 0; i < MAX_OPP_MELDS; i++) {
+    if (i < opp.melds.length) {
+      const meld = opp.melds[i]
+      const isRun = meld.type === 'run' ? 1 : 0
+      const cardCount = meld.cards.length / 8
+      const hasJoker = meld.cards.some(c => c.suit === 'joker') ? 1 : 0
+      let minRank: number, maxRank: number
+      if (meld.type === 'run') {
+        const naturalRanks = meld.cards.filter(c => c.suit !== 'joker').map(c => c.rank)
+        minRank = meld.runMin !== undefined ? meld.runMin : (naturalRanks.length > 0 ? Math.min(...naturalRanks) : 0)
+        maxRank = meld.runMax !== undefined ? meld.runMax : (naturalRanks.length > 0 ? Math.max(...naturalRanks) : 0)
+      } else {
+        const setRank = meld.cards.find(c => c.suit !== 'joker')?.rank ?? 0
+        minRank = setRank
+        maxRank = setRank
+      }
+      features.push(isRun, cardCount, minRank / 13, maxRank / 13, hasJoker)
+    } else {
+      features.push(0, 0, 0, 0, 0)
+    }
+  }
+
+  // ── Scalar stats (6 features) ──
+  const oppScore = g.scores[oppIdx].reduce((a, b) => a + b, 0)
+  const allScores = g.scores.map(rs => rs.reduce((a, b) => a + b, 0))
+  const minScore = Math.min(...allScores)
+
+  features.push(opp.hand.length / 16)           // hand size
+  features.push(opp.hasLaidDown ? 1 : 0)         // laid down
+  features.push(opp.buysRemaining / 5)            // buys remaining
+  features.push(hist.layoffCount / 10)             // cards laid off this round
+  features.push(oppScore / 300)                    // cumulative score
+  features.push(oppScore === minScore ? 1 : 0)    // is winning
+
+  return features // Total: 126
+}
+
+/**
+ * V2 Rich state encoding — returns base state (264) + opponent raw (378) separately.
+ *
+ * Base state layout:
+ *   Hand cards      132 (22 × 6)
+ *   Discard history  60 (10 × 6)
+ *   Table melds      60 (12 × 5)
+ *   Game context     12 (no opponent features — those are in opponent_raw)
+ *                   ---
+ *   Total           264
+ */
+function encodeRichStateV2(
+  g: BridgeGameState,
+  playerIdx: number,
+): { state: number[]; opponentRaw: number[] } {
+  const p = g.players[playerIdx]
+  const features: number[] = []
+
+  // ── Hand cards (132 features: 22 × 6) — same as v1 ──
+  const suitOrder: Record<string, number> = { hearts: 0, diamonds: 1, clubs: 2, spades: 3, joker: 4 }
+  const sortedHand = [...p.hand].sort((a, b) => {
+    const suitDiff = suitOrder[a.suit] - suitOrder[b.suit]
+    if (suitDiff !== 0) return suitDiff
+    return a.rank - b.rank
+  })
+  const MAX_HAND = 22
+  for (let i = 0; i < MAX_HAND; i++) {
+    if (i < sortedHand.length) {
+      features.push(...encodeCard(sortedHand[i]))
+    } else {
+      features.push(0, 0, 0, 0, 0, 0)
+    }
+  }
+
+  // ── Discard history (60 features: 10 × 6) — same as v1 ──
+  const MAX_DISCARD = 10
+  const discardSlice = g.discardPile.slice(-MAX_DISCARD)
+  for (let i = 0; i < MAX_DISCARD; i++) {
+    if (i < discardSlice.length) {
+      features.push(...encodeCard(discardSlice[i]))
+    } else {
+      features.push(0, 0, 0, 0, 0, 0)
+    }
+  }
+
+  // ── Table melds (60 features: 12 × 5) — same as v1 ──
+  const MAX_MELDS = 12
+  for (let i = 0; i < MAX_MELDS; i++) {
+    if (i < g.tableMelds.length) {
+      const meld = g.tableMelds[i]
+      const isRun = meld.type === 'run' ? 1 : 0
+      const cardCount = meld.cards.length / 8
+      const hasJoker = meld.cards.some(c => c.suit === 'joker') ? 1 : 0
+      let minRank: number, maxRank: number
+      if (meld.type === 'run') {
+        const naturalRanks = meld.cards.filter(c => c.suit !== 'joker').map(c => c.rank)
+        minRank = meld.runMin !== undefined ? meld.runMin : (naturalRanks.length > 0 ? Math.min(...naturalRanks) : 0)
+        maxRank = meld.runMax !== undefined ? meld.runMax : (naturalRanks.length > 0 ? Math.max(...naturalRanks) : 0)
+      } else {
+        const setRank = meld.cards.find(c => c.suit !== 'joker')?.rank ?? 0
+        minRank = setRank
+        maxRank = setRank
+      }
+      features.push(isRun, cardCount, minRank / 13, maxRank / 13, hasJoker)
+    } else {
+      features.push(0, 0, 0, 0, 0)
+    }
+  }
+
+  // ── Game context V2 (12 features — NO opponent features) ──
+  features.push(g.currentRound / 7)
+  features.push(g.requirement.sets / 3)
+  features.push(g.requirement.runs / 3)
+  features.push(g.drawPile.length / 108)
+  features.push(g.discardPile.length / 108)
+  features.push(p.buysRemaining / 5)
+  features.push(p.hasLaidDown ? 1 : 0)
+  const handPoints = p.hand.reduce((s, c) => s + cardPoints(c.rank), 0)
+  features.push(handPoints / 200)
+  features.push(g.turnCount / 200)
+  features.push(g.phase === 'buy-window' ? 1 : 0)
+  const ownScore = g.scores[playerIdx].reduce((a, b) => a + b, 0)
+  features.push(ownScore / 300)
+  features.push(g.players.length / 8)
+
+  // ── Opponent raw features (3 × 126 = 378) ──
+  const MAX_OPPONENTS = 3
+  const opponentRaw: number[] = []
+  let oppSlot = 0
+  for (let i = 0; i < g.players.length && oppSlot < MAX_OPPONENTS; i++) {
+    if (i === playerIdx) continue
+    opponentRaw.push(...encodeOpponentRaw(g, i, playerIdx))
+    oppSlot++
+  }
+  while (oppSlot < MAX_OPPONENTS) {
+    for (let f = 0; f < 126; f++) opponentRaw.push(0)
+    oppSlot++
+  }
+
+  return { state: features, opponentRaw }
+}
+
+/**
  * Rich state encoding — 237 features total.
  *
  * Layout:
@@ -900,11 +1083,14 @@ rl.on('line', (line) => {
         const ai = cmd.opponent_ai ?? null  // e.g., "the-shark", "the-nemesis"
         game = initGame(cmd.players ?? 2, cmd.seed ?? Math.floor(Math.random() * 2147483647), ai)
         game.useRichState = cmd.rich_state === true
+        game.useRichStateV2 = cmd.rich_state_v2 === true
         // If player 0 doesn't go first, auto-play opponents up to player 0
         if (game.opponentAI && game.currentPlayerIndex !== 0) {
           autoPlayOpponents(game)
         }
-        const stateVec = game.useRichState ? encodeRichState(game, 0) : encodeState(game, 0)
+        const stateVec = game.useRichStateV2
+          ? encodeRichStateV2(game, 0).state
+          : (game.useRichState ? encodeRichState(game, 0) : encodeState(game, 0))
         respond({ ok: true, state: stateVec, raw_phase: game.phase, round: game.currentRound })
         break
       }
@@ -928,7 +1114,9 @@ rl.on('line', (line) => {
           }
         }
 
-        const stateVec = game.useRichState ? encodeRichState(game, 0) : encodeState(game, 0)
+        const stateVec = game.useRichStateV2
+          ? encodeRichStateV2(game, 0).state
+          : (game.useRichState ? encodeRichState(game, 0) : encodeState(game, 0))
         respond({
           ok: true,
           state: stateVec,
@@ -952,23 +1140,44 @@ rl.on('line', (line) => {
         if (!game) { respond({ ok: false, error: 'No game' }); break }
         const pi = cmd.player ?? 0
         const p = game.players[pi]
-        const stateVec = game.useRichState ? encodeRichState(game, pi) : encodeState(game, pi)
-        respond({
-          ok: true,
-          state: stateVec,
-          hand: p.hand.map(c => ({ rank: c.rank, suit: c.suit, id: c.id })),
-          handSize: p.hand.length,
-          hasLaidDown: p.hasLaidDown,
-          buysRemaining: p.buysRemaining,
-          phase: game.phase,
-          round: game.currentRound,
-          requirement: game.requirement,
-          discardTop: game.discardPile.length > 0
-            ? { rank: game.discardPile[game.discardPile.length - 1].rank, suit: game.discardPile[game.discardPile.length - 1].suit }
-            : null,
-          scores: game.scores.map(rs => rs.reduce((a, b) => a + b, 0)),
-          tableMeldCount: game.tableMelds.length,
-        })
+        if (game.useRichStateV2) {
+          const { state: stateVec, opponentRaw } = encodeRichStateV2(game, pi)
+          respond({
+            ok: true,
+            state: stateVec,
+            opponentRaw,
+            hand: p.hand.map(c => ({ rank: c.rank, suit: c.suit, id: c.id })),
+            handSize: p.hand.length,
+            hasLaidDown: p.hasLaidDown,
+            buysRemaining: p.buysRemaining,
+            phase: game.phase,
+            round: game.currentRound,
+            requirement: game.requirement,
+            discardTop: game.discardPile.length > 0
+              ? { rank: game.discardPile[game.discardPile.length - 1].rank, suit: game.discardPile[game.discardPile.length - 1].suit }
+              : null,
+            scores: game.scores.map(rs => rs.reduce((a, b) => a + b, 0)),
+            tableMeldCount: game.tableMelds.length,
+          })
+        } else {
+          const stateVec = game.useRichState ? encodeRichState(game, pi) : encodeState(game, pi)
+          respond({
+            ok: true,
+            state: stateVec,
+            hand: p.hand.map(c => ({ rank: c.rank, suit: c.suit, id: c.id })),
+            handSize: p.hand.length,
+            hasLaidDown: p.hasLaidDown,
+            buysRemaining: p.buysRemaining,
+            phase: game.phase,
+            round: game.currentRound,
+            requirement: game.requirement,
+            discardTop: game.discardPile.length > 0
+              ? { rank: game.discardPile[game.discardPile.length - 1].rank, suit: game.discardPile[game.discardPile.length - 1].suit }
+              : null,
+            scores: game.scores.map(rs => rs.reduce((a, b) => a + b, 0)),
+            tableMeldCount: game.tableMelds.length,
+          })
+        }
         break
       }
 
