@@ -1,12 +1,13 @@
 """
-Evaluate the hybrid neural AI — three networks combined into one player.
+Evaluate the hybrid neural AI — five v2 networks combined into one player.
 
+Networks: opponent encoder, hand evaluator, draw evaluator, discard policy, buy evaluator.
 Rules handle: melding, layoffs, joker swaps, turn structure.
-Neural nets handle: discard choice, buy decisions.
-Hand evaluator provides input to both.
+Neural nets handle: draw choice, discard choice, buy decisions.
 
 Usage:
     python evaluate_hybrid.py --opponent the-shark --games 100 --players 4
+    python evaluate_hybrid.py --opponent the-shark --games 100 --ablation
 """
 
 import argparse
@@ -18,9 +19,12 @@ import torch
 
 from shanghai_env import ShanghaiEnv
 from state_encoder import RICH_STATE_SIZE, MAX_ACTIONS, BUY_ACTION_IDX, DECLINE_BUY_ACTION_IDX
+from state_encoder import ENRICHED_STATE_SIZE, OFFERED_CARD_FEATURES
 from hand_evaluator import HandEvalNet
 from discard_policy import DiscardPolicyNet, MAX_HAND
 from buy_evaluator import BuyEvalNet, encode_offered_card
+from draw_evaluator import DrawEvalNet
+from opponent_encoder import OpponentEncoderNet, build_enriched_state
 
 MODELS_DIR = Path(__file__).parent.parent / "models"
 EVAL_DIR = Path(__file__).parent.parent / "data" / "eval"
@@ -28,15 +32,27 @@ EVAL_DIR = Path(__file__).parent.parent / "data" / "eval"
 
 def hybrid_action(
     state_vec: list,
+    opp_raw_vec: list,
     valid_actions: list,
     phase: str,
     hand_eval: HandEvalNet,
     discard_net: DiscardPolicyNet,
     buy_net: BuyEvalNet,
+    draw_net: DrawEvalNet,
+    encoder: OpponentEncoderNet,
     full_state: dict,
 ) -> str:
-    """Choose an action using the hybrid strategy."""
-    state = torch.tensor(state_vec, dtype=torch.float32)
+    """Choose an action using the hybrid v2 strategy (all 5 networks)."""
+    base_state = torch.tensor(state_vec, dtype=torch.float32)
+    opp_raw = torch.tensor(opp_raw_vec, dtype=torch.float32)
+
+    # Build enriched state once (encoder + base state)
+    with torch.no_grad():
+        enriched = build_enriched_state(base_state.unsqueeze(0), opp_raw.unsqueeze(0), encoder)
+    enriched_flat = enriched.squeeze(0)
+
+    with torch.no_grad():
+        hand_score = hand_eval(enriched).item()
 
     # Buy window: use buy evaluator
     if phase == "buy-window":
@@ -45,33 +61,22 @@ def hybrid_action(
 
         offered = full_state.get("discardTop")
         if offered:
-            with torch.no_grad():
-                hand_score = hand_eval(state.unsqueeze(0)).item()
             card_features = torch.tensor(encode_offered_card(offered), dtype=torch.float32)
-            buy_input = torch.cat([state, torch.tensor([hand_score]), card_features]).unsqueeze(0)
+            buy_input = torch.cat([enriched_flat, torch.tensor([hand_score]), card_features]).unsqueeze(0)
             with torch.no_grad():
                 buy_prob = buy_net(buy_input).item()
             return "buy" if buy_prob > 0.5 and "buy" in valid_actions else "decline_buy"
         return "decline_buy" if "decline_buy" in valid_actions else valid_actions[0]
 
-    # Draw phase: take discard if it improves hand eval, otherwise draw pile
+    # Draw phase: use draw evaluator network
     if phase == "draw":
         if "take_discard" in valid_actions and full_state.get("discardTop"):
             offered = full_state["discardTop"]
-            # Quick check: does this card help?
+            card_features = torch.tensor(encode_offered_card(offered), dtype=torch.float32)
+            draw_input = torch.cat([enriched_flat, torch.tensor([hand_score]), card_features]).unsqueeze(0)
             with torch.no_grad():
-                current_score = hand_eval(state.unsqueeze(0)).item()
-            # Approximate improvement by encoding card into empty slot
-            modified = state.clone()
-            card_features = encode_offered_card(offered)
-            for si in range(22):
-                start = si * 6
-                if modified[start:start + 6].sum().item() == 0:
-                    modified[start:start + 6] = torch.tensor(card_features)
-                    break
-            with torch.no_grad():
-                new_score = hand_eval(modified.unsqueeze(0)).item()
-            if new_score - current_score > 0.05:
+                take_prob = draw_net(draw_input).item()
+            if take_prob > 0.5:
                 return "take_discard"
         return "draw_pile" if "draw_pile" in valid_actions else valid_actions[0]
 
@@ -89,9 +94,7 @@ def hybrid_action(
         # Discard: use neural network
         discard_actions = [a for a in valid_actions if a.startswith("discard:")]
         if discard_actions:
-            with torch.no_grad():
-                hand_score = hand_eval(state.unsqueeze(0)).item()
-            features = torch.cat([state, torch.tensor([hand_score])]).unsqueeze(0)
+            features = torch.cat([enriched_flat, torch.tensor([hand_score])]).unsqueeze(0)
             with torch.no_grad():
                 logits = discard_net(features)[0]
             # Mask invalid slots
@@ -111,31 +114,40 @@ def hybrid_action(
 
 def evaluate(args):
     opponent_label = args.opponent or "random"
-    print(f"Hybrid Neural AI Evaluation")
+    ablation_label = " [ABLATION: opponent embeddings zeroed]" if args.ablation else ""
+    print(f"Hybrid Neural AI v2 Evaluation{ablation_label}")
     print(f"  Opponent: {opponent_label}")
     print(f"  Games:    {args.games}")
     print(f"  Players:  {args.players}")
     print()
 
-    # Load all three networks
-    hand_eval = HandEvalNet()
+    # Load all five v2 networks
+    encoder = OpponentEncoderNet()
+    encoder.load_state_dict(torch.load(MODELS_DIR / "opponent_encoder.pt", weights_only=True))
+    encoder.eval()
+
+    hand_eval = HandEvalNet(input_size=ENRICHED_STATE_SIZE)
     hand_eval.load_state_dict(torch.load(MODELS_DIR / "hand_evaluator.pt", weights_only=True))
     hand_eval.eval()
 
-    discard_net = DiscardPolicyNet()
+    discard_net = DiscardPolicyNet(input_size=ENRICHED_STATE_SIZE + 1)
     discard_net.load_state_dict(torch.load(MODELS_DIR / "discard_policy.pt", weights_only=True))
     discard_net.eval()
 
-    buy_net = BuyEvalNet()
+    buy_net = BuyEvalNet(input_size=ENRICHED_STATE_SIZE + 1 + OFFERED_CARD_FEATURES)
     buy_net.load_state_dict(torch.load(MODELS_DIR / "buy_evaluator.pt", weights_only=True))
     buy_net.eval()
 
-    print("Loaded all three networks")
+    draw_net = DrawEvalNet()
+    draw_net.load_state_dict(torch.load(MODELS_DIR / "draw_evaluator.pt", weights_only=True))
+    draw_net.eval()
+
+    print("Loaded all five v2 networks")
 
     env = ShanghaiEnv(
         player_count=args.players,
         opponent_ai=args.opponent,
-        rich_state=True,
+        rich_state_v2=True,
     )
 
     results = []
@@ -157,9 +169,13 @@ def evaluate(args):
             # Bridge auto-plays AI opponents after each step — get_valid_actions
             # always returns current_player=0 when opponent_ai is set.
             full_state = env.get_full_state(player=0)
+            opp_raw_vec = full_state["opponentRaw"]
+            if args.ablation:
+                opp_raw_vec = [0.0] * len(opp_raw_vec)
             action = hybrid_action(
-                full_state["state"], valid_actions, full_state["phase"],
-                hand_eval, discard_net, buy_net, full_state,
+                full_state["state"], opp_raw_vec,
+                valid_actions, full_state["phase"],
+                hand_eval, discard_net, buy_net, draw_net, encoder, full_state,
             )
 
             _, _, done, info = env.step(action)
@@ -192,37 +208,46 @@ def evaluate(args):
     opp_valid = [r["best_opp_score"] for r in results if r["best_opp_score"] is not None]
     avg_opp = sum(opp_valid) / len(opp_valid) if opp_valid else 0
 
+    elapsed = time.time() - start_total
     print()
     print("=" * 55)
-    print("Hybrid Neural AI -- Evaluation Results")
+    print("Hybrid Neural AI v2 -- Evaluation Results")
     print("=" * 55)
     print(f"  Opponent:         {opponent_label}")
     print(f"  Games:            {total}")
     print(f"  Win rate:         {wins/total*100:.1f}%  ({wins}/{total})")
     print(f"  Avg score (ours): {avg_score:.1f}")
     print(f"  Avg opp score:    {avg_opp:.1f}")
+    print(f"  Elapsed:          {elapsed:.1f}s")
+    if args.ablation:
+        print(f"  Ablation:         opponent embeddings zeroed")
     print("=" * 55)
 
     # Save
     EVAL_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = EVAL_DIR / f"eval_hybrid_vs_{opponent_label}.json"
+    suffix = "_ablation" if args.ablation else ""
+    out_path = EVAL_DIR / f"eval_hybrid_vs_{opponent_label}{suffix}.json"
     with open(out_path, "w") as f:
         json.dump({
-            "model": "hybrid (hand_eval + discard + buy)",
+            "model": "hybrid_v2 (encoder + hand_eval + draw + discard + buy)",
             "opponent": opponent_label,
             "games": total, "players": args.players,
+            "ablation": args.ablation,
             "win_rate": round(wins / total * 100, 2),
             "avg_my_score": round(avg_score, 1),
             "avg_opp_score": round(avg_opp, 1),
+            "elapsed_s": round(elapsed, 1),
             "per_game": results,
         }, f, indent=2)
     print(f"\nSaved to {out_path}")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Evaluate hybrid neural AI")
+    parser = argparse.ArgumentParser(description="Evaluate hybrid neural AI v2")
     parser.add_argument("--opponent", type=str, default="the-shark")
     parser.add_argument("--games", type=int, default=100)
     parser.add_argument("--players", type=int, default=4)
+    parser.add_argument("--ablation", action="store_true",
+                        help="Zero out opponent embeddings to measure contribution")
     args = parser.parse_args()
     evaluate(args)
