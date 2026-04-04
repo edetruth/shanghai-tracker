@@ -31,55 +31,47 @@ import numpy as np
 import torch
 
 
-# Data type definitions: maps type name -> processing config
-DATA_TYPES = {
-    "hand_eval": {
-        "state_dim": 264,
-        "opponent_raw_dim": 378,
-    },
-    "buy": {
-        "state_dim": 264,
-        "opponent_raw_dim": 378,
-    },
-    "discard": {
-        "state_dim": 264,
-        "opponent_raw_dim": 378,
-    },
-    "draw": {
-        "state_dim": 264,
-        "opponent_raw_dim": 378,
-    },
-}
+KNOWN_DATA_TYPES = ["hand_eval", "buy", "discard", "draw"]
 
 
 def detect_data_type(filepath: str) -> str:
     """Auto-detect data type from filename prefix."""
     basename = Path(filepath).name
-    for dtype in DATA_TYPES:
+    for dtype in KNOWN_DATA_TYPES:
         if basename.startswith(dtype + "_") or basename == dtype + ".json":
             return dtype
     raise ValueError(
         f"Cannot detect data type from filename '{basename}'. "
-        f"Expected prefix: {', '.join(DATA_TYPES.keys())}"
+        f"Expected prefix: {', '.join(KNOWN_DATA_TYPES)}"
     )
 
 
-def get_count(filepath: str) -> int:
-    """First pass: read the 'count' field from the JSON header."""
+def get_count_and_check_opponent_raw(filepath: str) -> tuple[int, bool]:
+    """Single pass: read 'count' field and check first sample for opponent_raw."""
+    count = None
+    has_opponent_raw = False
     with open(filepath, "rb") as f:
+        # Read count
         parser = ijson.items(f, "count")
-        for count in parser:
-            return int(count)
-    raise ValueError(f"No 'count' field found in {filepath}")
-
-
-def check_has_opponent_raw(filepath: str) -> bool:
-    """Check if the first sample has opponent_raw (v2 data)."""
+        for c in parser:
+            count = int(c)
+            break
+    if count is None:
+        raise ValueError(f"No 'count' field found in {filepath}")
     with open(filepath, "rb") as f:
         samples = ijson.items(f, "samples.item")
         for sample in samples:
-            return "opponent_raw" in sample
-    return False
+            has_opponent_raw = "opponent_raw" in sample
+            break
+    return count, has_opponent_raw
+
+
+def _validate_count(actual: int, count: int, filepath: str) -> None:
+    """Validate actual sample count matches the header count."""
+    if actual == 0:
+        raise ValueError(f"No samples found in {filepath}")
+    if actual != count:
+        raise ValueError(f"Sample count mismatch in {filepath}: header says {count}, got {actual}")
 
 
 def process_hand_eval(filepath: str, count: int, has_opponent_raw: bool) -> dict:
@@ -88,6 +80,7 @@ def process_hand_eval(filepath: str, count: int, has_opponent_raw: bool) -> dict
     labels = np.empty(count, dtype=np.float32)
     rounds = np.empty(count, dtype=np.int64)
     opponent_raw = np.empty((count, 378), dtype=np.float32) if has_opponent_raw else None
+    actual = 0
 
     with open(filepath, "rb") as f:
         samples = ijson.items(f, "samples.item")
@@ -100,6 +93,9 @@ def process_hand_eval(filepath: str, count: int, has_opponent_raw: bool) -> dict
 
             if (i + 1) % 50000 == 0:
                 print(f"  Processed {i + 1:,}/{count:,} samples...")
+            actual = i + 1
+
+    _validate_count(actual, count, filepath)
 
     result = {
         "states": torch.from_numpy(states),
@@ -120,6 +116,7 @@ def process_buy(filepath: str, count: int, has_opponent_raw: bool) -> dict:
     bought = np.empty(count, dtype=np.bool_)
     opponent_raw = np.empty((count, 378), dtype=np.float32) if has_opponent_raw else None
     offered_cards = []
+    actual = 0
 
     with open(filepath, "rb") as f:
         samples = ijson.items(f, "samples.item")
@@ -127,14 +124,16 @@ def process_buy(filepath: str, count: int, has_opponent_raw: bool) -> dict:
             states[i] = sample["state"]
             rounds[i] = sample["round"]
             bought[i] = sample["bought"]
-            # Keep offered_card as dict for encode_offered_card() at train time
-            card = sample["offered_card"]
-            offered_cards.append({"rank": int(card["rank"]), "suit": card["suit"]})
+            # Keep offered_card as-is for encode_offered_card() at train time
+            offered_cards.append(sample["offered_card"])
             if has_opponent_raw and "opponent_raw" in sample:
                 opponent_raw[i] = sample["opponent_raw"]
 
             if (i + 1) % 50000 == 0:
                 print(f"  Processed {i + 1:,}/{count:,} samples...")
+            actual = i + 1
+
+    _validate_count(actual, count, filepath)
 
     result = {
         "states": torch.from_numpy(states),
@@ -155,6 +154,7 @@ def process_discard(filepath: str, count: int, has_opponent_raw: bool) -> dict:
     rounds = np.empty(count, dtype=np.int64)
     hand_sizes = np.empty(count, dtype=np.int64)
     opponent_raw = np.empty((count, 378), dtype=np.float32) if has_opponent_raw else None
+    actual = 0
 
     with open(filepath, "rb") as f:
         samples = ijson.items(f, "samples.item")
@@ -167,6 +167,9 @@ def process_discard(filepath: str, count: int, has_opponent_raw: bool) -> dict:
 
             if (i + 1) % 50000 == 0:
                 print(f"  Processed {i + 1:,}/{count:,} samples...")
+            actual = i + 1
+
+    _validate_count(actual, count, filepath)
 
     result = {
         "states": torch.from_numpy(states),
@@ -186,19 +189,23 @@ def process_draw(filepath: str, count: int, has_opponent_raw: bool) -> dict:
     rounds = np.empty(count, dtype=np.int64)
     opponent_raw = np.empty((count, 378), dtype=np.float32) if has_opponent_raw else None
     offered_cards = []
+    actual = 0
 
     with open(filepath, "rb") as f:
         samples = ijson.items(f, "samples.item")
         for i, sample in enumerate(samples):
             states[i] = sample["state"]
             rounds[i] = sample["round"]
-            card = sample["offered_card"]
-            offered_cards.append({"rank": int(card["rank"]), "suit": card["suit"]})
+            # Keep offered_card as-is for encode_offered_card() at train time
+            offered_cards.append(sample["offered_card"])
             if has_opponent_raw and "opponent_raw" in sample:
                 opponent_raw[i] = sample["opponent_raw"]
 
             if (i + 1) % 50000 == 0:
                 print(f"  Processed {i + 1:,}/{count:,} samples...")
+            actual = i + 1
+
+    _validate_count(actual, count, filepath)
 
     result = {
         "states": torch.from_numpy(states),
@@ -239,13 +246,10 @@ def preprocess_file(filepath: str) -> str:
     print(f"Data type:  {dtype}")
     print(f"{'='*60}")
 
-    # Pass 1: get count
+    # Single pass: get count and check for opponent_raw
     t0 = time.time()
-    count = get_count(filepath)
+    count, has_opponent_raw = get_count_and_check_opponent_raw(filepath)
     print(f"  Sample count: {count:,} (read in {time.time() - t0:.1f}s)")
-
-    # Check for opponent_raw (v2 feature)
-    has_opponent_raw = check_has_opponent_raw(filepath)
     print(f"  Has opponent_raw: {has_opponent_raw}")
 
     # Pass 2: stream and fill arrays
@@ -255,9 +259,11 @@ def preprocess_file(filepath: str) -> str:
     elapsed = time.time() - t1
     print(f"  Streamed {count:,} samples in {elapsed:.1f}s ({count / max(elapsed, 0.01):.0f} samples/s)")
 
-    # Save
-    t2 = time.time()
-    torch.save(result, out_path)
+    # Save atomically via temp file
+    out = Path(out_path)
+    tmp = out.with_suffix(".pt.tmp")
+    torch.save(result, str(tmp))
+    os.replace(str(tmp), out_path)
     file_size_mb = os.path.getsize(out_path) / (1024 * 1024)
     json_size_mb = os.path.getsize(filepath) / (1024 * 1024)
     print(f"  Saved: {os.path.basename(out_path)} ({file_size_mb:.1f} MB, {json_size_mb / max(file_size_mb, 0.01):.1f}x compression)")
@@ -296,17 +302,12 @@ def main():
     )
     parser.add_argument(
         "--verify",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=True,
         help="Verify output .pt files after saving (default: True).",
     )
-    parser.add_argument(
-        "--no-verify",
-        action="store_true",
-        help="Skip verification step.",
-    )
     args = parser.parse_args()
-    do_verify = args.verify and not args.no_verify
+    do_verify = args.verify
 
     total_start = time.time()
     results = []
