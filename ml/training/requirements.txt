@@ -1,2 +1,4 @@
 torch>=2.0
 onnx>=1.14
+ijson>=3.2
+numpy>=1.24
