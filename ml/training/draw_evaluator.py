@@ -136,13 +136,30 @@ def train(args):
     print("Loaded hand evaluator and opponent encoder")
 
     # Load raw draw data
-    with open(args.data) as f:
-        raw = json.load(f)
-    print(f"Loaded {raw['count']} raw draw samples")
+    data_path = Path(args.data)
+    if data_path.suffix == ".pt":
+        raw_data = torch.load(data_path, weights_only=False)
+        # Reconstruct sample dicts for compute_draw_labels
+        samples = []
+        has_opp = "opponent_raw" in raw_data
+        for i in range(raw_data["count"]):
+            s = {
+                "state": raw_data["states"][i].tolist(),
+                "offered_card": raw_data["offered_cards"][i],
+            }
+            if has_opp:
+                s["opponent_raw"] = raw_data["opponent_raw"][i].tolist()
+            samples.append(s)
+        print(f"Loaded {raw_data['count']} raw draw samples from {data_path.name}")
+    else:
+        with open(data_path) as f:
+            raw = json.load(f)
+        samples = raw["samples"]
+        print(f"Loaded {raw['count']} raw draw samples")
 
     # Compute labels
     print("Computing draw labels via hand eval proxy...")
-    labeled = compute_draw_labels(raw["samples"], hand_eval, encoder)
+    labeled = compute_draw_labels(samples, hand_eval, encoder)
     take_count = sum(s["label"] for s in labeled)
     print(f"Labeled {len(labeled)} samples ({take_count} take, {len(labeled) - take_count} draw)")
 
