@@ -242,6 +242,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   const meldBuilderRef = useRef<MeldBuilderHandle>(null)
   const [jokerPositionPrompt, setJokerPositionPrompt] = useState<{ card: CardType; meld: Meld } | null>(null)
   const [pendingUndo, setPendingUndo] = useState<UndoState | null>(null)
+  const discardPendingRef = useRef(false) // synchronous guard — mirrors pendingUndo for instant blocking
   const [pendingLayOffUndo, setPendingLayOffUndo] = useState<UndoLayOffState | null>(null)
   const [showPauseModal, setShowPauseModal] = useState(false)
   const [reshuffleMsg, setReshuffleMsg] = useState(false)
@@ -993,6 +994,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     if (uiPhaseRef.current !== 'draw') return
     if (drawInProgressRef.current) return
     drawInProgressRef.current = true
+    uiPhaseRef.current = 'action' // synchronous — blocks any concurrent draw before React commits
 
     // Use BOTH the ref and the React state value for wasExplicitlyDeclined.
     // freeOfferDeclinedRef.current covers the AI stale-closure case.
@@ -1115,9 +1117,10 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     if (uiPhaseRef.current !== 'draw') return
     if (drawInProgressRef.current) return
     drawInProgressRef.current = true
+    uiPhaseRef.current = 'action' // synchronous — blocks any concurrent draw before React commits
 
     const card = gameState.roundState.discardPile[gameState.roundState.discardPile.length - 1]
-    if (!card) return
+    if (!card) { drawInProgressRef.current = false; uiPhaseRef.current = 'draw'; return }
     if (pendingBuyDiscardRef.current !== null) {
       const state = gameStateRef.current
       addBuyLog({
@@ -1401,6 +1404,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   function handleMeldConfirm(meldGroups: CardType[][], jokerPositions?: Map<string, number>) {
     // Guard against rapid double-taps: only allow melding during the action phase
     if (uiPhaseRef.current !== 'action') return
+    // Block melds during the discard undo window — turn is over once you discard
+    if (discardPendingRef.current) return
     const prev = gameState
     let counter = prev.roundState.meldIdCounter
     const playerIdx = prev.roundState.currentPlayerIndex
@@ -1486,7 +1491,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   // ── Lay off ───────────────────────────────────────────────────────────────
   function handleLayOff(card: CardType, meld: Meld, jokerPosition?: 'low' | 'high') {
     // Bug fix: prevent lay-offs after discarding — turn is over once you discard
-    if (pendingUndo) return
+    // Use ref for synchronous blocking (React state pendingUndo may lag behind)
+    if (discardPendingRef.current) return
     const prev = gameState
     const playerIdx = prev.roundState.currentPlayerIndex
     const player = prev.players[playerIdx]
@@ -1755,7 +1761,8 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   // ── Inline lay-off (from TableMelds tap) ─────────────────────────────────
   function handleInlineLayOff(card: CardType, meld: Meld) {
     // Bug fix: prevent lay-offs after discarding — turn is over once you discard
-    if (pendingUndo) return
+    // Use ref for synchronous blocking (React state pendingUndo may lag behind)
+    if (discardPendingRef.current) return
     if (card.suit === 'joker' && meld.type === 'run') {
       const canLow = (meld.runMin ?? 1) > 1
       const canHigh = (meld.runMax ?? 13) < 14
@@ -1874,6 +1881,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     checkStalemateProgress()
 
     function afterUndoExpires() {
+      discardPendingRef.current = false
       setPendingUndo(null)
       // Rule 9A: advance to next player who gets first right to take the discard
       const advanced = advancePlayer(afterDiscard)
@@ -1886,6 +1894,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     // Skip undo delay for AI and remote players (they have no undo UI)
     const isRemotePlayer = mode === 'host' && remoteSeatIndices.includes(playerIdx)
     if (!player.isAI && !isRemotePlayer) {
+      discardPendingRef.current = true // synchronous — blocks lay-offs/melds immediately
       const timerId = setTimeout(afterUndoExpires, 3000)
       setPendingUndo({ card, preDiscardState, discarderIdx: playerIdx, timerId })
     } else {
@@ -1896,6 +1905,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   function handleUndoDiscard() {
     if (!pendingUndo) return
     clearTimeout(pendingUndo.timerId)
+    discardPendingRef.current = false
     setGameState(pendingUndo.preDiscardState)
     setPendingUndo(null)
     // Stay in 'action' phase
