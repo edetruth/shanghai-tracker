@@ -27,6 +27,9 @@ __pycache__/
 # ML model checkpoints (large binaries)
 ml/models/*.pt
 
+# Preprocessed training data (large binaries)
+ml/data/**/*.pt
+
 # ML training logs (generated per run)
 ml/training/logs/
 
