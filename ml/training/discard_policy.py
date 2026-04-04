@@ -174,11 +174,26 @@ def train(args):
         print(f"Loaded opponent encoder from {encoder_path}")
 
     # Load raw discard data
-    with open(args.data) as f:
-        raw = json.load(f)
-    print(f"Loaded {raw['count']} raw discard samples")
-
-    samples = raw["samples"]
+    data_path = Path(args.data)
+    if data_path.suffix == ".pt":
+        raw_data = torch.load(data_path, weights_only=False)
+        # Reconstruct sample dicts for compute_optimal_discards
+        samples = []
+        has_opp = "opponent_raw" in raw_data
+        for i in range(raw_data["count"]):
+            s = {
+                "state": raw_data["states"][i].tolist(),
+                "hand_size": raw_data["hand_sizes"][i].item(),
+            }
+            if has_opp:
+                s["opponent_raw"] = raw_data["opponent_raw"][i].tolist()
+            samples.append(s)
+        print(f"Loaded {raw_data['count']} raw discard samples from {data_path.name}")
+    else:
+        with open(data_path) as f:
+            raw = json.load(f)
+        samples = raw["samples"]
+        print(f"Loaded {raw['count']} raw discard samples")
     if args.max_samples and args.max_samples < len(samples):
         print(f"Subsampling {args.max_samples} of {len(samples)} samples...")
         samples = random.sample(samples, args.max_samples)
