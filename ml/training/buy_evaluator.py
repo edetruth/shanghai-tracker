@@ -190,14 +190,31 @@ def train(args):
         encoder.load_state_dict(torch.load(encoder_path, weights_only=True))
         print(f"Loaded opponent encoder from {encoder_path}")
 
-    # Load and label data
-    with open(args.data) as f:
-        raw = json.load(f)
-    print(f"Loaded {raw['count']} raw buy samples")
+    # Load raw data
+    data_path = Path(args.data)
+    if data_path.suffix == ".pt":
+        raw_data = torch.load(data_path, weights_only=False)
+        # Reconstruct sample dicts for compute_buy_labels
+        samples = []
+        has_opp = "opponent_raw" in raw_data
+        for i in range(raw_data["count"]):
+            s = {
+                "state": raw_data["states"][i].tolist(),
+                "offered_card": raw_data["offered_cards"][i],
+            }
+            if has_opp:
+                s["opponent_raw"] = raw_data["opponent_raw"][i].tolist()
+            samples.append(s)
+        print(f"Loaded {raw_data['count']} raw buy samples from {data_path.name}")
+    else:
+        with open(data_path) as f:
+            raw = json.load(f)
+        samples = raw["samples"]
+        print(f"Loaded {raw['count']} raw buy samples")
 
     print("Computing buy labels via hand eval proxy...")
     labeled = compute_buy_labels(
-        raw["samples"], hand_eval, threshold=args.threshold, encoder=encoder
+        samples, hand_eval, threshold=args.threshold, encoder=encoder
     )
     buy_count = sum(s["label"] for s in labeled)
     print(f"Labeled {len(labeled)} samples ({buy_count} buy, {len(labeled) - buy_count} pass)")
