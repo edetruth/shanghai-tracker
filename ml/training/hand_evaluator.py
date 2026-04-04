@@ -45,28 +45,44 @@ class HandEvalNet(nn.Module):
 
 
 class HandEvalDataset(Dataset):
-    """Loads hand evaluator training data from JSON.
+    """Loads hand evaluator training data from .pt (preprocessed) or .json (legacy).
 
-    Supports v1 (state + label) and v2 (state + opponent_raw + label) formats.
+    .pt format: dict with 'states', 'labels', 'opponent_raw' tensors
+    .json format: {"samples": [{"state": [...], "label": float, ...}, ...]}
     """
 
     def __init__(self, path: str):
-        with open(path) as f:
-            data = json.load(f)
-        self.samples = data["samples"]
-        self.is_v2 = "opponent_raw" in self.samples[0] if self.samples else False
+        path = Path(path)
+        if path.suffix == ".pt":
+            data = torch.load(path, weights_only=False)
+            self.states = data["states"]
+            self.labels = data["labels"]
+            self.opp_raw = data.get("opponent_raw", None)
+            self.is_v2 = self.opp_raw is not None
+            count = len(self.states)
+        else:
+            with open(path) as f:
+                data = json.load(f)
+            samples = data["samples"]
+            self.is_v2 = "opponent_raw" in samples[0] if samples else False
+            self.states = torch.tensor([s["state"] for s in samples], dtype=torch.float32)
+            self.labels = torch.tensor([s["label"] for s in samples], dtype=torch.float32)
+            if self.is_v2:
+                self.opp_raw = torch.tensor([s["opponent_raw"] for s in samples], dtype=torch.float32)
+            else:
+                self.opp_raw = None
+            count = len(samples)
         fmt = "v2 (enriched)" if self.is_v2 else "v1 (legacy)"
-        print(f"Loaded {len(self.samples)} hand eval samples from {path} [{fmt}]")
+        print(f"Loaded {count} hand eval samples from {path.name} [{fmt}]")
 
     def __len__(self):
-        return len(self.samples)
+        return len(self.states)
 
     def __getitem__(self, idx):
-        s = self.samples[idx]
-        state = torch.tensor(s["state"], dtype=torch.float32)
-        label = torch.tensor(s["label"], dtype=torch.float32)
+        state = self.states[idx]
+        label = self.labels[idx]
         if self.is_v2:
-            opp_raw = torch.tensor(s["opponent_raw"], dtype=torch.float32)
+            opp_raw = self.opp_raw[idx]
             return state, opp_raw, label
         else:
             return state, label
