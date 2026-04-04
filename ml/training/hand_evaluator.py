@@ -206,6 +206,8 @@ def train(args):
 
 
 if __name__ == "__main__":
+    from log_utils import setup_logging
+    setup_logging("hand_evaluator")
     parser = argparse.ArgumentParser(description="Train hand evaluator network")
     parser.add_argument("--data", type=str, required=True, help="Path to hand eval JSON data")
     parser.add_argument("--epochs", type=int, default=50, help="Training epochs")

@@ -313,6 +313,8 @@ def train(args):
 
 
 if __name__ == "__main__":
+    from log_utils import setup_logging
+    setup_logging("buy_evaluator")
     parser = argparse.ArgumentParser(description="Train buy evaluator network")
     parser.add_argument("--data", type=str, required=True, help="Path to buy JSON data")
     parser.add_argument("--evaluator", type=str, default="hand_evaluator.pt", help="Hand evaluator model filename")

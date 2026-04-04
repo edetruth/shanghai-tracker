@@ -306,6 +306,8 @@ def train(args):
 
 
 if __name__ == "__main__":
+    from log_utils import setup_logging
+    setup_logging("discard_policy")
     parser = argparse.ArgumentParser(description="Train discard policy network")
     parser.add_argument("--data", type=str, required=True, help="Path to discard JSON data")
     parser.add_argument("--evaluator", type=str, default="hand_evaluator.pt", help="Hand evaluator model filename")

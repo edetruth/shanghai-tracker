@@ -338,4 +338,6 @@ def main():
 
 
 if __name__ == "__main__":
+    from log_utils import setup_logging
+    setup_logging("preprocess")
     main()

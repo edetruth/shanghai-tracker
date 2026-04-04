@@ -238,6 +238,8 @@ def train(args):
 
 
 if __name__ == "__main__":
+    from log_utils import setup_logging
+    setup_logging("draw_evaluator")
     parser = argparse.ArgumentParser(description="Train draw evaluator network")
     parser.add_argument("--data", type=str, required=True, help="Path to draw JSON data")
     parser.add_argument("--epochs", type=int, default=50, help="Training epochs")
