@@ -36,7 +36,7 @@ Each decision point in a round produces one timestep for the LSTM.
 | Action taken (previous) | 10 | Action type one-hot (5) + card features (5) |
 | Opponent actions since last turn | 18 | See Opponent Action Features section |
 | Phase indicator | 3 | One-hot: draw / buy / action |
-| **Total** | **~323** | Exact count pinned during implementation |
+| **Total** | **373** | 132+60+60+12+30+48+10+18+3 (pinned in `state_encoder.py`) |
 
 ### Meld Plan Features (30 dims)
 
