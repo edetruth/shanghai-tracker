@@ -19,11 +19,12 @@ from pathlib import Path
 BRIDGE_DIR = Path(__file__).parent.parent / "bridge"
 
 class ShanghaiEnv:
-    def __init__(self, player_count=2, opponent_ai=None, rich_state=False, rich_state_v2=False):
+    def __init__(self, player_count=2, opponent_ai=None, rich_state=False, rich_state_v2=False, rich_state_v3=False):
         self.player_count = player_count
         self.opponent_ai = opponent_ai  # e.g., "the-shark", "the-nemesis", None for random
         self.rich_state = rich_state
         self.rich_state_v2 = rich_state_v2
+        self.rich_state_v3 = rich_state_v3
         self.proc = None
         self._start_bridge()
 
@@ -65,6 +66,8 @@ class ShanghaiEnv:
             cmd["rich_state"] = True
         if self.rich_state_v2:
             cmd["rich_state_v2"] = True
+        if self.rich_state_v3:
+            cmd["rich_state_v3"] = True
         result = self._send(cmd)
         if not result.get("ok"):
             raise RuntimeError(f"Failed to start game: {result}")
@@ -97,6 +100,10 @@ class ShanghaiEnv:
         result = self._send({"cmd": "get_full_state", "player": player})
         if not result.get("ok"):
             raise RuntimeError(f"get_full_state failed: {result}")
+        # V3: extract meld plan and opponent actions if present
+        if self.rich_state_v3:
+            result["meld_plan"] = result.get("meldPlan", [0.0] * 30)
+            result["opponent_actions"] = result.get("opponentActionsSinceLast", [0.0] * 18)
         return result
 
     def get_ai_action(self) -> str:

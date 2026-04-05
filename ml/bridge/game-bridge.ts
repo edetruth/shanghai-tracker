@@ -31,8 +31,69 @@ import {
   aiShouldBuy,
   getAIEvalConfig,
 } from '../../src/game/ai'
+import { encodeMeldPlan } from './meld-plan-encoder'
 import type { Card, Meld, RoundRequirement, AIPersonality } from '../../src/game/types'
 import * as readline from 'readline'
+
+// ── V3 Opponent Action Tracking ─────────────────────────────────────────────
+// 18-dim vector tracking what opponents did between player 0's turns.
+// Layout:
+//   [0]    total opponent actions count since last player 0 decision
+//   [1]    any opponent went down (binary)
+//   [2]    any opponent went out (binary)
+//   [3-8]  2nd-most-recent opponent discard pickup (6 card features)
+//   [9-14] most-recent opponent discard pickup (6 card features)
+//   [15]   opponent buys count this interval
+//   [16]   opponent layoffs count this interval
+//   [17]   reserved/padding (0)
+
+let oppActionsSinceLast: number[] = new Array(18).fill(0)
+
+function resetOppActionsSinceLast(): void {
+  oppActionsSinceLast = new Array(18).fill(0)
+}
+
+function recordOpponentAction(g: BridgeGameState, action: string, playerIdx: number): void {
+  // Increment total action count
+  oppActionsSinceLast[0]++
+
+  // Check if opponent went down (melded)
+  if (action === 'meld') {
+    oppActionsSinceLast[1] = 1
+  }
+
+  // Check if opponent went out (hand empty after meld/layoff)
+  if (g.players[playerIdx].hand.length === 0) {
+    oppActionsSinceLast[2] = 1
+  }
+
+  // Track discard pickups (take_discard or buy)
+  if (action === 'take_discard' || action === 'buy') {
+    // Shift most-recent to 2nd-most-recent
+    for (let i = 3; i <= 8; i++) {
+      oppActionsSinceLast[i] = oppActionsSinceLast[i + 6]
+    }
+    // Encode the picked-up card as most-recent
+    const hist = g.opponentHistory[playerIdx]
+    const lastPickup = hist.pickups.length > 0 ? hist.pickups[hist.pickups.length - 1] : null
+    if (lastPickup) {
+      const encoded = encodeCard(lastPickup)
+      for (let i = 0; i < 6; i++) {
+        oppActionsSinceLast[9 + i] = encoded[i]
+      }
+    }
+  }
+
+  // Track buys
+  if (action === 'buy') {
+    oppActionsSinceLast[15]++
+  }
+
+  // Track layoffs
+  if (action.startsWith('layoff:')) {
+    oppActionsSinceLast[16]++
+  }
+}
 
 // ── Game State ──────────────────────────────────────────────────────────────
 
@@ -60,6 +121,7 @@ interface BridgeGameState {
   opponentAI: AIPersonality | null  // null = random opponents (legacy), string = AI personality
   useRichState: boolean  // if true, encodeRichState() is used instead of encodeState()
   useRichStateV2: boolean  // if true, encodeRichStateV2() is used (separate opponent raw)
+  useRichStateV3: boolean  // if true, v2 + meldPlan (30) + opponentActionsSinceLast (18)
   lastDiscarderIndex: number  // who discarded last (for buy window exclusion)
   buyWindowState: {
     offeredCard: Card     // the discard being offered for buying
@@ -121,6 +183,7 @@ function initGame(playerCount: number, seed: number, opponentAI: AIPersonality |
     opponentAI: opponentAI,
     useRichState: false,
     useRichStateV2: false,
+    useRichStateV3: false,
     lastDiscarderIndex: -1,
     buyWindowState: null,
     opponentHistory,
@@ -406,6 +469,8 @@ function openBuyWindow(g: BridgeGameState, offeredCard: Card): 'paused' | 'resol
         // Remove offered card from discard pile
         const discIdx = g.discardPile.findIndex(c => c.id === offeredCard.id)
         if (discIdx >= 0) g.discardPile.splice(discIdx, 1)
+        // V3: record opponent buy action
+        if (g.useRichStateV3 && pi !== 0) recordOpponentAction(g, 'buy', pi)
         return 'resolved'
       }
     }
@@ -441,6 +506,8 @@ function processBuyQueueAI(g: BridgeGameState, bws: NonNullable<BridgeGameState[
       }
       const discIdx = g.discardPile.findIndex(c => c.id === bws.offeredCard.id)
       if (discIdx >= 0) g.discardPile.splice(discIdx, 1)
+      // V3: record opponent buy action
+      if (g.useRichStateV3 && pi !== 0) recordOpponentAction(g, 'buy', pi)
       // Next-in-turn player draws
       g.currentPlayerIndex = bws.drawPlayerIndex
       g.phase = 'draw'
@@ -503,6 +570,9 @@ function endRound(g: BridgeGameState): { reward: number; done: boolean } {
     g.opponentHistory[i].layoffCount = 0
   }
 
+  // V3: reset opponent action tracking at round boundaries
+  if (g.useRichStateV3) resetOppActionsSinceLast()
+
   return { reward: 0, done: false }
 }
 
@@ -513,6 +583,7 @@ function playAITurn(g: BridgeGameState): { reward: number; done: boolean } {
   const personality = g.opponentAI!
   const config = getAIEvalConfig(personality)
   const player = g.players[g.currentPlayerIndex]
+  const oppIdx = g.currentPlayerIndex
 
   // Phase: draw — decide whether to take discard or draw from pile
   if (g.phase === 'draw') {
@@ -524,7 +595,9 @@ function playAITurn(g: BridgeGameState): { reward: number; done: boolean } {
         config, g.tableMelds
       )
     }
-    const drawResult = takeAction(g, shouldTake ? 'take_discard' : 'draw_pile')
+    const drawAction = shouldTake ? 'take_discard' : 'draw_pile'
+    const drawResult = takeAction(g, drawAction)
+    if (g.useRichStateV3) recordOpponentAction(g, drawAction, oppIdx)
     if (drawResult.done) return drawResult
     // If draw_pile opened a buy window for player 0, stop here
     if (g.phase === 'buy-window') return { reward: 0, done: false }
@@ -537,6 +610,7 @@ function playAITurn(g: BridgeGameState): { reward: number; done: boolean } {
       const melds = aiFindBestMelds(player.hand, g.requirement)
       if (melds) {
         const meldResult = takeAction(g, 'meld')
+        if (g.useRichStateV3) recordOpponentAction(g, 'meld', oppIdx)
         if (meldResult.done) return meldResult
       }
     }
@@ -570,7 +644,9 @@ function playAITurn(g: BridgeGameState): { reward: number; done: boolean } {
         const ci = player.hand.findIndex(c => c.id === layoff!.card.id)
         const mi = g.tableMelds.findIndex(m => m.id === layoff!.meld.id)
         if (ci >= 0 && mi >= 0) {
-          const result = takeAction(g, `layoff:${ci}:${mi}`)
+          const layoffAction = `layoff:${ci}:${mi}`
+          const result = takeAction(g, layoffAction)
+          if (g.useRichStateV3) recordOpponentAction(g, layoffAction, oppIdx)
           if (result.done) return result
         } else {
           break
@@ -584,10 +660,14 @@ function playAITurn(g: BridgeGameState): { reward: number; done: boolean } {
       const discardCard = aiChooseDiscard(player.hand, g.requirement, config, g.tableMelds)
       const discardIdx = player.hand.findIndex(c => c.id === discardCard.id)
       if (discardIdx >= 0) {
-        return takeAction(g, `discard:${discardIdx}`)
+        const discardAction = `discard:${discardIdx}`
+        if (g.useRichStateV3) recordOpponentAction(g, discardAction, oppIdx)
+        return takeAction(g, discardAction)
       }
       // Fallback: discard last card
-      return takeAction(g, `discard:${player.hand.length - 1}`)
+      const fallbackAction = `discard:${player.hand.length - 1}`
+      if (g.useRichStateV3) recordOpponentAction(g, fallbackAction, oppIdx)
+      return takeAction(g, fallbackAction)
     }
   }
 
@@ -1083,7 +1163,9 @@ rl.on('line', (line) => {
         const ai = cmd.opponent_ai ?? null  // e.g., "the-shark", "the-nemesis"
         game = initGame(cmd.players ?? 2, cmd.seed ?? Math.floor(Math.random() * 2147483647), ai)
         game.useRichState = cmd.rich_state === true
-        game.useRichStateV2 = cmd.rich_state_v2 === true
+        game.useRichStateV2 = cmd.rich_state_v2 === true || cmd.rich_state_v3 === true
+        game.useRichStateV3 = cmd.rich_state_v3 === true
+        if (game.useRichStateV3) resetOppActionsSinceLast()
         // If player 0 doesn't go first, auto-play opponents up to player 0
         if (game.opponentAI && game.currentPlayerIndex !== 0) {
           autoPlayOpponents(game)
@@ -1117,7 +1199,7 @@ rl.on('line', (line) => {
         const stateVec = game.useRichStateV2
           ? encodeRichStateV2(game, 0).state
           : (game.useRichState ? encodeRichState(game, 0) : encodeState(game, 0))
-        respond({
+        const response: Record<string, unknown> = {
           ok: true,
           state: stateVec,
           reward,
@@ -1126,7 +1208,13 @@ rl.on('line', (line) => {
           round: game.currentRound,
           currentPlayer: game.currentPlayerIndex,
           scores: game.scores.map(rs => rs.reduce((a, b) => a + b, 0)),
-        })
+        }
+        if (game.useRichStateV3) {
+          response.meldPlan = encodeMeldPlan(game.players[0].hand, game.currentRound)
+          response.opponentActionsSinceLast = [...oppActionsSinceLast]
+          resetOppActionsSinceLast()
+        }
+        respond(response)
         break
       }
 
@@ -1142,7 +1230,7 @@ rl.on('line', (line) => {
         const p = game.players[pi]
         if (game.useRichStateV2) {
           const { state: stateVec, opponentRaw } = encodeRichStateV2(game, pi)
-          respond({
+          const fullStateResponse: Record<string, unknown> = {
             ok: true,
             state: stateVec,
             opponentRaw,
@@ -1158,7 +1246,12 @@ rl.on('line', (line) => {
               : null,
             scores: game.scores.map(rs => rs.reduce((a, b) => a + b, 0)),
             tableMeldCount: game.tableMelds.length,
-          })
+          }
+          if (game.useRichStateV3) {
+            fullStateResponse.meldPlan = encodeMeldPlan(p.hand, game.currentRound)
+            fullStateResponse.opponentActionsSinceLast = [...oppActionsSinceLast]
+          }
+          respond(fullStateResponse)
         } else {
           const stateVec = game.useRichState ? encodeRichState(game, pi) : encodeState(game, pi)
           respond({
