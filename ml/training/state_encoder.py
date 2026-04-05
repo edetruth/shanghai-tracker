@@ -61,3 +61,59 @@ OFFERED_CARD_FEATURES = 6
 MAX_ACTIONS = 350
 BUY_ACTION_IDX = 339
 DECLINE_BUY_ACTION_IDX = 340
+
+# ── V3: LSTM Sequence Model ──────────────────────────────────────────
+
+# Per-timestep input components
+V3_HAND_FEATURES = MAX_HAND_CARDS * CARD_FEATURES          # 22 * 6 = 132
+V3_DISCARD_HISTORY_FEATURES = MAX_DISCARD_HISTORY * CARD_FEATURES  # 10 * 6 = 60
+V3_TABLE_MELD_FEATURES = MAX_TABLE_MELDS * MELD_FEATURES   # 12 * 5 = 60
+V3_GAME_CONTEXT_FEATURES = 12  # round, req_sets, req_runs, draw_pile, discard_pile,
+                                # buys_remaining, hand_points, turn, buy_window,
+                                # cumulative_score, player_count, laid_down
+
+# New v3 feature groups
+V3_MELD_PLAN_FEATURES = 30     # See spec: plan count, completeness, per-requirement, etc.
+V3_OPP_ACTIONS_FEATURES = 18   # Opponent actions between our turns
+V3_ACTION_TAKEN_FEATURES = 10  # Previous action: type one-hot(5) + card features(5)
+V3_PHASE_FEATURES = 3          # One-hot: draw / buy / action
+
+# Alias for v3 (reuses v2 opponent embedding)
+V3_OPP_EMBEDDING_TOTAL = OPP_EMBEDDING_TOTAL  # 48 (3 opponents x 16-dim)
+
+# Total per-timestep input to LSTM
+V3_TIMESTEP_INPUT_SIZE = (
+    V3_HAND_FEATURES
+    + V3_DISCARD_HISTORY_FEATURES
+    + V3_TABLE_MELD_FEATURES
+    + V3_GAME_CONTEXT_FEATURES
+    + V3_MELD_PLAN_FEATURES
+    + OPP_EMBEDDING_TOTAL          # 48 (3 opponents x 16-dim, reused from v2)
+    + V3_ACTION_TAKEN_FEATURES
+    + V3_OPP_ACTIONS_FEATURES
+    + V3_PHASE_FEATURES
+)  # = 373
+
+# LSTM architecture
+V3_LSTM_HIDDEN = 192
+V3_LSTM_LAYERS = 2
+V3_LSTM_DROPOUT = 0.2
+V3_MAX_SEQ_LEN = 80  # Max timesteps per round sequence (padded)
+
+# Head input sizes
+V3_DRAW_HEAD_INPUT = V3_LSTM_HIDDEN + CARD_FEATURES    # 192 + 6 = 198
+V3_BUY_HEAD_INPUT = V3_LSTM_HIDDEN + CARD_FEATURES     # 192 + 6 = 198
+V3_DISCARD_HEAD_INPUT = V3_LSTM_HIDDEN                  # 192
+V3_DISCARD_HEAD_OUTPUT = MAX_HAND_CARDS                 # 22
+
+# Phase indices for one-hot encoding
+V3_PHASE_DRAW = 0
+V3_PHASE_BUY = 1
+V3_PHASE_ACTION = 2
+
+# Action type indices for one-hot encoding (action_taken features)
+V3_ACT_DRAW_PILE = 0
+V3_ACT_TAKE_DISCARD = 1
+V3_ACT_BUY = 2
+V3_ACT_DECLINE_BUY = 3
+V3_ACT_DISCARD = 4
