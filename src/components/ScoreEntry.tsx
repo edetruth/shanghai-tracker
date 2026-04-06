@@ -112,7 +112,7 @@ export default function ScoreEntry({ game, players, onComplete, onBack }: Props)
           </button>
           <div className="text-center">
             <div className="text-[#a08c6e] text-xs uppercase tracking-wider">Round {round.number} of 7</div>
-            <div className="font-display text-lg font-semibold text-[#8b6914]">{round.name}</div>
+            <div className="font-heading text-lg font-semibold text-[#8b6914]">{round.name}</div>
             <div className="text-[#a08c6e] text-xs">{round.cards} cards dealt</div>
           </div>
           <div className="w-8" />

@@ -25,8 +25,9 @@ export default {
       },
       fontFamily: {
         display: ['"Playfair Display"', 'Georgia', 'serif'],
+        heading: ['"Fredoka"', 'sans-serif'],
         mono: ['"DM Mono"', 'monospace'],
-        sans: ['system-ui', 'sans-serif'],
+        sans: ['"Nunito"', 'system-ui', 'sans-serif'],
       },
     },
   },

@@ -193,7 +193,7 @@ export default function StatsLeaderboard({ onPlayerClick, onNavigateHome }: Prop
               <ArrowLeft size={22} />
             </button>
           )}
-          <h2 className="font-display text-2xl font-semibold text-[#2c1810]">Stats & Records</h2>
+          <h2 className="font-heading text-2xl font-semibold text-[#2c1810]">Stats & Records</h2>
         </div>
 
         {/* Date filter */}
@@ -292,7 +292,7 @@ export default function StatsLeaderboard({ onPlayerClick, onNavigateHome }: Prop
                       </div>
                       <div className={`w-full ${podiumPlatformH[rankIdx]} rounded-b-lg flex items-center justify-center`}
                         style={{ background: `${color}18` }}>
-                        <span className="font-display font-bold text-lg" style={{ color }}>#{rankIdx + 1}</span>
+                        <span className="font-heading font-bold text-lg" style={{ color }}>#{rankIdx + 1}</span>
                       </div>
                     </div>
                   )

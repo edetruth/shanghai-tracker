@@ -90,7 +90,7 @@ export default function ScoreTrackerPage({ onNavigateHome, onStartNewGame, onPla
           <button onClick={onNavigateHome} className="text-[#8b6914] p-1 -ml-1">
             <ArrowLeft size={22} />
           </button>
-          <h2 className="font-display text-2xl font-semibold text-[#2c1810]">Score Tracker</h2>
+          <h2 className="font-heading text-2xl font-semibold text-[#2c1810]">Score Tracker</h2>
           <button onClick={loadGames} className="ml-auto text-[#a08c6e] p-1">
             <RefreshCw size={18} />
           </button>

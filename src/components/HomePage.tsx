@@ -43,7 +43,7 @@ export default function HomePage({ onNavigate, onShowTutorial }: Props) {
         style={{ animation: 'slide-up-fade 400ms ease-out 0ms both' }}
       >
         <div className="text-5xl mb-3">🃏</div>
-        <h1 className="font-display text-4xl font-bold text-[#8b6914]">Shanghai</h1>
+        <h1 className="font-heading text-4xl font-bold text-[#8b6914]">Shanghai</h1>
         <p className="text-[#8b7355] mt-2 text-sm">Shanghai Rummy Score Tracker</p>
         {onShowTutorial && (
           <button

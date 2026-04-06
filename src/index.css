@@ -14,7 +14,7 @@
   body {
     background-color: #f8f6f1;
     color: #2c1810;
-    font-family: system-ui, sans-serif;
+    font-family: 'Nunito', system-ui, sans-serif;
     font-size: 15px;
     min-height: 100dvh;
     overscroll-behavior: none;

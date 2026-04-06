@@ -98,7 +98,7 @@ export default function PlayerSetup({ onGameCreated, onJoinGame, onBack }: Props
           </button>
         )}
         <div className="text-center">
-          <h1 className="font-display text-2xl font-bold text-[#2c1810]">New Game</h1>
+          <h1 className="font-heading text-2xl font-bold text-[#2c1810]">New Game</h1>
           <p className="text-[#a08c6e] text-sm mt-1">Set up your score card</p>
         </div>
       </div>

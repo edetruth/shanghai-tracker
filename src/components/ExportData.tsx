@@ -58,7 +58,7 @@ export default function ExportData({ games, onBack }: Props) {
         <button onClick={onBack} className="text-[#a08c6e]">
           <ArrowLeft size={24} />
         </button>
-        <h2 className="font-display text-2xl font-semibold text-[#2c1810]">Export Data</h2>
+        <h2 className="font-heading text-2xl font-semibold text-[#2c1810]">Export Data</h2>
       </div>
 
       <p className="text-[#8b7355] text-sm">{games.length} games available to export.</p>

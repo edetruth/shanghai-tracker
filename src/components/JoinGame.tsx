@@ -53,7 +53,7 @@ export default function JoinGame({ onBack }: Props) {
         <button onClick={onBack} className="text-[#a08c6e]">
           <ArrowLeft size={24} />
         </button>
-        <h2 className="font-display text-2xl font-semibold text-[#2c1810]">Join Game</h2>
+        <h2 className="font-heading text-2xl font-semibold text-[#2c1810]">Join Game</h2>
       </div>
 
       <div className="card p-4 flex flex-col gap-4">

@@ -162,7 +162,7 @@ export default function PlayerProfileModal({ playerId, onClose }: Props) {
         <div className="px-4 py-3 flex items-center gap-3 flex-shrink-0 border-b border-[#e2ddd2]">
           <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: playerColor }} />
           <div className="flex-1 min-w-0">
-            <div className="font-display text-xl font-semibold text-[#2c1810] truncate">{player?.name ?? '…'}</div>
+            <div className="font-heading text-xl font-semibold text-[#2c1810] truncate">{player?.name ?? '…'}</div>
             <div className="text-[#8b7355] text-sm">{gamesPlayed} games played</div>
           </div>
           <button onClick={handleClose} className="text-[#a08c6e] hover:text-[#2c1810] p-1 flex-shrink-0">

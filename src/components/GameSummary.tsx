@@ -90,7 +90,7 @@ export default function GameSummary({ game, players, onDone, onPlayerClick }: Pr
       {/* Header */}
       <div className="p-4 text-center safe-top">
         <div className="text-[#a08c6e] text-xs uppercase tracking-wider mb-1">Game Complete</div>
-        <h1 className="font-display text-2xl font-bold text-[#8b6914]">Game Night Recap</h1>
+        <h1 className="font-heading text-2xl font-bold text-[#8b6914]">Game Night Recap</h1>
       </div>
 
       <div className="px-4 flex flex-col gap-3 flex-1 overflow-auto pb-4">
@@ -102,7 +102,7 @@ export default function GameSummary({ game, players, onDone, onPlayerClick }: Pr
               <div className="text-[#a08c6e] text-xs">Winner</div>
               <button
                 onClick={() => onPlayerClick?.(winner.player_id)}
-                className={`font-display text-xl font-semibold text-[#2c1810] truncate block text-left ${onPlayerClick ? 'hover:text-[#8b6914]' : ''}`}
+                className={`font-heading text-xl font-semibold text-[#2c1810] truncate block text-left ${onPlayerClick ? 'hover:text-[#8b6914]' : ''}`}
               >
                 {winner.player?.name}
               </button>

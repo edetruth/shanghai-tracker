@@ -638,7 +638,7 @@ export default function AnalyticsPage({ onBack }: Props) {
           <button onClick={onBack} className="text-[#8b6914] p-1 -ml-1">
             <ArrowLeft size={22} />
           </button>
-          <h2 className="font-display text-2xl font-semibold text-[#2c1810]">Analytics</h2>
+          <h2 className="font-heading text-2xl font-semibold text-[#2c1810]">Analytics</h2>
         </div>
       </div>
 

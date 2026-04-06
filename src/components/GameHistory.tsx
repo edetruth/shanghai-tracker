@@ -46,7 +46,7 @@ export default function GameHistory({ onPlayerClick }: Props) {
       {/* Header */}
       <div className="p-4 pt-6">
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-2xl font-semibold text-[#2c1810]">Game History</h2>
+          <h2 className="font-heading text-2xl font-semibold text-[#2c1810]">Game History</h2>
           <button onClick={loadGames} className="text-[#a08c6e] p-1">
             <RefreshCw size={18} />
           </button>
