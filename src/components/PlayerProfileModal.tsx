@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
-import { LineChart, Line, ResponsiveContainer } from 'recharts'
+import { LineChart, Line, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, Radar } from 'recharts'
 import { getCompletedGames, computeWinner, getPlayerAchievements } from '../lib/gameStore'
 import { PLAYER_COLORS } from '../lib/constants'
 import { ACHIEVEMENTS } from '../lib/achievements'
@@ -109,6 +109,37 @@ export default function PlayerProfileModal({ playerId, onClose }: Props) {
   })
   const top3Opponents = Object.values(opMap).sort((a, b) => b.games - a.games).slice(0, 3)
 
+  // Radar chart: player strengths (0–100 scale, higher = better)
+  const radarData = (() => {
+    if (gamesPlayed === 0) return []
+    // Win rate: direct percentage
+    const winPct = winRate
+    // Scoring: lower is better — invert. 0 pts = 100, 500+ pts = 0
+    const scorePct = Math.max(0, Math.min(100, Math.round(100 - (avgScore / 5))))
+    // Consistency: low std dev = good. Compute coefficient of variation
+    const mean = avgScore || 1
+    const variance = allScores.reduce((s, v) => s + (v - mean) ** 2, 0) / gamesPlayed
+    const cv = Math.sqrt(variance) / mean
+    const consistPct = Math.max(0, Math.min(100, Math.round(100 - cv * 100)))
+    // Going out rate: % of rounds with score 0
+    let totalRounds = 0, zeroRounds = 0
+    playerGames.forEach(g => {
+      const gs = g.game_scores.find(s => s.player_id === playerId)
+      if (gs) { totalRounds += gs.round_scores.length; zeroRounds += gs.round_scores.filter(s => s === 0).length }
+    })
+    const goingOutPct = totalRounds ? Math.round((zeroRounds / totalRounds) * 100) : 0
+    // Podium rate: % of games finishing top 2
+    const podiums = playerGames.filter(g => getRank(g) <= 2).length
+    const podiumPct = Math.round((podiums / gamesPlayed) * 100)
+    return [
+      { stat: 'Win Rate', value: winPct },
+      { stat: 'Scoring', value: scorePct },
+      { stat: 'Consistency', value: consistPct },
+      { stat: 'Going Out', value: goingOutPct },
+      { stat: 'Podium', value: podiumPct },
+    ]
+  })()
+
   const fmtDate = (d: string) => { try { return format(new Date(d + 'T12:00:00'), 'MMM d, yy') } catch { return d } }
   const fmtDateLong = (d: string) => { try { return format(new Date(d + 'T12:00:00'), 'MMM d, yyyy') } catch { return d } }
   const ordinal = (n: number) => ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'][n - 1] ?? `${n}th`
@@ -195,6 +226,28 @@ export default function PlayerProfileModal({ playerId, onClose }: Props) {
                   </div>
                 ))}
               </div>
+
+              {/* Strengths radar */}
+              {radarData.length > 0 && (
+                <div className="card p-3">
+                  <p className="text-[#8b7355] text-xs uppercase tracking-wider mb-1">Strengths</p>
+                  <div style={{ height: 200 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="72%">
+                        <PolarGrid stroke="#D4C4A8" />
+                        <PolarAngleAxis dataKey="stat" tick={{ fontSize: 11, fill: '#78350F' }} />
+                        <Radar dataKey="value" stroke={playerColor} fill={playerColor} fillOpacity={0.25} strokeWidth={2} />
+                      </RadarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  {/* Accessible data table (screen readers) */}
+                  <table className="sr-only">
+                    <caption>Player strengths</caption>
+                    <thead><tr><th>Stat</th><th>Score</th></tr></thead>
+                    <tbody>{radarData.map(d => <tr key={d.stat}><td>{d.stat}</td><td>{d.value}%</td></tr>)}</tbody>
+                  </table>
+                </div>
+              )}
 
               {/* Recent form */}
               {last5.length > 0 && (
