@@ -98,8 +98,8 @@ export default function PlayerSetup({ onGameCreated, onJoinGame, onBack }: Props
           </button>
         )}
         <div className="text-center">
-          <h1 className="font-heading text-2xl font-bold text-[#2c1810]">New Game</h1>
-          <p className="text-[#a08c6e] text-sm mt-1">Set up your score card</p>
+          <h1 className="font-heading text-2xl font-bold text-warm-text">New Game</h1>
+          <p className="text-warm-muted text-sm mt-1">Set up your score card</p>
         </div>
       </div>
 
@@ -113,21 +113,21 @@ export default function PlayerSetup({ onGameCreated, onJoinGame, onBack }: Props
 
       {/* Date picker */}
       <div className="card p-4">
-        <label className="text-xs text-[#a08c6e] uppercase tracking-wider font-medium">
+        <label className="text-xs text-warm-muted uppercase tracking-wider font-medium">
           Game Date
         </label>
         <input
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="mt-2 w-full bg-white border border-[#e2ddd2] rounded-lg px-3 py-2 text-[#2c1810]
+          className="mt-2 w-full bg-white border border-sand-light rounded-lg px-3 py-2 text-warm-text
                      focus:outline-none focus:border-[#8b6914] focus:ring-1 focus:ring-[#8b6914]"
         />
       </div>
 
       {/* Player selection */}
       <div className="card p-4">
-        <label className="text-xs text-[#a08c6e] uppercase tracking-wider font-medium">
+        <label className="text-xs text-warm-muted uppercase tracking-wider font-medium">
           Players {selectedPlayers.length > 0 && `(${selectedPlayers.length})`}
         </label>
 
@@ -139,9 +139,9 @@ export default function PlayerSetup({ onGameCreated, onJoinGame, onBack }: Props
               return (
                 <span
                   key={id}
-                  className="flex items-center gap-1.5 bg-[#e2b858] text-[#2c1810] text-sm font-medium px-2.5 py-1 rounded-full"
+                  className="flex items-center gap-1.5 bg-[#e2b858] text-warm-text text-sm font-medium px-2.5 py-1 rounded-full"
                 >
-                  <span className="text-[#2c1810]/50 text-xs">{i + 1}.</span>
+                  <span className="text-warm-text/50 text-xs">{i + 1}.</span>
                   {player?.name}
                   <button
                     onClick={() => removePlayer(id)}
@@ -172,17 +172,17 @@ export default function PlayerSetup({ onGameCreated, onJoinGame, onBack }: Props
               if (e.key === 'Enter') addPlayer()
               if (e.key === 'Escape') setShowSuggestions(false)
             }}
-            className="w-full bg-white border border-[#e2ddd2] rounded-lg px-3 py-2 text-[#2c1810]
+            className="w-full bg-white border border-sand-light rounded-lg px-3 py-2 text-warm-text
                        placeholder-[#a08c6e] focus:outline-none focus:border-[#8b6914] focus:ring-1 focus:ring-[#8b6914]"
           />
           {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute z-10 w-full mt-1 bg-white border border-[#e2ddd2] rounded-lg overflow-hidden"
+            <div className="absolute z-10 w-full mt-1 bg-white border border-sand-light rounded-lg overflow-hidden"
               style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
               {suggestions.map((player) => (
                 <button
                   key={player.id}
                   onMouseDown={() => selectPlayer(player)}
-                  className="w-full text-left px-3 py-2 text-[#2c1810] hover:bg-[#efe9dd] transition-colors text-sm"
+                  className="w-full text-left px-3 py-2 text-warm-text hover:bg-[#efe9dd] transition-colors text-sm"
                 >
                   {player.name}
                 </button>
@@ -190,7 +190,7 @@ export default function PlayerSetup({ onGameCreated, onJoinGame, onBack }: Props
             </div>
           )}
         </div>
-        <p className="text-[#a08c6e] text-xs mt-2">
+        <p className="text-warm-muted text-xs mt-2">
           Select from suggestions or press Enter to add a new name
         </p>
       </div>

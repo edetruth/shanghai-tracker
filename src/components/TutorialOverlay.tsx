@@ -63,7 +63,7 @@ export default function TutorialOverlay({ onDone }: Props) {
       <div className="w-full max-w-[480px] mx-auto bg-white rounded-t-3xl px-6 pt-6 pb-10 flex flex-col">
         {/* Close button */}
         <div className="flex justify-end mb-2">
-          <button onClick={dismiss} className="text-[#a08c6e] p-1 -mr-1 active:opacity-60">
+          <button onClick={dismiss} className="text-warm-muted p-1 -mr-1 active:opacity-60">
             <X size={20} />
           </button>
         </div>
@@ -83,7 +83,7 @@ export default function TutorialOverlay({ onDone }: Props) {
         {/* Content */}
         <div className="text-center flex-1">
           <div className="text-5xl mb-4">{current.emoji}</div>
-          <h2 className="text-xl font-bold text-[#2c1810] mb-3">{current.title}</h2>
+          <h2 className="text-xl font-bold text-warm-text mb-3">{current.title}</h2>
           <p className="text-[#8b7355] text-sm leading-relaxed">{current.body}</p>
           {current.tip && (
             <div className="mt-4 bg-[#efe9dd] rounded-xl px-4 py-3 text-left">
@@ -98,7 +98,7 @@ export default function TutorialOverlay({ onDone }: Props) {
           {!isLast && (
             <button
               onClick={dismiss}
-              className="flex-none px-5 py-3 text-sm text-[#a08c6e] active:opacity-60"
+              className="flex-none px-5 py-3 text-sm text-warm-muted active:opacity-60"
             >
               Skip
             </button>

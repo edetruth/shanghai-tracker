@@ -19,16 +19,16 @@ export default function PrivacyScreen({ playerName, onReady, message, roundNum, 
 
         {/* Gold circle with initial */}
         <div className="w-20 h-20 rounded-full bg-[#e2b858] flex items-center justify-center mx-auto mb-4">
-          <span className="text-3xl font-bold text-[#2c1810]">{initial}</span>
+          <span className="text-3xl font-bold text-warm-text">{initial}</span>
         </div>
 
-        <h2 className="text-2xl font-bold text-[#2c1810] mb-2">{playerName}</h2>
+        <h2 className="text-2xl font-bold text-warm-text mb-2">{playerName}</h2>
 
         {roundNum && requirement && (
           <p className="text-sm text-[#8b7355] mb-1">Round {roundNum} &middot; {requirement}</p>
         )}
         {rank !== undefined && (
-          <p className="text-sm text-[#a08c6e] mb-6">
+          <p className="text-sm text-warm-muted mb-6">
             {rank === 1 ? 'Leading!' : `${rank}${rank === 2 ? 'nd' : rank === 3 ? 'rd' : 'th'} place${scoreDiff ? ` · ${scoreDiff} pts behind` : ''}`}
           </p>
         )}
@@ -37,7 +37,7 @@ export default function PrivacyScreen({ playerName, onReady, message, roundNum, 
           <p className="text-sm text-[#8b7355] mb-8">{message}</p>
         )}
 
-        <p className="text-xs text-[#a08c6e] mb-8">
+        <p className="text-xs text-warm-muted mb-8">
           Make sure only {playerName} can see the screen, then tap Ready.
         </p>
 

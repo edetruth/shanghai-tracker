@@ -159,13 +159,13 @@ export default function PlayerProfileModal({ playerId, onClose }: Props) {
         </div>
 
         {/* Header */}
-        <div className="px-4 py-3 flex items-center gap-3 flex-shrink-0 border-b border-[#e2ddd2]">
+        <div className="px-4 py-3 flex items-center gap-3 flex-shrink-0 border-b border-sand-light">
           <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: playerColor }} />
           <div className="flex-1 min-w-0">
-            <div className="font-heading text-xl font-semibold text-[#2c1810] truncate">{player?.name ?? '…'}</div>
+            <div className="font-heading text-xl font-semibold text-warm-text truncate">{player?.name ?? '…'}</div>
             <div className="text-[#8b7355] text-sm">{gamesPlayed} games played</div>
           </div>
-          <button onClick={handleClose} className="text-[#a08c6e] hover:text-[#2c1810] p-1 flex-shrink-0">
+          <button onClick={handleClose} className="text-warm-muted hover:text-warm-text p-1 flex-shrink-0">
             <X size={20} />
           </button>
         </div>
@@ -217,7 +217,7 @@ export default function PlayerProfileModal({ playerId, onClose }: Props) {
                     {last5Scores.map((s, i) => (
                       <div key={i} className="flex-1 text-center">
                         <div className="font-mono text-sm font-semibold" style={{ color: playerColor }}>{s}</div>
-                        <div className="text-[#a08c6e] text-[10px]">{fmtDate(last5[i].date)}</div>
+                        <div className="text-warm-muted text-[10px]">{fmtDate(last5[i].date)}</div>
                       </div>
                     ))}
                   </div>
@@ -267,7 +267,7 @@ export default function PlayerProfileModal({ playerId, onClose }: Props) {
                   <div className="flex flex-col gap-2">
                     {top3Opponents.map((op) => (
                       <div key={op.name} className="flex items-center justify-between">
-                        <span className="text-[#2c1810] text-sm">{op.name}</span>
+                        <span className="text-warm-text text-sm">{op.name}</span>
                         <div className="flex items-center gap-3 text-xs font-mono text-right">
                           <span className="text-[#8b7355]">{op.games}g together</span>
                           <span className="text-[#8b6914] font-semibold">{op.ourWins}W</span>
@@ -313,7 +313,7 @@ export default function PlayerProfileModal({ playerId, onClose }: Props) {
 
               {/* Game log */}
               <div className="card overflow-hidden">
-                <div className="px-3 py-2 border-b border-[#e2ddd2]">
+                <div className="px-3 py-2 border-b border-sand-light">
                   <p className="text-[#8b7355] text-xs uppercase tracking-wider">Game Log</p>
                 </div>
                 {playerGames.map((g, i) => {
@@ -324,15 +324,15 @@ export default function PlayerProfileModal({ playerId, onClose }: Props) {
                     <button
                       key={g.id}
                       onClick={() => pushDrilldown({ type: 'game-scorecard', title: fmtDateLong(g.date), game: g, highlightPlayerId: playerId })}
-                      className={`flex items-center justify-between w-full px-3 py-2.5 text-sm text-left active:opacity-70 ${i > 0 ? 'border-t border-[#e2ddd2]/40' : ''} ${i % 2 !== 0 ? 'bg-[#efe9dd]/40' : ''}`}
+                      className={`flex items-center justify-between w-full px-3 py-2.5 text-sm text-left active:opacity-70 ${i > 0 ? 'border-t border-sand-light/40' : ''} ${i % 2 !== 0 ? 'bg-[#efe9dd]/40' : ''}`}
                     >
                       <div>
-                        <div className="text-[#2c1810] font-medium text-sm">{fmtDate(g.date)}</div>
-                        <div className="text-[#a08c6e] text-xs">{g.game_scores.length} players</div>
+                        <div className="text-warm-text font-medium text-sm">{fmtDate(g.date)}</div>
+                        <div className="text-warm-muted text-xs">{g.game_scores.length} players</div>
                       </div>
                       <div className="text-right">
-                        <div className={`font-mono font-semibold ${won ? 'text-[#8b6914]' : 'text-[#2c1810]'}`}>{score} pts</div>
-                        <div className="text-[#a08c6e] text-xs">{ordinal(rank)}</div>
+                        <div className={`font-mono font-semibold ${won ? 'text-[#8b6914]' : 'text-warm-text'}`}>{score} pts</div>
+                        <div className="text-warm-muted text-xs">{ordinal(rank)}</div>
                       </div>
                     </button>
                   )

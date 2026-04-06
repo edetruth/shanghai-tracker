@@ -45,7 +45,7 @@ export default function PauseMenu({
               key={s}
               onClick={() => onSpeedChange(s)}
               className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all capitalize ${
-                gameSpeed === s ? 'bg-[#e2b858] text-[#2c1810] shadow-sm' : 'text-[#8bc48b]'
+                gameSpeed === s ? 'bg-[#e2b858] text-warm-text shadow-sm' : 'text-[#8bc48b]'
               }`}
             >
               {s.charAt(0).toUpperCase() + s.slice(1)}
@@ -94,7 +94,7 @@ export default function PauseMenu({
         <div className="space-y-2">
           <button
             onClick={onClose}
-            className="bg-[#e2b858] text-[#2c1810] font-bold rounded-xl w-full py-3 text-sm active:opacity-80"
+            className="bg-[#e2b858] text-warm-text font-bold rounded-xl w-full py-3 text-sm active:opacity-80"
           >
             Resume Game
           </button>

@@ -134,11 +134,11 @@ export default function GameCard({ game, onDelete, onEdit, onPlayerClick }: Prop
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className="text-[#2c1810] font-medium text-base">{dateLabel}</span>
-            <span className="text-[#a08c6e] text-sm">·</span>
-            <span className="text-[#a08c6e] text-sm">{game.game_scores.length} players</span>
+            <span className="text-warm-text font-medium text-base">{dateLabel}</span>
+            <span className="text-warm-muted text-sm">·</span>
+            <span className="text-warm-muted text-sm">{game.game_scores.length} players</span>
             {game.game_type === 'ai' && (
-              <span className="text-[10px] bg-[#e2b858] text-[#2c1810] px-1.5 py-0.5 rounded-full font-semibold">vs AI</span>
+              <span className="text-[10px] bg-[#e2b858] text-warm-text px-1.5 py-0.5 rounded-full font-semibold">vs AI</span>
             )}
             {game.game_type === 'pass-and-play' && (
               <span className="text-[10px] bg-[#efe9dd] text-[#8b7355] px-1.5 py-0.5 rounded-full font-medium">Played</span>
@@ -148,28 +148,28 @@ export default function GameCard({ game, onDelete, onEdit, onPlayerClick }: Prop
             <div className="flex items-center gap-1.5">
               <Trophy size={13} className="text-[#8b6914]" />
               <span className="text-[#8b6914] text-sm font-medium">{winner.player?.name}</span>
-              <span className="font-mono text-[#a08c6e] text-sm">{winner.total_score}</span>
+              <span className="font-mono text-warm-muted text-sm">{winner.total_score}</span>
             </div>
           )}
-          {game.notes && <p className="text-[#a08c6e] text-xs mt-1 truncate">{game.notes}</p>}
+          {game.notes && <p className="text-warm-muted text-xs mt-1 truncate">{game.notes}</p>}
         </div>
         <div className="ml-2">
-          {expanded ? <ChevronUp size={18} className="text-[#a08c6e]" /> : <ChevronDown size={18} className="text-[#a08c6e]" />}
+          {expanded ? <ChevronUp size={18} className="text-warm-muted" /> : <ChevronDown size={18} className="text-warm-muted" />}
         </div>
       </button>
 
       {/* Expanded */}
       {expanded && !editing && (
-        <div className="border-t border-[#e2ddd2]">
+        <div className="border-t border-sand-light">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-[#e2ddd2]">
-                  <th className="text-left px-4 py-2 text-[#a08c6e] text-xs font-medium">Player</th>
+                <tr className="border-b border-sand-light">
+                  <th className="text-left px-4 py-2 text-warm-muted text-xs font-medium">Player</th>
                   {ROUNDS.map((r) => (
-                    <th key={r.number} className="px-2 py-2 text-[#a08c6e] text-xs font-medium text-center">R{r.number}</th>
+                    <th key={r.number} className="px-2 py-2 text-warm-muted text-xs font-medium text-center">R{r.number}</th>
                   ))}
-                  <th className="px-4 py-2 text-[#a08c6e] text-xs font-medium text-right">Total</th>
+                  <th className="px-4 py-2 text-warm-muted text-xs font-medium text-right">Total</th>
                 </tr>
               </thead>
               <tbody>
@@ -177,13 +177,13 @@ export default function GameCard({ game, onDelete, onEdit, onPlayerClick }: Prop
                   const color = PLAYER_COLORS[game.game_scores.findIndex((s) => s.player_id === gs.player_id) % PLAYER_COLORS.length]
                   const isWinner = gs.player_id === winner?.player_id
                   return (
-                    <tr key={gs.id} className="border-b border-[#e2ddd2]/50">
+                    <tr key={gs.id} className="border-b border-sand-light/50">
                       <td className="px-4 py-2">
                         <div className="flex items-center gap-2">
                           <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
                           <button
                             onClick={() => onPlayerClick?.(gs.player_id)}
-                            className={`text-left truncate max-w-[80px] ${isWinner ? 'text-[#8b6914]' : 'text-[#2c1810]'} ${onPlayerClick ? 'hover:underline' : ''}`}
+                            className={`text-left truncate max-w-[80px] ${isWinner ? 'text-[#8b6914]' : 'text-warm-text'} ${onPlayerClick ? 'hover:underline' : ''}`}
                           >
                             {gs.player?.name}
                           </button>
@@ -200,7 +200,7 @@ export default function GameCard({ game, onDelete, onEdit, onPlayerClick }: Prop
                         )
                       })}
                       <td className="px-4 py-2 text-right">
-                        <span className={`font-mono font-semibold ${isWinner ? 'text-[#8b6914]' : 'text-[#2c1810]'}`}>{gs.total_score}</span>
+                        <span className={`font-mono font-semibold ${isWinner ? 'text-[#8b6914]' : 'text-warm-text'}`}>{gs.total_score}</span>
                       </td>
                     </tr>
                   )
@@ -210,15 +210,15 @@ export default function GameCard({ game, onDelete, onEdit, onPlayerClick }: Prop
           </div>
 
           {game.notes && (
-            <div className="px-4 py-3 text-[#8b7355] text-sm border-t border-[#e2ddd2]/50">
-              <span className="text-[#a08c6e] text-xs">Notes: </span>{game.notes}
+            <div className="px-4 py-3 text-[#8b7355] text-sm border-t border-sand-light/50">
+              <span className="text-warm-muted text-xs">Notes: </span>{game.notes}
             </div>
           )}
 
-          <div className="px-4 py-3 border-t border-[#e2ddd2]/50 flex items-center gap-4">
+          <div className="px-4 py-3 border-t border-sand-light/50 flex items-center gap-4">
             <button
               onClick={initEdit}
-              className="flex items-center gap-2 text-sm text-[#a08c6e] hover:text-[#2c1810] transition-colors"
+              className="flex items-center gap-2 text-sm text-warm-muted hover:text-warm-text transition-colors"
             >
               <Pencil size={14} />
               Edit game
@@ -226,7 +226,7 @@ export default function GameCard({ game, onDelete, onEdit, onPlayerClick }: Prop
             <button
               onClick={handleDelete}
               className={`flex items-center gap-2 text-sm transition-colors
-                ${confirming ? 'text-[#b83232]' : 'text-[#a08c6e] hover:text-[#b83232]'}`}
+                ${confirming ? 'text-[#b83232]' : 'text-warm-muted hover:text-[#b83232]'}`}
             >
               <Trash2 size={14} />
               {confirming ? 'Tap again to confirm' : 'Delete'}
@@ -237,15 +237,15 @@ export default function GameCard({ game, onDelete, onEdit, onPlayerClick }: Prop
 
       {/* Edit mode */}
       {expanded && editing && (
-        <div className="border-t border-[#e2ddd2] p-4 flex flex-col gap-4">
+        <div className="border-t border-sand-light p-4 flex flex-col gap-4">
           {/* Date */}
           <div>
-            <label className="text-[#a08c6e] text-xs uppercase tracking-wider">Date</label>
+            <label className="text-warm-muted text-xs uppercase tracking-wider">Date</label>
             <input
               type="date"
               value={editDate}
               onChange={(e) => setEditDate(e.target.value)}
-              className="mt-1 w-full bg-white border border-[#e2ddd2] rounded-lg px-3 py-2 text-[#2c1810]
+              className="mt-1 w-full bg-white border border-sand-light rounded-lg px-3 py-2 text-warm-text
                          focus:outline-none focus:border-[#8b6914]"
             />
           </div>
@@ -274,7 +274,7 @@ export default function GameCard({ game, onDelete, onEdit, onPlayerClick }: Prop
 
           {/* Player names */}
           <div>
-            <label className="text-[#a08c6e] text-xs uppercase tracking-wider mb-2 block">Player Names</label>
+            <label className="text-warm-muted text-xs uppercase tracking-wider mb-2 block">Player Names</label>
             <datalist id={`players-${game.id}`}>
               {knownPlayers.map((p) => <option key={p.id} value={p.name} />)}
             </datalist>
@@ -288,7 +288,7 @@ export default function GameCard({ game, onDelete, onEdit, onPlayerClick }: Prop
                     list={`players-${game.id}`}
                     value={editNames[gs.player_id] ?? gs.player?.name ?? ''}
                     onChange={(e) => setEditNames((prev) => ({ ...prev, [gs.player_id]: e.target.value }))}
-                    className="flex-1 bg-white border border-[#e2ddd2] rounded-lg px-3 py-1.5 text-[#2c1810] text-sm
+                    className="flex-1 bg-white border border-sand-light rounded-lg px-3 py-1.5 text-warm-text text-sm
                                focus:outline-none focus:border-[#8b6914]"
                     placeholder="Player name"
                   />
@@ -299,14 +299,14 @@ export default function GameCard({ game, onDelete, onEdit, onPlayerClick }: Prop
 
           {/* Score grid */}
           <div>
-            <label className="text-[#a08c6e] text-xs uppercase tracking-wider mb-2 block">Scores</label>
+            <label className="text-warm-muted text-xs uppercase tracking-wider mb-2 block">Scores</label>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-[#e2ddd2]">
-                    <th className="text-left py-1.5 text-[#a08c6e] text-xs pr-3">Player</th>
+                  <tr className="border-b border-sand-light">
+                    <th className="text-left py-1.5 text-warm-muted text-xs pr-3">Player</th>
                     {ROUNDS.map((r) => (
-                      <th key={r.number} className="py-1.5 text-[#a08c6e] text-xs text-center px-1">R{r.number}</th>
+                      <th key={r.number} className="py-1.5 text-warm-muted text-xs text-center px-1">R{r.number}</th>
                     ))}
                   </tr>
                 </thead>
@@ -315,8 +315,8 @@ export default function GameCard({ game, onDelete, onEdit, onPlayerClick }: Prop
                     const rowScores = editScores[gs.player_id] ?? gs.round_scores.map(String)
                     const displayName = (editNames[gs.player_id] ?? gs.player?.name ?? '').split(' ')[0]
                     return (
-                      <tr key={gs.player_id} className="border-b border-[#e2ddd2]/30">
-                        <td className="py-2 text-[#2c1810] text-sm pr-3 max-w-[72px] truncate">{displayName}</td>
+                      <tr key={gs.player_id} className="border-b border-sand-light/30">
+                        <td className="py-2 text-warm-text text-sm pr-3 max-w-[72px] truncate">{displayName}</td>
                         {ROUNDS.map((_, i) => (
                           <td key={i} className="py-1 px-1">
                             <input
@@ -324,8 +324,8 @@ export default function GameCard({ game, onDelete, onEdit, onPlayerClick }: Prop
                               inputMode="numeric"
                               value={rowScores[i] ?? '0'}
                               onChange={(e) => handleEditScoreChange(gs.player_id, i, e.target.value)}
-                              className="w-10 text-center font-mono text-sm bg-white border border-[#e2ddd2]
-                                         rounded px-1 py-1 text-[#2c1810] focus:outline-none focus:border-[#8b6914]"
+                              className="w-10 text-center font-mono text-sm bg-white border border-sand-light
+                                         rounded px-1 py-1 text-warm-text focus:outline-none focus:border-[#8b6914]"
                               min={0}
                             />
                           </td>
@@ -340,12 +340,12 @@ export default function GameCard({ game, onDelete, onEdit, onPlayerClick }: Prop
 
           {/* Notes */}
           <div>
-            <label className="text-[#a08c6e] text-xs uppercase tracking-wider">Notes</label>
+            <label className="text-warm-muted text-xs uppercase tracking-wider">Notes</label>
             <textarea
               value={editNotes}
               onChange={(e) => setEditNotes(e.target.value)}
               rows={2}
-              className="mt-1 w-full bg-white border border-[#e2ddd2] rounded-lg px-3 py-2 text-[#2c1810]
+              className="mt-1 w-full bg-white border border-sand-light rounded-lg px-3 py-2 text-warm-text
                          placeholder-[#a08c6e] resize-none focus:outline-none focus:border-[#8b6914]"
             />
           </div>

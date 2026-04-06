@@ -2761,7 +2761,7 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
             background: 'linear-gradient(180deg, #e2b858 0%, rgba(226,184,88,0) 100%)',
             pointerEvents: 'none',
           }}>
-            <span className="text-xs font-medium text-[#2c1810]">Draw pile reshuffled from discards</span>
+            <span className="text-xs font-medium text-warm-text">Draw pile reshuffled from discards</span>
           </div>
         )}
         {/* Close race indicator — replaced by tension system overlays above */}

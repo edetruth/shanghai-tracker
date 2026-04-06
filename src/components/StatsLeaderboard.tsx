@@ -193,7 +193,7 @@ export default function StatsLeaderboard({ onPlayerClick, onNavigateHome }: Prop
               <ArrowLeft size={22} />
             </button>
           )}
-          <h2 className="font-heading text-2xl font-semibold text-[#2c1810]">Stats & Records</h2>
+          <h2 className="font-heading text-2xl font-semibold text-warm-text">Stats & Records</h2>
         </div>
 
         {/* Date filter */}
@@ -201,7 +201,7 @@ export default function StatsLeaderboard({ onPlayerClick, onNavigateHome }: Prop
           {(['all', 'month', '30d', '3m', 'custom'] as DateFilter[]).map((f) => (
             <button key={f} onClick={() => setDateFilter(f)}
               className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors
-                ${dateFilter === f ? 'bg-[#efe9dd] text-[#8b6914] font-semibold' : 'text-[#a08c6e] hover:text-[#2c1810]'}`}>
+                ${dateFilter === f ? 'bg-[#efe9dd] text-[#8b6914] font-semibold' : 'text-warm-muted hover:text-warm-text'}`}>
               {f === 'all' ? 'All Time' : f === 'month' ? 'This Month' : f === '30d' ? '30 Days' : f === '3m' ? '3 Months' : 'Custom'}
             </button>
           ))}
@@ -209,9 +209,9 @@ export default function StatsLeaderboard({ onPlayerClick, onNavigateHome }: Prop
         {dateFilter === 'custom' && (
           <div className="flex gap-2 mt-2">
             <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)}
-              className="flex-1 bg-white border border-[#e2ddd2] rounded-lg px-2 py-1.5 text-[#2c1810] text-xs focus:outline-none focus:border-[#8b6914]" />
+              className="flex-1 bg-white border border-sand-light rounded-lg px-2 py-1.5 text-warm-text text-xs focus:outline-none focus:border-[#8b6914]" />
             <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)}
-              className="flex-1 bg-white border border-[#e2ddd2] rounded-lg px-2 py-1.5 text-[#2c1810] text-xs focus:outline-none focus:border-[#8b6914]" />
+              className="flex-1 bg-white border border-sand-light rounded-lg px-2 py-1.5 text-warm-text text-xs focus:outline-none focus:border-[#8b6914]" />
           </div>
         )}
         {filterLabel && (
@@ -222,11 +222,11 @@ export default function StatsLeaderboard({ onPlayerClick, onNavigateHome }: Prop
 
         {/* Game type filter */}
         <div className="mt-2 flex items-center gap-1.5">
-          <span className="text-[#a08c6e] text-xs">Type:</span>
+          <span className="text-warm-muted text-xs">Type:</span>
           {([['all', 'All'], ['manual', 'Tracker'], ['played', 'Played']] as [GameTypeFilter, string][]).map(([val, label]) => (
             <button key={val} onClick={() => setGameTypeFilter(val)}
               className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors
-                ${gameTypeFilter === val ? 'bg-[#efe9dd] text-[#8b6914] font-semibold' : 'text-[#a08c6e] hover:text-[#2c1810]'}`}>
+                ${gameTypeFilter === val ? 'bg-[#efe9dd] text-[#8b6914] font-semibold' : 'text-warm-muted hover:text-warm-text'}`}>
               {label}
             </button>
           ))}
@@ -262,7 +262,7 @@ export default function StatsLeaderboard({ onPlayerClick, onNavigateHome }: Prop
                 {([2, 3, 5, 0] as MinGames[]).map((n) => (
                   <button key={n} onClick={() => setMinGames(n)}
                     className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors
-                      ${minGames === n ? 'bg-[#efe9dd] text-[#8b6914] font-semibold' : 'text-[#a08c6e] hover:text-[#2c1810]'}`}>
+                      ${minGames === n ? 'bg-[#efe9dd] text-[#8b6914] font-semibold' : 'text-warm-muted hover:text-warm-text'}`}>
                     {n === 0 ? 'All' : n}
                   </button>
                 ))}
@@ -283,12 +283,12 @@ export default function StatsLeaderboard({ onPlayerClick, onNavigateHome }: Prop
                         style={{ borderColor: `${color}50`, background: isFirst ? `rgba(139,105,20,0.06)` : undefined }}>
                         {isFirst && <div className="text-lg mb-1">👑</div>}
                         <PlayerName id={s.player.id} name={s.player.name}
-                          className="text-[#2c1810] font-medium text-sm leading-tight truncate block w-full" />
+                          className="text-warm-text font-medium text-sm leading-tight truncate block w-full" />
                         <div className="font-mono font-bold mt-1">
                           <DS onClick={() => pushDrilldown(winsGamesList(s.player.id, s.player.name))} className="font-mono font-bold" style={{ color }}>{s.wins}W</DS>
                         </div>
                         <div className="text-[#8b7355] text-xs">avg <DS onClick={() => pushDrilldown(scoreHistoryDrill(s.player.id, s.player.name))} className="text-[#8b7355] text-xs">{s.avg_score}</DS></div>
-                        <div className="text-[#a08c6e] text-xs"><DS onClick={() => pushDrilldown(allGamesList(s.player.id, s.player.name))} className="text-[#a08c6e] text-xs">{s.games_played}g</DS></div>
+                        <div className="text-warm-muted text-xs"><DS onClick={() => pushDrilldown(allGamesList(s.player.id, s.player.name))} className="text-warm-muted text-xs">{s.games_played}g</DS></div>
                       </div>
                       <div className={`w-full ${podiumPlatformH[rankIdx]} rounded-b-lg flex items-center justify-center`}
                         style={{ background: `${color}18` }}>
@@ -305,20 +305,20 @@ export default function StatsLeaderboard({ onPlayerClick, onNavigateHome }: Prop
               <div className="card overflow-hidden">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-[#e2ddd2]">
+                    <tr className="border-b border-sand-light">
                       {['#', 'Player', 'G', 'W', 'Avg', 'Best', '0s'].map((h) => (
-                        <th key={h} className="px-2 py-2 text-[#a08c6e] text-xs font-medium text-center first:text-left">{h}</th>
+                        <th key={h} className="px-2 py-2 text-warm-muted text-xs font-medium text-center first:text-left">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {tableRows.map((s, i) => (
-                      <tr key={s.player.id} className={`border-b border-[#e2ddd2]/50 ${i % 2 !== 0 ? 'bg-[#efe9dd]/40' : ''}`}>
-                        <td className="px-2 py-2 text-[#a08c6e] text-xs">{i + 4}</td>
+                      <tr key={s.player.id} className={`border-b border-sand-light/50 ${i % 2 !== 0 ? 'bg-[#efe9dd]/40' : ''}`}>
+                        <td className="px-2 py-2 text-warm-muted text-xs">{i + 4}</td>
                         <td className="px-2 py-2">
                           <div className="flex items-center gap-1.5">
                             <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: playerColor(s.player.id) }} />
-                            <PlayerName id={s.player.id} name={s.player.name} className="text-[#2c1810] truncate max-w-[80px] text-sm" />
+                            <PlayerName id={s.player.id} name={s.player.name} className="text-warm-text truncate max-w-[80px] text-sm" />
                           </div>
                         </td>
                         <td className="px-2 py-2 text-center font-mono text-[#8b7355] text-xs">
@@ -327,8 +327,8 @@ export default function StatsLeaderboard({ onPlayerClick, onNavigateHome }: Prop
                         <td className="px-2 py-2 text-center font-mono text-[#8b6914] text-xs font-semibold">
                           <DS onClick={() => pushDrilldown(winsGamesList(s.player.id, s.player.name))} className="font-mono text-[#8b6914] text-xs font-semibold">{s.wins}</DS>
                         </td>
-                        <td className="px-2 py-2 text-center font-mono text-[#2c1810] text-xs">
-                          <DS onClick={() => pushDrilldown(scoreHistoryDrill(s.player.id, s.player.name))} className="font-mono text-[#2c1810] text-xs">{s.avg_score}</DS>
+                        <td className="px-2 py-2 text-center font-mono text-warm-text text-xs">
+                          <DS onClick={() => pushDrilldown(scoreHistoryDrill(s.player.id, s.player.name))} className="font-mono text-warm-text text-xs">{s.avg_score}</DS>
                         </td>
                         <td className="px-2 py-2 text-center font-mono text-[#2d7a3a] text-xs">
                           <DS onClick={() => { const v = bestGameDrill(s.player.id, s.best_game); if (v) pushDrilldown(v) }} className="font-mono text-[#2d7a3a] text-xs">{s.best_game}</DS>
@@ -353,15 +353,15 @@ export default function StatsLeaderboard({ onPlayerClick, onNavigateHome }: Prop
                   <span className="text-[#8b7355] text-sm">
                     Guests & newcomers ({alsoPlayed.length} player{alsoPlayed.length !== 1 ? 's' : ''})
                   </span>
-                  {alsoPlayedOpen ? <ChevronUp size={16} className="text-[#a08c6e]" /> : <ChevronDown size={16} className="text-[#a08c6e]" />}
+                  {alsoPlayedOpen ? <ChevronUp size={16} className="text-warm-muted" /> : <ChevronDown size={16} className="text-warm-muted" />}
                 </button>
                 {alsoPlayedOpen && (
-                  <div className="border-t border-[#e2ddd2]">
+                  <div className="border-t border-sand-light">
                     {alsoPlayed.map((s, i) => (
                       <div key={s.player.id} className={`flex items-center justify-between px-3 py-2 ${i % 2 !== 0 ? 'bg-[#efe9dd]/40' : ''}`}>
                         <div className="flex items-center gap-2">
                           <div className="w-1.5 h-1.5 rounded-full" style={{ background: playerColor(s.player.id) }} />
-                          <PlayerName id={s.player.id} name={s.player.name} className="text-[#2c1810] text-sm" />
+                          <PlayerName id={s.player.id} name={s.player.name} className="text-warm-text text-sm" />
                         </div>
                         <span className="text-[#8b7355] text-xs font-mono">{s.games_played}g · avg {s.avg_score}</span>
                       </div>
@@ -376,7 +376,7 @@ export default function StatsLeaderboard({ onPlayerClick, onNavigateHome }: Prop
           /* Records */
           <div className="flex flex-col gap-4">
             <div>
-              <p className="text-[#a08c6e] text-xs uppercase tracking-wider mb-2">Champions</p>
+              <p className="text-warm-muted text-xs uppercase tracking-wider mb-2">Champions</p>
               <div className="flex flex-col gap-2">
                 {[
                   { icon: <Trophy size={18} className="text-[#8b6914]" />, label: 'Most Wins', id: mostWins?.player.id, name: mostWins?.player.name, value: `${mostWins?.wins} wins`, accent: '#8b6914',
@@ -400,10 +400,10 @@ export default function StatsLeaderboard({ onPlayerClick, onNavigateHome }: Prop
                       className={`card p-3 flex items-center gap-3 ${r.glow ? 'ring-1 ring-[#2d7a3a]/30' : ''}`}>
                       <div className="w-9 h-9 bg-[#efe9dd] rounded-lg flex items-center justify-center flex-shrink-0">{r.icon}</div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-[#a08c6e] text-xs uppercase tracking-wider">{r.label}</div>
+                        <div className="text-warm-muted text-xs uppercase tracking-wider">{r.label}</div>
                         {r.id
-                          ? <PlayerName id={r.id} name={r.name ?? '—'} className="text-[#2c1810] font-medium text-sm truncate block" />
-                          : <div className="text-[#2c1810] font-medium text-sm">—</div>}
+                          ? <PlayerName id={r.id} name={r.name ?? '—'} className="text-warm-text font-medium text-sm truncate block" />
+                          : <div className="text-warm-text font-medium text-sm">—</div>}
                       </div>
                       <div className="font-mono text-xs font-semibold flex-shrink-0" style={{ color: r.accent }}>
                         {r.onDrill

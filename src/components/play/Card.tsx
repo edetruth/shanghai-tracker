@@ -167,7 +167,7 @@ export default function Card({ card, selected, selectionIndex, onClick, compact,
     >
       {/* NEW badge */}
       {showNew && (
-        <div className="absolute -top-1.5 -right-1 z-10 bg-[#e2b858] text-[#2c1810] text-[8px] font-bold px-1 rounded leading-4">
+        <div className="absolute -top-1.5 -right-1 z-10 bg-[#e2b858] text-warm-text text-[8px] font-bold px-1 rounded leading-4">
           NEW
         </div>
       )}

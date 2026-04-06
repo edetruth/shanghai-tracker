@@ -48,7 +48,7 @@ export default function HomePage({ onNavigate, onShowTutorial }: Props) {
         {onShowTutorial && (
           <button
             onClick={onShowTutorial}
-            className="absolute top-0 right-0 text-[#a08c6e] p-1 active:opacity-60"
+            className="absolute top-0 right-0 text-warm-muted p-1 active:opacity-60"
             title="Show tutorial"
           >
             <HelpCircle size={20} />
@@ -69,7 +69,7 @@ export default function HomePage({ onNavigate, onShowTutorial }: Props) {
               <card.Icon size={28} className="text-[#8b6914]" />
             </div>
             <div>
-              <div className="text-[#2c1810] font-semibold text-lg">{card.title}</div>
+              <div className="text-warm-text font-semibold text-lg">{card.title}</div>
               <div className="text-[#8b7355] text-sm mt-0.5">{card.sub}</div>
             </div>
           </button>

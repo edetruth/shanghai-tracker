@@ -50,10 +50,10 @@ export default function JoinGame({ onBack }: Props) {
   return (
     <div className="flex flex-col gap-6 p-4">
       <div className="flex items-center gap-3 pt-6">
-        <button onClick={onBack} className="text-[#a08c6e]">
+        <button onClick={onBack} className="text-warm-muted">
           <ArrowLeft size={24} />
         </button>
-        <h2 className="font-heading text-2xl font-semibold text-[#2c1810]">Join Game</h2>
+        <h2 className="font-heading text-2xl font-semibold text-warm-text">Join Game</h2>
       </div>
 
       <div className="card p-4 flex flex-col gap-4">
@@ -66,7 +66,7 @@ export default function JoinGame({ onBack }: Props) {
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
           onKeyDown={(e) => e.key === 'Enter' && join()}
-          className="w-full bg-white border border-[#e2ddd2] rounded-lg px-4 py-3 text-[#2c1810]
+          className="w-full bg-white border border-sand-light rounded-lg px-4 py-3 text-warm-text
                      text-center font-mono text-xl tracking-widest uppercase
                      placeholder-[#a08c6e] focus:outline-none focus:border-[#8b6914]
                      focus:ring-1 focus:ring-[#8b6914]"

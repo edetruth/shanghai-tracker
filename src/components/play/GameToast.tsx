@@ -14,7 +14,7 @@ interface Props {
 }
 
 const STYLE_CLASSES: Record<ToastStyle, string> = {
-  celebration: 'bg-gradient-to-r from-[#e2b858] to-[#d4a843] text-[#2c1810]',
+  celebration: 'bg-gradient-to-r from-[#e2b858] to-[#d4a843] text-warm-text',
   pressure: 'bg-[#b83232]/90 text-white',
   neutral: 'bg-[#1e4a2e] text-[#a8d0a8]',
   drama: 'bg-[#0f2218]/95 text-white border border-[#6aad7a]',
