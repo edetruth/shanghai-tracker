@@ -549,3 +549,29 @@
   25% { transform: rotate(-1deg); }
   75% { transform: rotate(1deg); }
 }
+
+/* ── Accessibility: Reduced Motion ─────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-shimmer,
+  .joker-shimmer::after {
+    animation: none !important;
+  }
+}
+
+/* ── Touch target minimums ─────────────────────────────────────────────────── */
+
+.buy-btn,
+.pass-btn {
+  min-height: 44px;
+  min-width: 44px;
+}
