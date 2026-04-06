@@ -1,3 +1,4 @@
+import { SkeletonList } from './Skeleton'
 import { useState, useEffect } from 'react'
 import { ArrowLeft, Plus, Download, Upload, RefreshCw, ChevronDown } from 'lucide-react'
 import { getCompletedGames, deleteGame } from '../lib/gameStore'
@@ -186,7 +187,7 @@ export default function ScoreTrackerPage({ onNavigateHome, onStartNewGame, onPla
       {/* Game list */}
       <div className="flex-1 px-4 pb-8 flex flex-col gap-3 overflow-auto">
         {loading ? (
-          <div className="text-center text-warm-muted py-12">Loading...</div>
+          <SkeletonList />
         ) : filtered.length === 0 ? (
           <div className="text-center py-16">
             <div className="text-4xl mb-4">🃏</div>

@@ -7,6 +7,7 @@ import { ACHIEVEMENTS } from '../lib/achievements'
 import type { GameWithScores, Player, DrilldownView } from '../lib/types'
 import { format } from 'date-fns'
 import DrilldownModal from './DrilldownModal'
+import { SkeletonProfile } from './Skeleton'
 
 interface Props {
   playerId: string
@@ -173,7 +174,7 @@ export default function PlayerProfileModal({ playerId, onClose }: Props) {
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto px-4 pb-8">
           {loading ? (
-            <div className="text-center text-[#8b7355] py-12">Loading…</div>
+            <SkeletonProfile />
           ) : gamesPlayed === 0 ? (
             <div className="text-center text-[#8b7355] py-12">No completed games found</div>
           ) : (

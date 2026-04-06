@@ -9,6 +9,7 @@ import { ACHIEVEMENTS, getCategoryIcon } from '../lib/achievements'
 import type { GameWithScores, Player, DrilldownView } from '../lib/types'
 import { format } from 'date-fns'
 import DrilldownModal from './DrilldownModal'
+import { SkeletonStats } from './Skeleton'
 
 type MinGames = 0 | 2 | 3 | 5
 type DateFilter = 'all' | 'month' | '30d' | '3m' | 'custom'
@@ -246,7 +247,7 @@ export default function StatsLeaderboard({ onPlayerClick, onNavigateHome }: Prop
 
       <div className="flex-1 px-4 pb-8 overflow-auto">
         {loading ? (
-          <div className="text-center text-[#8b7355] py-12">Loading…</div>
+          <SkeletonStats />
         ) : filteredGames.length === 0 ? (
           <div className="text-center py-16">
             <div className="text-4xl mb-4">📊</div>
