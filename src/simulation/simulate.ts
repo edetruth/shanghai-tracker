@@ -6,6 +6,7 @@
  */
 
 import type { Card, Meld, Player, GameState, PlayerConfig, AIDifficulty, AIPersonality, PersonalityConfig } from '../game/types'
+import { CardTracker } from '../game/card-tracker'
 import { PERSONALITIES } from '../game/types'
 import { createDecks, shuffle, dealHands } from '../game/deck'
 import { buildMeld, isValidSet, findSwappableJoker, simulateLayOff, canGoOutViaChainLayOff, isLegalDiscard, canLayOff } from '../game/meld-validator'
@@ -521,11 +522,24 @@ interface ActionResult {
   isJokerLayOff?: boolean
 }
 
+/** Sync a CardTracker from the current simulation game state for a given player. */
+function syncSimTracker(tracker: CardTracker, state: GameState, playerId: string): CardTracker {
+  const player = state.players.find(p => p.id === playerId)
+  if (!player) return tracker
+  tracker.reset(player.hand)
+  tracker.markSeenMany(state.roundState.discardPile)
+  for (const meld of state.roundState.tablesMelds) {
+    tracker.markSeenMany(meld.cards)
+  }
+  return tracker
+}
+
 function simExecuteAIAction(
   state: GameState,
   config: SimConfig,
   layOffDoneThisTurn: boolean,
   timing: GoDownTimingState,
+  tracker?: CardTracker,
 ): ActionResult {
   const player = getCurrentPlayer(state)
   const playerIdx = state.roundState.currentPlayerIndex
@@ -557,7 +571,7 @@ function simExecuteAIAction(
       }
     }
     const easyOpponents = state.players.filter((_, i) => i !== state.roundState.currentPlayerIndex)
-    const card = aiChooseDiscard(player.hand, requirement, evalConfig, tablesMelds, easyOpponents, undefined, player.hasLaidDown)
+    const card = aiChooseDiscard(player.hand, requirement, evalConfig, tablesMelds, easyOpponents, undefined, player.hasLaidDown, tracker)
     const result = simDiscard(state, card.id)
     if (!result) return { state, action: 'stuck' }
     return { state: result.state, action: 'discard' }
@@ -570,7 +584,7 @@ function simExecuteAIAction(
       const newState = simJokerSwap(state, swap.card, swap.meld)
       if (newState) {
         // After swap, immediately try to meld (re-run action on new state)
-        const afterSwap = simExecuteAIAction(newState, config, layOffDoneThisTurn, timing)
+        const afterSwap = simExecuteAIAction(newState, config, layOffDoneThisTurn, timing, tracker)
         return { ...afterSwap, swapped: true }
       }
     }
@@ -598,7 +612,7 @@ function simExecuteAIAction(
       const newState = simJokerSwap(state, swap.card, swap.meld)
       if (newState) {
         // After joker swap, re-run to lay off the recovered joker
-        const afterSwap = simExecuteAIAction(newState, config, true, timing)
+        const afterSwap = simExecuteAIAction(newState, config, true, timing, tracker)
         return { ...afterSwap, swapped: true }
       }
     }
@@ -615,7 +629,7 @@ function simExecuteAIAction(
         const isJokerLayOff = layOff.card.suit === 'joker'
         if (isHard && !newState.roundState.goOutPlayerId) {
           // Hard AI: keep laying off until can't
-          const next = simExecuteAIAction(newState, config, true, timing)
+          const next = simExecuteAIAction(newState, config, true, timing, tracker)
           return { ...next, cardsLaidOff: (next.cardsLaidOff ?? 0) + 1, isJokerLayOff: isJokerLayOff || next.isJokerLayOff }
         }
         return { state: newState, action: 'layoff', cardsLaidOff: 1, isJokerLayOff }
@@ -626,7 +640,8 @@ function simExecuteAIAction(
   // Discard
   if (player.hand.length > 0) {
     const discardOpponents = state.players.filter((_, i) => i !== state.roundState.currentPlayerIndex)
-    const card = aiChooseDiscard(player.hand, requirement, evalConfig, tablesMelds, discardOpponents, undefined, player.hasLaidDown)
+    const simTracker = tracker ? syncSimTracker(tracker, state, player.id) : undefined
+    const card = aiChooseDiscard(player.hand, requirement, evalConfig, tablesMelds, discardOpponents, undefined, player.hasLaidDown, simTracker)
     const result = simDiscard(state, card.id)
     if (!result) {
       // Stuck with 1 card that can't be discarded
@@ -677,6 +692,9 @@ export function simulateRound(gameState: GameState, config: SimConfig): { state:
   // Go-down timing state for this round
   const timing = createGoDownTimingState(playerIds)
 
+  // Card tracker for enhanced AI (shared across all players in this round)
+  const roundTracker = new CardTracker()
+
   // Count jokers dealt this round
   const jokersDealt = state.players.reduce((sum, p) => sum + p.hand.filter(c => c.suit === 'joker').length, 0)
 
@@ -700,10 +718,11 @@ export function simulateRound(gameState: GameState, config: SimConfig): { state:
 
     // ── DRAW PHASE ──────────────────────────────────────────────────────────
     const topDiscard = state.roundState.discardPile[state.roundState.discardPile.length - 1] ?? null
-    const { evalConfig: takeEvalCfg } = getSimPlayerConfig(playerIdx, config)
+    const { evalConfig: takeEvalCfg, personality: takePersonality } = getSimPlayerConfig(playerIdx, config)
     const opponentsForDraw = state.players.filter((_, i) => i !== playerIdx)
+    const takeTracker = takePersonality.opponentAwareness ? syncSimTracker(roundTracker, state, pid) : undefined
     const shouldTake = topDiscard !== null && (
-      aiShouldTakeDiscard(player.hand, topDiscard, state.roundState.requirement, player.hasLaidDown, takeEvalCfg, state.roundState.tablesMelds, opponentsForDraw) ||
+      aiShouldTakeDiscard(player.hand, topDiscard, state.roundState.requirement, player.hasLaidDown, takeEvalCfg, state.roundState.tablesMelds, opponentsForDraw, takeTracker) ||
       // Fix 1: Post-down discard taking — if player has laid down and top discard can lay off onto any table meld, take it
       (player.hasLaidDown && state.roundState.tablesMelds.some(m => canLayOff(topDiscard, m))) ||
       // Fix 2: Post-down joker-swap take — take a card that replaces a joker in a table run, freeing the joker for lay-off
@@ -763,7 +782,7 @@ export function simulateRound(gameState: GameState, config: SimConfig): { state:
 
     while (!turnDone && !state.roundState.goOutPlayerId && actionSteps < 50) {
       actionSteps++
-      const actionResult = simExecuteAIAction(state, config, layOffCount >= layOffCap, timing)
+      const actionResult = simExecuteAIAction(state, config, layOffCount >= layOffCap, timing, roundTracker)
       state = actionResult.state
 
       if (actionResult.swapped) statsMap[pid].jokerSwaps++
