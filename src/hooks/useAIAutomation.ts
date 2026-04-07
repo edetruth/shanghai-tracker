@@ -13,6 +13,7 @@ import {
   type AIEvalConfig,
 } from '../game/ai'
 import { loadOpponentModel, buildNemesisOverrides } from '../game/opponent-model'
+import { CardTracker } from '../game/card-tracker'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -136,6 +137,36 @@ export function useAIAutomation({
 
   const [aiActionTick, setAiActionTick] = useState(0)
   const aiLayOffCountRef = useRef(0)
+
+  // Card tracker for Nemesis: rebuilt from game state each AI turn
+  const cardTrackerRef = useRef(new CardTracker())
+
+  /** Sync the card tracker from the current game state for the given AI player. */
+  function syncTracker(state: GameState, playerId: string): CardTracker {
+    const tracker = cardTrackerRef.current
+    const player = state.players.find(p => p.id === playerId)
+    if (!player) return tracker
+
+    // Reset and mark own hand as seen
+    tracker.reset(player.hand)
+
+    // Mark all cards in the discard pile as seen
+    tracker.markSeenMany(state.roundState.discardPile)
+
+    // Mark all cards on the table (melds) as seen
+    for (const meld of state.roundState.tablesMelds) {
+      tracker.markSeenMany(meld.cards)
+    }
+
+    // Mark cards in opponent history (picks that are now in their hands)
+    const history = opponentHistoryRef.current
+    for (const [, hist] of history) {
+      tracker.markSeenMany(hist.picked)
+      tracker.markSeenMany(hist.discarded)
+    }
+
+    return tracker
+  }
 
   // ── Personality & eval config ────────────────────────────────────────────
 
@@ -357,8 +388,9 @@ export function useAIAutomation({
         card = pool.reduce((worst, c) => cardPoints(c.rank) > cardPoints(worst.rank) ? c : worst)
       } else {
         const evalCfg = getEvalConfig()
+        const tracker = config.opponentAwareness ? syncTracker(state, player.id) : undefined
         card = aiChooseDiscard(player.hand, requirement, evalCfg, tablesMelds,
-            state.players.filter(p => p.id !== player.id), opponentHistoryRef.current, player.hasLaidDown)
+            state.players.filter(p => p.id !== player.id), opponentHistoryRef.current, player.hasLaidDown, tracker)
         // Lucky Lou: 15% chance to pick a random card instead
         if (config.randomFactor > 0 && Math.random() < 0.15 && player.hand.length > 1) {
           const randomIdx = Math.floor(Math.random() * player.hand.length)
@@ -396,8 +428,9 @@ export function useAIAutomation({
         const evalCfg = getEvalConfig()
         let shouldTake = false
         if (top !== null) {
+          const drawTracker = cfg.opponentAwareness ? syncTracker(state, player.id) : undefined
           shouldTake = aiShouldTakeDiscard(player.hand, top, state.roundState.requirement, player.hasLaidDown, evalCfg,
-              state.roundState.tablesMelds, state.players.filter(p => p.id !== player.id))
+              state.roundState.tablesMelds, state.players.filter(p => p.id !== player.id), drawTracker)
           // Lucky Lou random factor: 20% chance to take any discard, 10% chance to decline a good one
           if (cfg.randomFactor > 0) {
             if (!shouldTake && Math.random() < 0.2) shouldTake = true
@@ -467,7 +500,8 @@ export function useAIAutomation({
       } else {
         const opponents = state.players.filter(p => p.id !== currentBuyer.id)
           .map(p => ({ hand: { length: p.hand.length }, hasLaidDown: p.hasLaidDown }))
-        shouldBuy = aiShouldBuy(currentBuyer.hand, disc, req, currentBuyer.buysRemaining, buyEvalCfg, opponents, state.roundState.tablesMelds, currentBuyer.hasLaidDown)
+        const buyTracker = buyConfig.opponentAwareness ? syncTracker(state, currentBuyer.id) : undefined
+        shouldBuy = aiShouldBuy(currentBuyer.hand, disc, req, currentBuyer.buysRemaining, buyEvalCfg, opponents, state.roundState.tablesMelds, currentBuyer.hasLaidDown, buyTracker)
       }
 
       if (shouldBuy) {

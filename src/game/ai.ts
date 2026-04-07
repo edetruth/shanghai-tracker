@@ -1,6 +1,8 @@
 import type { AIPersonality, Card, Meld, OpponentHistory, Player, RoundRequirement } from './types'
 import { isValidRun, canLayOff, simulateLayOff, findSwappableJoker, canGoOutViaChainLayOff } from './meld-validator'
 import { cardPoints, MIN_SET_SIZE, MIN_RUN_SIZE } from './rules'
+import type { CardTracker } from './card-tracker'
+import { sampleOpponentHands } from './hand-inference'
 
 function isJoker(c: Card): boolean { return c.suit === 'joker' }
 
@@ -409,6 +411,71 @@ function getRoundStrategy(requirement: RoundRequirement): {
   if (requirement.runs === 0) return { suitWeight: 0.2, rankWeight: 0.9, holdJokersLonger: false }
   if (requirement.sets === 0) return { suitWeight: 0.9, rankWeight: 0.2, holdJokersLonger: true }
   return { suitWeight: 0.5, rankWeight: 0.5, holdJokersLonger: requirement.runs > requirement.sets }
+}
+
+// ── Discard Lookahead (uses CardTracker + HandInference) ─────────────────────
+
+/**
+ * Estimate how much a discard would help opponents, using Monte Carlo hand inference.
+ * Replaces heuristic cardDanger() when a CardTracker is available.
+ *
+ * For each opponent: sample 10 possible hands, simulate them receiving the card,
+ * measure average hand improvement, weight by proximity to going down.
+ */
+function discardDangerWithLookahead(
+  card: Card,
+  tracker: CardTracker,
+  opponents: Player[],
+  opponentHistory: Map<string, OpponentHistory> | undefined,
+  requirement: RoundRequirement,
+  tablesMelds: Meld[],
+): number {
+  if (isJoker(card)) return 0
+  let totalDanger = 0
+
+  for (const opp of opponents) {
+    // Get pick history for this opponent (for weighting hand samples)
+    const hist = opponentHistory?.get(opp.id)
+    const pickHistory = hist?.picked ?? []
+
+    // Proximity weight: opponents closer to winning are more dangerous to feed
+    let proximityWeight = 1.0
+    if (opp.hasLaidDown) {
+      if (opp.hand.length <= 1) proximityWeight = 5.0
+      else if (opp.hand.length <= 3) proximityWeight = 3.0
+      else proximityWeight = 2.0
+    }
+
+    // Check direct lay-off threat (table melds — no inference needed)
+    const oppMelds = tablesMelds.filter(m => m.ownerId === opp.id)
+    for (const m of oppMelds) {
+      if (canLayOff(card, m)) {
+        totalDanger += 80 * proximityWeight
+      }
+    }
+
+    // Skip hand inference for opponents who have already laid down
+    // (their strategy is just lay-off/empty hand, inference adds little)
+    if (opp.hasLaidDown) continue
+
+    // Sample possible opponent hands and measure how much this card helps them
+    const samples = sampleOpponentHands(tracker, opp.hand.length, pickHistory, 10)
+    if (samples.length === 0) continue
+
+    let totalImprovement = 0
+    for (const sampleHand of samples) {
+      const scoreBefore = evaluateHandFast(sampleHand, requirement, false)
+      const scoreAfter = evaluateHandFast([...sampleHand, card], requirement, false)
+      const improvement = scoreAfter - scoreBefore
+      if (improvement > 0) totalImprovement += improvement
+    }
+    const avgImprovement = totalImprovement / samples.length
+
+    // Scale: an average improvement of 20+ is very significant
+    totalDanger += avgImprovement * proximityWeight
+  }
+
+  return totalDanger
 }
 
 // ── Hand Evaluation System ────────────────────────────────────────────────────
@@ -1068,6 +1135,7 @@ export function aiShouldTakeDiscard(
   config: AIEvalConfig = DEFAULT_EVAL_CONFIG,
   tablesMelds: Meld[] = [],
   opponents: Player[] = [],
+  tracker?: CardTracker,
 ): boolean {
   // After laying down, only take via lay-off (handled by GameBoard override).
   // Even jokers: don't blindly take if we can't use them.
@@ -1102,6 +1170,14 @@ export function aiShouldTakeDiscard(
         improvement += 15
       }
     }
+  }
+
+  // Card scarcity: if this card is rare in the remaining deck, lower the bar to take it.
+  // A card with 0 remaining copies elsewhere is irreplaceable.
+  if (tracker && improvement > 0 && !isJoker(discardCard)) {
+    const remaining = tracker.getRemainingCount(discardCard.rank, discardCard.suit)
+    if (remaining === 0) improvement += 3       // last copy — now or never
+    else if (remaining === 1) improvement += 1  // scarce
   }
 
   // Threshold scales with hand size — larger hands are riskier to add to
@@ -1147,6 +1223,7 @@ export function aiShouldBuy(
   players?: { hand: { length: number }, hasLaidDown: boolean }[],
   tablesMelds: Meld[] = [],
   hasLaidDown = false,
+  tracker?: CardTracker,
 ): boolean {
   if (buysRemaining <= 0) return false
 
@@ -1221,9 +1298,17 @@ export function aiShouldBuy(
     risk += (hand.length - 13) * 5
   }
 
+  // Card scarcity: buying a rare card is more valuable since the draw pile is unlikely to provide it
+  let scarcityBonus = 0
+  if (tracker && improvement > 0 && !isJoker(discardCard)) {
+    const remaining = tracker.getRemainingCount(discardCard.rank, discardCard.suit)
+    if (remaining === 0) scarcityBonus = 5       // last copy
+    else if (remaining === 1) scarcityBonus = 2  // scarce
+  }
+
   // === DECISION ===
   // buyRiskTolerance adjusts the threshold: positive = more willing to buy
-  if (improvement + runBuyBonus + config.buyRiskTolerance > risk) return true
+  if (improvement + runBuyBonus + scarcityBonus + config.buyRiskTolerance > risk) return true
 
   // === DENIAL BUY ===
   // Shark/Mastermind: buy a card purely to deny an opponent close to going out,
@@ -1257,6 +1342,7 @@ export function aiChooseDiscard(
   opponents?: Player[],
   opponentHistory?: Map<string, OpponentHistory>,
   hasLaidDown?: boolean,
+  tracker?: CardTracker,
 ): Card {
   if (hand.length === 0) throw new Error('Empty hand')
 
@@ -1398,7 +1484,10 @@ export function aiChooseDiscard(
     // A dangerous card should have a LOWER without-score so we DON'T pick it.
     // → Add danger as a penalty to the without-score.
     if (useOpponentAwareness) {
-      const danger = cardDanger(card, tablesMelds, opponents, opponentHistory)
+      // Use Monte Carlo lookahead when tracker available, else fall back to heuristic
+      const danger = (tracker && opponents)
+        ? discardDangerWithLookahead(card, tracker, opponents, opponentHistory, requirement, tablesMelds)
+        : cardDanger(card, tablesMelds, opponents, opponentHistory)
       score -= danger * config.dangerWeight
 
       // Upgrade 2: Hand reading — penalize cards matching inferred opponent needs
