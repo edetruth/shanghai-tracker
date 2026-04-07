@@ -1,3 +1,4 @@
+import { SkeletonList } from './Skeleton'
 import { useState, useEffect } from 'react'
 import { ArrowLeft, Plus, Download, Upload, RefreshCw, ChevronDown } from 'lucide-react'
 import { getCompletedGames, deleteGame } from '../lib/gameStore'
@@ -90,12 +91,12 @@ export default function ScoreTrackerPage({ onNavigateHome, onStartNewGame, onPla
           <button onClick={onNavigateHome} className="text-[#8b6914] p-1 -ml-1">
             <ArrowLeft size={22} />
           </button>
-          <h2 className="font-display text-2xl font-semibold text-[#2c1810]">Score Tracker</h2>
-          <button onClick={loadGames} className="ml-auto text-[#a08c6e] p-1">
+          <h2 className="font-heading text-2xl font-semibold text-warm-text">Score Tracker</h2>
+          <button onClick={loadGames} className="ml-auto text-warm-muted p-1">
             <RefreshCw size={18} />
           </button>
         </div>
-        <p className="text-[#a08c6e] text-sm ml-8">{games.length} game{games.length !== 1 ? 's' : ''} recorded</p>
+        <p className="text-warm-muted text-sm ml-8">{games.length} game{games.length !== 1 ? 's' : ''} recorded</p>
 
         {/* Enter New Scores button */}
         <button
@@ -129,35 +130,35 @@ export default function ScoreTrackerPage({ onNavigateHome, onStartNewGame, onPla
               <ChevronDown size={14} />
             </button>
             {showFilterMenu && (
-              <div className="absolute left-0 top-full mt-1 z-20 bg-white border border-[#e2ddd2] rounded-xl overflow-hidden min-w-[160px]"
+              <div className="absolute left-0 top-full mt-1 z-20 bg-white border border-sand-light rounded-xl overflow-hidden min-w-[160px]"
                 style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
                 <button onClick={() => { setFilter('all'); setShowFilterMenu(false) }}
-                  className={`w-full text-left px-4 py-2 text-sm ${filter === 'all' ? 'text-[#8b6914] font-medium' : 'text-[#2c1810]'} hover:bg-[#efe9dd]`}>
+                  className={`w-full text-left px-4 py-2 text-sm ${filter === 'all' ? 'text-[#8b6914] font-medium' : 'text-warm-text'} hover:bg-[#efe9dd]`}>
                   All Time
                 </button>
                 <button onClick={() => { setFilter('thisyear'); setShowFilterMenu(false) }}
-                  className={`w-full text-left px-4 py-2 text-sm ${filter === 'thisyear' ? 'text-[#8b6914] font-medium' : 'text-[#2c1810]'} hover:bg-[#efe9dd]`}>
+                  className={`w-full text-left px-4 py-2 text-sm ${filter === 'thisyear' ? 'text-[#8b6914] font-medium' : 'text-warm-text'} hover:bg-[#efe9dd]`}>
                   This Year ({thisYear})
                 </button>
                 {availableMonths.length > 0 && (
-                  <div className="border-t border-[#e2ddd2]">
-                    <div className="px-4 py-1.5 text-[#a08c6e] text-xs uppercase tracking-wider">By Month</div>
+                  <div className="border-t border-sand-light">
+                    <div className="px-4 py-1.5 text-warm-muted text-xs uppercase tracking-wider">By Month</div>
                     {availableMonths.map((m) => (
                       <button key={m.value}
                         onClick={() => { setFilter('month'); setSelectedMonth(m.value); setShowFilterMenu(false) }}
-                        className={`w-full text-left px-4 py-2 text-sm ${filter === 'month' && selectedMonth === m.value ? 'text-[#8b6914] font-medium' : 'text-[#2c1810]'} hover:bg-[#efe9dd]`}>
+                        className={`w-full text-left px-4 py-2 text-sm ${filter === 'month' && selectedMonth === m.value ? 'text-[#8b6914] font-medium' : 'text-warm-text'} hover:bg-[#efe9dd]`}>
                         {m.label}
                       </button>
                     ))}
                   </div>
                 )}
                 {availableYears.length > 1 && (
-                  <div className="border-t border-[#e2ddd2]">
-                    <div className="px-4 py-1.5 text-[#a08c6e] text-xs uppercase tracking-wider">By Year</div>
+                  <div className="border-t border-sand-light">
+                    <div className="px-4 py-1.5 text-warm-muted text-xs uppercase tracking-wider">By Year</div>
                     {availableYears.map((y) => (
                       <button key={y}
                         onClick={() => { setFilter('year'); setSelectedYear(y); setShowFilterMenu(false) }}
-                        className={`w-full text-left px-4 py-2 text-sm ${filter === 'year' && selectedYear === y ? 'text-[#8b6914] font-medium' : 'text-[#2c1810]'} hover:bg-[#efe9dd]`}>
+                        className={`w-full text-left px-4 py-2 text-sm ${filter === 'year' && selectedYear === y ? 'text-[#8b6914] font-medium' : 'text-warm-text'} hover:bg-[#efe9dd]`}>
                         {y}
                       </button>
                     ))}
@@ -176,7 +177,7 @@ export default function ScoreTrackerPage({ onNavigateHome, onStartNewGame, onPla
             <Upload size={14} /> Import
           </button>
           <button onClick={() => setView('export')}
-            className="flex-1 flex items-center justify-center gap-2 bg-[#efe9dd] text-[#a08c6e]
+            className="flex-1 flex items-center justify-center gap-2 bg-[#efe9dd] text-warm-muted
                        rounded-xl py-2 text-xs font-medium">
             <Download size={14} /> Export
           </button>
@@ -186,12 +187,12 @@ export default function ScoreTrackerPage({ onNavigateHome, onStartNewGame, onPla
       {/* Game list */}
       <div className="flex-1 px-4 pb-8 flex flex-col gap-3 overflow-auto">
         {loading ? (
-          <div className="text-center text-[#a08c6e] py-12">Loading...</div>
+          <SkeletonList />
         ) : filtered.length === 0 ? (
           <div className="text-center py-16">
             <div className="text-4xl mb-4">🃏</div>
-            <div className="text-[#a08c6e]">{games.length === 0 ? 'No games yet' : 'No games in this period'}</div>
-            <div className="text-[#a08c6e] text-sm mt-1">
+            <div className="text-warm-muted">{games.length === 0 ? 'No games yet' : 'No games in this period'}</div>
+            <div className="text-warm-muted text-sm mt-1">
               {games.length === 0 ? 'Tap "Enter New Scores" to record a game' : 'Try a different filter'}
             </div>
           </div>

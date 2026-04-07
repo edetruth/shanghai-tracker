@@ -89,8 +89,8 @@ export default function GameSummary({ game, players, onDone, onPlayerClick }: Pr
     <div className="flex flex-col min-h-[100dvh]">
       {/* Header */}
       <div className="p-4 text-center safe-top">
-        <div className="text-[#a08c6e] text-xs uppercase tracking-wider mb-1">Game Complete</div>
-        <h1 className="font-display text-2xl font-bold text-[#8b6914]">Game Night Recap</h1>
+        <div className="text-warm-muted text-xs uppercase tracking-wider mb-1">Game Complete</div>
+        <h1 className="font-heading text-2xl font-bold text-[#8b6914]">Game Night Recap</h1>
       </div>
 
       <div className="px-4 flex flex-col gap-3 flex-1 overflow-auto pb-4">
@@ -99,10 +99,10 @@ export default function GameSummary({ game, players, onDone, onPlayerClick }: Pr
           <div className="card p-4 flex items-center gap-3" style={{ borderColor: '#e2b858', background: 'rgba(226,184,88,0.08)' }}>
             <Trophy size={28} className="text-[#8b6914] flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <div className="text-[#a08c6e] text-xs">Winner</div>
+              <div className="text-warm-muted text-xs">Winner</div>
               <button
                 onClick={() => onPlayerClick?.(winner.player_id)}
-                className={`font-display text-xl font-semibold text-[#2c1810] truncate block text-left ${onPlayerClick ? 'hover:text-[#8b6914]' : ''}`}
+                className={`font-heading text-xl font-semibold text-warm-text truncate block text-left ${onPlayerClick ? 'hover:text-[#8b6914]' : ''}`}
               >
                 {winner.player?.name}
               </button>
@@ -114,21 +114,21 @@ export default function GameSummary({ game, players, onDone, onPlayerClick }: Pr
         {/* Final standings */}
         <div className="card overflow-hidden">
           <div className="px-3 pt-3 pb-1">
-            <p className="text-[#a08c6e] text-xs uppercase tracking-wider">Final Standings</p>
+            <p className="text-warm-muted text-xs uppercase tracking-wider">Final Standings</p>
           </div>
           {sortedScores.map((gs, rank) => {
             const player = players.find((p) => p.id === gs.player_id)
             const color = PLAYER_COLORS[players.findIndex((p) => p.id === gs.player_id) % PLAYER_COLORS.length]
             const isWinner = gs.player_id === winner?.player_id
             return (
-              <div key={gs.id} className={`px-3 py-2.5 ${rank > 0 ? 'border-t border-[#e2ddd2]/60' : ''} ${rank % 2 !== 0 ? 'bg-[#efe9dd]/40' : ''}`}>
+              <div key={gs.id} className={`px-3 py-2.5 ${rank > 0 ? 'border-t border-sand-light/60' : ''} ${rank % 2 !== 0 ? 'bg-[#efe9dd]/40' : ''}`}>
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2.5">
-                    <span className="text-[#a08c6e] text-xs w-4">{rank + 1}</span>
+                    <span className="text-warm-muted text-xs w-4">{rank + 1}</span>
                     <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
                     <button
                       onClick={() => onPlayerClick?.(gs.player_id)}
-                      className={`text-[#2c1810] font-medium text-sm text-left ${onPlayerClick ? 'hover:text-[#8b6914]' : ''}`}
+                      className={`text-warm-text font-medium text-sm text-left ${onPlayerClick ? 'hover:text-[#8b6914]' : ''}`}
                     >
                       {player?.name}
                     </button>
@@ -143,8 +143,8 @@ export default function GameSummary({ game, players, onDone, onPlayerClick }: Pr
                     const isRoundWinner = roundWinners[i]?.includes(gs.player_id)
                     return (
                       <div key={i} className="text-center">
-                        <div className="text-[#a08c6e] text-[9px]">R{r.number}</div>
-                        <div className={`font-mono text-xs ${roundScore === 0 ? 'text-[#2d7a3a] font-semibold' : isRoundWinner ? 'text-[#8b6914]' : 'text-[#2c1810]'}`}>
+                        <div className="text-warm-muted text-[9px]">R{r.number}</div>
+                        <div className={`font-mono text-xs ${roundScore === 0 ? 'text-[#2d7a3a] font-semibold' : isRoundWinner ? 'text-[#8b6914]' : 'text-warm-text'}`}>
                           {roundScore}
                         </div>
                         {isRoundWinner && roundScore > 0 && <div className="text-[8px] text-[#8b6914]">★</div>}
@@ -159,14 +159,14 @@ export default function GameSummary({ game, players, onDone, onPlayerClick }: Pr
 
         {/* Fun stats */}
         <div className="card p-3">
-          <p className="text-[#a08c6e] text-xs uppercase tracking-wider mb-2">Game Stats</p>
+          <p className="text-warm-muted text-xs uppercase tracking-wider mb-2">Game Stats</p>
           <div className="grid grid-cols-3 gap-2 text-center">
             <div className="bg-[#efe9dd] rounded-lg p-2">
-              <div className="font-mono text-[#2c1810] font-semibold text-sm">{totalPoints}</div>
+              <div className="font-mono text-warm-text font-semibold text-sm">{totalPoints}</div>
               <div className="text-[#8b7355] text-xs">Total pts</div>
             </div>
             <div className="bg-[#efe9dd] rounded-lg p-2">
-              <div className="font-mono text-[#2c1810] font-semibold text-sm">{margin}</div>
+              <div className="font-mono text-warm-text font-semibold text-sm">{margin}</div>
               <div className="text-[#8b7355] text-xs">Margin</div>
             </div>
             <div className="bg-[#efe9dd] rounded-lg p-2">
@@ -188,7 +188,7 @@ export default function GameSummary({ game, players, onDone, onPlayerClick }: Pr
 
         {/* Round Winners summary */}
         <div className="card p-3">
-          <p className="text-[#a08c6e] text-xs uppercase tracking-wider mb-2">Round Winners</p>
+          <p className="text-warm-muted text-xs uppercase tracking-wider mb-2">Round Winners</p>
           <div className="flex flex-wrap gap-2">
             {players
               .filter((p) => winCountByPlayer[p.id] > 0)
@@ -202,7 +202,7 @@ export default function GameSummary({ game, players, onDone, onPlayerClick }: Pr
                     className="flex items-center gap-1.5 bg-[#efe9dd] rounded-lg px-2.5 py-1.5"
                   >
                     <div className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
-                    <span className="text-[#2c1810] text-sm">{p.name}</span>
+                    <span className="text-warm-text text-sm">{p.name}</span>
                     <span className="font-mono text-[#8b6914] text-xs font-semibold">{winCountByPlayer[p.id]}</span>
                   </button>
                 )
@@ -213,8 +213,8 @@ export default function GameSummary({ game, players, onDone, onPlayerClick }: Pr
         {/* Share */}
         <button
           onClick={copyShare}
-          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-[#e2ddd2]
-                     text-[#8b7355] hover:text-[#2c1810] hover:border-[#a08c6e] transition-colors text-sm bg-white"
+          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-sand-light
+                     text-[#8b7355] hover:text-warm-text hover:border-[#a08c6e] transition-colors text-sm bg-white"
         >
           {copied ? <Check size={16} className="text-[#2d7a3a]" /> : <Copy size={16} />}
           {copied ? 'Copied!' : 'Copy results to clipboard'}
@@ -222,13 +222,13 @@ export default function GameSummary({ game, players, onDone, onPlayerClick }: Pr
 
         {/* Notes */}
         <div className="card p-4">
-          <label className="text-xs text-[#a08c6e] uppercase tracking-wider">Game Notes</label>
+          <label className="text-xs text-warm-muted uppercase tracking-wider">Game Notes</label>
           <textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Any memorable moments? (optional)"
             rows={3}
-            className="mt-2 w-full bg-white border border-[#e2ddd2] rounded-lg px-3 py-2 text-[#2c1810]
+            className="mt-2 w-full bg-white border border-sand-light rounded-lg px-3 py-2 text-warm-text
                        placeholder-[#a08c6e] resize-none focus:outline-none focus:border-[#8b6914]
                        focus:ring-1 focus:ring-[#8b6914]"
           />
@@ -236,7 +236,7 @@ export default function GameSummary({ game, players, onDone, onPlayerClick }: Pr
       </div>
 
       {/* Save button */}
-      <div className="p-4 border-t border-[#e2ddd2]">
+      <div className="p-4 border-t border-sand-light">
         <button onClick={save} disabled={saving} className="btn-primary">
           {saving ? 'Saving…' : 'Save Game'}
         </button>

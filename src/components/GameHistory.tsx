@@ -1,3 +1,4 @@
+import { SkeletonList } from './Skeleton'
 import { useState, useEffect } from 'react'
 import { Download, Upload, RefreshCw } from 'lucide-react'
 import { getCompletedGames, deleteGame } from '../lib/gameStore'
@@ -46,12 +47,12 @@ export default function GameHistory({ onPlayerClick }: Props) {
       {/* Header */}
       <div className="p-4 pt-6">
         <div className="flex items-center justify-between">
-          <h2 className="font-display text-2xl font-semibold text-[#2c1810]">Game History</h2>
-          <button onClick={loadGames} className="text-[#a08c6e] p-1">
+          <h2 className="font-heading text-2xl font-semibold text-warm-text">Game History</h2>
+          <button onClick={loadGames} className="text-warm-muted p-1">
             <RefreshCw size={18} />
           </button>
         </div>
-        <p className="text-[#a08c6e] text-sm mt-1">{games.length} games played</p>
+        <p className="text-warm-muted text-sm mt-1">{games.length} games played</p>
 
         {/* Action buttons */}
         <div className="flex gap-2 mt-4">
@@ -65,7 +66,7 @@ export default function GameHistory({ onPlayerClick }: Props) {
           </button>
           <button
             onClick={() => setView('export')}
-            className="flex-1 flex items-center justify-center gap-2 bg-[#efe9dd] text-[#a08c6e]
+            className="flex-1 flex items-center justify-center gap-2 bg-[#efe9dd] text-warm-muted
                        rounded-xl py-2.5 text-sm font-medium"
           >
             <Download size={16} />
@@ -77,12 +78,12 @@ export default function GameHistory({ onPlayerClick }: Props) {
       {/* Game list */}
       <div className="flex-1 px-4 pb-24 flex flex-col gap-3 overflow-auto">
         {loading ? (
-          <div className="text-center text-[#a08c6e] py-12">Loading...</div>
+          <SkeletonList />
         ) : games.length === 0 ? (
           <div className="text-center py-16">
             <div className="text-4xl mb-4">🃏</div>
-            <div className="text-[#a08c6e]">No games yet</div>
-            <div className="text-[#a08c6e] text-sm mt-1">Start a new game or import history</div>
+            <div className="text-warm-muted">No games yet</div>
+            <div className="text-warm-muted text-sm mt-1">Start a new game or import history</div>
           </div>
         ) : (
           games.map((game) => (

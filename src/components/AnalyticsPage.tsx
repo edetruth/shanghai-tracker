@@ -42,9 +42,9 @@ const BAR_COLORS: Record<string, string> = {
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-[#e2ddd2] p-4 text-center">
-      <div className="text-2xl font-bold text-[#2c1810]">{value}</div>
-      <div className="text-xs text-[#a08c6e] uppercase tracking-wider mt-1">{label}</div>
+    <div className="bg-white rounded-xl shadow-sm border border-sand-light p-4 text-center">
+      <div className="text-2xl font-bold text-warm-text">{value}</div>
+      <div className="text-xs text-warm-muted uppercase tracking-wider mt-1">{label}</div>
     </div>
   )
 }
@@ -54,7 +54,7 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="mb-6">
-      <h3 className="text-sm font-semibold text-[#a08c6e] uppercase tracking-wider mb-3">{title}</h3>
+      <h3 className="text-sm font-semibold text-warm-muted uppercase tracking-wider mb-3">{title}</h3>
       {children}
     </div>
   )
@@ -64,7 +64,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function ChartCard({ children }: { children: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-[#e2ddd2] p-4">
+    <div className="bg-white rounded-xl shadow-sm border border-sand-light p-4">
       {children}
     </div>
   )
@@ -74,7 +74,7 @@ function ChartCard({ children }: { children: React.ReactNode }) {
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-[#e2ddd2] p-8 text-center">
+    <div className="bg-white rounded-xl shadow-sm border border-sand-light p-8 text-center">
       <BarChart3 size={32} className="text-[#e2ddd2] mx-auto mb-3" />
       <p className="text-[#8b7355] text-sm">{message}</p>
     </div>
@@ -272,27 +272,27 @@ function AIQualityTab({ roundStats }: { roundStats: PlayerRoundStats[] }) {
       </Section>
 
       <Section title="Decision Breakdown">
-        <div className="bg-white rounded-xl shadow-sm border border-[#e2ddd2] overflow-x-auto">
+        <div className="bg-white rounded-xl shadow-sm border border-sand-light overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#e2ddd2]">
-                <th className="text-left p-3 text-[#a08c6e] font-medium text-xs">Metric</th>
-                {labels.map(l => <th key={l} className="text-right p-3 text-[#a08c6e] font-medium text-xs">{l}</th>)}
+              <tr className="border-b border-sand-light">
+                <th className="text-left p-3 text-warm-muted font-medium text-xs">Metric</th>
+                {labels.map(l => <th key={l} className="text-right p-3 text-warm-muted font-medium text-xs">{l}</th>)}
               </tr>
             </thead>
-            <tbody className="text-[#2c1810]">
-              <tr className="border-b border-[#e2ddd2]">
+            <tbody className="text-warm-text">
+              <tr className="border-b border-sand-light">
                 <td className="p-3 text-[#8b7355]">Avg round score</td>
                 {labels.map(l => <td key={l} className="text-right p-3 font-medium">{Math.round(avg(diffGroups[l].map(r => r.round_score)))}</td>)}
               </tr>
-              <tr className="border-b border-[#e2ddd2]">
+              <tr className="border-b border-sand-light">
                 <td className="p-3 text-[#8b7355]">Shanghai rate</td>
                 {labels.map(l => {
                   const g = diffGroups[l]
                   return <td key={l} className="text-right p-3 font-medium">{pct(g.filter(r => r.shanghaied).length, g.length)}</td>
                 })}
               </tr>
-              <tr className="border-b border-[#e2ddd2]">
+              <tr className="border-b border-sand-light">
                 <td className="p-3 text-[#8b7355]">Take accuracy</td>
                 {labels.map(l => {
                   const g = diffGroups[l]
@@ -301,14 +301,14 @@ function AIQualityTab({ roundStats }: { roundStats: PlayerRoundStats[] }) {
                   return <td key={l} className="text-right p-3 font-medium">{pct(used, total)}</td>
                 })}
               </tr>
-              <tr className="border-b border-[#e2ddd2]">
+              <tr className="border-b border-sand-light">
                 <td className="p-3 text-[#8b7355]">Avg turn went down</td>
                 {labels.map(l => {
                   const turns = diffGroups[l].filter(r => r.turn_went_down !== null).map(r => r.turn_went_down!)
                   return <td key={l} className="text-right p-3 font-medium">{turns.length > 0 ? (avg(turns)).toFixed(1) : '—'}</td>
                 })}
               </tr>
-              <tr className="border-b border-[#e2ddd2]">
+              <tr className="border-b border-sand-light">
                 <td className="p-3 text-[#8b7355]">Avg lay-offs/round</td>
                 {labels.map(l => <td key={l} className="text-right p-3 font-medium">{avg(diffGroups[l].map(r => r.lay_offs_made)).toFixed(1)}</td>)}
               </tr>
@@ -437,12 +437,12 @@ function RoundsTab({ roundStats }: { roundStats: PlayerRoundStats[] }) {
       <Section title="Round Difficulty Ranking">
         <div className="flex flex-col gap-2">
           {ranking.map((r, i) => (
-            <div key={r.round} className="bg-white rounded-xl shadow-sm border border-[#e2ddd2] p-3 flex items-center gap-3">
+            <div key={r.round} className="bg-white rounded-xl shadow-sm border border-sand-light p-3 flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-[#efe9dd] flex items-center justify-center text-sm font-bold text-[#8b6914]">
                 {i + 1}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-[#2c1810] font-medium text-sm">Round {r.round} — {r.name}</div>
+                <div className="text-warm-text font-medium text-sm">Round {r.round} — {r.name}</div>
                 <div className="text-[#8b7355] text-xs mt-0.5">
                   Avg {r.avgScore} pts &middot; {r.shanghaiRate}% shanghaied &middot; {r.avgTurns} turns
                 </div>
@@ -506,7 +506,7 @@ function DecisionsTab({ decisions }: { decisions: AIDecision[] }) {
           <select
             value={diffFilter}
             onChange={e => setDiffFilter(e.target.value)}
-            className="flex-1 bg-white border border-[#e2ddd2] rounded-lg px-3 py-2 text-sm text-[#2c1810]"
+            className="flex-1 bg-white border border-sand-light rounded-lg px-3 py-2 text-sm text-warm-text"
           >
             <option value="all">All Players</option>
             <option value="human">Human</option>
@@ -517,7 +517,7 @@ function DecisionsTab({ decisions }: { decisions: AIDecision[] }) {
           <select
             value={typeFilter}
             onChange={e => setTypeFilter(e.target.value)}
-            className="flex-1 bg-white border border-[#e2ddd2] rounded-lg px-3 py-2 text-sm text-[#2c1810]"
+            className="flex-1 bg-white border border-sand-light rounded-lg px-3 py-2 text-sm text-warm-text"
           >
             <option value="all">All Types</option>
             <option value="draw">Draw</option>
@@ -541,19 +541,19 @@ function DecisionsTab({ decisions }: { decisions: AIDecision[] }) {
 
       {reasonGroups.length > 0 && reasonGroups[0][0] !== '(none)' && (
         <Section title="Decision Reasons">
-          <div className="bg-white rounded-xl shadow-sm border border-[#e2ddd2] overflow-x-auto">
+          <div className="bg-white rounded-xl shadow-sm border border-sand-light overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-[#e2ddd2]">
-                  <th className="text-left p-3 text-[#a08c6e] font-medium text-xs">Reason</th>
-                  <th className="text-right p-3 text-[#a08c6e] font-medium text-xs">Count</th>
-                  <th className="text-right p-3 text-[#a08c6e] font-medium text-xs">Used</th>
-                  <th className="text-right p-3 text-[#a08c6e] font-medium text-xs">Wasted</th>
+                <tr className="border-b border-sand-light">
+                  <th className="text-left p-3 text-warm-muted font-medium text-xs">Reason</th>
+                  <th className="text-right p-3 text-warm-muted font-medium text-xs">Count</th>
+                  <th className="text-right p-3 text-warm-muted font-medium text-xs">Used</th>
+                  <th className="text-right p-3 text-warm-muted font-medium text-xs">Wasted</th>
                 </tr>
               </thead>
-              <tbody className="text-[#2c1810]">
+              <tbody className="text-warm-text">
                 {reasonGroups.map(([reason, data]) => (
-                  <tr key={reason} className="border-b border-[#e2ddd2] last:border-b-0">
+                  <tr key={reason} className="border-b border-sand-light last:border-b-0">
                     <td className="p-3 text-[#8b7355]">{reason}</td>
                     <td className="text-right p-3 font-medium">{data.count}</td>
                     <td className="text-right p-3 font-medium text-[#2d7a3a]">
@@ -571,26 +571,26 @@ function DecisionsTab({ decisions }: { decisions: AIDecision[] }) {
       <Section title="Recent Decisions">
         <div className="flex flex-col gap-2">
           {recent.map((d, i) => (
-            <div key={i} className="bg-white rounded-xl shadow-sm border border-[#e2ddd2] p-3">
+            <div key={i} className="bg-white rounded-xl shadow-sm border border-sand-light p-3">
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-[#2c1810] font-medium text-sm">{d.player_name}</span>
+                  <span className="text-warm-text font-medium text-sm">{d.player_name}</span>
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#efe9dd] text-[#8b7355] font-medium">
                     {difficultyLabel(d.difficulty, d.is_human)}
                   </span>
                 </div>
-                <span className="text-xs text-[#a08c6e]">R{d.round_number} T{d.turn_number}</span>
+                <span className="text-xs text-warm-muted">R{d.round_number} T{d.turn_number}</span>
               </div>
               <div className="text-sm text-[#8b7355]">
-                <span className="font-medium text-[#2c1810]">{d.decision_type}</span>
+                <span className="font-medium text-warm-text">{d.decision_type}</span>
                 {' → '}{d.decision_result}
                 {d.card_suit && d.card_rank !== undefined && (
-                  <span className="ml-1 text-[#a08c6e]">
+                  <span className="ml-1 text-warm-muted">
                     ({d.card_rank === 0 ? 'Joker' : `${d.card_rank} of ${d.card_suit}`})
                   </span>
                 )}
               </div>
-              {d.reason && <div className="text-xs text-[#a08c6e] mt-1">{d.reason}</div>}
+              {d.reason && <div className="text-xs text-warm-muted mt-1">{d.reason}</div>}
             </div>
           ))}
         </div>
@@ -638,7 +638,7 @@ export default function AnalyticsPage({ onBack }: Props) {
           <button onClick={onBack} className="text-[#8b6914] p-1 -ml-1">
             <ArrowLeft size={22} />
           </button>
-          <h2 className="font-display text-2xl font-semibold text-[#2c1810]">Analytics</h2>
+          <h2 className="font-heading text-2xl font-semibold text-warm-text">Analytics</h2>
         </div>
       </div>
 

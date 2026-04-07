@@ -31,23 +31,23 @@ function GameListView({ games, focalPlayerId, onPush, onPlayerClick: _onPlayerCl
           <button
             key={g.id}
             onClick={() => onPush({ type: 'game-scorecard', title: fmtDate(g.date), game: g, highlightPlayerId: focalPlayerId })}
-            className={`flex items-center justify-between py-3 text-left w-full ${i > 0 ? 'border-t border-[#e2ddd2]/60' : ''} ${i % 2 !== 0 ? '-mx-4 px-4 bg-[#efe9dd]/30' : ''}`}
+            className={`flex items-center justify-between py-3 text-left w-full ${i > 0 ? 'border-t border-sand-light/60' : ''} ${i % 2 !== 0 ? '-mx-4 px-4 bg-[#efe9dd]/30' : ''}`}
           >
             <div>
-              <div className={`font-medium text-sm ${isWin ? 'text-[#8b6914]' : 'text-[#2c1810]'}`}>
+              <div className={`font-medium text-sm ${isWin ? 'text-[#8b6914]' : 'text-warm-text'}`}>
                 {fmtDate(g.date)}{isWin && ' 🏆'}
               </div>
-              <div className="flex items-center gap-1.5 text-[#a08c6e] text-xs mt-0.5 flex-wrap">
+              <div className="flex items-center gap-1.5 text-warm-muted text-xs mt-0.5 flex-wrap">
                 <span>{g.game_scores.length} players</span>
-                {g.game_type === 'ai' && <span className="bg-[#e2b858] text-[#2c1810] px-1 py-0.5 rounded text-[9px] font-semibold">vs AI</span>}
+                {g.game_type === 'ai' && <span className="bg-[#e2b858] text-warm-text px-1 py-0.5 rounded text-[9px] font-semibold">vs AI</span>}
                 {g.game_type === 'pass-and-play' && <span className="bg-[#efe9dd] text-[#8b7355] px-1 py-0.5 rounded text-[9px]">Played</span>}
                 {winner && focalPlayerId && !isWin && <span>· {winner.player?.name} won</span>}
                 {!focalPlayerId && winner && <span>· {winner.player?.name} won</span>}
               </div>
             </div>
             <div className="text-right flex-shrink-0 ml-3">
-              {gs && <div className="font-mono font-semibold text-sm text-[#2c1810]">{gs.total_score} pts</div>}
-              {rank !== null && rank > 0 && <div className="text-[#a08c6e] text-xs">{ordinal(rank)}</div>}
+              {gs && <div className="font-mono font-semibold text-sm text-warm-text">{gs.total_score} pts</div>}
+              {rank !== null && rank > 0 && <div className="text-warm-muted text-xs">{ordinal(rank)}</div>}
             </div>
           </button>
         )
@@ -69,18 +69,18 @@ function GameScorecardView({ game, highlightPlayerId, onPush: _onPush, onPlayerC
     <div>
       <div className="text-center mb-4">
         <div className="text-[#8b7355] text-sm">{fmtDate(game.date)}</div>
-        <div className="text-[#a08c6e] text-xs mt-0.5">{game.game_scores.length} players{game.room_code && ` · ${game.room_code}`}</div>
+        <div className="text-warm-muted text-xs mt-0.5">{game.game_scores.length} players{game.room_code && ` · ${game.room_code}`}</div>
         {game.notes && <div className="text-[#8b7355] text-sm mt-1 italic">"{game.notes}"</div>}
       </div>
       <div className="overflow-x-auto -mx-4 px-4">
         <table className="w-full text-sm min-w-[340px]">
           <thead>
-            <tr className="border-b border-[#e2ddd2]">
-              <th className="text-left py-2 text-[#a08c6e] text-xs font-medium">Player</th>
+            <tr className="border-b border-sand-light">
+              <th className="text-left py-2 text-warm-muted text-xs font-medium">Player</th>
               {ROUNDS.map(r => (
-                <th key={r.number} className="py-2 text-[#a08c6e] text-xs font-medium text-center px-1">R{r.number}</th>
+                <th key={r.number} className="py-2 text-warm-muted text-xs font-medium text-center px-1">R{r.number}</th>
               ))}
-              <th className="text-right py-2 text-[#a08c6e] text-xs font-medium">Total</th>
+              <th className="text-right py-2 text-warm-muted text-xs font-medium">Total</th>
             </tr>
           </thead>
           <tbody>
@@ -89,13 +89,13 @@ function GameScorecardView({ game, highlightPlayerId, onPush: _onPush, onPlayerC
               const isWinner = gs.player_id === winner?.player_id
               const isHighlighted = gs.player_id === highlightPlayerId
               return (
-                <tr key={gs.id} className={`border-b border-[#e2ddd2]/50 ${isHighlighted ? 'bg-[#e2b858]/08' : rank % 2 !== 0 ? 'bg-[#efe9dd]/30' : ''}`}>
+                <tr key={gs.id} className={`border-b border-sand-light/50 ${isHighlighted ? 'bg-[#e2b858]/08' : rank % 2 !== 0 ? 'bg-[#efe9dd]/30' : ''}`}>
                   <td className="py-2.5">
                     <div className="flex items-center gap-1.5">
                       <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
                       <button
                         onClick={() => onPlayerClick?.(gs.player_id)}
-                        className={`text-left text-sm ${isWinner ? 'text-[#8b6914] font-semibold' : 'text-[#2c1810]'} ${onPlayerClick ? 'hover:underline' : ''}`}
+                        className={`text-left text-sm ${isWinner ? 'text-[#8b6914] font-semibold' : 'text-warm-text'} ${onPlayerClick ? 'hover:underline' : ''}`}
                       >
                         {gs.player?.name}
                       </button>
@@ -113,7 +113,7 @@ function GameScorecardView({ game, highlightPlayerId, onPush: _onPush, onPlayerC
                     )
                   })}
                   <td className="py-2.5 text-right">
-                    <span className={`font-mono font-semibold text-sm ${isWinner ? 'text-[#8b6914]' : 'text-[#2c1810]'}`}>{gs.total_score}</span>
+                    <span className={`font-mono font-semibold text-sm ${isWinner ? 'text-[#8b6914]' : 'text-warm-text'}`}>{gs.total_score}</span>
                   </td>
                 </tr>
               )
@@ -144,9 +144,9 @@ function ScoreHistoryView({ games, focalPlayerId, playerColor, onPush }: {
   return (
     <div>
       <div className="text-center mb-4">
-        <div className="text-[#a08c6e] text-xs uppercase tracking-wider">Average Score</div>
+        <div className="text-warm-muted text-xs uppercase tracking-wider">Average Score</div>
         <div className="font-mono text-2xl font-bold text-[#8b6914]">{avg}</div>
-        <div className="text-[#a08c6e] text-xs">{scores.length} game{scores.length !== 1 ? 's' : ''} · lower is better</div>
+        <div className="text-warm-muted text-xs">{scores.length} game{scores.length !== 1 ? 's' : ''} · lower is better</div>
       </div>
       <div className="flex flex-col gap-1.5">
         {scores.map(({ game, score }, _i) => {
@@ -158,7 +158,7 @@ function ScoreHistoryView({ games, focalPlayerId, playerColor, onPush }: {
               onClick={() => onPush({ type: 'game-scorecard', title: fmtDate(game.date), game, highlightPlayerId: focalPlayerId })}
               className="flex items-center gap-2 py-1 text-left w-full group"
             >
-              <span className="w-12 text-[#a08c6e] text-xs flex-shrink-0 text-right">{fmtShort(game.date)}</span>
+              <span className="w-12 text-warm-muted text-xs flex-shrink-0 text-right">{fmtShort(game.date)}</span>
               <div className="flex-1 relative h-5 flex items-center">
                 <div
                   className="h-4 rounded-sm transition-all"
@@ -170,7 +170,7 @@ function ScoreHistoryView({ games, focalPlayerId, playerColor, onPush }: {
             </button>
           )
         })}
-        <div className="flex items-center gap-3 mt-2 pt-2 border-t border-[#e2ddd2] text-xs text-[#a08c6e]">
+        <div className="flex items-center gap-3 mt-2 pt-2 border-t border-sand-light text-xs text-warm-muted">
           <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ background: '#2d7a3a', opacity: 0.65 }} />
           <span>Below avg (good)</span>
           <div className="w-px h-3 bg-[#b83232] opacity-50 flex-shrink-0 ml-2" />
@@ -202,23 +202,23 @@ function ZeroRoundsView({ games, focalPlayerId }: {
     <div>
       <div className="text-center mb-4">
         <div className="font-mono text-2xl font-bold text-[#7c3aed]">{total}</div>
-        <div className="text-[#a08c6e] text-xs">total zero rounds (went out)</div>
+        <div className="text-warm-muted text-xs">total zero rounds (went out)</div>
       </div>
       {groups.length === 0 ? (
         <p className="text-[#8b7355] text-sm text-center py-8">No zeros recorded</p>
       ) : (
         <div className="flex flex-col">
           {groups.map(({ game, zeroRounds }, i) => (
-            <div key={game.id} className={`flex items-center justify-between py-3 ${i > 0 ? 'border-t border-[#e2ddd2]/60' : ''}`}>
+            <div key={game.id} className={`flex items-center justify-between py-3 ${i > 0 ? 'border-t border-sand-light/60' : ''}`}>
               <div>
-                <div className="text-[#2c1810] text-sm font-medium">{fmtDate(game.date)}</div>
-                <div className="text-[#a08c6e] text-xs mt-0.5">{game.game_scores.length} players</div>
+                <div className="text-warm-text text-sm font-medium">{fmtDate(game.date)}</div>
+                <div className="text-warm-muted text-xs mt-0.5">{game.game_scores.length} players</div>
               </div>
               <div className="text-right">
                 <div className="font-mono text-[#7c3aed] font-semibold text-sm">
                   {zeroRounds.length} zero{zeroRounds.length !== 1 ? 's' : ''}
                 </div>
-                <div className="text-[#a08c6e] text-xs">
+                <div className="text-warm-muted text-xs">
                   Round{zeroRounds.length !== 1 ? 's' : ''} {zeroRounds.join(', ')}
                 </div>
               </div>
@@ -241,7 +241,7 @@ function WinStreakView({ games, focalPlayerId, onPush }: {
     <div>
       <div className="text-center mb-4">
         <div className="font-mono text-2xl font-bold text-[#8b6914]">{sorted.length}</div>
-        <div className="text-[#a08c6e] text-xs">consecutive wins</div>
+        <div className="text-warm-muted text-xs">consecutive wins</div>
       </div>
       <div className="flex flex-col">
         {sorted.map((g, i) => {
@@ -251,15 +251,15 @@ function WinStreakView({ games, focalPlayerId, onPush }: {
             <button
               key={g.id}
               onClick={() => onPush({ type: 'game-scorecard', title: fmtDate(g.date), game: g, highlightPlayerId: focalPlayerId })}
-              className={`flex items-center justify-between py-3 text-left w-full ${i > 0 ? 'border-t border-[#e2ddd2]/60' : ''}`}
+              className={`flex items-center justify-between py-3 text-left w-full ${i > 0 ? 'border-t border-sand-light/60' : ''}`}
             >
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[#a08c6e] text-xs w-5 flex-shrink-0">#{i + 1}</span>
-                  <span className="text-[#2c1810] text-sm font-medium">{fmtDate(g.date)}</span>
+                  <span className="text-warm-muted text-xs w-5 flex-shrink-0">#{i + 1}</span>
+                  <span className="text-warm-text text-sm font-medium">{fmtDate(g.date)}</span>
                 </div>
                 {runnerUp && (
-                  <div className="text-[#a08c6e] text-xs mt-0.5 pl-7">
+                  <div className="text-warm-muted text-xs mt-0.5 pl-7">
                     beat {runnerUp.player?.name} ({runnerUp.total_score} pts)
                   </div>
                 )}
@@ -295,42 +295,42 @@ function ImprovementView({ firstGames, lastGames, focalPlayerId, playerColor: _p
       <div className="flex items-center justify-center gap-6 mb-5">
         <div className="text-center">
           <div className="font-mono text-xl font-bold text-[#8b7355]">{firstAvg}</div>
-          <div className="text-[#a08c6e] text-xs">First {first.length} avg</div>
+          <div className="text-warm-muted text-xs">First {first.length} avg</div>
         </div>
         <div className={`font-mono text-2xl font-bold ${improved ? 'text-[#2d7a3a]' : 'text-[#b83232]'}`}>
           {improved ? '↓' : '↑'} {Math.abs(firstAvg - lastAvg)}
         </div>
         <div className="text-center">
           <div className={`font-mono text-xl font-bold ${improved ? 'text-[#2d7a3a]' : 'text-[#b83232]'}`}>{lastAvg}</div>
-          <div className="text-[#a08c6e] text-xs">Last {last.length} avg</div>
+          <div className="text-warm-muted text-xs">Last {last.length} avg</div>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <p className="text-[#a08c6e] text-xs uppercase tracking-wider mb-2 text-center">First {first.length}</p>
+          <p className="text-warm-muted text-xs uppercase tracking-wider mb-2 text-center">First {first.length}</p>
           {first.map(g => (
             <button
               key={g.id}
               onClick={() => onPush({ type: 'game-scorecard', title: fmtDate(g.date), game: g, highlightPlayerId: focalPlayerId })}
-              className="flex justify-between w-full py-1.5 border-b border-[#e2ddd2]/40 text-left"
+              className="flex justify-between w-full py-1.5 border-b border-sand-light/40 text-left"
             >
-              <span className="text-[#a08c6e] text-xs">{fmtShort(g.date)}</span>
+              <span className="text-warm-muted text-xs">{fmtShort(g.date)}</span>
               <span className="font-mono text-sm text-[#8b7355]">{getScore(g)}</span>
             </button>
           ))}
         </div>
         <div>
-          <p className={`text-xs uppercase tracking-wider mb-2 text-center ${improved ? 'text-[#2d7a3a]' : 'text-[#a08c6e]'}`}>
+          <p className={`text-xs uppercase tracking-wider mb-2 text-center ${improved ? 'text-[#2d7a3a]' : 'text-warm-muted'}`}>
             Last {last.length}
           </p>
           {last.map(g => (
             <button
               key={g.id}
               onClick={() => onPush({ type: 'game-scorecard', title: fmtDate(g.date), game: g, highlightPlayerId: focalPlayerId })}
-              className="flex justify-between w-full py-1.5 border-b border-[#e2ddd2]/40 text-left"
+              className="flex justify-between w-full py-1.5 border-b border-sand-light/40 text-left"
             >
-              <span className="text-[#a08c6e] text-xs">{fmtShort(g.date)}</span>
+              <span className="text-warm-muted text-xs">{fmtShort(g.date)}</span>
               <span className={`font-mono text-sm font-semibold ${improved ? 'text-[#2d7a3a]' : 'text-[#b83232]'}`}>{getScore(g)}</span>
             </button>
           ))}
@@ -402,27 +402,27 @@ export default function DrilldownModal({ stack, onPush, onPop, onClose, onPlayer
         </div>
 
         {/* Header */}
-        <div className="px-4 py-3 flex items-center gap-2 flex-shrink-0 border-b border-[#e2ddd2]">
+        <div className="px-4 py-3 flex items-center gap-2 flex-shrink-0 border-b border-sand-light">
           {stack.length > 1 ? (
-            <button onClick={onPop} className="text-[#a08c6e] hover:text-[#2c1810] p-1 flex-shrink-0 -ml-1">
+            <button onClick={onPop} className="text-warm-muted hover:text-warm-text p-1 flex-shrink-0 -ml-1">
               <ArrowLeft size={20} />
             </button>
           ) : (
             <div className="w-8 flex-shrink-0" />
           )}
           <div className="flex-1 min-w-0 text-center">
-            <div className="font-semibold text-[#2c1810] text-base truncate">{current.title}</div>
+            <div className="font-semibold text-warm-text text-base truncate">{current.title}</div>
           </div>
-          <button onClick={handleClose} className="text-[#a08c6e] hover:text-[#2c1810] p-1 flex-shrink-0 -mr-1">
+          <button onClick={handleClose} className="text-warm-muted hover:text-warm-text p-1 flex-shrink-0 -mr-1">
             <X size={20} />
           </button>
         </div>
 
         {/* Breadcrumb — only when 2+ deep */}
         {stack.length > 1 && (
-          <div className="px-4 py-1.5 flex items-center gap-1 border-b border-[#e2ddd2]/40 flex-shrink-0 overflow-x-auto">
+          <div className="px-4 py-1.5 flex items-center gap-1 border-b border-sand-light/40 flex-shrink-0 overflow-x-auto">
             {stack.slice(0, -1).map((v, i) => (
-              <span key={i} className="text-[#a08c6e] text-xs whitespace-nowrap flex-shrink-0">
+              <span key={i} className="text-warm-muted text-xs whitespace-nowrap flex-shrink-0">
                 {v.title} <span className="mx-0.5">›</span>
               </span>
             ))}

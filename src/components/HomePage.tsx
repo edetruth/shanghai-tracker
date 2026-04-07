@@ -43,12 +43,12 @@ export default function HomePage({ onNavigate, onShowTutorial }: Props) {
         style={{ animation: 'slide-up-fade 400ms ease-out 0ms both' }}
       >
         <div className="text-5xl mb-3">🃏</div>
-        <h1 className="font-display text-4xl font-bold text-[#8b6914]">Shanghai</h1>
+        <h1 className="font-heading text-4xl font-bold text-[#8b6914]">Shanghai</h1>
         <p className="text-[#8b7355] mt-2 text-sm">Shanghai Rummy Score Tracker</p>
         {onShowTutorial && (
           <button
             onClick={onShowTutorial}
-            className="absolute top-0 right-0 text-[#a08c6e] p-1 active:opacity-60"
+            className="absolute top-0 right-0 text-warm-muted p-1 active:opacity-60"
             title="Show tutorial"
           >
             <HelpCircle size={20} />
@@ -69,7 +69,7 @@ export default function HomePage({ onNavigate, onShowTutorial }: Props) {
               <card.Icon size={28} className="text-[#8b6914]" />
             </div>
             <div>
-              <div className="text-[#2c1810] font-semibold text-lg">{card.title}</div>
+              <div className="text-warm-text font-semibold text-lg">{card.title}</div>
               <div className="text-[#8b7355] text-sm mt-0.5">{card.sub}</div>
             </div>
           </button>

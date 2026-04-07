@@ -16,7 +16,7 @@ const tabs = [
 
 export default function BottomNav({ active, onChange }: Props) {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-[#e2ddd2] safe-bottom z-50"
+    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-sand-light safe-bottom z-50"
       style={{ boxShadow: '0 -1px 4px rgba(0,0,0,0.06)' }}>
       <div className="max-w-[480px] mx-auto flex">
         {tabs.map(({ id, label, Icon }) => (
@@ -24,7 +24,7 @@ export default function BottomNav({ active, onChange }: Props) {
             key={id}
             onClick={() => onChange(id)}
             className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors
-              ${active === id ? 'text-[#8b6914]' : 'text-[#a08c6e]'}`}
+              ${active === id ? 'text-[#8b6914]' : 'text-warm-muted'}`}
           >
             <Icon size={22} strokeWidth={active === id ? 2.5 : 1.5} />
             <span className="text-xs font-medium">{label}</span>

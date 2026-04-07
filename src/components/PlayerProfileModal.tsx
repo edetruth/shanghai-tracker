@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
-import { LineChart, Line, ResponsiveContainer } from 'recharts'
+import { LineChart, Line, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, Radar } from 'recharts'
 import { getCompletedGames, computeWinner, getPlayerAchievements } from '../lib/gameStore'
 import { PLAYER_COLORS } from '../lib/constants'
 import { ACHIEVEMENTS } from '../lib/achievements'
 import type { GameWithScores, Player, DrilldownView } from '../lib/types'
 import { format } from 'date-fns'
 import DrilldownModal from './DrilldownModal'
+import { SkeletonProfile } from './Skeleton'
 
 interface Props {
   playerId: string
@@ -108,6 +109,37 @@ export default function PlayerProfileModal({ playerId, onClose }: Props) {
   })
   const top3Opponents = Object.values(opMap).sort((a, b) => b.games - a.games).slice(0, 3)
 
+  // Radar chart: player strengths (0–100 scale, higher = better)
+  const radarData = (() => {
+    if (gamesPlayed === 0) return []
+    // Win rate: direct percentage
+    const winPct = winRate
+    // Scoring: lower is better — invert. 0 pts = 100, 500+ pts = 0
+    const scorePct = Math.max(0, Math.min(100, Math.round(100 - (avgScore / 5))))
+    // Consistency: low std dev = good. Compute coefficient of variation
+    const mean = avgScore || 1
+    const variance = allScores.reduce((s, v) => s + (v - mean) ** 2, 0) / gamesPlayed
+    const cv = Math.sqrt(variance) / mean
+    const consistPct = Math.max(0, Math.min(100, Math.round(100 - cv * 100)))
+    // Going out rate: % of rounds with score 0
+    let totalRounds = 0, zeroRounds = 0
+    playerGames.forEach(g => {
+      const gs = g.game_scores.find(s => s.player_id === playerId)
+      if (gs) { totalRounds += gs.round_scores.length; zeroRounds += gs.round_scores.filter(s => s === 0).length }
+    })
+    const goingOutPct = totalRounds ? Math.round((zeroRounds / totalRounds) * 100) : 0
+    // Podium rate: % of games finishing top 2
+    const podiums = playerGames.filter(g => getRank(g) <= 2).length
+    const podiumPct = Math.round((podiums / gamesPlayed) * 100)
+    return [
+      { stat: 'Win Rate', value: winPct },
+      { stat: 'Scoring', value: scorePct },
+      { stat: 'Consistency', value: consistPct },
+      { stat: 'Going Out', value: goingOutPct },
+      { stat: 'Podium', value: podiumPct },
+    ]
+  })()
+
   const fmtDate = (d: string) => { try { return format(new Date(d + 'T12:00:00'), 'MMM d, yy') } catch { return d } }
   const fmtDateLong = (d: string) => { try { return format(new Date(d + 'T12:00:00'), 'MMM d, yyyy') } catch { return d } }
   const ordinal = (n: number) => ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'][n - 1] ?? `${n}th`
@@ -159,13 +191,13 @@ export default function PlayerProfileModal({ playerId, onClose }: Props) {
         </div>
 
         {/* Header */}
-        <div className="px-4 py-3 flex items-center gap-3 flex-shrink-0 border-b border-[#e2ddd2]">
+        <div className="px-4 py-3 flex items-center gap-3 flex-shrink-0 border-b border-sand-light">
           <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: playerColor }} />
           <div className="flex-1 min-w-0">
-            <div className="font-display text-xl font-semibold text-[#2c1810] truncate">{player?.name ?? '…'}</div>
+            <div className="font-heading text-xl font-semibold text-warm-text truncate">{player?.name ?? '…'}</div>
             <div className="text-[#8b7355] text-sm">{gamesPlayed} games played</div>
           </div>
-          <button onClick={handleClose} className="text-[#a08c6e] hover:text-[#2c1810] p-1 flex-shrink-0">
+          <button onClick={handleClose} className="text-warm-muted hover:text-warm-text p-1 flex-shrink-0">
             <X size={20} />
           </button>
         </div>
@@ -173,7 +205,7 @@ export default function PlayerProfileModal({ playerId, onClose }: Props) {
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto px-4 pb-8">
           {loading ? (
-            <div className="text-center text-[#8b7355] py-12">Loading…</div>
+            <SkeletonProfile />
           ) : gamesPlayed === 0 ? (
             <div className="text-center text-[#8b7355] py-12">No completed games found</div>
           ) : (
@@ -194,6 +226,28 @@ export default function PlayerProfileModal({ playerId, onClose }: Props) {
                   </div>
                 ))}
               </div>
+
+              {/* Strengths radar */}
+              {radarData.length > 0 && (
+                <div className="card p-3">
+                  <p className="text-[#8b7355] text-xs uppercase tracking-wider mb-1">Strengths</p>
+                  <div style={{ height: 200 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadarChart data={radarData} cx="50%" cy="50%" outerRadius="72%">
+                        <PolarGrid stroke="#D4C4A8" />
+                        <PolarAngleAxis dataKey="stat" tick={{ fontSize: 11, fill: '#78350F' }} />
+                        <Radar dataKey="value" stroke={playerColor} fill={playerColor} fillOpacity={0.25} strokeWidth={2} />
+                      </RadarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  {/* Accessible data table (screen readers) */}
+                  <table className="sr-only">
+                    <caption>Player strengths</caption>
+                    <thead><tr><th>Stat</th><th>Score</th></tr></thead>
+                    <tbody>{radarData.map(d => <tr key={d.stat}><td>{d.stat}</td><td>{d.value}%</td></tr>)}</tbody>
+                  </table>
+                </div>
+              )}
 
               {/* Recent form */}
               {last5.length > 0 && (
@@ -217,7 +271,7 @@ export default function PlayerProfileModal({ playerId, onClose }: Props) {
                     {last5Scores.map((s, i) => (
                       <div key={i} className="flex-1 text-center">
                         <div className="font-mono text-sm font-semibold" style={{ color: playerColor }}>{s}</div>
-                        <div className="text-[#a08c6e] text-[10px]">{fmtDate(last5[i].date)}</div>
+                        <div className="text-warm-muted text-[10px]">{fmtDate(last5[i].date)}</div>
                       </div>
                     ))}
                   </div>
@@ -267,7 +321,7 @@ export default function PlayerProfileModal({ playerId, onClose }: Props) {
                   <div className="flex flex-col gap-2">
                     {top3Opponents.map((op) => (
                       <div key={op.name} className="flex items-center justify-between">
-                        <span className="text-[#2c1810] text-sm">{op.name}</span>
+                        <span className="text-warm-text text-sm">{op.name}</span>
                         <div className="flex items-center gap-3 text-xs font-mono text-right">
                           <span className="text-[#8b7355]">{op.games}g together</span>
                           <span className="text-[#8b6914] font-semibold">{op.ourWins}W</span>
@@ -313,7 +367,7 @@ export default function PlayerProfileModal({ playerId, onClose }: Props) {
 
               {/* Game log */}
               <div className="card overflow-hidden">
-                <div className="px-3 py-2 border-b border-[#e2ddd2]">
+                <div className="px-3 py-2 border-b border-sand-light">
                   <p className="text-[#8b7355] text-xs uppercase tracking-wider">Game Log</p>
                 </div>
                 {playerGames.map((g, i) => {
@@ -324,15 +378,15 @@ export default function PlayerProfileModal({ playerId, onClose }: Props) {
                     <button
                       key={g.id}
                       onClick={() => pushDrilldown({ type: 'game-scorecard', title: fmtDateLong(g.date), game: g, highlightPlayerId: playerId })}
-                      className={`flex items-center justify-between w-full px-3 py-2.5 text-sm text-left active:opacity-70 ${i > 0 ? 'border-t border-[#e2ddd2]/40' : ''} ${i % 2 !== 0 ? 'bg-[#efe9dd]/40' : ''}`}
+                      className={`flex items-center justify-between w-full px-3 py-2.5 text-sm text-left active:opacity-70 ${i > 0 ? 'border-t border-sand-light/40' : ''} ${i % 2 !== 0 ? 'bg-[#efe9dd]/40' : ''}`}
                     >
                       <div>
-                        <div className="text-[#2c1810] font-medium text-sm">{fmtDate(g.date)}</div>
-                        <div className="text-[#a08c6e] text-xs">{g.game_scores.length} players</div>
+                        <div className="text-warm-text font-medium text-sm">{fmtDate(g.date)}</div>
+                        <div className="text-warm-muted text-xs">{g.game_scores.length} players</div>
                       </div>
                       <div className="text-right">
-                        <div className={`font-mono font-semibold ${won ? 'text-[#8b6914]' : 'text-[#2c1810]'}`}>{score} pts</div>
-                        <div className="text-[#a08c6e] text-xs">{ordinal(rank)}</div>
+                        <div className={`font-mono font-semibold ${won ? 'text-[#8b6914]' : 'text-warm-text'}`}>{score} pts</div>
+                        <div className="text-warm-muted text-xs">{ordinal(rank)}</div>
                       </div>
                     </button>
                   )

@@ -107,13 +107,13 @@ export default function ScoreEntry({ game, players, onComplete, onBack }: Props)
       {/* Header */}
       <div className="p-4 safe-top">
         <div className="flex items-center justify-between mb-4">
-          <button onClick={onBack} className="text-[#a08c6e] p-1" aria-label="Exit game">
+          <button onClick={onBack} className="text-warm-muted p-1" aria-label="Exit game">
             <ChevronLeft size={24} />
           </button>
           <div className="text-center">
-            <div className="text-[#a08c6e] text-xs uppercase tracking-wider">Round {round.number} of 7</div>
-            <div className="font-display text-lg font-semibold text-[#8b6914]">{round.name}</div>
-            <div className="text-[#a08c6e] text-xs">{round.cards} cards dealt</div>
+            <div className="text-warm-muted text-xs uppercase tracking-wider">Round {round.number} of 7</div>
+            <div className="font-heading text-lg font-semibold text-[#8b6914]">{round.name}</div>
+            <div className="text-warm-muted text-xs">{round.cards} cards dealt</div>
           </div>
           <div className="w-8" />
         </div>
@@ -153,10 +153,10 @@ export default function ScoreEntry({ game, players, onComplete, onBack }: Props)
             <span className="font-mono text-[#8b6914] text-sm font-semibold tracking-wider">{game.room_code}</span>
             {codeCopied
               ? <Check size={13} className="text-[#2d7a3a]" />
-              : <Copy size={13} className="text-[#a08c6e]" />
+              : <Copy size={13} className="text-warm-muted" />
             }
           </button>
-          <p className="text-[#a08c6e] text-[10px] text-center mt-1">Tap to copy · Others can join from Score Tracker → Join Game</p>
+          <p className="text-warm-muted text-[10px] text-center mt-1">Tap to copy · Others can join from Score Tracker → Join Game</p>
         </div>
       )}
 
@@ -172,7 +172,7 @@ export default function ScoreEntry({ game, players, onComplete, onBack }: Props)
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: color }} />
                   <div className="min-w-0">
-                    <div className="text-[#2c1810] font-medium text-base truncate">{player.name}</div>
+                    <div className="text-warm-text font-medium text-base truncate">{player.name}</div>
                     <div className="text-[#8b7355] text-xs font-mono">Running: {total}</div>
                   </div>
                 </div>
@@ -197,12 +197,12 @@ export default function ScoreEntry({ game, players, onComplete, onBack }: Props)
       </div>
 
       {/* Footer */}
-      <div className="p-4 border-t border-[#e2ddd2]">
+      <div className="p-4 border-t border-sand-light">
         {roundError && (
           <p className="text-[#b83232] text-sm text-center mb-3">{roundError}</p>
         )}
         {!canProceed && !roundError && (
-          <p className="text-[#a08c6e] text-xs text-center mb-2">Enter all scores to continue</p>
+          <p className="text-warm-muted text-xs text-center mb-2">Enter all scores to continue</p>
         )}
         <div className="flex gap-2">
           {/* Previous button — only visible from Round 2 onward */}
