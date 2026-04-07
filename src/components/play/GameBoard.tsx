@@ -1995,12 +1995,6 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       // Achievement: Buyer's Market (first buy by human)
       if (!buyer.isAI) unlockAchievement(buyer.name, 'buyers-market')
 
-      // Highlight newly received buy cards
-      const buyNewIds = new Set<string>()
-      if (buyingDiscard) buyNewIds.add(buyingDiscard.id)
-      if (penaltyCard) buyNewIds.add(penaltyCard.id)
-      if (buyNewIds.size > 0) setNewCardIds(buyNewIds)
-
       addBuyLog({
         turn: turnCountRef.current,
         round: gameState.currentRound,
@@ -2014,7 +2008,14 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
       setRemoteEvent(`${buyer.name} bought ${buyingDiscard ? formatCard(buyingDiscard) : 'a card'}!`)
 
       if (isPostDraw) {
-        // Post-draw buy: current player (who drew from pile) still acts after this
+        // Post-draw buy: buyer stays as display player, so NEW badge works here.
+        // Delay badge until after buy animation lands (same pattern as normal draw).
+        const buyNewIds = new Set<string>()
+        if (buyingDiscard) buyNewIds.add(buyingDiscard.id)
+        if (penaltyCard) buyNewIds.add(penaltyCard.id)
+        const animDuration = reduceAnimations ? 0 : (buyer.isAI ? 400 : 1000)
+        if (buyNewIds.size > 0) setTimeout(() => setNewCardIds(buyNewIds), animDuration)
+
         buyingIsPostDrawRef.current = false
         useGameStore.getState().completeBuyingRound()
         if (withBuy.roundState.goOutPlayerId !== null) {

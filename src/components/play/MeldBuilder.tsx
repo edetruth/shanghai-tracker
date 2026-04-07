@@ -32,6 +32,61 @@ function slotLabel(slotIdx: number, req: RoundRequirement): string {
   return slotIdx < req.sets ? 'Set' : 'Run'
 }
 
+/** Reorder a run's cards so jokers sit at their logical sequence position (gap-filling). */
+function orderRunCards(cards: CardType[]): CardType[] {
+  const naturals = cards.filter(c => c.suit !== 'joker')
+  const jokers = cards.filter(c => c.suit === 'joker')
+  if (naturals.length === 0 || jokers.length === 0) return cards
+
+  const ranks = naturals.map(c => c.rank).sort((a, b) => a - b)
+
+  // Determine ace-high vs ace-low
+  let useRanks = ranks
+  let aceHigh = false
+  if (ranks.includes(1)) {
+    const hiRanks = ranks.map(r => (r === 1 ? 14 : r)).sort((a, b) => a - b)
+    const lowSpan = ranks[ranks.length - 1] - ranks[0]
+    const highSpan = hiRanks[hiRanks.length - 1] - hiRanks[0]
+    if (highSpan < lowSpan) {
+      useRanks = hiRanks
+      aceHigh = true
+    }
+  }
+
+  const knownMin = useRanks[0]
+  const knownMax = useRanks[useRanks.length - 1]
+  const knownSet = new Set(useRanks)
+
+  // Gaps within the known span that jokers fill
+  const gaps: number[] = []
+  for (let r = knownMin; r <= knownMax; r++) {
+    if (!knownSet.has(r)) gaps.push(r)
+  }
+  const extraJokers = jokers.length - gaps.length
+  const seqMin = knownMin
+  const seqMax = knownMax + Math.max(0, extraJokers)
+
+  // Assign jokers to positions: fill gaps first, then extend high
+  const jokerPositions: number[] = [...gaps]
+  for (let i = 0; i < extraJokers; i++) jokerPositions.push(knownMax + 1 + i)
+
+  // Build ordered array
+  const ordered: CardType[] = []
+  let jokerIdx = 0
+  for (let r = seqMin; r <= seqMax; r++) {
+    const natural = naturals.find(c => (aceHigh ? (c.rank === 1 ? 14 : c.rank) : c.rank) === r)
+    if (natural) {
+      ordered.push(natural)
+    } else if (jokerIdx < jokers.length) {
+      ordered.push(jokers[jokerIdx++])
+    }
+  }
+  // Fallback: include any unplaced cards
+  const placedIds = new Set(ordered.map(c => c.id))
+  cards.forEach(c => { if (!placedIds.has(c.id)) ordered.push(c) })
+  return ordered
+}
+
 function rankLabel(rank: number): string {
   if (rank === 0 || rank === 14) return 'A'
   if (rank === 1) return 'A'
@@ -338,7 +393,7 @@ const MeldBuilder = forwardRef<MeldBuilderHandle, Props>(function MeldBuilder({
       else if (isValidSet(meld)) sets.push(meld)
       else runs.push(meld)
     }
-    const ordered = [...sets, ...runs]
+    const ordered = [...sets, ...runs.map(r => orderRunCards(r))]
     setSlotCards(ordered.map(m => [...m]))
     setSuggestionApplied(true)
     // Auto-select last slot
