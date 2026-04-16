@@ -65,12 +65,16 @@ def _get_worker_model(model_path_str: str):
     if model_path_str not in _worker_model_cache:
         import torch as _torch
         state = _torch.load(model_path_str, map_location="cpu", weights_only=True)
-        if "draw_head.weight" in state:
+        has_draw = "draw_head.weight" in state
+        is_v3    = has_draw and tuple(state["draw_head.weight"].shape) == (1, 256)
+        if has_draw and not is_v3:
             from train_network import PIMCNet as _Net
         else:
             from train_network_v2 import PIMCDiscardNet as _Net
         m = _Net()
-        m.load_state_dict(state)
+        # strict=False: opponents only use discard head; draw head keys may be
+        # absent (v2 checkpoint) or present (v3 checkpoint) — both are fine.
+        m.load_state_dict(state, strict=False)
         m.eval()
         _worker_model_cache[model_path_str] = m
     return _worker_model_cache[model_path_str]
