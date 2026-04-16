@@ -125,10 +125,11 @@ def run_one_game(
             if not discard_only and discard_int >= 0 and 'take_discard' in actions:
                 decision = hook.draw(0, hand_ints, discard_int, has_ld, round_idx)
                 action   = 'take_discard' if decision == 'take' else 'draw_pile'
-            elif 'take_discard' in actions:
-                # Discard-only mode: use bridge AI heuristic (aiShouldTakeDiscard)
-                ai_resp = env._send({'cmd': 'get_ai_action'})
-                action  = ai_resp.get('action', 'draw_pile')
+            elif discard_int >= 0 and 'take_discard' in actions:
+                # Discard-only mode: always draw from pile (no draw head)
+                # NOTE: changing this without retraining hurts the discard policy
+                # (distribution shift). Draw fix requires co-training — see Phase 2.
+                action = 'draw_pile'
             else:
                 action = 'draw_pile'
 
