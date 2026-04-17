@@ -188,14 +188,12 @@ def run_collection(
 
         for fut in as_completed(futs):
             records = fut.result()
-            # Only discard records (type==0); draw records are empty anyway
             for rec in records:
-                if rec["type"] == 0:
-                    writer.add(rec)
+                writer.add(rec)   # type==0 (discard) and type==1 (draw)
 
             completed      += 1
             games_done     += 1
-            records_written += sum(1 for r in records if r["type"] == 0)
+            records_written += len(records)
 
             elapsed = time.perf_counter() - t_start
             rate    = completed / elapsed
