@@ -211,16 +211,31 @@ def make_tensors(data: dict) -> dict:
 
 
 def train_val_split(tensors: dict, val_frac: float = 0.1, seed: int = 42):
-    n   = tensors["states"].shape[0]
-    rng = torch.Generator().manual_seed(seed)
-    idx = torch.randperm(n, generator=rng)
-    n_val = int(n * val_frac)
-    val_idx, train_idx = idx[:n_val], idx[n_val:]
+    # Discard tensors (states, labels, ev_scores, round_idx)
+    discard_keys = ["states", "labels", "ev_scores", "round_idx"]
+    draw_keys    = ["draw_states", "draw_labels"]
 
-    return (
-        {k: v[train_idx] for k, v in tensors.items()},
-        {k: v[val_idx]   for k, v in tensors.items()},
-    )
+    rng   = torch.Generator().manual_seed(seed)
+    nd    = tensors["states"].shape[0]
+    idx_d = torch.randperm(nd, generator=rng)
+    nv_d  = int(nd * val_frac)
+    val_d, train_d = idx_d[:nv_d], idx_d[nv_d:]
+
+    train_t = {k: tensors[k][train_d] for k in discard_keys}
+    val_t   = {k: tensors[k][val_d]   for k in discard_keys}
+
+    # Draw tensors split separately (different size from discard)
+    if "draw_states" in tensors:
+        rng2  = torch.Generator().manual_seed(seed + 1)
+        nr    = tensors["draw_states"].shape[0]
+        idx_r = torch.randperm(nr, generator=rng2)
+        nv_r  = int(nr * val_frac)
+        val_r, train_r = idx_r[:nv_r], idx_r[nv_r:]
+        for k in draw_keys:
+            train_t[k] = tensors[k][train_r]
+            val_t[k]   = tensors[k][val_r]
+
+    return train_t, val_t
 
 
 # ── Loss ──────────────────────────────────────────────────────────
