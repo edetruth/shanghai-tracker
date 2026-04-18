@@ -37,6 +37,11 @@ from evaluate_pimc import _Tee
 from evaluate_network import NetworkHook, load_model, HUMAN_AVG, MASTERMIND_AVG, PIMC_40R_AVG
 # load_model auto-detects v1 (dual-head PIMCNet) vs v2 (PIMCDiscardNet)
 
+from engine import find_meld_assignment, ROUND_REQS, CARDS_DEALT as _CARDS_DEALT_LD
+from collect_data import build_laydown_state_vec, LAYDOWN_STATE_DIM
+
+# LaydownNet imported lazily (only if laydown_net.pt exists)
+
 
 # ── Card encoding: TypeScript <-> Python int ──────────────────────
 # Mirrors pimc_bridge_eval.py exactly.
@@ -73,14 +78,63 @@ def _find_discard_index(hand_cards: list, chosen_int: int) -> int:
     return len(sorted_hand) - 1   # fallback: last card
 
 
+# ── Lay-down timing hook ──────────────────────────────────────────
+
+class LaydownHook:
+    """
+    Wraps LaydownNet as a no-arg callable for use with get_strategic_actions(meld_hook=).
+
+    Called when player 0 has a meld opportunity. Fetches full state from the
+    bridge, reconstructs the lay-down state vector, and returns True/False.
+    """
+
+    def __init__(self, model, env, n_players: int):
+        self._model     = model
+        self._env       = env
+        self._n_players = n_players
+        self.decisions  = 0
+        self.skipped    = 0
+
+    def __call__(self) -> bool:
+        """Return True to lay down now, False to skip this turn."""
+        full       = self._env.get_full_state()
+        hand_cards = full.get('hand', [])
+        hand_ints  = [_ts_to_int(c) for c in hand_cards]
+        round_idx  = max(0, full.get('round', 1) - 1)
+
+        req_sets, req_runs = ROUND_REQS[round_idx]
+        assignment = find_meld_assignment(hand_ints, req_sets, req_runs)
+        if assignment is None:
+            return True   # no valid assignment — shouldn't happen; default to meld
+
+        opp_sizes     = [_CARDS_DEALT_LD[round_idx]] * (self._n_players - 1)
+        has_ld_others = [False] * (self._n_players - 1)   # approximate
+
+        sv      = build_laydown_state_vec(
+            hand=hand_ints,
+            assignment=assignment,
+            round_idx=round_idx,
+            has_laid_down_others=has_ld_others,
+            opp_sizes=opp_sizes,
+        )
+        state_t = torch.from_numpy(sv).unsqueeze(0)
+        pred    = int(self._model.predict(state_t).item())   # 1=meld, 0=skip
+
+        self.decisions += 1
+        if pred == 0:
+            self.skipped += 1
+        return bool(pred)
+
+
 # ── Single game ───────────────────────────────────────────────────
 
 def run_one_game(
     env: ShanghaiEnv,
-    model: PIMCNet,
+    model,
     n_players: int,
     seed: int,
     discard_only: bool = False,
+    laydown_hook=None,
 ) -> tuple:
     """
     Play one game with PIMCNet as player 0.
@@ -98,7 +152,7 @@ def run_one_game(
 
     while not done and step < max_steps:
         step += 1
-        actions, current_player, _ = env.get_strategic_actions()
+        actions, current_player, _ = env.get_strategic_actions(meld_hook=laydown_hook)
 
         if not actions:
             break
@@ -161,12 +215,15 @@ def run_evaluation(
     n_players: int,
     opponent: str,
     seed: int,
-    model: PIMCNet,
+    model,
     discard_only: bool = False,
+    laydown_hook=None,
 ) -> dict:
     import random as _random
 
     env        = ShanghaiEnv(player_count=n_players, opponent_ai=opponent)
+    if laydown_hook is not None:
+        laydown_hook._env = env
     rng        = _random.Random(seed)
     p0_scores  = []
     opp_avgs   = []
@@ -177,7 +234,8 @@ def run_evaluation(
 
     for game_i in range(n_games):
         game_seed          = rng.randint(0, 2 ** 31 - 1)
-        scores, hook       = run_one_game(env, model, n_players, game_seed, discard_only)
+        scores, hook       = run_one_game(env, model, n_players, game_seed, discard_only,
+                                          laydown_hook=laydown_hook)
 
         p0_scores.append(scores[0])
         opp_avgs.append(mean(scores[1:]))
@@ -201,7 +259,7 @@ def run_evaluation(
 
     avg = lambda v: mean(v) if v else 0.0
     sd  = lambda v: stdev(v) if len(v) > 1 else 0.0
-    return {
+    result = {
         "n_games":      n_games,
         "n_players":    n_players,
         "opponent":     opponent,
@@ -215,6 +273,10 @@ def run_evaluation(
         "fallbacks":    total_fb,
         "discard_only": discard_only,
     }
+    if laydown_hook is not None:
+        result["ld_decisions"] = laydown_hook.decisions
+        result["ld_skipped"]   = laydown_hook.skipped
+    return result
 
 
 # ── Report ────────────────────────────────────────────────────────
@@ -294,6 +356,8 @@ def main() -> None:
                         help="Checkpoint filename in models/ (default: network_v1.pt)")
     parser.add_argument("--discard-only", action="store_true",
                         help="Network discard only; greedy draw (no draw_hook)")
+    parser.add_argument("--no-laydown",  action="store_true",
+                        help="Force greedy lay-down (skip LaydownNet even if present)")
     args = parser.parse_args()
 
     model_path = _HERE / "models" / args.model
@@ -316,6 +380,25 @@ def main() -> None:
     n_params = sum(p.numel() for p in model.parameters())
     model_tag = "v2 discard-only" if is_v2 else "v1 dual-head"
     print(f"  Model loaded: {n_params:,} parameters  ({model_tag})")
+
+    # ── Load lay-down net (optional) ─────────────────────────────────
+    laydown_hook = None
+    if not args.no_laydown:
+        ld_path = _HERE / "models" / "laydown_net.pt"
+        if ld_path.exists():
+            from laydown_net import LaydownNet
+            ld_model = LaydownNet()
+            ld_model.load_state_dict(
+                torch.load(ld_path, map_location="cpu", weights_only=True)
+            )
+            ld_model.eval()
+            # env assigned inside run_evaluation after ShanghaiEnv is created
+            laydown_hook = LaydownHook(ld_model, env=None, n_players=args.players)
+            print(f"  LaydownNet loaded: {ld_path.name}")
+        else:
+            print(f"  LaydownNet not found ({ld_path.name}) — using greedy lay-down")
+    else:
+        print("  Lay-down timing: greedy (--no-laydown)")
     print()
 
     t0      = time.perf_counter()
@@ -326,6 +409,7 @@ def main() -> None:
         seed=args.seed,
         model=model,
         discard_only=args.discard_only,
+        laydown_hook=laydown_hook,
     )
     elapsed = time.perf_counter() - t0
 
@@ -339,6 +423,11 @@ def main() -> None:
     print(f"  vs Human (227)          : {HUMAN_AVG - p0_avg:+.1f}")
     print(f"  vs Mastermind (219)     : {MASTERMIND_AVG - p0_avg:+.1f}")
     print(f"  vs PIMC-40R (220)       : {PIMC_40R_AVG - p0_avg:+.1f}")
+    if "ld_decisions" in results:
+        ld_d = results["ld_decisions"]
+        ld_s = results["ld_skipped"]
+        skip_pct = ld_s / max(ld_d, 1)
+        print(f"  LaydownNet decisions    : {ld_d}  skipped={ld_s} ({skip_pct:.0%})")
 
     _save_report(results, model_path.name, elapsed)
 
