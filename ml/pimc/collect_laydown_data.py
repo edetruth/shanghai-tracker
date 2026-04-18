@@ -2,10 +2,14 @@
 Lay-down timing data collector.
 
 For each game, whenever player 0 has a valid meld assignment, runs two
-PIMC branches to generate a binary label:
-  Branch A: lay down now  (N=10 rollouts) -> mean_score_A
-  Branch B: skip one turn (N=10 rollouts) -> mean_score_B
-  label = 1 if mean_score_A < mean_score_B (lay down now is better)
+PIMC branches to generate a binary label using ROUND-SCORE labeling:
+  Branch A: lay down now  (N rollouts, current round only) -> mean_round_score_A
+  Branch B: skip one turn (N rollouts, current round only) -> mean_round_score_B
+  label = 1 if mean_round_score_A < mean_round_score_B (lay down now is better)
+
+Round-score labeling uses play_round() instead of play_game() so variance
+is ~3x lower (~40 pts std dev vs ~150 pts for full game). This makes 10
+rollouts sufficient where 100 full-game rollouts would be needed.
 
 Players 1-3 use network_v3.pt for discard decisions (same as data_v2).
 Player 0 uses greedy discard during collection (only lay-down labels recorded).
@@ -32,7 +36,7 @@ if str(_HERE) not in sys.path:
     sys.path.insert(0, str(_HERE))
 
 from engine import (
-    play_game, DECK_COUNT, CARDS_DEALT, make_deck,
+    play_game, play_round, DECK_COUNT, CARDS_DEALT, make_deck,
     find_meld_assignment, ROUND_REQS,
 )
 from collect_data import (
@@ -125,7 +129,8 @@ def _run_one_game_laydown(args: tuple) -> list:
     import numpy as _np
     from collections import Counter as _Counter
     from engine import (
-        play_game as _play_game, DECK_COUNT as _DC, CARDS_DEALT as _CD,
+        play_game as _play_game, play_round as _play_round,
+        DECK_COUNT as _DC, CARDS_DEALT as _CD,
         make_deck as _make_deck, find_meld_assignment as _fma, ROUND_REQS as _RR,
     )
     from collect_data import (
@@ -169,24 +174,22 @@ def _run_one_game_laydown(args: tuple) -> list:
                      for i in range(n_players - 1)]
         all_hands = [list(hand)] + opp_hands
 
-        # Branch A: lay down immediately (greedy — no laydown_hook)
+        # Branch A: lay down immediately — round score only (lower variance)
         scores_a = []
         for _ in range(n_rollouts):
             rs = _random.Random(agent_rng.randint(0, 2 ** 31 - 1))
-            s  = _play_game(n_players, rs, _DC,
-                            starting_round=round_idx,
-                            initial_hands=[list(h) for h in all_hands])
+            s  = _play_round(round_idx, n_players, rs, _DC,
+                             initial_hands=[list(h) for h in all_hands])
             scores_a.append(s[0])
 
-        # Branch B: skip one turn for player 0
+        # Branch B: skip one turn for player 0 — round score only
         scores_b = []
         for _ in range(n_rollouts):
             rs   = _random.Random(agent_rng.randint(0, 2 ** 31 - 1))
             skip = _SkipOnceLaydownHook()
-            s    = _play_game(n_players, rs, _DC,
-                              starting_round=round_idx,
-                              initial_hands=[list(h) for h in all_hands],
-                              laydown_hook=skip)
+            s    = _play_round(round_idx, n_players, rs, _DC,
+                               initial_hands=[list(h) for h in all_hands],
+                               laydown_hook=skip)
             scores_b.append(s[0])
 
         label = int(_np.mean(scores_a) < _np.mean(scores_b))
