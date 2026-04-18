@@ -89,18 +89,35 @@ class LaydownHook:
     """
 
     def __init__(self, model, env, n_players: int):
-        self._model     = model
-        self._env       = env
-        self._n_players = n_players
-        self.decisions  = 0
-        self.skipped    = 0
+        self._model       = model
+        self._env         = env
+        self._n_players   = n_players
+        self.decisions    = 0
+        self.skipped      = 0
+        self._last_round  = -1    # round when we last skipped
+        self._skipped_this_round = False
 
     def __call__(self) -> bool:
-        """Return True to lay down now, False to skip this turn."""
-        full       = self._env.get_full_state()
+        """Return True to lay down now, False to skip this turn.
+
+        Mirrors _SkipOnceLaydownHook from training: at most one skip per round,
+        then always go down. Without this guard the hook keeps saying 'wait'
+        every turn and player 0 never lays down.
+        """
+        full      = self._env.get_full_state()
+        round_idx = max(0, full.get('round', 1) - 1)
+
+        # New round — reset skip flag
+        if round_idx != self._last_round:
+            self._last_round         = round_idx
+            self._skipped_this_round = False
+
+        # Already waited once this round — must go down now
+        if self._skipped_this_round:
+            return True
+
         hand_cards = full.get('hand', [])
         hand_ints  = [_ts_to_int(c) for c in hand_cards]
-        round_idx  = max(0, full.get('round', 1) - 1)
 
         req_sets, req_runs = ROUND_REQS[round_idx]
         assignment = find_meld_assignment(hand_ints, req_sets, req_runs)
@@ -122,7 +139,8 @@ class LaydownHook:
 
         self.decisions += 1
         if pred == 0:
-            self.skipped += 1
+            self.skipped          += 1
+            self._skipped_this_round = True
         return bool(pred)
 
 
