@@ -106,6 +106,80 @@ class ShanghaiEnv:
             result["opponent_actions"] = result.get("opponentActionsSinceLast", [0.0] * 18)
         return result
 
+    def evaluate_hand(self, player: int = 0) -> float:
+        """Get the hand evaluation score for a player. Used for reward shaping."""
+        result = self._send({"cmd": "evaluate_hand", "player": player})
+        if not result.get("ok"):
+            return 0.0
+        return float(result.get("score", 0.0))
+
+    def get_strategic_actions(self, meld_hook=None) -> tuple:
+        """Get only strategic actions (draw/discard/buy). Auto-execute meld/layoff.
+
+        Melds and layoffs are always executed first (they're almost always
+        correct), then the remaining strategic actions are returned for the
+        caller to decide.
+
+        IMPORTANT: auto-execution runs for BOTH agent and opponents. Previously
+        only player 0 got auto-meld, which gave the agent a massive asymmetric
+        advantage — random opponents wouldn't meld even when they could, so
+        they rarely went out and the agent won ~92% of games by default.
+
+        meld_hook: Optional callable() -> bool.  Called when current_player == 0
+        has a 'meld' action available and meld_hook is not None.
+        Return False to SKIP meld for player 0 this turn (lay-down timing).
+        Return True or None → execute meld as usual.
+
+        Returns (actions, current_player, state) where state is the updated
+        state vector after any auto-executed mechanical actions.
+        """
+        max_auto = 50  # safety cap to prevent infinite loops
+        auto_count = 0
+        latest_state = None
+        while auto_count < max_auto:
+            actions, current_player = self.get_valid_actions()
+            if not actions:
+                return [], current_player, latest_state
+
+            # Always auto-execute mechanical actions (meld/layoff) first,
+            # regardless of whose turn it is. This keeps the random/rule-based
+            # opponent behavior symmetric with the agent's behavior.
+            mechanical = [a for a in actions if a == "meld" or a.startswith("layoff:")]
+            if mechanical:
+                if "meld" in mechanical:
+                    # For player 0: ask meld_hook before auto-executing
+                    if meld_hook is not None and current_player == 0:
+                        if meld_hook() is False:
+                            # Hook said skip — remove meld, return strategic actions
+                            actions_no_meld = [a for a in actions if a != "meld"]
+                            strategic = [
+                                a for a in actions_no_meld
+                                if a in ("draw_pile", "take_discard", "buy", "decline_buy")
+                                or a.startswith("discard:")
+                            ]
+                            if strategic:
+                                return strategic, current_player, latest_state
+                            return actions_no_meld, current_player, latest_state
+                    latest_state, _, _, _ = self.step("meld")
+                else:
+                    latest_state, _, _, _ = self.step(mechanical[0])
+                auto_count += 1
+                continue  # Re-check: more melds/layoffs may now be available
+
+            # No mechanical actions left — return strategic ones.
+            # (Return for any player; caller decides whether it's the agent
+            # or an opponent and routes the action accordingly.)
+            strategic = [a for a in actions if a in ("draw_pile", "take_discard", "buy", "decline_buy") or a.startswith("discard:")]
+            if strategic:
+                return strategic, current_player, latest_state
+
+            # Fallback: return whatever the bridge gave us
+            return actions, current_player, latest_state
+
+        # Safety: return whatever we have after max iterations
+        actions, current_player = self.get_valid_actions()
+        return actions, current_player, latest_state
+
     def get_ai_action(self) -> str:
         """Get the AI personality's recommended action for the current state."""
         result = self._send({"cmd": "get_ai_action"})
