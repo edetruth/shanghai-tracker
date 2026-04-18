@@ -5,6 +5,9 @@ Like collect_data.py but players 1-3 use a trained network (discard-only)
 instead of the engine's greedy heuristic.  PIMC rollouts for player 0 remain
 greedy internally — only the actual game opponents are upgraded.
 
+Collects both discard (type=0) and draw (type=1) decisions for player 0,
+enabling co-training of both heads in train_network_v2.py.
+
 Why this helps:
   v1 data: PIMC player 0 vs greedy opponents (~330 avg)
   v2 data: PIMC player 0 vs network opponents (~164 avg)
@@ -134,7 +137,7 @@ def _run_one_game_v2(args: tuple) -> list:
         _random.Random(game_seed),
         _DC,
         discard_hook=_combined_discard,
-        draw_hook=p0_hook.draw,   # collect draw labels for co-trained draw head
+        draw_hook=p0_hook.draw,   # collect draw decisions alongside discard
     )
     return p0_hook.raw_records
 
