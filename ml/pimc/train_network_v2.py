@@ -278,10 +278,13 @@ def train(args) -> None:
 
     print(f"Loading dataset from {data_dir} ...")
     t0      = time.perf_counter()
-    data    = load_dataset(data_dir)
+    if args.discard_only:
+        data = load_dataset_discard_only(data_dir)
+    else:
+        data = load_dataset(data_dir)
     tensors = make_tensors(data)
     n_total = tensors["states"].shape[0]
-    has_draw = "draw_states" in tensors
+    has_draw = "draw_states" in tensors and not args.discard_only
     print(f"  {n_total:,} discard records loaded in {time.perf_counter()-t0:.1f}s")
     if has_draw:
         print(f"  {tensors['draw_states'].shape[0]:,} draw records loaded")
@@ -503,6 +506,8 @@ def main() -> None:
                         help="Output model filename in models/ (default: network_v3.pt)")
     parser.add_argument("--validate-only", action="store_true",
                         help="Only run validation on saved model")
+    parser.add_argument("--discard-only", action="store_true",
+                        help="Ignore draw records; train discard head only (no draw gradient)")
     args = parser.parse_args()
 
     if args.validate_only:
