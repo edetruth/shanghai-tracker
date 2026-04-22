@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional
+from typing import Dict, Optional
 
 import torch
 import torch.nn as nn
@@ -46,7 +46,7 @@ class ShanghaiNet(nn.Module):
         self.laydown_head  = nn.Linear(h, 1)
         self.value_head    = nn.Linear(h, 1)
 
-    def forward(self, x: torch.Tensor) -> dict:
+    def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
         """
         Args:
             x: (B, 170) float32
@@ -82,12 +82,42 @@ class ShanghaiNet(nn.Module):
         """
         Warm-start backbone and discard_head weights from a PIMCDiscardNet checkpoint.
         draw/buy/laydown/value heads keep random initialization.
+
+        Raises:
+            FileNotFoundError: if checkpoint_path does not exist.
+            ValueError: if checkpoint has no backbone.* or discard_head.* keys.
+            RuntimeError: if backbone or discard_head weights are missing after load.
         """
+        if not Path(checkpoint_path).exists():
+            raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
+
         net = cls(dropout=dropout)
         pimc_state = torch.load(checkpoint_path, map_location="cpu")
+
+        if not isinstance(pimc_state, dict):
+            raise ValueError(
+                f"Checkpoint must be a state_dict (dict), got {type(pimc_state)}"
+            )
+
         compatible = {
             k: v for k, v in pimc_state.items()
             if k.startswith("backbone.") or k.startswith("discard_head.")
         }
-        net.load_state_dict(compatible, strict=False)
+
+        if not compatible:
+            raise ValueError(
+                f"Checkpoint has no backbone.* or discard_head.* keys. "
+                f"Found top-level keys: {list(pimc_state.keys())[:10]}"
+            )
+
+        missing, _ = net.load_state_dict(compatible, strict=False)
+        critical_missing = [
+            k for k in missing
+            if k.startswith("backbone.") or k.startswith("discard_head.")
+        ]
+        if critical_missing:
+            raise RuntimeError(
+                f"Missing critical backbone/discard_head weights: {critical_missing}"
+            )
+
         return net
