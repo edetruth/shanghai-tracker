@@ -48,8 +48,13 @@ def test_warm_start_loads_backbone():
     pytest.fail("Backbone weights identical to random init after warm-start")
 
 
-def test_warm_start_new_heads_are_random():
-    """draw/buy/laydown/value heads must NOT be loaded from PIMC checkpoint."""
+def test_warm_start_new_heads_are_not_loaded():
+    """draw/buy/laydown/value heads must NOT have weights loaded from PIMC checkpoint.
+
+    PIMCDiscardNet has draw_head (1,256) — ShanghaiNet has draw_head (2,256).
+    buy/laydown/value heads don't exist in PIMC at all.
+    from_pimc_checkpoint() must leave all new heads randomly initialized.
+    """
     from network import ShanghaiNet
     ckpt = PIMC_MODELS / "network_v7.pt"
     if not ckpt.exists():
@@ -58,6 +63,17 @@ def test_warm_start_new_heads_are_random():
     pimc_state = torch.load(ckpt, map_location="cpu")
     warm = ShanghaiNet.from_pimc_checkpoint(ckpt)
 
-    # These keys must NOT exist in the pimc checkpoint
-    for key in ("draw_head.weight", "buy_head.weight", "laydown_head.weight", "value_head.weight"):
+    # draw_head shape must be (2, 256) — incompatible with PIMC's (1, 256)
+    assert warm.draw_head.weight.shape == (2, 256), (
+        f"draw_head should be (2,256), got {warm.draw_head.weight.shape}"
+    )
+    # Verify PIMC draw_head was NOT loaded: PIMC has shape (1,256), ShanghaiNet (2,256) — incompatible
+    if "draw_head.weight" in pimc_state:
+        pimc_draw_shape = pimc_state["draw_head.weight"].shape
+        assert pimc_draw_shape != warm.draw_head.weight.shape, (
+            "draw_head weight shapes match — PIMC weights may have been loaded!"
+        )
+
+    # buy/laydown/value heads must not exist in PIMC checkpoint
+    for key in ("buy_head.weight", "laydown_head.weight", "value_head.weight"):
         assert key not in pimc_state, f"PIMC checkpoint unexpectedly contains {key}"
