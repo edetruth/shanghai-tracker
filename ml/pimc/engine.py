@@ -811,7 +811,7 @@ def play_round(
                     greedy_buy = rm >= 2
                     if buy_hook is not None:
                         hook_result = buy_hook(
-                            buyer, list(hb), dc, buys_remaining[buyer],
+                            buyer, hb, dc, buys_remaining[buyer],
                             has_laid_down[buyer], round_idx,
                         )
                         should_buy = hook_result if hook_result is not None else greedy_buy
@@ -863,6 +863,10 @@ def play_game(
         laydown_hook:    Optional callable(player_idx, hand, assignment, round_idx,
                          has_laid_down) -> bool | None. Return False to skip lay-down
                          for this turn; True or None to proceed (greedy default).
+        buy_hook:        Optional callable(player_idx, hand, discard_top,
+                         buys_remaining, has_laid_down, round_idx) -> bool | None.
+                         Overrides the greedy buy decision for eligible players.
+                         None return = use greedy heuristic.
     """
     if rng is None:
         rng = random.Random()

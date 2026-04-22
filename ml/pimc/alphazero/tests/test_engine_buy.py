@@ -48,3 +48,30 @@ def test_buy_hook_none_returns_use_greedy():
     scores_greedy = play_round(0, 4, rng1)
     scores_passthrough = play_round(0, 4, rng2, buy_hook=passthrough)
     assert scores_greedy == scores_passthrough
+
+
+def test_buy_hook_force_buy_changes_outcome():
+    """Force-buying should produce different results than force-declining for the same seed."""
+    results_buy = []
+    results_decline = []
+
+    for seed in range(30):
+        rng1 = random.Random(seed)
+        rng2 = random.Random(seed)
+
+        def always_buy(player_idx, hand, discard_top, buys_remaining, has_laid_down, round_idx):
+            return True
+
+        def never_buy(player_idx, hand, discard_top, buys_remaining, has_laid_down, round_idx):
+            return False
+
+        try:
+            s1 = play_round(0, 4, rng1, buy_hook=always_buy)
+            s2 = play_round(0, 4, rng2, buy_hook=never_buy)
+            results_buy.append(sum(s1))
+            results_decline.append(sum(s2))
+        except Exception:
+            pass
+
+    # At least some seeds should produce different total scores
+    assert results_buy != results_decline, "always_buy and never_buy produced identical results"
