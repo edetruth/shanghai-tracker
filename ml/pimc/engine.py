@@ -578,6 +578,7 @@ def play_round(
     discard_hook=None,
     draw_hook=None,
     laydown_hook=None,
+    buy_hook=None,
 ) -> list:
     """Simulate one complete round. Returns list of scores per player.
 
@@ -807,7 +808,16 @@ def play_round(
                     for hc in hb:
                         if hc < JI and (hc & 15) == dr:
                             rm += 1
-                    if rm >= 2:              # would complete a set (2 → 3)
+                    greedy_buy = rm >= 2
+                    if buy_hook is not None:
+                        hook_result = buy_hook(
+                            buyer, hb, dc, buys_remaining[buyer],
+                            has_laid_down[buyer], round_idx,
+                        )
+                        should_buy = hook_result if hook_result is not None else greedy_buy
+                    else:
+                        should_buy = greedy_buy
+                    if should_buy:
                         discard_pile.pop()
                         hb.append(dc)
                         # Penalty draw
@@ -834,6 +844,7 @@ def play_game(
     discard_hook=None,
     draw_hook=None,
     laydown_hook=None,
+    buy_hook=None,
 ) -> list:
     """Simulate rounds starting_round..6. Returns cumulative scores per player.
 
@@ -852,13 +863,17 @@ def play_game(
         laydown_hook:    Optional callable(player_idx, hand, assignment, round_idx,
                          has_laid_down) -> bool | None. Return False to skip lay-down
                          for this turn; True or None to proceed (greedy default).
+        buy_hook:        Optional callable(player_idx, hand, discard_top,
+                         buys_remaining, has_laid_down, round_idx) -> bool | None.
+                         Overrides the greedy buy decision for eligible players.
+                         None return = use greedy heuristic.
     """
     if rng is None:
         rng = random.Random()
     scores = list(initial_scores) if initial_scores is not None else [0] * n_players
     for round_idx in range(starting_round, 7):
         ih = initial_hands if round_idx == starting_round else None
-        for p, s in enumerate(play_round(round_idx, n_players, rng, deck_count, ih, discard_hook, draw_hook, laydown_hook)):
+        for p, s in enumerate(play_round(round_idx, n_players, rng, deck_count, ih, discard_hook, draw_hook, laydown_hook, buy_hook)):
             scores[p] += s
     return scores
 
