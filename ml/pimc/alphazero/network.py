@@ -15,14 +15,14 @@ class ShanghaiNet(nn.Module):
       - draw_head:     (256→2)  logits for [draw_pile, take_discard]
       - buy_head:      (256→1)  logit; sigmoid > 0.5 = buy
       - laydown_head:  (256→1)  logit; sigmoid > 0.5 = lay down now
-      - value_head:    (256→1)  predicted round score (lower = better)
+      - value_head:    (256→1)  predicted cumulative game score (lower = better)
 
     Use from_pimc_checkpoint() to warm-start backbone + discard_head from
     a PIMCDiscardNet checkpoint, leaving other heads randomly initialized.
     """
 
     STATE_DIM = 170
-    HIDDEN = 256
+    HIDDEN    = 256
 
     def __init__(self, dropout: float = 0.1):
         super().__init__()
@@ -92,7 +92,7 @@ class ShanghaiNet(nn.Module):
             raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
 
         net = cls(dropout=dropout)
-        pimc_state = torch.load(checkpoint_path, map_location="cpu")
+        pimc_state = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
 
         if not isinstance(pimc_state, dict):
             raise ValueError(

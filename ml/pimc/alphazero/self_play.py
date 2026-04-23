@@ -31,12 +31,21 @@ def collect_games(
     Run n_games self-play games. Player 0 uses `network`; players 1-(n-1)
     each randomly sample a network from `opponent_pool`.
 
+    The network (and all pool opponents) are set to eval() mode for the
+    duration of collection. The caller is responsible for switching back
+    to train() mode before the gradient update.
+
     Returns:
         List of trajectory dicts, each with:
           - "steps": list of step dicts from ShanghaiNetAgent.trajectory
           - "final_score": float, player 0's cumulative score (all 7 rounds)
     """
-    from agent import ShanghaiNetAgent
+    from alphazero.agent import ShanghaiNetAgent
+
+    # Set eval mode once for all models — not per forward call
+    network.eval()
+    for opp in opponent_pool:
+        opp.eval()
 
     rng = random.Random(seed)
     trajectories = []
@@ -60,25 +69,18 @@ def collect_games(
 
         all_agents = [agent0] + opp_agents
 
-        def _discard(player_idx, hand, has_laid_down, table_melds, round_idx):
-            return all_agents[player_idx].discard(
-                player_idx, hand, has_laid_down, table_melds, round_idx
-            )
+        # Explicit capture via default args avoids any late-binding surprises
+        def _discard(pi, hand, hld, melds, ri, _a=all_agents):
+            return _a[pi].discard(pi, hand, hld, melds, ri)
 
-        def _draw(player_idx, hand, discard_top, has_laid_down, round_idx):
-            return all_agents[player_idx].draw(
-                player_idx, hand, discard_top, has_laid_down, round_idx
-            )
+        def _draw(pi, hand, dt, hld, ri, _a=all_agents):
+            return _a[pi].draw(pi, hand, dt, hld, ri)
 
-        def _buy(player_idx, hand, discard_top, buys_remaining, has_laid_down, round_idx):
-            return all_agents[player_idx].buy(
-                player_idx, hand, discard_top, buys_remaining, has_laid_down, round_idx
-            )
+        def _buy(pi, hand, dt, br, hld, ri, _a=all_agents):
+            return _a[pi].buy(pi, hand, dt, br, hld, ri)
 
-        def _laydown(player_idx, hand, assignment, round_idx, has_laid_down):
-            return all_agents[player_idx].laydown(
-                player_idx, hand, assignment, round_idx, has_laid_down
-            )
+        def _laydown(pi, hand, asgn, ri, hld, _a=all_agents):
+            return _a[pi].laydown(pi, hand, asgn, ri, hld)
 
         scores = play_game(
             n_players=n_players,

@@ -14,6 +14,14 @@ Usage
         --games-per-iter 32 \\
         --lr 1e-4
 
+    # Resume after interruption
+    python -m alphazero.runner \\
+        --warm-start models/network_v7.pt \\
+        --save-dir alphazero/checkpoints \\
+        --iterations 2000 \\
+        --games-per-iter 32 \\
+        --resume
+
 The warm-started checkpoint is optional; if omitted, training starts from
 a randomly initialised ShanghaiNet.
 """
@@ -34,10 +42,10 @@ _PIMC_DIR = Path(__file__).parent.parent
 if str(_PIMC_DIR) not in sys.path:
     sys.path.insert(0, str(_PIMC_DIR))
 
-from alphazero.network      import ShanghaiNet
-from alphazero.self_play    import collect_games
-from alphazero.value_labeler import label_values
-from alphazero.train        import build_batch, compute_losses
+from alphazero.network       import ShanghaiNet
+from alphazero.self_play     import collect_games
+from alphazero.value_labeler  import label_values
+from alphazero.train         import build_batch, compute_losses
 
 
 def train_iteration(
@@ -56,6 +64,9 @@ def train_iteration(
     2. Label each step with value_label = final_score
     3. Flatten steps → batch
     4. Forward + loss + backward + clip + step
+
+    collect_games() sets model to eval(); we switch back to train() before
+    the gradient update.
 
     Returns:
         dict with float values: policy_loss, value_loss, entropy,
@@ -89,7 +100,7 @@ def train_iteration(
 
 
 def _temperature_for(iteration: int, total: int) -> float:
-    """Linear temperature schedule: 1.0 → 0.5 → 0.2 in three equal phases."""
+    """Three-phase schedule: 1.0 → 0.5 → 0.2."""
     phase = iteration / max(total, 1)
     if phase < 1 / 3:
         return 1.0
@@ -98,28 +109,41 @@ def _temperature_for(iteration: int, total: int) -> float:
     return 0.2
 
 
+def _frozen_copy(model: ShanghaiNet) -> ShanghaiNet:
+    snap = copy.deepcopy(model)
+    snap.eval()
+    return snap
+
+
 def run_training(
     warm_start: Optional[str] = None,
     save_dir: str = "alphazero/checkpoints",
     n_iterations: int = 1000,
     games_per_iter: int = 16,
     pool_size: int = 5,
+    pool_every: int = 10,
     lr: float = 1e-4,
     entropy_coef: float = 0.01,
     save_every: int = 50,
     log_every: int = 10,
     seed: Optional[int] = None,
+    resume: bool = False,
 ) -> None:
     """
     Full training loop.
 
-    Opponent pool: keeps the last `pool_size` saved checkpoints as frozen
-    opponents.  The current model always plays as player 0 (recording=True).
+    Opponent pool: updated every `pool_every` iterations with a frozen
+    snapshot of the current model.  Keeps the last `pool_size` snapshots.
+    This is separate from checkpointing (save_every) so the pool diversifies
+    quickly even with infrequent saves.
 
     Checkpoints saved as:
         <save_dir>/ckpt_<iteration>.pt  — state dict only
-        <save_dir>/best.pt              — lowest avg_score so far
+        <save_dir>/best.pt              — lowest avg100 so far
         <save_dir>/training_log.jsonl   — one JSON line per logged iteration
+
+    Resume: if --resume is passed, the latest ckpt_*.pt is loaded and
+    training continues from the next iteration.
     """
     save_path = Path(save_dir)
     save_path.mkdir(parents=True, exist_ok=True)
@@ -127,7 +151,7 @@ def run_training(
 
     rng = random.Random(seed)
 
-    # ── Model + optimiser ───────────────────────────────────────────
+    # ── Model ────────────────────────────────────────────────────────
     if warm_start:
         model = ShanghaiNet.from_pimc_checkpoint(warm_start)
         print(f"Warm-started from {warm_start}")
@@ -137,17 +161,38 @@ def run_training(
 
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
-    # ── Opponent pool — starts with a copy of the initial model ─────
-    opponent_pool: List[ShanghaiNet] = [copy.deepcopy(model)]
-
-    best_avg_score = float("inf")
+    # ── Resume ───────────────────────────────────────────────────────
+    start_iteration = 1
     history: List[float] = []
+    if resume:
+        ckpts = sorted(save_path.glob("ckpt_*.pt"))
+        if ckpts:
+            latest = ckpts[-1]
+            model.load_state_dict(
+                torch.load(latest, map_location="cpu", weights_only=True)
+            )
+            start_iteration = int(latest.stem.split("_")[1]) + 1
+            print(f"Resumed from {latest.name} — continuing at iteration {start_iteration}")
+            # Rebuild history from log so avg100 is meaningful
+            if log_file.exists():
+                with open(log_file) as f:
+                    for line in f:
+                        try:
+                            history.append(json.loads(line)["avg_score"])
+                        except (KeyError, json.JSONDecodeError):
+                            pass
+        else:
+            print("--resume: no checkpoints found, starting fresh")
+
+    # ── Opponent pool — starts with a snapshot of the initial model ──
+    opponent_pool: List[ShanghaiNet] = [_frozen_copy(model)]
+    best_avg_score = float("inf")
 
     print(f"Training: {n_iterations} iters, {games_per_iter} games/iter, "
-          f"pool_size={pool_size}, lr={lr}")
+          f"pool_size={pool_size}, pool_every={pool_every}, lr={lr}")
     print()
 
-    for iteration in range(1, n_iterations + 1):
+    for iteration in range(start_iteration, n_iterations + 1):
         temperature = _temperature_for(iteration, n_iterations)
         iter_seed   = rng.randint(0, 2 ** 31)
         t0          = time.time()
@@ -162,15 +207,21 @@ def run_training(
         elapsed = time.time() - t0
         history.append(stats["avg_score"])
 
+        # ── Opponent pool update ─────────────────────────────────────
+        if iteration % pool_every == 0:
+            opponent_pool.append(_frozen_copy(model))
+            if len(opponent_pool) > pool_size:
+                opponent_pool.pop(0)
+
         # ── Logging ─────────────────────────────────────────────────
-        if iteration % log_every == 0 or iteration == 1:
+        if iteration % log_every == 0 or iteration == start_iteration:
             avg100 = sum(history[-100:]) / len(history[-100:])
             row = {
-                "iteration": iteration,
+                "iteration":   iteration,
                 "temperature": temperature,
                 **stats,
-                "avg100": avg100,
-                "elapsed_s": round(elapsed, 2),
+                "avg100":      avg100,
+                "elapsed_s":   round(elapsed, 2),
             }
             with open(log_file, "a") as f:
                 f.write(json.dumps(row) + "\n")
@@ -190,14 +241,6 @@ def run_training(
             ckpt_path = save_path / f"ckpt_{iteration:05d}.pt"
             torch.save(model.state_dict(), ckpt_path)
 
-            # Update opponent pool with a frozen snapshot
-            frozen = copy.deepcopy(model)
-            frozen.eval()
-            opponent_pool.append(frozen)
-            if len(opponent_pool) > pool_size:
-                opponent_pool.pop(0)
-
-            # Best model tracking
             avg100 = sum(history[-100:]) / len(history[-100:])
             if avg100 < best_avg_score:
                 best_avg_score = avg100
@@ -206,7 +249,6 @@ def run_training(
             else:
                 print(f"  => Checkpoint saved: {ckpt_path.name}")
 
-    # Final save
     torch.save(model.state_dict(), save_path / "final.pt")
     print(f"\nTraining complete. Final model: {save_path / 'final.pt'}")
     print(f"Best avg100 score: {best_avg_score:.1f}")
@@ -216,16 +258,18 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="AlphaZero-lite training for Shanghai Rummy")
-    parser.add_argument("--warm-start",      default=None,                  help="PIMC checkpoint to warm-start from")
-    parser.add_argument("--save-dir",        default="alphazero/checkpoints")
-    parser.add_argument("--iterations",      type=int,   default=1000)
-    parser.add_argument("--games-per-iter",  type=int,   default=16)
-    parser.add_argument("--pool-size",       type=int,   default=5)
-    parser.add_argument("--lr",              type=float, default=1e-4)
-    parser.add_argument("--entropy-coef",    type=float, default=0.01)
-    parser.add_argument("--save-every",      type=int,   default=50)
-    parser.add_argument("--log-every",       type=int,   default=10)
-    parser.add_argument("--seed",            type=int,   default=None)
+    parser.add_argument("--warm-start",     default=None,                  help="PIMC checkpoint to warm-start from")
+    parser.add_argument("--save-dir",       default="alphazero/checkpoints")
+    parser.add_argument("--iterations",     type=int,   default=1000)
+    parser.add_argument("--games-per-iter", type=int,   default=16)
+    parser.add_argument("--pool-size",      type=int,   default=5)
+    parser.add_argument("--pool-every",     type=int,   default=10,         help="Add pool snapshot every N iters")
+    parser.add_argument("--lr",             type=float, default=1e-4)
+    parser.add_argument("--entropy-coef",   type=float, default=0.01)
+    parser.add_argument("--save-every",     type=int,   default=50)
+    parser.add_argument("--log-every",      type=int,   default=10)
+    parser.add_argument("--seed",           type=int,   default=None)
+    parser.add_argument("--resume",         action="store_true",            help="Resume from latest checkpoint in save-dir")
     args = parser.parse_args()
 
     run_training(
@@ -234,9 +278,11 @@ if __name__ == "__main__":
         n_iterations  = args.iterations,
         games_per_iter= args.games_per_iter,
         pool_size     = args.pool_size,
+        pool_every    = args.pool_every,
         lr            = args.lr,
         entropy_coef  = args.entropy_coef,
         save_every    = args.save_every,
         log_every     = args.log_every,
         seed          = args.seed,
+        resume        = args.resume,
     )

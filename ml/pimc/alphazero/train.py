@@ -12,11 +12,13 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+from alphazero.constants import ACTION_DISCARD, ACTION_DRAW, ACTION_BUY, ACTION_LAYDOWN
 
-ACTION_DISCARD  = 0
-ACTION_DRAW     = 1
-ACTION_BUY      = 2
-ACTION_LAYDOWN  = 3
+# Re-export so existing imports from alphazero.train still work
+__all__ = [
+    "build_batch", "compute_losses",
+    "ACTION_DISCARD", "ACTION_DRAW", "ACTION_BUY", "ACTION_LAYDOWN",
+]
 
 
 def build_batch(steps: List[dict]) -> dict:
@@ -61,12 +63,14 @@ def compute_losses(
     Forward pass + loss computation.
 
     Policy gradient: REINFORCE with value baseline.
-        advantage = value_label − predicted_value (detached)
-        loss      = −mean(log_prob(action) × advantage)
+        advantage = normalize(value_label − predicted_value.detach())
+        loss      = −weighted_mean(log_prob(action) × advantage)
+                    weighted by step count per head so all action types
+                    contribute proportionally regardless of frequency.
 
     Value: MSE(predicted_value, value_label)
 
-    Entropy: mean per-head entropy (maximised to encourage exploration)
+    Entropy: per-head entropy, weighted by step count (maximised)
 
     Total: policy_loss + 0.5 × value_loss − entropy_coef × entropy
 
@@ -88,61 +92,83 @@ def compute_losses(
     predicted = out["value"].squeeze(-1)   # (N,)
 
     value_loss = F.mse_loss(predicted, value_labels)
-    advantages = (value_labels - predicted.detach())
 
-    policy_losses: list[torch.Tensor] = []
-    entropies:     list[torch.Tensor] = []
+    # Normalise advantages — reduces gradient variance across batches
+    raw_adv = value_labels - predicted.detach()
+    if raw_adv.numel() > 1:
+        advantages = (raw_adv - raw_adv.mean()) / (raw_adv.std() + 1e-8)
+    else:
+        advantages = raw_adv
+
+    # (policy_loss_tensor, step_count) per head
+    policy_terms: list[tuple[torch.Tensor, int]] = []
+    entropy_terms: list[tuple[torch.Tensor, int]] = []
 
     # ── Discard (categorical over 53 card types) ────────────────────
     mask_d = action_types == ACTION_DISCARD
     if mask_d.any():
+        n        = int(mask_d.sum())
         logits   = out["discard_logits"][mask_d]
         adv      = advantages[mask_d]
         acts     = action_takens[mask_d]
         log_p    = F.log_softmax(logits, dim=-1)
-        lp       = log_p[torch.arange(mask_d.sum()), acts]
-        policy_losses.append(-(lp * adv).mean())
-        p        = log_p.exp()
-        entropies.append(-(p * log_p).sum(dim=-1).mean())
+        lp       = log_p[torch.arange(n), acts]
+        policy_terms.append((-(lp * adv).mean(), n))
+        p = log_p.exp()
+        entropy_terms.append((-(p * log_p).sum(dim=-1).mean(), n))
 
     # ── Draw (categorical over 2: pile/take) ────────────────────────
     mask_r = action_types == ACTION_DRAW
     if mask_r.any():
+        n        = int(mask_r.sum())
         logits   = out["draw_logits"][mask_r]
         adv      = advantages[mask_r]
         acts     = action_takens[mask_r]
         log_p    = F.log_softmax(logits, dim=-1)
-        lp       = log_p[torch.arange(mask_r.sum()), acts]
-        policy_losses.append(-(lp * adv).mean())
-        p        = log_p.exp()
-        entropies.append(-(p * log_p).sum(dim=-1).mean())
+        lp       = log_p[torch.arange(n), acts]
+        policy_terms.append((-(lp * adv).mean(), n))
+        p = log_p.exp()
+        entropy_terms.append((-(p * log_p).sum(dim=-1).mean(), n))
 
     # ── Buy (binary) ─────────────────────────────────────────────────
     mask_b = action_types == ACTION_BUY
     if mask_b.any():
+        n        = int(mask_b.sum())
         logit    = out["buy_logit"][mask_b].squeeze(-1)
         adv      = advantages[mask_b]
         acts_f   = action_takens[mask_b].float()
         lp       = -F.binary_cross_entropy_with_logits(logit, acts_f, reduction="none")
-        policy_losses.append(-(lp * adv).mean())
-        p        = torch.sigmoid(logit).clamp(1e-6, 1 - 1e-6)
-        entropies.append(-(p * p.log() + (1 - p) * (1 - p).log()).mean())
+        policy_terms.append((-(lp * adv).mean(), n))
+        p = torch.sigmoid(logit).clamp(1e-6, 1 - 1e-6)
+        entropy_terms.append((-(p * p.log() + (1 - p) * (1 - p).log()).mean(), n))
 
     # ── Laydown (binary) ─────────────────────────────────────────────
     mask_l = action_types == ACTION_LAYDOWN
     if mask_l.any():
+        n        = int(mask_l.sum())
         logit    = out["laydown_logit"][mask_l].squeeze(-1)
         adv      = advantages[mask_l]
         acts_f   = action_takens[mask_l].float()
         lp       = -F.binary_cross_entropy_with_logits(logit, acts_f, reduction="none")
-        policy_losses.append(-(lp * adv).mean())
-        p        = torch.sigmoid(logit).clamp(1e-6, 1 - 1e-6)
-        entropies.append(-(p * p.log() + (1 - p) * (1 - p).log()).mean())
+        policy_terms.append((-(lp * adv).mean(), n))
+        p = torch.sigmoid(logit).clamp(1e-6, 1 - 1e-6)
+        entropy_terms.append((-(p * p.log() + (1 - p) * (1 - p).log()).mean(), n))
 
     zero = torch.tensor(0.0)
-    policy_loss = torch.stack(policy_losses).mean() if policy_losses else zero
-    entropy     = torch.stack(entropies).mean()     if entropies     else zero
-    total_loss  = policy_loss + 0.5 * value_loss - entropy_coef * entropy
+
+    if policy_terms:
+        total_n     = sum(n for _, n in policy_terms)
+        policy_loss = sum(loss * n / total_n for loss, n in policy_terms)
+    else:
+        policy_loss = zero
+
+    if entropy_terms:
+        total_n = sum(n for _, n in entropy_terms)
+        entropy  = sum(ent * n / total_n for ent, n in entropy_terms)
+    else:
+        entropy = zero
+
+    total_loss = policy_loss + 0.5 * value_loss - entropy_coef * entropy
 
     return {
         "policy_loss": policy_loss,

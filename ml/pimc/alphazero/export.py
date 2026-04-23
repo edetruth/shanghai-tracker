@@ -39,7 +39,7 @@ INPUT_NAME   = "state"
 def export_onnx(
     model: ShanghaiNet,
     output_path: str,
-    opset: int = 17,
+    opset: int = 12,
     verify: bool = True,
 ) -> Path:
     """
@@ -48,14 +48,14 @@ def export_onnx(
     Args:
         model:       trained ShanghaiNet (eval mode applied internally)
         output_path: destination .onnx file
-        opset:       ONNX opset version (default 17)
+        opset:       ONNX opset version (default 12 — broad runtime compat)
         verify:      run onnxruntime cross-check if available (default True)
 
     Returns:
         Path to the written .onnx file.
 
     Raises:
-        RuntimeError if onnxruntime verification fails (output shape mismatch).
+        RuntimeError if onnxruntime verification fails (output mismatch).
     """
     model.eval()
     out_path = Path(output_path)
@@ -81,7 +81,6 @@ def export_onnx(
 
 
 def _verify(model: ShanghaiNet, onnx_path: Path, dummy: torch.Tensor) -> None:
-    """Cross-check PyTorch and ONNX outputs.  Skips gracefully if onnxruntime absent."""
     try:
         import onnxruntime as ort
         import numpy as np
@@ -108,11 +107,11 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Export ShanghaiNet to ONNX")
-    parser.add_argument("--checkpoint",  required=True,  help="Path to .pt state dict")
-    parser.add_argument("--warm-start",  default=None,   help="Load via from_pimc_checkpoint")
-    parser.add_argument("--output",      required=True,  help="Output .onnx file path")
-    parser.add_argument("--opset",       type=int, default=17)
-    parser.add_argument("--no-verify",   action="store_true")
+    parser.add_argument("--checkpoint", required=True,  help="Path to .pt state dict")
+    parser.add_argument("--warm-start", default=None,   help="Load via from_pimc_checkpoint")
+    parser.add_argument("--output",     required=True,  help="Output .onnx file path")
+    parser.add_argument("--opset",      type=int, default=12)
+    parser.add_argument("--no-verify",  action="store_true")
     args = parser.parse_args()
 
     ckpt = Path(args.checkpoint)
@@ -120,6 +119,6 @@ if __name__ == "__main__":
         model = ShanghaiNet.from_pimc_checkpoint(ckpt)
     else:
         model = ShanghaiNet()
-        model.load_state_dict(torch.load(ckpt, map_location="cpu"))
+        model.load_state_dict(torch.load(ckpt, map_location="cpu", weights_only=True))
 
     export_onnx(model, args.output, opset=args.opset, verify=not args.no_verify)
