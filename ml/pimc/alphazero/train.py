@@ -91,7 +91,13 @@ def compute_losses(
     out = model(state_vecs)
     predicted = out["value"].squeeze(-1)   # (N,)
 
-    value_loss = F.mse_loss(predicted, value_labels)
+    # Normalise value targets so MSE stays in [0,4] regardless of score scale.
+    # Detach stats so they don't flow gradients into the normalisation itself.
+    vl_mean = value_labels.mean().detach()
+    vl_std  = value_labels.std().detach().clamp(min=1e-8)
+    value_labels_n = (value_labels - vl_mean) / vl_std
+    predicted_n    = (predicted    - vl_mean) / vl_std
+    value_loss = F.mse_loss(predicted_n, value_labels_n)
 
     # Normalise advantages — reduces gradient variance across batches
     raw_adv = value_labels - predicted.detach()

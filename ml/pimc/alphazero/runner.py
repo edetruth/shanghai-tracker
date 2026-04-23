@@ -117,13 +117,14 @@ def _frozen_copy(model: ShanghaiNet) -> ShanghaiNet:
 
 def run_training(
     warm_start: Optional[str] = None,
+    from_checkpoint: Optional[str] = None,
     save_dir: str = "alphazero/checkpoints",
     n_iterations: int = 1000,
     games_per_iter: int = 16,
     pool_size: int = 5,
     pool_every: int = 10,
     lr: float = 1e-4,
-    entropy_coef: float = 0.01,
+    entropy_coef: float = 0.05,
     save_every: int = 50,
     log_every: int = 10,
     seed: Optional[int] = None,
@@ -144,6 +145,10 @@ def run_training(
 
     Resume: if --resume is passed, the latest ckpt_*.pt is loaded and
     training continues from the next iteration.
+
+    from_checkpoint: load a raw state-dict .pt file (not PIMC format).
+    Use this to restart from best.pt after a divergence without --resume
+    picking up the bad latest checkpoint.
     """
     save_path = Path(save_dir)
     save_path.mkdir(parents=True, exist_ok=True)
@@ -152,7 +157,13 @@ def run_training(
     rng = random.Random(seed)
 
     # ── Model ────────────────────────────────────────────────────────
-    if warm_start:
+    if from_checkpoint:
+        model = ShanghaiNet()
+        model.load_state_dict(
+            torch.load(from_checkpoint, map_location="cpu", weights_only=True)
+        )
+        print(f"Loaded checkpoint {from_checkpoint}")
+    elif warm_start:
         model = ShanghaiNet.from_pimc_checkpoint(warm_start)
         print(f"Warm-started from {warm_start}")
     else:
@@ -264,25 +275,27 @@ if __name__ == "__main__":
     parser.add_argument("--games-per-iter", type=int,   default=16)
     parser.add_argument("--pool-size",      type=int,   default=5)
     parser.add_argument("--pool-every",     type=int,   default=10,         help="Add pool snapshot every N iters")
-    parser.add_argument("--lr",             type=float, default=1e-4)
-    parser.add_argument("--entropy-coef",   type=float, default=0.01)
-    parser.add_argument("--save-every",     type=int,   default=50)
-    parser.add_argument("--log-every",      type=int,   default=10)
-    parser.add_argument("--seed",           type=int,   default=None)
-    parser.add_argument("--resume",         action="store_true",            help="Resume from latest checkpoint in save-dir")
+    parser.add_argument("--lr",              type=float, default=1e-4)
+    parser.add_argument("--entropy-coef",    type=float, default=0.05)
+    parser.add_argument("--save-every",      type=int,   default=50)
+    parser.add_argument("--log-every",       type=int,   default=10)
+    parser.add_argument("--seed",            type=int,   default=None)
+    parser.add_argument("--resume",          action="store_true",           help="Resume from latest checkpoint in save-dir")
+    parser.add_argument("--from-checkpoint", default=None,                  help="Load raw state-dict .pt (bypasses PIMC format)")
     args = parser.parse_args()
 
     run_training(
-        warm_start    = args.warm_start,
-        save_dir      = args.save_dir,
-        n_iterations  = args.iterations,
-        games_per_iter= args.games_per_iter,
-        pool_size     = args.pool_size,
-        pool_every    = args.pool_every,
-        lr            = args.lr,
-        entropy_coef  = args.entropy_coef,
-        save_every    = args.save_every,
-        log_every     = args.log_every,
-        seed          = args.seed,
-        resume        = args.resume,
+        warm_start      = args.warm_start,
+        from_checkpoint = args.from_checkpoint,
+        save_dir        = args.save_dir,
+        n_iterations    = args.iterations,
+        games_per_iter  = args.games_per_iter,
+        pool_size       = args.pool_size,
+        pool_every      = args.pool_every,
+        lr              = args.lr,
+        entropy_coef    = args.entropy_coef,
+        save_every      = args.save_every,
+        log_every       = args.log_every,
+        seed            = args.seed,
+        resume          = args.resume,
     )
