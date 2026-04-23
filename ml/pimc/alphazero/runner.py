@@ -245,7 +245,7 @@ def run_training(
             if avg100 < best_avg_score:
                 best_avg_score = avg100
                 torch.save(model.state_dict(), save_path / "best.pt")
-                print(f"  => New best: avg100={avg100:.1f} → best.pt")
+                print(f"  => New best: avg100={avg100:.1f} -> best.pt")
             else:
                 print(f"  => Checkpoint saved: {ckpt_path.name}")
 
