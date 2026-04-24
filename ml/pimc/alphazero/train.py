@@ -99,8 +99,9 @@ def compute_losses(
     predicted_n    = (predicted    - vl_mean) / vl_std
     value_loss = F.mse_loss(predicted_n, value_labels_n)
 
-    # Normalise advantages — reduces gradient variance across batches
-    raw_adv = value_labels - predicted.detach()
+    # Advantage: positive when actual score < predicted (better than expected).
+    # Negated because lower score = better in Shanghai Rummy.
+    raw_adv = predicted.detach() - value_labels
     if raw_adv.numel() > 1:
         advantages = (raw_adv - raw_adv.mean()) / (raw_adv.std() + 1e-8)
     else:
