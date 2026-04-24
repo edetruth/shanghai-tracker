@@ -171,6 +171,9 @@ def run_training(
         print("Starting from random initialisation")
 
     optimizer = optim.Adam(model.parameters(), lr=lr)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer, mode="min", factor=0.5, patience=20, min_lr=1e-6
+    )
 
     # ── Resume ───────────────────────────────────────────────────────
     start_iteration = 1
@@ -218,6 +221,13 @@ def run_training(
         elapsed = time.time() - t0
         history.append(stats["avg_score"])
 
+        # ── LR schedule + health checks ──────────────────────────────
+        scheduler.step(stats["value_loss"])
+        if stats["entropy"] < 0.3 and stats["n_steps"] > 0:
+            current_lr = optimizer.param_groups[0]["lr"]
+            print(f"  [WARN] entropy={stats['entropy']:.4f} < 0.3 — policy collapsing  "
+                  f"(iter={iteration}, lr={current_lr:.2e})")
+
         # ── Opponent pool update ─────────────────────────────────────
         if iteration % pool_every == 0:
             opponent_pool.append(_frozen_copy(model))
@@ -227,11 +237,13 @@ def run_training(
         # ── Logging ─────────────────────────────────────────────────
         if iteration % log_every == 0 or iteration == start_iteration:
             avg100 = sum(history[-100:]) / len(history[-100:])
+            current_lr = optimizer.param_groups[0]["lr"]
             row = {
                 "iteration":   iteration,
                 "temperature": temperature,
                 **stats,
                 "avg100":      avg100,
+                "lr":          current_lr,
                 "elapsed_s":   round(elapsed, 2),
             }
             with open(log_file, "a") as f:
@@ -243,6 +255,7 @@ def run_training(
                 f"policy={stats['policy_loss']:8.4f}  "
                 f"value={stats['value_loss']:8.4f}  "
                 f"entropy={stats['entropy']:.4f}  "
+                f"lr={current_lr:.1e}  "
                 f"steps={stats['n_steps']:4d}  "
                 f"({elapsed:.1f}s)"
             )
