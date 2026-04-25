@@ -56,7 +56,7 @@ def train_iteration(
     pimc_ratio: float = 0.0,
     n_games: int = 16,
     temperature: float = 1.0,
-    entropy_coef: float = 0.01,
+    entropy_coef: float = 0.05,
     seed: Optional[int] = None,
 ) -> dict:
     """
@@ -162,6 +162,10 @@ def run_training(
 
     rng = random.Random(seed)
 
+    if resume and from_checkpoint:
+        print("[WARN] --resume and --from-checkpoint both set; "
+              "--resume will overwrite --from-checkpoint weights with latest ckpt_*.pt")
+
     # ── Model ────────────────────────────────────────────────────────
     if from_checkpoint:
         model = ShanghaiNet()
@@ -215,7 +219,16 @@ def run_training(
 
     # ── Opponent pool — starts with a snapshot of the initial model ──
     opponent_pool: List[ShanghaiNet] = [_frozen_copy(model)]
+
+    # Restore best_avg_score from log so --resume doesn't overwrite a better best.pt
     best_avg_score = float("inf")
+    if resume and log_file.exists():
+        with open(log_file) as f:
+            for line in f:
+                try:
+                    best_avg_score = min(best_avg_score, json.loads(line)["avg100"])
+                except (KeyError, json.JSONDecodeError):
+                    pass
 
     print(f"Training: {n_iterations} iters, {games_per_iter} games/iter, "
           f"pool_size={pool_size}, pool_every={pool_every}, lr={lr}")
@@ -260,6 +273,7 @@ def run_training(
                 **stats,
                 "avg100":      avg100,
                 "lr":          current_lr,
+                "pimc_ratio":  pimc_ratio,
                 "elapsed_s":   round(elapsed, 2),
             }
             with open(log_file, "a") as f:

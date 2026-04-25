@@ -62,6 +62,11 @@ def collect_games(
     rng = random.Random(seed)
     trajectories = []
 
+    def _pick_opp() -> object:
+        if use_pimc and rng.random() < pimc_ratio:
+            return rng.choice(pimc_pool)
+        return rng.choice(opponent_pool)
+
     for _ in range(n_games):
         game_seed = rng.randint(0, 2 ** 31)
         game_rng  = random.Random(game_seed)
@@ -71,14 +76,9 @@ def collect_games(
             temperature=temperature, record=True,
         )
 
-        def _pick_opponent(p: int):
-            if use_pimc and rng.random() < pimc_ratio:
-                return rng.choice(pimc_pool)
-            return rng.choice(opponent_pool)
-
         opp_agents = [
             ShanghaiNetAgent(
-                _pick_opponent(p), player_idx=p, n_players=n_players,
+                _pick_opp(), player_idx=p, n_players=n_players,
                 temperature=1.0, record=False,
             )
             for p in range(1, n_players)
