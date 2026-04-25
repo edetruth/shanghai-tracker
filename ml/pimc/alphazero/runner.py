@@ -52,6 +52,8 @@ def train_iteration(
     model: ShanghaiNet,
     optimizer: torch.optim.Optimizer,
     opponent_pool: List[ShanghaiNet],
+    pimc_pool: Optional[List[ShanghaiNet]] = None,
+    pimc_ratio: float = 0.0,
     n_games: int = 16,
     temperature: float = 1.0,
     entropy_coef: float = 0.01,
@@ -73,7 +75,9 @@ def train_iteration(
         total_loss, avg_score, n_steps.
     """
     trajectories = collect_games(
-        model, n_games, opponent_pool, temperature=temperature, seed=seed
+        model, n_games, opponent_pool,
+        pimc_pool=pimc_pool, pimc_ratio=pimc_ratio,
+        temperature=temperature, seed=seed,
     )
     label_values(trajectories)
 
@@ -118,6 +122,8 @@ def _frozen_copy(model: ShanghaiNet) -> ShanghaiNet:
 def run_training(
     warm_start: Optional[str] = None,
     from_checkpoint: Optional[str] = None,
+    pimc_checkpoint: Optional[str] = None,
+    pimc_ratio: float = 0.33,
     save_dir: str = "alphazero/checkpoints",
     n_iterations: int = 1000,
     games_per_iter: int = 16,
@@ -170,6 +176,15 @@ def run_training(
         model = ShanghaiNet()
         print("Starting from random initialisation")
 
+    # ── PIMC opponent pool ────────────────────────────────────────────
+    pimc_pool: List[ShanghaiNet] = []
+    if pimc_checkpoint:
+        _pimc = ShanghaiNet.from_pimc_checkpoint(pimc_checkpoint)
+        pimc_pool = [_frozen_copy(_pimc)]
+        print(f"PIMC opponents loaded from {pimc_checkpoint} (ratio={pimc_ratio:.0%})")
+    else:
+        pimc_ratio = 0.0
+
     optimizer = optim.Adam(model.parameters(), lr=lr)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode="min", factor=0.5, patience=20, min_lr=1e-6
@@ -213,6 +228,7 @@ def run_training(
 
         stats = train_iteration(
             model, optimizer, opponent_pool,
+            pimc_pool=pimc_pool, pimc_ratio=pimc_ratio,
             n_games=games_per_iter,
             temperature=temperature,
             entropy_coef=entropy_coef,
@@ -295,11 +311,15 @@ if __name__ == "__main__":
     parser.add_argument("--seed",            type=int,   default=None)
     parser.add_argument("--resume",          action="store_true",           help="Resume from latest checkpoint in save-dir")
     parser.add_argument("--from-checkpoint", default=None,                  help="Load raw state-dict .pt (bypasses PIMC format)")
+    parser.add_argument("--pimc-pool",       default=None,                  help="PIMC checkpoint to use as fixed opponent pool")
+    parser.add_argument("--pimc-ratio",      type=float, default=0.33,      help="Fraction of opponent slots filled by PIMC (default 0.33)")
     args = parser.parse_args()
 
     run_training(
         warm_start      = args.warm_start,
         from_checkpoint = args.from_checkpoint,
+        pimc_checkpoint = args.pimc_pool,
+        pimc_ratio      = args.pimc_ratio,
         save_dir        = args.save_dir,
         n_iterations    = args.iterations,
         games_per_iter  = args.games_per_iter,

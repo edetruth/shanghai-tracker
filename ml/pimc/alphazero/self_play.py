@@ -23,6 +23,8 @@ def collect_games(
     network,
     n_games: int,
     opponent_pool: list,
+    pimc_pool: Optional[list] = None,
+    pimc_ratio: float = 0.0,
     temperature: float = 1.0,
     seed: Optional[int] = None,
     n_players: int = 4,
@@ -30,6 +32,11 @@ def collect_games(
     """
     Run n_games self-play games. Player 0 uses `network`; players 1-(n-1)
     each randomly sample a network from `opponent_pool`.
+
+    If `pimc_pool` is provided and `pimc_ratio` > 0, each opponent slot
+    independently draws from `pimc_pool` with probability `pimc_ratio`
+    instead of `opponent_pool`. This breaks the self-play echo chamber by
+    always exposing the model to stronger, externally-trained opponents.
 
     The network (and all pool opponents) are set to eval() mode for the
     duration of collection. The caller is responsible for switching back
@@ -42,10 +49,15 @@ def collect_games(
     """
     from alphazero.agent import ShanghaiNetAgent
 
+    use_pimc = bool(pimc_pool) and pimc_ratio > 0.0
+
     # Set eval mode once for all models — not per forward call
     network.eval()
     for opp in opponent_pool:
         opp.eval()
+    if use_pimc:
+        for opp in pimc_pool:
+            opp.eval()
 
     rng = random.Random(seed)
     trajectories = []
@@ -59,9 +71,14 @@ def collect_games(
             temperature=temperature, record=True,
         )
 
+        def _pick_opponent(p: int):
+            if use_pimc and rng.random() < pimc_ratio:
+                return rng.choice(pimc_pool)
+            return rng.choice(opponent_pool)
+
         opp_agents = [
             ShanghaiNetAgent(
-                rng.choice(opponent_pool), player_idx=p, n_players=n_players,
+                _pick_opponent(p), player_idx=p, n_players=n_players,
                 temperature=1.0, record=False,
             )
             for p in range(1, n_players)
