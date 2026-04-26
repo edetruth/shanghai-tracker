@@ -153,7 +153,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Evaluate a ShanghaiNet checkpoint")
     parser.add_argument("--checkpoint",  default=None,    help="Path to .pt state dict (omit with --baseline)")
-    parser.add_argument("--warm-start",  default=None,    help="Load via from_pimc_checkpoint instead of state_dict")
+    parser.add_argument("--warm-start",  action="store_true", help="Load via from_pimc_checkpoint instead of state_dict")
     parser.add_argument("--baseline",    action="store_true", help="Run greedy-vs-greedy baseline (no model needed)")
     parser.add_argument("--games",       type=int,   default=200)
     parser.add_argument("--players",     type=int,   default=4)
