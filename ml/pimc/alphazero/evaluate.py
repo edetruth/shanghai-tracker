@@ -111,30 +111,80 @@ def evaluate_model(
     }
 
 
+def evaluate_greedy_baseline(
+    n_games: int = 200,
+    n_players: int = 4,
+    seed: Optional[int] = None,
+) -> dict:
+    """
+    Run n_games with all players using the engine's built-in greedy logic
+    (no neural network). Player 0's scores are collected as the baseline.
+
+    This establishes a fair apples-to-apples reference: what does a greedy
+    player score when everyone is greedy? Use this before comparing model
+    scores to the PIMC 166.8 baseline, which was measured differently.
+    """
+    import random
+    rng = random.Random(seed)
+
+    scores = []
+    wins   = 0
+
+    for _ in range(n_games):
+        game_rng = random.Random(rng.randint(0, 2 ** 31))
+        all_scores = play_game(n_players=n_players, rng=game_rng)
+        p0 = float(all_scores[0])
+        scores.append(p0)
+        if p0 == min(all_scores):
+            wins += 1
+
+    return {
+        "avg_score": statistics.mean(scores),
+        "std_score": statistics.stdev(scores) if len(scores) > 1 else 0.0,
+        "min_score": min(scores),
+        "max_score": max(scores),
+        "win_rate":  wins / n_games,
+        "n_games":   n_games,
+    }
+
+
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Evaluate a ShanghaiNet checkpoint")
-    parser.add_argument("--checkpoint", required=True,   help="Path to .pt state dict")
-    parser.add_argument("--warm-start", default=None,    help="Load via from_pimc_checkpoint instead of state_dict")
-    parser.add_argument("--games",      type=int,   default=200)
-    parser.add_argument("--players",    type=int,   default=4)
-    parser.add_argument("--temperature",type=float, default=0.0)
-    parser.add_argument("--seed",       type=int,   default=42)
+    parser.add_argument("--checkpoint",  default=None,    help="Path to .pt state dict (omit with --baseline)")
+    parser.add_argument("--warm-start",  default=None,    help="Load via from_pimc_checkpoint instead of state_dict")
+    parser.add_argument("--baseline",    action="store_true", help="Run greedy-vs-greedy baseline (no model needed)")
+    parser.add_argument("--games",       type=int,   default=200)
+    parser.add_argument("--players",     type=int,   default=4)
+    parser.add_argument("--temperature", type=float, default=0.0)
+    parser.add_argument("--seed",        type=int,   default=42)
     args = parser.parse_args()
 
-    ckpt = Path(args.checkpoint)
-    if args.warm_start:
-        model = ShanghaiNet.from_pimc_checkpoint(ckpt)
+    if args.baseline:
+        print(f"Greedy baseline  ({args.games} games, all players greedy)")
+        results = evaluate_greedy_baseline(
+            n_games=args.games, n_players=args.players, seed=args.seed
+        )
+        print(f"  avg_score : {results['avg_score']:.1f}")
+        print(f"  std_score : {results['std_score']:.1f}")
+        print(f"  min/max   : {results['min_score']:.0f} / {results['max_score']:.0f}")
+        print(f"  win_rate  : {results['win_rate']*100:.1f}%  (expected ~25%)")
     else:
-        model = ShanghaiNet()
-        model.load_state_dict(torch.load(ckpt, map_location="cpu"))
-    model.eval()
+        if not args.checkpoint:
+            parser.error("--checkpoint is required unless --baseline is set")
+        ckpt = Path(args.checkpoint)
+        if args.warm_start:
+            model = ShanghaiNet.from_pimc_checkpoint(ckpt)
+        else:
+            model = ShanghaiNet()
+            model.load_state_dict(torch.load(ckpt, map_location="cpu", weights_only=True))
+        model.eval()
 
-    print(f"Evaluating {ckpt.name}  ({args.games} games, T={args.temperature})")
-    results = evaluate_model(model, n_games=args.games, n_players=args.players,
-                             temperature=args.temperature, seed=args.seed)
-    print(f"  avg_score : {results['avg_score']:.1f}  (PIMC baseline: ~166.8)")
-    print(f"  std_score : {results['std_score']:.1f}")
-    print(f"  min/max   : {results['min_score']:.0f} / {results['max_score']:.0f}")
-    print(f"  win_rate  : {results['win_rate']*100:.1f}%  (random baseline: 25%)")
+        print(f"Evaluating {ckpt.name}  ({args.games} games, T={args.temperature})")
+        results = evaluate_model(model, n_games=args.games, n_players=args.players,
+                                 temperature=args.temperature, seed=args.seed)
+        print(f"  avg_score : {results['avg_score']:.1f}  (PIMC baseline: ~166.8)")
+        print(f"  std_score : {results['std_score']:.1f}")
+        print(f"  min/max   : {results['min_score']:.0f} / {results['max_score']:.0f}")
+        print(f"  win_rate  : {results['win_rate']*100:.1f}%  (random baseline: 25%)")
