@@ -85,6 +85,7 @@ def collect_games(
         ]
 
         all_agents = [agent0] + opp_agents
+        round_cumulative: dict = {}
 
         # Explicit capture via default args avoids any late-binding surprises
         def _discard(pi, hand, hld, melds, ri, _a=all_agents):
@@ -99,6 +100,9 @@ def collect_games(
         def _laydown(pi, hand, asgn, ri, hld, _a=all_agents):
             return _a[pi].laydown(pi, hand, asgn, ri, hld)
 
+        def _round_end(ri, cum_scores, _rc=round_cumulative):
+            _rc[ri] = float(cum_scores[0])
+
         scores = play_game(
             n_players=n_players,
             rng=game_rng,
@@ -106,11 +110,13 @@ def collect_games(
             draw_hook=_draw,
             buy_hook=_buy,
             laydown_hook=_laydown,
+            round_end_hook=_round_end,
         )
 
         trajectories.append({
-            "steps":       agent0.trajectory,
-            "final_score": float(scores[0]),
+            "steps":                agent0.trajectory,
+            "final_score":          float(scores[0]),
+            "round_cumulative":     round_cumulative,
         })
 
     return trajectories

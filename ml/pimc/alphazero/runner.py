@@ -57,6 +57,7 @@ def train_iteration(
     n_games: int = 16,
     temperature: float = 1.0,
     entropy_coef: float = 0.05,
+    round_rewards: bool = True,
     seed: Optional[int] = None,
 ) -> dict:
     """
@@ -79,7 +80,7 @@ def train_iteration(
         pimc_pool=pimc_pool, pimc_ratio=pimc_ratio,
         temperature=temperature, seed=seed,
     )
-    label_values(trajectories)
+    label_values(trajectories, round_rewards=round_rewards)
 
     all_steps = [step for t in trajectories for step in t["steps"]]
     if not all_steps:
@@ -124,6 +125,7 @@ def run_training(
     from_checkpoint: Optional[str] = None,
     pimc_checkpoint: Optional[str] = None,
     pimc_ratio: float = 0.33,
+    round_rewards: bool = True,
     save_dir: str = "alphazero/checkpoints",
     n_iterations: int = 1000,
     games_per_iter: int = 16,
@@ -245,6 +247,7 @@ def run_training(
             n_games=games_per_iter,
             temperature=temperature,
             entropy_coef=entropy_coef,
+            round_rewards=round_rewards,
             seed=iter_seed,
         )
         elapsed = time.time() - t0
@@ -325,8 +328,9 @@ if __name__ == "__main__":
     parser.add_argument("--seed",            type=int,   default=None)
     parser.add_argument("--resume",          action="store_true",           help="Resume from latest checkpoint in save-dir")
     parser.add_argument("--from-checkpoint", default=None,                  help="Load raw state-dict .pt (bypasses PIMC format)")
-    parser.add_argument("--pimc-pool",       default=None,                  help="PIMC checkpoint to use as fixed opponent pool")
-    parser.add_argument("--pimc-ratio",      type=float, default=0.33,      help="Fraction of opponent slots filled by PIMC (default 0.33)")
+    parser.add_argument("--pimc-pool",        default=None,                  help="PIMC checkpoint to use as fixed opponent pool")
+    parser.add_argument("--pimc-ratio",       type=float, default=0.33,      help="Fraction of opponent slots filled by PIMC (default 0.33)")
+    parser.add_argument("--no-round-rewards", action="store_true",           help="Use game-level rewards instead of per-round rewards")
     args = parser.parse_args()
 
     run_training(
@@ -334,6 +338,7 @@ if __name__ == "__main__":
         from_checkpoint = args.from_checkpoint,
         pimc_checkpoint = args.pimc_pool,
         pimc_ratio      = args.pimc_ratio,
+        round_rewards   = not args.no_round_rewards,
         save_dir        = args.save_dir,
         n_iterations    = args.iterations,
         games_per_iter  = args.games_per_iter,

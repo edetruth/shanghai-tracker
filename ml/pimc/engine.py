@@ -845,6 +845,7 @@ def play_game(
     draw_hook=None,
     laydown_hook=None,
     buy_hook=None,
+    round_end_hook=None,
 ) -> list:
     """Simulate rounds starting_round..6. Returns cumulative scores per player.
 
@@ -875,6 +876,8 @@ def play_game(
         ih = initial_hands if round_idx == starting_round else None
         for p, s in enumerate(play_round(round_idx, n_players, rng, deck_count, ih, discard_hook, draw_hook, laydown_hook, buy_hook)):
             scores[p] += s
+        if round_end_hook is not None:
+            round_end_hook(round_idx, list(scores))
     return scores
 
 

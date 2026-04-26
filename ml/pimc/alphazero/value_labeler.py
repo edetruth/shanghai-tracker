@@ -1,59 +1,61 @@
 """
 Value labeler for AlphaZero-lite training.
 
-label_values() annotates each trajectory step with a scalar value target
-derived from the game's final outcome.  This is the standard REINFORCE
-baseline approach: the value head learns to predict the expected final score
-from the current state, providing a low-variance training signal.
+label_values() annotates each trajectory step with a scalar value target.
 
-Value target convention
------------------------
-    value_label = final_score (player 0's cumulative score across all 7 rounds)
+Two modes
+---------
+Round-level (default, round_rewards=True):
+    Each step is labeled with the cumulative score at the END of the round
+    in which that step occurred.  This gives 7x denser feedback than
+    game-level labeling: a discard in round 2 is judged on how round 2 went,
+    not on the 7-round total.
 
-Lower is better in Shanghai Rummy (fewest points wins), so the value head
-predicts a raw score — not a reward.  The loss in train.py minimises
-MSE between the predicted value and this label.
+    round_idx is recovered from positions 159:166 of the state vector
+    (one-hot encoding).  If round_cumulative is missing from a trajectory
+    (e.g. old data), falls back to final_score.
 
-Discount factor
----------------
-For games where future rounds are already "baked in" to the final score,
-discount=1.0 (no discounting) is correct.  Pass discount < 1.0 to weight
-earlier decisions less if desired; the label for step i (0-indexed from the
-start of the trajectory) becomes:
-
-    value_label = final_score * discount^(n_steps - 1 - i)
+Game-level (round_rewards=False):
+    All steps in a trajectory receive the same label: the player's total
+    cumulative score across all 7 rounds.  This is the original REINFORCE
+    baseline approach.
 """
 from __future__ import annotations
 
+import numpy as np
 from typing import List
 
 
 def label_values(
     trajectories: List[dict],
-    discount: float = 1.0,
+    round_rewards: bool = True,
 ) -> List[dict]:
     """
     Annotate each trajectory step with a value target.
 
     Args:
         trajectories: output of collect_games() — list of dicts, each with
-            "steps" (list of step dicts) and "final_score" (float).
-        discount: per-step discount factor applied backward from the end of
-            the trajectory.  Default 1.0 (no discounting).
+            "steps", "final_score", and (if round_rewards) "round_cumulative".
+        round_rewards: if True, label each step with the cumulative score at
+            the end of its own round. If False, use the 7-round final score.
 
     Returns:
-        The same trajectories list, with "value_label" (float) added to
-        every step dict in-place.  Empty trajectories are skipped silently.
+        The same trajectories list with "value_label" (float) added to every
+        step dict in-place.
     """
     for traj in trajectories:
         steps = traj["steps"]
         if not steps:
             continue
+
         final_score = float(traj["final_score"])
-        n = len(steps)
-        for i, step in enumerate(steps):
-            if discount == 1.0:
-                step["value_label"] = final_score
+        round_cumulative: dict = traj.get("round_cumulative", {})
+
+        for step in steps:
+            if round_rewards and round_cumulative:
+                round_idx = int(np.argmax(step["state_vec"][159:166]))
+                step["value_label"] = round_cumulative.get(round_idx, final_score)
             else:
-                step["value_label"] = final_score * (discount ** (n - 1 - i))
+                step["value_label"] = final_score
+
     return trajectories
