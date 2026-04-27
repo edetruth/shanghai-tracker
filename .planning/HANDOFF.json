@@ -1,0 +1,59 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-04-27T13:32:47",
+  "phase": null,
+  "phase_name": "ppo-training",
+  "phase_dir": null,
+  "plan": null,
+  "task": 8,
+  "total_tasks": 8,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": 1, "name": "Agent stores log_prob_old in trajectory steps", "status": "done", "commit": "00779af"},
+    {"id": 2, "name": "Mark terminal steps in self_play trajectories", "status": "done", "commit": "1bf8e58"},
+    {"id": 3, "name": "implement compute_gae()", "status": "done", "commit": "2711099"},
+    {"id": 4, "name": "implement build_ppo_batch()", "status": "done", "commit": "6798344"},
+    {"id": 5, "name": "implement compute_ppo_losses()", "status": "done", "commit": "38de6be"},
+    {"id": 6, "name": "implement ppo_iteration()", "status": "done", "commit": "d8c1fb1"},
+    {"id": 7, "name": "Add --ppo flag to runner.py", "status": "done", "commit": "ae29842"},
+    {"id": 8, "name": "Launch v7 PPO training run", "status": "pending_user_action", "progress": "Command ready, user runs training locally"}
+  ],
+  "remaining_tasks": [
+    {"id": 8, "name": "Run v7 training, evaluate, compare to 258.9 target", "status": "user_action_required"}
+  ],
+  "blockers": [],
+  "human_actions_pending": [
+    {
+      "action": "Run PPO v7 training",
+      "context": "User runs training locally to save tokens. Command is ready.",
+      "blocking": true,
+      "command": "cd D:/shanghai-tracker/ml/pimc && python -m alphazero.runner --warm-start models/network_v7.pt --save-dir alphazero/checkpoints_v7 --iterations 2000 --games-per-iter 32 --ppo --n-epochs 4 --clip-eps 0.2 --gamma 0.99 --lam 0.95 --value-coef 0.5 --max-grad-norm 0.5 --lr 3e-4 --entropy-coef 0.05 --save-every 50 --log-every 10 --seed 42"
+    },
+    {
+      "action": "Evaluate v7 model after training",
+      "context": "python -m alphazero.evaluate --checkpoint alphazero/checkpoints_v7/best.pt --games 200 --seed 42",
+      "blocking": false
+    }
+  ],
+  "decisions": [
+    {"decision": "Return-space convention: V(s) predicts -expected_score (higher=better)", "rationale": "Standard RL convention; enables clean GAE bootstrapping", "phase": "ppo"},
+    {"decision": "log_prob_old computed at temperature=1 always", "rationale": "Temperature-invariant importance ratios for PPO clipping", "phase": "ppo"},
+    {"decision": "index_put (non-in-place) for assembling log_probs_new", "rationale": "In-place assignment severs autograd graph; index_put preserves gradient flow", "phase": "ppo"},
+    {"decision": "User runs training runs locally", "rationale": "Saves tokens; PyTorch import is slow on this machine", "phase": "ppo"},
+    {"decision": "REINFORCE path (train.py) kept intact alongside PPO", "rationale": "Comparison baseline; --ppo flag is opt-in", "phase": "ppo"},
+    {"decision": "Phase 2 (MCTS with determinization) deferred until PPO results are in", "rationale": "No point building MCTS if PPO alone closes the gap", "phase": "ppo"}
+  ],
+  "uncommitted_files": [
+    "ml/bridge/game-bridge.ts",
+    "ml/training/ppo.py",
+    "ml/training/curriculum.py",
+    "ml/training/evaluate.py",
+    "ml/training/network_v2.py",
+    "ml/training/state_encoder.py",
+    "src/components/play/HandArea.tsx",
+    "src/components/play/HandDisplay.tsx",
+    "src/simulation/results/*.json"
+  ],
+  "next_action": "User pastes v7 training output; evaluate against 258.9 avg_score target. If successful, plan ONNX export to deploy as 'the-oracle' personality. If not, consider Phase 2 (MCTS determinization).",
+  "context_notes": "PPO implementation is complete and tested (9 tests, all passing). Pre-existing test failures: test_value_labeler (discount kwarg API mismatch, unrelated to PPO), test_export (onnx module missing). GSD was just installed this session. The older PPO in ml/training/ppo.py is for a different, retired architecture (ShanghaiNetV2 + 26-action space) — not the same system."
+}
