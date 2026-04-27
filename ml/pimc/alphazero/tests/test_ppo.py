@@ -57,5 +57,6 @@ def test_log_prob_old_matches_temperature_one():
     agent._maybe_new_round(0)
     agent.discard(player_idx=0, hand=hand, has_laid_down=False,
                   table_melds=[], round_idx=0)
+    assert len(agent.trajectory) == 1, "discard step was not recorded"
     step = agent.trajectory[-1]
     assert abs(step["log_prob_old"] - expected_lp) < 1e-5
