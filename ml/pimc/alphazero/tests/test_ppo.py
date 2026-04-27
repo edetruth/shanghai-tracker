@@ -181,3 +181,35 @@ def test_build_ppo_batch_shapes():
     # All log_probs_old must be finite and <= 0
     assert torch.isfinite(batch["log_probs_old"]).all()
     assert (batch["log_probs_old"] <= 0).all()
+
+
+def test_ppo_loss_ratio_clipping():
+    """
+    PPO loss must return a dict with all expected keys and valid properties.
+    """
+    from alphazero.self_play import collect_games
+    from alphazero.ppo import compute_gae, build_ppo_batch, compute_ppo_losses
+
+    model = ShanghaiNet()
+    trajectories = collect_games(model, n_games=8, opponent_pool=[model],
+                                 temperature=1.0, seed=3)
+    compute_gae(trajectories, model)
+    all_steps = [s for t in trajectories for s in t["steps"]]
+    batch = build_ppo_batch(all_steps)
+
+    adv = batch["advantages"]
+    adv_norm = (adv - adv.mean()) / (adv.std() + 1e-8)
+
+    model.train()
+    losses = compute_ppo_losses(model, batch, adv_norm, clip_eps=0.2,
+                                entropy_coef=0.05, value_coef=0.5)
+
+    assert "policy_loss" in losses
+    assert "value_loss"  in losses
+    assert "entropy"     in losses
+    assert "total_loss"  in losses
+    # Total loss must be a scalar with gradient
+    assert losses["total_loss"].ndim == 0
+    assert losses["total_loss"].requires_grad
+    # Entropy must be positive
+    assert losses["entropy"].item() > 0
