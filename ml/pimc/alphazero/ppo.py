@@ -248,3 +248,149 @@ def compute_ppo_losses(
         "entropy":     entropy,
         "total_loss":  total_loss,
     }
+
+
+def ppo_iteration(
+    model,
+    optimizer: torch.optim.Optimizer,
+    opponent_pool: list,
+    pimc_pool: Optional[list] = None,
+    pimc_ratio: float = 0.0,
+    n_games: int = 32,
+    n_epochs: int = 4,
+    temperature: float = 1.0,
+    clip_eps: float = 0.2,
+    entropy_coef: float = 0.05,
+    value_coef: float = 0.5,
+    max_grad_norm: float = 0.5,
+    gamma: float = 0.99,
+    lam: float = 0.95,
+    seed: Optional[int] = None,
+) -> dict:
+    """
+    One PPO iteration:
+      1. Collect n_games under current policy (stores log_prob_old)
+      2. Run compute_gae to get advantages and value targets
+      3. Normalize advantages once across the whole batch
+      4. Run n_epochs gradient updates over the same batch
+
+    Returns stats dict with per-epoch averages plus:
+      approx_kl     — mean |log ratio| approximation of KL divergence
+      clip_fraction — fraction of samples where ratio was clipped
+      avg_score     — mean final_score across collected games
+      n_steps       — total steps collected
+    """
+    from alphazero.self_play import collect_games
+
+    # ── Collect ──────────────────────────────────────────────────────
+    trajectories = collect_games(
+        model, n_games, opponent_pool,
+        pimc_pool=pimc_pool, pimc_ratio=pimc_ratio,
+        temperature=temperature, seed=seed,
+    )
+
+    all_steps = [s for t in trajectories for s in t["steps"]]
+    if not all_steps:
+        return {"policy_loss": 0.0, "value_loss": 0.0, "entropy": 0.0,
+                "total_loss": 0.0, "avg_score": 0.0, "n_steps": 0,
+                "approx_kl": 0.0, "clip_fraction": 0.0}
+
+    # ── GAE ──────────────────────────────────────────────────────────
+    compute_gae(trajectories, model, gamma=gamma, lam=lam)
+
+    # ── Build batch ──────────────────────────────────────────────────
+    batch = build_ppo_batch(all_steps)
+
+    # Normalize advantages once (consistent across epochs)
+    adv = batch["advantages"]
+    adv_norm = (adv - adv.mean()) / (adv.std() + 1e-8)
+
+    log_probs_old = batch["log_probs_old"]
+
+    # ── N-epoch update ───────────────────────────────────────────────
+    model.train()
+    epoch_stats: list = []
+
+    for _ in range(n_epochs):
+        optimizer.zero_grad()
+        losses = compute_ppo_losses(
+            model, batch, adv_norm,
+            clip_eps=clip_eps,
+            entropy_coef=entropy_coef,
+            value_coef=value_coef,
+        )
+        losses["total_loss"].backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
+        optimizer.step()
+        epoch_stats.append({k: v.item() for k, v in losses.items()})
+
+    # ── Diagnostics ──────────────────────────────────────────────────
+    with torch.no_grad():
+        model.eval()
+        out = model(batch["state_vecs"])
+        # Compute approx_kl via |log_new - log_old| proxy and clip_fraction
+        # Rebuild log_probs_new using current (updated) model
+        action_types  = batch["action_types"]
+        action_takens = batch["action_takens"]
+        discard_masks = batch["discard_masks"]
+        N = batch["state_vecs"].shape[0]
+
+        log_probs_new = torch.zeros(N)
+
+        mask_d = action_types == ACTION_DISCARD
+        if mask_d.any():
+            n_d = int(mask_d.sum())
+            logits = out["discard_logits"][mask_d]
+            acts   = action_takens[mask_d]
+            masked = logits.clone()
+            masked[~discard_masks] = float("-inf")
+            log_p  = F.log_softmax(masked, dim=-1)
+            lp_new = log_p[torch.arange(n_d), acts]
+            idx = mask_d.nonzero(as_tuple=True)[0]
+            log_probs_new = log_probs_new.index_put((idx,), lp_new)
+
+        mask_r = action_types == ACTION_DRAW
+        if mask_r.any():
+            n_r    = int(mask_r.sum())
+            logits = out["draw_logits"][mask_r]
+            acts   = action_takens[mask_r]
+            log_p  = F.log_softmax(logits, dim=-1)
+            lp_new = log_p[torch.arange(n_r), acts]
+            idx = mask_r.nonzero(as_tuple=True)[0]
+            log_probs_new = log_probs_new.index_put((idx,), lp_new)
+
+        mask_b = action_types == ACTION_BUY
+        if mask_b.any():
+            n_b    = int(mask_b.sum())
+            logit  = out["buy_logit"][mask_b].squeeze(-1)
+            acts_f = action_takens[mask_b].float()
+            lp_new = -F.binary_cross_entropy_with_logits(logit, acts_f, reduction="none")
+            idx = mask_b.nonzero(as_tuple=True)[0]
+            log_probs_new = log_probs_new.index_put((idx,), lp_new)
+
+        mask_l = action_types == ACTION_LAYDOWN
+        if mask_l.any():
+            n_l    = int(mask_l.sum())
+            logit  = out["laydown_logit"][mask_l].squeeze(-1)
+            acts_f = action_takens[mask_l].float()
+            lp_new = -F.binary_cross_entropy_with_logits(logit, acts_f, reduction="none")
+            idx = mask_l.nonzero(as_tuple=True)[0]
+            log_probs_new = log_probs_new.index_put((idx,), lp_new)
+
+        log_ratio = log_probs_new - log_probs_old
+        approx_kl = float(log_ratio.abs().mean().item())
+        ratio = log_ratio.exp()
+        clip_fraction = float(((ratio - 1.0).abs() > clip_eps).float().mean().item())
+        model.train()
+
+    avg_score = sum(t["final_score"] for t in trajectories) / len(trajectories)
+    avg_stats = {k: sum(e[k] for e in epoch_stats) / len(epoch_stats)
+                 for k in epoch_stats[0]}
+
+    return {
+        **avg_stats,
+        "avg_score":     avg_score,
+        "n_steps":       len(all_steps),
+        "approx_kl":     approx_kl,
+        "clip_fraction": clip_fraction,
+    }

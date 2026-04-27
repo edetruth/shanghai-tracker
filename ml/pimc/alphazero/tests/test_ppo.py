@@ -242,3 +242,27 @@ def test_ppo_policy_loss_has_model_gradients():
         for p in model.parameters()
     )
     assert has_nonzero_grad, "policy_loss produced no gradient through model parameters"
+
+
+def test_ppo_iteration_returns_valid_stats():
+    """ppo_iteration must return a dict with all expected keys and finite values."""
+    import torch.optim as optim
+    from alphazero.ppo import ppo_iteration
+
+    model = ShanghaiNet()
+    optimizer = optim.Adam(model.parameters(), lr=1e-4)
+
+    stats = ppo_iteration(
+        model=model,
+        optimizer=optimizer,
+        opponent_pool=[model],
+        n_games=4,
+        n_epochs=2,
+        temperature=1.0,
+        seed=42,
+    )
+
+    for key in ["policy_loss", "value_loss", "entropy", "total_loss",
+                "avg_score", "n_steps", "approx_kl", "clip_fraction"]:
+        assert key in stats, f"missing key: {key}"
+        assert np.isfinite(stats[key]), f"{key} is not finite: {stats[key]}"
