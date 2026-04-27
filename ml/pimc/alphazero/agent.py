@@ -154,23 +154,44 @@ class ShanghaiNetAgent:
         x = torch.from_numpy(state_vec).unsqueeze(0)  # (1, 170)
         return self._model(x)
 
-    def _sample_categorical(self, logits: torch.Tensor, mask: Optional[list] = None) -> int:
+    def _sample_categorical(
+        self, logits: torch.Tensor, mask: Optional[list] = None
+    ) -> tuple:
+        """Returns (action_index, log_prob_at_temperature_1)."""
         logits = logits.squeeze(0).float()
-        if mask:
+        if mask is not None:
             neg_inf = torch.full_like(logits, float("-inf"))
             for idx in mask:
                 neg_inf[idx] = logits[idx]
             logits = neg_inf
         probs = F.softmax(logits / max(self._temperature, 1e-6), dim=-1)
-        return int(torch.multinomial(probs, 1).item())
+        action = int(torch.multinomial(probs, 1).item())
+        # Log prob at temperature=1 (policy parameters, not exploration temp)
+        log_prob = float(F.log_softmax(logits, dim=-1)[action].item())
+        return action, log_prob
 
-    def _sample_binary(self, logit: torch.Tensor) -> int:
-        scaled = logit.squeeze().float() / max(self._temperature, 1e-6)
-        return int(torch.bernoulli(torch.sigmoid(scaled)).item())
+    def _sample_binary(self, logit: torch.Tensor) -> tuple:
+        """Returns (0_or_1, log_prob_at_temperature_1)."""
+        logit = logit.squeeze().float()
+        scaled = logit / max(self._temperature, 1e-6)
+        action = int(torch.bernoulli(torch.sigmoid(scaled)).item())
+        # log_prob = log p if action=1 else log(1-p), using raw logit (temp=1)
+        log_prob = float(
+            -F.binary_cross_entropy_with_logits(
+                logit, torch.tensor(float(action))
+            ).item()
+        )
+        return action, log_prob
 
     def _record_step(
-        self, state_vec: np.ndarray, action_type: int, action_taken: int,
-        hand: list, round_idx: int, has_laid_down: bool,
+        self,
+        state_vec: np.ndarray,
+        action_type: int,
+        action_taken: int,
+        hand: list,
+        round_idx: int,
+        has_laid_down: bool,
+        log_prob_old: float = 0.0,
     ) -> None:
         if self._record:
             self.trajectory.append({
@@ -181,6 +202,7 @@ class ShanghaiNetAgent:
                 "round_idx":     round_idx,
                 "has_laid_down": has_laid_down,
                 "opp_sizes":     self._opp_sizes(round_idx),
+                "log_prob_old":  log_prob_old,
             })
 
     # ── Engine hooks — called for ALL players ─────────────────────────
@@ -203,13 +225,16 @@ class ShanghaiNetAgent:
         out = self._forward(sv)
 
         hand_types = list({_ctype(c) for c in hand})
-        chosen_type = self._sample_categorical(out["discard_logits"], mask=hand_types)
+        chosen_type, log_prob = self._sample_categorical(
+            out["discard_logits"], mask=hand_types
+        )
 
         card = next((c for c in hand if _ctype(c) == chosen_type), None)
         if card is None:
             return None  # fallback to greedy
 
-        self._record_step(sv, ACTION_DISCARD, chosen_type, hand, round_idx, has_laid_down)
+        self._record_step(sv, ACTION_DISCARD, chosen_type, hand, round_idx,
+                          has_laid_down, log_prob_old=log_prob)
         return card
 
     def draw(
@@ -229,8 +254,9 @@ class ShanghaiNetAgent:
         sv = self._state_vec(hand, discard_top, round_idx, has_laid_down)
         out = self._forward(sv)
 
-        action = self._sample_categorical(out["draw_logits"])  # 0=pile, 1=take
-        self._record_step(sv, ACTION_DRAW, action, hand, round_idx, has_laid_down)
+        action, log_prob = self._sample_categorical(out["draw_logits"])  # 0=pile, 1=take
+        self._record_step(sv, ACTION_DRAW, action, hand, round_idx,
+                          has_laid_down, log_prob_old=log_prob)
         return "take" if action == 1 else "draw"
 
     def buy(
@@ -251,8 +277,9 @@ class ShanghaiNetAgent:
         sv = self._state_vec(hand, discard_top, round_idx, has_laid_down)
         out = self._forward(sv)
 
-        action = self._sample_binary(out["buy_logit"])
-        self._record_step(sv, ACTION_BUY, action, hand, round_idx, has_laid_down)
+        action, log_prob = self._sample_binary(out["buy_logit"])
+        self._record_step(sv, ACTION_BUY, action, hand, round_idx,
+                          has_laid_down, log_prob_old=log_prob)
         return bool(action)
 
     def laydown(
@@ -273,6 +300,7 @@ class ShanghaiNetAgent:
         sv = self._state_vec(hand, -1, round_idx, own_ld)
         out = self._forward(sv)
 
-        action = self._sample_binary(out["laydown_logit"])
-        self._record_step(sv, ACTION_LAYDOWN, action, hand, round_idx, own_ld)
+        action, log_prob = self._sample_binary(out["laydown_logit"])
+        self._record_step(sv, ACTION_LAYDOWN, action, hand, round_idx,
+                          own_ld, log_prob_old=log_prob)
         return bool(action)
