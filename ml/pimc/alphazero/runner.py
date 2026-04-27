@@ -46,6 +46,7 @@ from alphazero.network       import ShanghaiNet
 from alphazero.self_play     import collect_games
 from alphazero.value_labeler  import label_values
 from alphazero.train         import build_batch, compute_losses
+from alphazero.ppo           import ppo_iteration
 
 
 def train_iteration(
@@ -137,6 +138,13 @@ def run_training(
     log_every: int = 10,
     seed: Optional[int] = None,
     resume: bool = False,
+    use_ppo: bool = False,
+    n_epochs: int = 4,
+    clip_eps: float = 0.2,
+    gamma: float = 0.99,
+    lam: float = 0.95,
+    value_coef: float = 0.5,
+    max_grad_norm: float = 0.5,
 ) -> None:
     """
     Full training loop.
@@ -241,15 +249,31 @@ def run_training(
         iter_seed   = rng.randint(0, 2 ** 31)
         t0          = time.time()
 
-        stats = train_iteration(
-            model, optimizer, opponent_pool,
-            pimc_pool=pimc_pool, pimc_ratio=pimc_ratio,
-            n_games=games_per_iter,
-            temperature=temperature,
-            entropy_coef=entropy_coef,
-            round_rewards=round_rewards,
-            seed=iter_seed,
-        )
+        if use_ppo:
+            stats = ppo_iteration(
+                model, optimizer, opponent_pool,
+                pimc_pool=pimc_pool, pimc_ratio=pimc_ratio,
+                n_games=games_per_iter,
+                n_epochs=n_epochs,
+                temperature=temperature,
+                clip_eps=clip_eps,
+                entropy_coef=entropy_coef,
+                value_coef=value_coef,
+                max_grad_norm=max_grad_norm,
+                gamma=gamma,
+                lam=lam,
+                seed=iter_seed,
+            )
+        else:
+            stats = train_iteration(
+                model, optimizer, opponent_pool,
+                pimc_pool=pimc_pool, pimc_ratio=pimc_ratio,
+                n_games=games_per_iter,
+                temperature=temperature,
+                entropy_coef=entropy_coef,
+                round_rewards=round_rewards,
+                seed=iter_seed,
+            )
         elapsed = time.time() - t0
         history.append(stats["avg_score"])
 
@@ -281,6 +305,7 @@ def run_training(
             }
             with open(log_file, "a") as f:
                 f.write(json.dumps(row) + "\n")
+            kl_str = f"  kl={stats['approx_kl']:.4f}" if "approx_kl" in stats else ""
             print(
                 f"[{iteration:5d}] temp={temperature:.1f}  "
                 f"avg_score={stats['avg_score']:7.1f}  "
@@ -288,7 +313,8 @@ def run_training(
                 f"policy={stats['policy_loss']:8.4f}  "
                 f"value={stats['value_loss']:8.4f}  "
                 f"entropy={stats['entropy']:.4f}  "
-                f"lr={current_lr:.1e}  "
+                f"lr={current_lr:.1e}"
+                f"{kl_str}  "
                 f"steps={stats['n_steps']:4d}  "
                 f"({elapsed:.1f}s)"
             )
@@ -331,6 +357,13 @@ if __name__ == "__main__":
     parser.add_argument("--pimc-pool",        default=None,                  help="PIMC checkpoint to use as fixed opponent pool")
     parser.add_argument("--pimc-ratio",       type=float, default=0.33,      help="Fraction of opponent slots filled by PIMC (default 0.33)")
     parser.add_argument("--no-round-rewards", action="store_true",           help="Use game-level rewards instead of per-round rewards")
+    parser.add_argument("--ppo",           action="store_true",           help="Use PPO instead of REINFORCE")
+    parser.add_argument("--n-epochs",      type=int,   default=4,         help="PPO gradient epochs per iteration (default 4)")
+    parser.add_argument("--clip-eps",      type=float, default=0.2,       help="PPO clip range (default 0.2)")
+    parser.add_argument("--gamma",         type=float, default=0.99,      help="Discount factor for GAE (default 0.99)")
+    parser.add_argument("--lam",           type=float, default=0.95,      help="GAE lambda (default 0.95)")
+    parser.add_argument("--value-coef",    type=float, default=0.5,       help="Value loss weight (default 0.5)")
+    parser.add_argument("--max-grad-norm", type=float, default=0.5,       help="Gradient clip norm for PPO (default 0.5)")
     args = parser.parse_args()
 
     run_training(
@@ -350,4 +383,11 @@ if __name__ == "__main__":
         log_every       = args.log_every,
         seed            = args.seed,
         resume          = args.resume,
+        use_ppo         = args.ppo,
+        n_epochs        = args.n_epochs,
+        clip_eps        = args.clip_eps,
+        gamma           = args.gamma,
+        lam             = args.lam,
+        value_coef      = args.value_coef,
+        max_grad_norm   = args.max_grad_norm,
     )

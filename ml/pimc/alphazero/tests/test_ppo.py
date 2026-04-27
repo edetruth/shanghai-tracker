@@ -267,3 +267,22 @@ def test_ppo_iteration_returns_valid_stats():
         assert key in stats, f"missing key: {key}"
         assert np.isfinite(stats[key]), f"{key} is not finite: {stats[key]}"
     assert model.training, "model must be in train() mode after ppo_iteration"
+
+
+def test_run_training_ppo_flag_runs_without_error():
+    """run_training with use_ppo=True should complete 3 iterations without error."""
+    import tempfile, os
+    from alphazero.runner import run_training
+
+    with tempfile.TemporaryDirectory() as tmp:
+        run_training(
+            save_dir=tmp,
+            n_iterations=3,
+            games_per_iter=4,
+            use_ppo=True,
+            n_epochs=2,
+            log_every=1,
+            save_every=10,
+            seed=0,
+        )
+        assert os.path.exists(os.path.join(tmp, "training_log.jsonl"))
