@@ -213,3 +213,32 @@ def test_ppo_loss_ratio_clipping():
     assert losses["total_loss"].requires_grad
     # Entropy must be positive
     assert losses["entropy"].item() > 0
+
+
+def test_ppo_policy_loss_has_model_gradients():
+    """policy_loss must produce non-zero gradients through model parameters."""
+    import torch.optim as optim
+    from alphazero.self_play import collect_games
+    from alphazero.ppo import compute_gae, build_ppo_batch, compute_ppo_losses
+
+    model = ShanghaiNet()
+    trajectories = collect_games(model, n_games=4, opponent_pool=[model],
+                                 temperature=1.0, seed=4)
+    compute_gae(trajectories, model)
+    all_steps = [s for t in trajectories for s in t["steps"]]
+    batch = build_ppo_batch(all_steps)
+
+    adv = batch["advantages"]
+    adv_norm = (adv - adv.mean()) / (adv.std() + 1e-8)
+
+    model.train()
+    model.zero_grad()
+    losses = compute_ppo_losses(model, batch, adv_norm)
+    losses["policy_loss"].backward()
+
+    # At least one parameter must have a non-zero gradient from policy_loss alone
+    has_nonzero_grad = any(
+        p.grad is not None and p.grad.abs().max().item() > 0
+        for p in model.parameters()
+    )
+    assert has_nonzero_grad, "policy_loss produced no gradient through model parameters"

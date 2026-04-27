@@ -222,7 +222,8 @@ def compute_ppo_losses(
     N = state_vecs.shape[0]
     log_probs_new = torch.zeros(N, device=state_vecs.device)
     for mask, lp in log_probs_new_list:
-        log_probs_new[mask] = lp
+        idx = mask.nonzero(as_tuple=True)[0]
+        log_probs_new = log_probs_new.index_put((idx,), lp)
 
     # ── PPO clipped surrogate objective ──────────────────────────────
     ratio   = torch.exp(log_probs_new - log_probs_old)
@@ -237,7 +238,7 @@ def compute_ppo_losses(
         total_n = sum(n for _, n in entropy_terms)
         entropy = sum(e * n / total_n for e, n in entropy_terms)
     else:
-        entropy = torch.tensor(0.0)
+        entropy = torch.tensor(0.0, device=state_vecs.device)
 
     total_loss = policy_loss + value_coef * value_loss - entropy_coef * entropy
 
