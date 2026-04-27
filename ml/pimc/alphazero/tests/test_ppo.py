@@ -64,3 +64,21 @@ def test_log_prob_old_matches_temperature_one():
     chosen_type = step["action_taken"]
     assert chosen_type in expected_lps, f"chosen type {chosen_type} not in hand"
     assert abs(step["log_prob_old"] - expected_lps[chosen_type]) < 1e-5
+
+
+def test_terminal_step_marked():
+    """Last step of each trajectory must have is_terminal=True; others False."""
+    from alphazero.self_play import collect_games
+    model = ShanghaiNet()
+    trajectories = collect_games(model, n_games=3, opponent_pool=[model],
+                                 temperature=1.0, seed=1)
+    for traj in trajectories:
+        steps = traj["steps"]
+        if not steps:
+            continue
+        for i, step in enumerate(steps):
+            assert "is_terminal" in step
+            if i < len(steps) - 1:
+                assert step["is_terminal"] is False
+            else:
+                assert step["is_terminal"] is True

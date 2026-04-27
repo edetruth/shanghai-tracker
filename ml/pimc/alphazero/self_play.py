@@ -113,10 +113,14 @@ def collect_games(
             round_end_hook=_round_end,
         )
 
+        steps = agent0.trajectory
+        for i, step in enumerate(steps):
+            step["is_terminal"] = (i == len(steps) - 1)
+
         trajectories.append({
-            "steps":                agent0.trajectory,
-            "final_score":          float(scores[0]),
-            "round_cumulative":     round_cumulative,
+            "steps":            steps,
+            "final_score":      float(scores[0]),
+            "round_cumulative": round_cumulative,
         })
 
     return trajectories
