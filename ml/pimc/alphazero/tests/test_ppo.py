@@ -266,3 +266,4 @@ def test_ppo_iteration_returns_valid_stats():
                 "avg_score", "n_steps", "approx_kl", "clip_fraction"]:
         assert key in stats, f"missing key: {key}"
         assert np.isfinite(stats[key]), f"{key} is not finite: {stats[key]}"
+    assert model.training, "model must be in train() mode after ppo_iteration"

@@ -70,7 +70,7 @@ def compute_gae(
                     v_next = 0.0
                     r_t    = terminal_return
                 else:
-                    v_next = values[t + 1]
+                    v_next = values[t + 1] if t + 1 < T else 0.0
                     r_t    = 0.0
 
                 delta = r_t + gamma * v_next - v_t
