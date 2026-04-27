@@ -81,3 +81,50 @@ def compute_gae(
                 steps[t]["value_old"]    = v_t
 
     return trajectories
+
+
+def build_ppo_batch(steps: List[dict]) -> dict:
+    """
+    Flatten a list of labeled trajectory steps into tensors for PPO loss.
+
+    Requires steps to already have: advantage, value_target (from compute_gae)
+    and log_prob_old (from agent collection).
+
+    Returns dict with:
+        state_vecs    FloatTensor (N, 170)
+        action_types  LongTensor  (N,)
+        action_takens LongTensor  (N,)
+        log_probs_old FloatTensor (N,)
+        advantages    FloatTensor (N,)
+        value_targets FloatTensor (N,)
+        discard_masks BoolTensor  (N_discard, 53) — True = valid action
+    """
+    if not steps:
+        raise ValueError("build_ppo_batch requires at least one step")
+
+    state_vecs    = torch.from_numpy(
+        np.stack([s["state_vec"] for s in steps]).astype(np.float32)
+    )
+    action_types  = torch.tensor([s["action_type"]  for s in steps], dtype=torch.long)
+    action_takens = torch.tensor([s["action_taken"] for s in steps], dtype=torch.long)
+    log_probs_old = torch.tensor([s["log_prob_old"] for s in steps], dtype=torch.float32)
+    advantages    = torch.tensor([s["advantage"]    for s in steps], dtype=torch.float32)
+    value_targets = torch.tensor([s["value_target"] for s in steps], dtype=torch.float32)
+
+    # Build per-sample discard mask (True = card type is in hand, valid to discard)
+    discard_steps = [s for s in steps if s["action_type"] == ACTION_DISCARD]
+    n_d = len(discard_steps)
+    discard_masks = torch.zeros(n_d, 53, dtype=torch.bool)
+    for i, s in enumerate(discard_steps):
+        for c in s["hand"]:
+            discard_masks[i, _ctype(c)] = True
+
+    return {
+        "state_vecs":    state_vecs,
+        "action_types":  action_types,
+        "action_takens": action_takens,
+        "log_probs_old": log_probs_old,
+        "advantages":    advantages,
+        "value_targets": value_targets,
+        "discard_masks": discard_masks,
+    }

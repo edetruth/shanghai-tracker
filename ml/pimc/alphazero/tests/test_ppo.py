@@ -151,3 +151,33 @@ def test_compute_gae_terminal_only_reward():
     assert abs(steps[2]["value_target"] - (A2+v2)) < 1e-4
     assert abs(steps[1]["value_target"] - (A1+v1)) < 1e-4
     assert abs(steps[0]["value_target"] - (A0+v0)) < 1e-4
+
+
+def test_build_ppo_batch_shapes():
+    """build_ppo_batch produces correctly shaped tensors."""
+    from alphazero.self_play import collect_games
+    from alphazero.ppo import compute_gae, build_ppo_batch
+
+    model = ShanghaiNet()
+    trajectories = collect_games(model, n_games=4, opponent_pool=[model],
+                                 temperature=1.0, seed=2)
+    compute_gae(trajectories, model)
+
+    all_steps = [s for t in trajectories for s in t["steps"]]
+    N = len(all_steps)
+    assert N > 0
+
+    batch = build_ppo_batch(all_steps)
+
+    assert batch["state_vecs"].shape    == (N, 170)
+    assert batch["action_types"].shape  == (N,)
+    assert batch["action_takens"].shape == (N,)
+    assert batch["log_probs_old"].shape == (N,)
+    assert batch["advantages"].shape    == (N,)
+    assert batch["value_targets"].shape == (N,)
+    # discard_masks: (N_discard, 53) bool tensor
+    n_discard = int((batch["action_types"] == 0).sum().item())
+    assert batch["discard_masks"].shape == (n_discard, 53)
+    # All log_probs_old must be finite and <= 0
+    assert torch.isfinite(batch["log_probs_old"]).all()
+    assert (batch["log_probs_old"] <= 0).all()
