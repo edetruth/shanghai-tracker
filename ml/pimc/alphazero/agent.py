@@ -225,6 +225,8 @@ class ShanghaiNetAgent:
         out = self._forward(sv)
 
         hand_types = list({_ctype(c) for c in hand})
+        if not hand_types:
+            return None
         chosen_type, log_prob = self._sample_categorical(
             out["discard_logits"], mask=hand_types
         )

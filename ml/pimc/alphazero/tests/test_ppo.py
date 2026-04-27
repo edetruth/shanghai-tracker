@@ -41,22 +41,26 @@ def test_log_prob_old_matches_temperature_one():
     agent = ShanghaiNetAgent(model, player_idx=0, n_players=4,
                              temperature=5.0, record=True)
 
-    hand = [0x11]  # rank 1, suit 1
+    hand = [0x11, 0x21]  # rank 1 suit 1, rank 1 suit 2 — two distinct ctypes
+
+    # Build expected_lps using the same state vector the agent will use
+    agent._maybe_new_round(0)
+    sv = agent._state_vec(hand, -1, round_idx=0, has_laid_down=False)
     with torch.no_grad():
-        sv = np.zeros(170, dtype=np.float32)
-        sv[_ctype(hand[0])] = 1.0
         out = model(torch.from_numpy(sv).unsqueeze(0))
         logits = out["discard_logits"].squeeze(0)
-        hand_types = [_ctype(c) for c in hand]
-        masked = logits.clone()
-        neg_inf = torch.full_like(masked, float("-inf"))
+        hand_types = sorted(list({_ctype(c) for c in hand}))
+        neg_inf = torch.full_like(logits, float("-inf"))
         for idx in hand_types:
-            neg_inf[idx] = masked[idx]
-        expected_lp = float(F.log_softmax(neg_inf, dim=-1)[hand_types[0]].item())
+            neg_inf[idx] = logits[idx]
+        # expected log_prob for each valid action at temperature=1
+        lp_all = F.log_softmax(neg_inf, dim=-1)
+        expected_lps = {idx: float(lp_all[idx].item()) for idx in hand_types}
 
-    agent._maybe_new_round(0)
     agent.discard(player_idx=0, hand=hand, has_laid_down=False,
                   table_melds=[], round_idx=0)
     assert len(agent.trajectory) == 1, "discard step was not recorded"
     step = agent.trajectory[-1]
-    assert abs(step["log_prob_old"] - expected_lp) < 1e-5
+    chosen_type = step["action_taken"]
+    assert chosen_type in expected_lps, f"chosen type {chosen_type} not in hand"
+    assert abs(step["log_prob_old"] - expected_lps[chosen_type]) < 1e-5
