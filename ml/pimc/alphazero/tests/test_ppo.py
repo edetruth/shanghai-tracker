@@ -82,3 +82,72 @@ def test_terminal_step_marked():
                 assert step["is_terminal"] is False
             else:
                 assert step["is_terminal"] is True
+
+
+def test_compute_gae_terminal_only_reward():
+    """
+    For a 3-step episode with terminal reward R:
+      delta_2 = R - V(s_2)          (terminal step, V_next=0)
+      delta_1 = gamma*V(s_2) - V(s_1)
+      delta_0 = gamma*V(s_1) - V(s_0)
+      A_2 = delta_2
+      A_1 = delta_1 + gamma*lam*A_2
+      A_0 = delta_0 + gamma*lam*A_1
+      value_target_t = A_t + V(s_t)
+    """
+    from alphazero.ppo import compute_gae
+
+    gamma, lam = 0.99, 0.95
+    R = -200.0  # terminal return (negative score)
+
+    model = ShanghaiNet()
+    model.eval()
+
+    # Override value head to return known values [10, 20, 30]
+    v_vals = [10.0, 20.0, 30.0]
+    _orig_forward = model.forward
+    call_count = [0]
+    def _mock_forward(x):
+        out = _orig_forward(x)
+        n = x.shape[0]
+        out["value"] = torch.tensor(
+            [v_vals[call_count[0] + i] for i in range(n)],
+            dtype=torch.float32
+        ).unsqueeze(1)
+        call_count[0] += n
+        return out
+    model.forward = _mock_forward
+
+    steps = [
+        {"state_vec": np.zeros(170, dtype=np.float32),
+         "is_terminal": False, "log_prob_old": -1.0,
+         "action_type": 0, "action_taken": 0, "hand": [],
+         "round_idx": 0, "has_laid_down": False, "opp_sizes": []},
+        {"state_vec": np.zeros(170, dtype=np.float32),
+         "is_terminal": False, "log_prob_old": -1.0,
+         "action_type": 0, "action_taken": 0, "hand": [],
+         "round_idx": 0, "has_laid_down": False, "opp_sizes": []},
+        {"state_vec": np.zeros(170, dtype=np.float32),
+         "is_terminal": True,  "log_prob_old": -1.0,
+         "action_type": 0, "action_taken": 0, "hand": [],
+         "round_idx": 0, "has_laid_down": False, "opp_sizes": []},
+    ]
+    traj = {"steps": steps, "final_score": 200.0}  # R = -200
+
+    compute_gae([traj], model, gamma=gamma, lam=lam)
+
+    v0, v1, v2 = 10.0, 20.0, 30.0
+    delta2 = R + 0.0 - v2             # terminal: r=R, v_next=0
+    delta1 = 0.0 + gamma * v2 - v1   # non-terminal: r=0
+    delta0 = 0.0 + gamma * v1 - v0
+
+    A2 = delta2
+    A1 = delta1 + gamma * lam * A2
+    A0 = delta0 + gamma * lam * A1
+
+    assert abs(steps[2]["advantage"]    - A2)      < 1e-4
+    assert abs(steps[1]["advantage"]    - A1)      < 1e-4
+    assert abs(steps[0]["advantage"]    - A0)      < 1e-4
+    assert abs(steps[2]["value_target"] - (A2+v2)) < 1e-4
+    assert abs(steps[1]["value_target"] - (A1+v1)) < 1e-4
+    assert abs(steps[0]["value_target"] - (A0+v0)) < 1e-4
