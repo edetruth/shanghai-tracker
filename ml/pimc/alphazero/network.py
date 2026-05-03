@@ -64,6 +64,19 @@ class ShanghaiNet(nn.Module):
             "value":          self.value_head(feat),
         }
 
+    @torch.no_grad()
+    def predict_discard(self, state: torch.Tensor) -> torch.Tensor:
+        """Mirrors PIMCDiscardNet.predict_discard() — used by NetworkHook in bridge eval."""
+        single = state.dim() == 1
+        if single:
+            state = state.unsqueeze(0)
+        logits = self.forward(state)["discard_logits"]
+        hand_mask = (state[:, :53] > 0).clone()
+        hand_mask[:, 52] = False
+        logits = logits.masked_fill(~hand_mask, float('-inf'))
+        result = logits.argmax(dim=1)
+        return result.squeeze(0) if single else result
+
     def forward_onnx(self, x: torch.Tensor) -> tuple:
         """ONNX-compatible forward — tuple output for torch.onnx.export."""
         feat = self.backbone(x)

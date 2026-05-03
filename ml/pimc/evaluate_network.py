@@ -55,16 +55,26 @@ def load_model(model_path: Path) -> tuple:
     """
     Load a network checkpoint, auto-detecting checkpoint type.
 
-    Three types:
+    Four types:
+      ShanghaiNet:               has value_head.weight (AlphaZero model)
       v1 (PIMCNet):              draw_head.weight shape != (1, 256)
       v2 (PIMCDiscardNet):       no draw_head.weight
       v3 (PIMCDiscardNet+draw):  draw_head.weight shape == (1, 256)
 
     Returns:
-        (model, is_discard_only) — False means model has a draw head.
+        (model, is_discard_only) — False means model has a usable draw head.
     """
     from train_network_v2 import PIMCDiscardNet
     state_dict = torch.load(model_path, map_location="cpu", weights_only=True)
+
+    if "value_head.weight" in state_dict:
+        # ShanghaiNet (AlphaZero) — use discard head only
+        from alphazero.network import ShanghaiNet
+        model = ShanghaiNet()
+        model.load_state_dict(state_dict)
+        model.eval()
+        return model, True
+
     has_draw = "draw_head.weight" in state_dict
     is_v3    = has_draw and tuple(state_dict["draw_head.weight"].shape) == (1, 256)
 

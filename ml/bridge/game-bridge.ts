@@ -30,6 +30,7 @@ import {
   aiFindJokerSwap,
   aiShouldBuy,
   getAIEvalConfig,
+  evaluateHand,
 } from '../../src/game/ai'
 import { encodeMeldPlan } from './meld-plan-encoder'
 import type { Card, Meld, RoundRequirement, AIPersonality } from '../../src/game/types'
@@ -106,6 +107,7 @@ interface OpponentHistory {
 interface BridgeGameState {
   players: BridgePlayer[]
   currentPlayerIndex: number
+  dealerIndex: number  // rotates each round — matches production simulate.ts
   currentRound: number
   drawPile: Card[]
   discardPile: Card[]
@@ -168,6 +170,7 @@ function initGame(playerCount: number, seed: number, opponentAI: AIPersonality |
   return {
     players,
     currentPlayerIndex: 0,
+    dealerIndex: 0,
     currentRound: 1,
     drawPile: remaining,
     discardPile: [topDiscard],
@@ -201,7 +204,10 @@ function getValidActions(g: BridgeGameState): string[] {
     actions.push('draw_pile')
     if (g.discardPile.length > 0) actions.push('take_discard')
   } else if (g.phase === 'action') {
-    // Can discard unless it's your last card (can't go out by discarding)
+    // Can discard unless it's your last card (can't go out by discarding).
+    // IMPORTANT: discard slots are indices into the SORTED hand (sortHandForEncoding),
+    // not the raw hand. This matches the state encoder so the model sees the
+    // same card at slot N as it removes by saying discard:N.
     if (player.hand.length > 1) {
       for (let i = 0; i < player.hand.length; i++) {
         actions.push(`discard:${i}`)
@@ -212,7 +218,9 @@ function getValidActions(g: BridgeGameState): string[] {
       const melds = aiFindBestMelds(player.hand, g.requirement)
       if (melds) actions.push('meld')
     }
-    // Can lay off if has laid down
+    // Can lay off if has laid down.
+    // Layoff indices still use the RAW hand order (not sorted) because
+    // layoff is auto-executed by the env wrapper, not chosen by the model.
     if (player.hasLaidDown) {
       for (let ci = 0; ci < player.hand.length; ci++) {
         for (let mi = 0; mi < g.tableMelds.length; mi++) {
@@ -370,8 +378,17 @@ function takeAction(g: BridgeGameState, action: string): { reward: number; done:
   if (action.startsWith('discard:')) {
     // Can't go out by discarding last card — must meld or lay off
     if (player.hand.length <= 1) return { reward: 0, done: false }
-    const idx = parseInt(action.split(':')[1])
-    const card = player.hand.splice(idx, 1)[0]
+    // The incoming index refers to the SORTED hand (what the model sees).
+    // Translate it to the raw hand index by matching card id.
+    const sortedIdx = parseInt(action.split(':')[1])
+    const sortedHand = sortHandForEncoding(player.hand)
+    if (sortedIdx < 0 || sortedIdx >= sortedHand.length) {
+      return { reward: 0, done: false }
+    }
+    const targetCard = sortedHand[sortedIdx]
+    const rawIdx = player.hand.findIndex(c => c.id === targetCard.id)
+    if (rawIdx < 0) return { reward: 0, done: false }
+    const card = player.hand.splice(rawIdx, 1)[0]
     g.discardPile.push(card)
 
     // Track the discard in opponent history
@@ -556,7 +573,12 @@ function endRound(g: BridgeGameState): { reward: number; done: boolean } {
   g.drawPile = remaining
   g.discardPile = [topDiscard]
   g.tableMelds = []
-  g.currentPlayerIndex = 0
+  // Rotate dealer; starting player = (nextDealer + 1) mod N.
+  // Matches production src/simulation/simulate.ts — without this, player 0
+  // starts every round and gains a ~135-point compounded advantage in 2P.
+  const nextDealer = (g.dealerIndex + 1) % g.players.length
+  g.dealerIndex = nextDealer
+  g.currentPlayerIndex = (nextDealer + 1) % g.players.length
   g.phase = 'draw'
   g.turnCount = 0
   g.lastDiscarderIndex = -1
@@ -655,17 +677,19 @@ function playAITurn(g: BridgeGameState): { reward: number; done: boolean } {
       }
     }
 
-    // Discard
+    // Discard — emit sorted index (takeAction expects sorted index since
+    // the discard-indexing fix that aligned actions with the state encoder).
     if (g.phase === 'action' && player.hand.length > 0) {
       const discardCard = aiChooseDiscard(player.hand, g.requirement, config, g.tableMelds)
-      const discardIdx = player.hand.findIndex(c => c.id === discardCard.id)
-      if (discardIdx >= 0) {
-        const discardAction = `discard:${discardIdx}`
+      const sortedHand = sortHandForEncoding(player.hand)
+      const sortedIdx = sortedHand.findIndex(c => c.id === discardCard.id)
+      if (sortedIdx >= 0) {
+        const discardAction = `discard:${sortedIdx}`
         if (g.useRichStateV3) recordOpponentAction(g, discardAction, oppIdx)
         return takeAction(g, discardAction)
       }
-      // Fallback: discard last card
-      const fallbackAction = `discard:${player.hand.length - 1}`
+      // Fallback: discard last sorted slot
+      const fallbackAction = `discard:${sortedHand.length - 1}`
       if (g.useRichStateV3) recordOpponentAction(g, fallbackAction, oppIdx)
       return takeAction(g, fallbackAction)
     }
@@ -720,12 +744,13 @@ function getAIRecommendedAction(g: BridgeGameState): string {
       }
     }
 
-    // Discard
+    // Discard — emit sorted index (see takeAction for why).
     if (player.hand.length > 0) {
       const discardCard = aiChooseDiscard(player.hand, g.requirement, config, g.tableMelds)
-      const discardIdx = player.hand.findIndex(c => c.id === discardCard.id)
-      if (discardIdx >= 0) return `discard:${discardIdx}`
-      return `discard:${player.hand.length - 1}`
+      const sortedHand = sortHandForEncoding(player.hand)
+      const sortedIdx = sortedHand.findIndex(c => c.id === discardCard.id)
+      if (sortedIdx >= 0) return `discard:${sortedIdx}`
+      return `discard:${sortedHand.length - 1}`
     }
   }
 
@@ -845,6 +870,40 @@ function encodeCard(card: Card): number[] {
 }
 
 /**
+ * Deterministic sort used by BOTH state encoding AND discard action indexing.
+ *
+ * Sort order: rank-first ascending, then suit, with jokers at the END.
+ * Rationale:
+ *   - Slot 0 = lowest-rank card, slot N-1 = highest-rank non-joker (or joker).
+ *   - This gives the model a stable semantic mapping: "discard highest slot"
+ *     consistently means "discard the highest-rank card."
+ *   - Jokers (rank=0) are placed last so they're rarely targeted by a naive
+ *     high-slot heuristic — the model can learn "avoid the last slot if joker."
+ *   - Tie-breaking by suit then id ensures full determinism across state reads.
+ *
+ * CRITICAL: getValidActions and takeAction('discard:N') MUST use this same
+ * ordering so the action index the model picks corresponds to the card the
+ * model actually sees at slot N in the state vector.
+ */
+const SUIT_ORDER: Record<string, number> = {
+  hearts: 0, diamonds: 1, clubs: 2, spades: 3, joker: 4,
+}
+
+function sortHandForEncoding(hand: Card[]): Card[] {
+  return [...hand].sort((a, b) => {
+    // Jokers (rank 0) go to the end — treat as rank 14
+    const ra = a.suit === 'joker' ? 14 : a.rank
+    const rb = b.suit === 'joker' ? 14 : b.rank
+    if (ra !== rb) return ra - rb
+    const sa = SUIT_ORDER[a.suit]
+    const sb = SUIT_ORDER[b.suit]
+    if (sa !== sb) return sa - sb
+    // Final tie-break by id for full determinism across duplicate cards
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
+  })
+}
+
+/**
  * Encode raw observable data for a single opponent — 126 features.
  *
  * Layout:
@@ -942,12 +1001,8 @@ function encodeRichStateV2(
   const features: number[] = []
 
   // ── Hand cards (132 features: 22 × 6) — same as v1 ──
-  const suitOrder: Record<string, number> = { hearts: 0, diamonds: 1, clubs: 2, spades: 3, joker: 4 }
-  const sortedHand = [...p.hand].sort((a, b) => {
-    const suitDiff = suitOrder[a.suit] - suitOrder[b.suit]
-    if (suitDiff !== 0) return suitDiff
-    return a.rank - b.rank
-  })
+  // Rank-first sort — see sortHandForEncoding docstring.
+  const sortedHand = sortHandForEncoding(p.hand)
   const MAX_HAND = 22
   for (let i = 0; i < MAX_HAND; i++) {
     if (i < sortedHand.length) {
@@ -1041,13 +1096,9 @@ function encodeRichState(g: BridgeGameState, playerIdx: number): number[] {
   const features: number[] = []
 
   // ── Hand cards (132 features: 22 × 6) ────────────────────────────────────
-  // Sort hand by suit then rank for deterministic encoding
-  const suitOrder: Record<string, number> = { hearts: 0, diamonds: 1, clubs: 2, spades: 3, joker: 4 }
-  const sortedHand = [...p.hand].sort((a, b) => {
-    const suitDiff = suitOrder[a.suit] - suitOrder[b.suit]
-    if (suitDiff !== 0) return suitDiff
-    return a.rank - b.rank
-  })
+  // Rank-first sort — see sortHandForEncoding docstring.
+  // This MUST match the sort used by getValidActions/takeAction for discards.
+  const sortedHand = sortHandForEncoding(p.hand)
   const MAX_HAND = 22
   for (let i = 0; i < MAX_HAND; i++) {
     if (i < sortedHand.length) {
@@ -1174,6 +1225,16 @@ rl.on('line', (line) => {
           ? encodeRichStateV2(game, 0).state
           : (game.useRichState ? encodeRichState(game, 0) : encodeState(game, 0))
         respond({ ok: true, state: stateVec, raw_phase: game.phase, round: game.currentRound })
+        break
+      }
+
+      case 'evaluate_hand': {
+        if (!game) { respond({ ok: false, error: 'No game' }); break }
+        const pi = cmd.player ?? game.currentPlayerIndex
+        const p = game.players[pi]
+        const req = ROUND_REQUIREMENTS[game.currentRound - 1]
+        const score = evaluateHand(p.hand, req)
+        respond({ ok: true, score })
         break
       }
 

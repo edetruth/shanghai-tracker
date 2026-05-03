@@ -27,46 +27,39 @@ MODELS_DIR = Path(__file__).parent.parent / "models"
 EVAL_DIR = Path(__file__).parent.parent / "data" / "eval"
 
 
-# ── Action helpers ────────────────────────────────────────────────────────────
+# ── Action helpers (PPO v2: 26 strategic actions) ────────────────────────────
 
 def encode_action(action: str) -> int:
-    """Convert an action string to a network output index."""
+    """Map a strategic action string to index in [0, 26)."""
     if action == "draw_pile":
         return 0
     if action == "take_discard":
         return 1
-    if action == "meld":
-        return 2
     if action.startswith("discard:"):
-        return 3 + int(action.split(":")[1])
-    if action.startswith("layoff:"):
-        parts = action.split(":")
-        return 19 + int(parts[1]) * 20 + int(parts[2])
+        idx = int(action.split(":")[1])
+        return 2 + min(idx, 21)  # slots 2..23
     if action == "buy":
         return BUY_ACTION_IDX
     if action == "decline_buy":
         return DECLINE_BUY_ACTION_IDX
-    return 0
+    return 0  # fallback
 
 
 def get_action_mask(valid_actions: list) -> torch.Tensor:
     """Create a mask tensor where valid actions are 1, invalid are 0."""
     mask = torch.zeros(MAX_ACTIONS)
     for a in valid_actions:
-        mask[encode_action(a)] = 1.0
+        idx = encode_action(a)
+        if 0 <= idx < MAX_ACTIONS:
+            mask[idx] = 1.0
     return mask
 
 
 def decode_action(index: int, valid_actions: list) -> str:
-    """
-    Convert a network output index back to an action string.
-    Falls back to the first valid action if the index has no match.
-    """
+    """Reverse-map an integer index back to the closest valid action string."""
     action_to_idx = {a: encode_action(a) for a in valid_actions}
     idx_to_action = {v: k for k, v in action_to_idx.items()}
-    if index in idx_to_action:
-        return idx_to_action[index]
-    return valid_actions[0] if valid_actions else "draw_pile"
+    return idx_to_action.get(index, valid_actions[0] if valid_actions else "draw_pile")
 
 
 # ── Greedy policy ─────────────────────────────────────────────────────────────
@@ -113,9 +106,13 @@ def evaluate_game(
     info = {}
 
     while not done and step_count < max_steps:
-        valid_actions, current_player = env.get_valid_actions()
+        valid_actions, current_player, auto_state = env.get_strategic_actions()
         if not valid_actions:
             break
+
+        # If auto-meld/layoff updated the state, use the fresh one
+        if auto_state is not None:
+            state = auto_state
 
         if current_player == 0:
             # Trained agent — greedy policy (argmax, no temperature)

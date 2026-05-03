@@ -42,11 +42,13 @@ _PIMC_DIR = Path(__file__).parent.parent
 if str(_PIMC_DIR) not in sys.path:
     sys.path.insert(0, str(_PIMC_DIR))
 
-from alphazero.network       import ShanghaiNet
-from alphazero.self_play     import collect_games
-from alphazero.value_labeler  import label_values
-from alphazero.train         import build_batch, compute_losses
-from alphazero.ppo           import ppo_iteration
+from alphazero.network            import ShanghaiNet
+from alphazero.self_play          import collect_games
+from alphazero.bridge_self_play   import collect_games_bridge
+from alphazero.bridge_pool        import BridgePool
+from alphazero.value_labeler      import label_values
+from alphazero.train              import build_batch, compute_losses
+from alphazero.ppo                import ppo_iteration
 
 
 def train_iteration(
@@ -60,27 +62,34 @@ def train_iteration(
     entropy_coef: float = 0.05,
     round_rewards: bool = True,
     seed: Optional[int] = None,
+    bridge_pool: Optional[BridgePool] = None,
 ) -> dict:
     """
     One training iteration.
 
-    1. Collect n_games self-play games (player 0 = model, others = pool)
-    2. Label each step with value_label = final_score
+    If bridge_pool is provided, games are collected through the TypeScript
+    engine (correct rules). Otherwise uses the Python engine (legacy).
+
+    1. Collect n_games games
+    2. Label each step with value_label = round or final score
     3. Flatten steps → batch
     4. Forward + loss + backward + clip + step
-
-    collect_games() sets model to eval(); we switch back to train() before
-    the gradient update.
 
     Returns:
         dict with float values: policy_loss, value_loss, entropy,
         total_loss, avg_score, n_steps.
     """
-    trajectories = collect_games(
-        model, n_games, opponent_pool,
-        pimc_pool=pimc_pool, pimc_ratio=pimc_ratio,
-        temperature=temperature, seed=seed,
-    )
+    if bridge_pool is not None:
+        trajectories = collect_games_bridge(
+            model, n_games, bridge_pool,
+            temperature=temperature, seed=seed,
+        )
+    else:
+        trajectories = collect_games(
+            model, n_games, opponent_pool,
+            pimc_pool=pimc_pool, pimc_ratio=pimc_ratio,
+            temperature=temperature, seed=seed,
+        )
     label_values(trajectories, round_rewards=round_rewards)
 
     all_steps = [step for t in trajectories for step in t["steps"]]
@@ -106,13 +115,9 @@ def train_iteration(
 
 
 def _temperature_for(iteration: int, total: int) -> float:
-    """Three-phase schedule: 1.0 → 0.5 → 0.2."""
+    """Linear annealing from 1.0 → 0.3 over full training. Floor at 0.3."""
     phase = iteration / max(total, 1)
-    if phase < 1 / 3:
-        return 1.0
-    if phase < 2 / 3:
-        return 0.5
-    return 0.2
+    return max(0.3, 1.0 - 0.7 * phase)
 
 
 def _frozen_copy(model: ShanghaiNet) -> ShanghaiNet:
@@ -145,6 +150,10 @@ def run_training(
     lam: float = 0.95,
     value_coef: float = 0.5,
     max_grad_norm: float = 0.5,
+    bridge_workers: int = 0,
+    bridge_opponent: str = "the-mastermind",
+    entropy_stop_threshold: float = 0.4,
+    entropy_stop_patience: int = 5,
 ) -> None:
     """
     Full training loop.
@@ -200,8 +209,8 @@ def run_training(
         pimc_ratio = 0.0
 
     optimizer = optim.Adam(model.parameters(), lr=lr)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode="min", factor=0.5, patience=20, min_lr=1e-6
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=n_iterations, eta_min=1e-6
     )
 
     # ── Resume ───────────────────────────────────────────────────────
@@ -240,97 +249,128 @@ def run_training(
                 except (KeyError, json.JSONDecodeError):
                     pass
 
+    use_bridge = bridge_workers > 0
+    bridge_pool_ctx: Optional[BridgePool] = None
+
     print(f"Training: {n_iterations} iters, {games_per_iter} games/iter, "
           f"pool_size={pool_size}, pool_every={pool_every}, lr={lr}")
+    print(f"Temperature: linear 1.0->0.3  |  "
+          f"Entropy stop: <{entropy_stop_threshold} for {entropy_stop_patience} iters")
     print()
 
-    for iteration in range(start_iteration, n_iterations + 1):
-        temperature = _temperature_for(iteration, n_iterations)
-        iter_seed   = rng.randint(0, 2 ** 31)
-        t0          = time.time()
+    entropy_danger = 0   # consecutive iterations below threshold
 
-        if use_ppo:
-            stats = ppo_iteration(
-                model, optimizer, opponent_pool,
-                pimc_pool=pimc_pool, pimc_ratio=pimc_ratio,
-                n_games=games_per_iter,
-                n_epochs=n_epochs,
-                temperature=temperature,
-                clip_eps=clip_eps,
-                entropy_coef=entropy_coef,
-                value_coef=value_coef,
-                max_grad_norm=max_grad_norm,
-                gamma=gamma,
-                lam=lam,
-                seed=iter_seed,
+    try:
+        if use_bridge:
+            bridge_pool_ctx = BridgePool(
+                n_workers=bridge_workers,
+                player_count=4,
+                opponent_ai=bridge_opponent,
             )
+            print(f"Bridge mode: {bridge_workers} workers, opponent={bridge_opponent}")
         else:
-            stats = train_iteration(
-                model, optimizer, opponent_pool,
-                pimc_pool=pimc_pool, pimc_ratio=pimc_ratio,
-                n_games=games_per_iter,
-                temperature=temperature,
-                entropy_coef=entropy_coef,
-                round_rewards=round_rewards,
-                seed=iter_seed,
-            )
-        elapsed = time.time() - t0
-        history.append(stats["avg_score"])
+            print(f"Python engine mode")
 
-        # ── LR schedule + health checks ──────────────────────────────
-        scheduler.step(stats["value_loss"])
-        if stats["entropy"] < 0.3 and stats["n_steps"] > 0:
-            current_lr = optimizer.param_groups[0]["lr"]
-            print(f"  [WARN] entropy={stats['entropy']:.4f} < 0.3 — policy collapsing  "
-                  f"(iter={iteration}, lr={current_lr:.2e})")
+        for iteration in range(start_iteration, n_iterations + 1):
+            temperature = _temperature_for(iteration, n_iterations)
+            iter_seed   = rng.randint(0, 2 ** 31)
+            t0          = time.time()
 
-        # ── Opponent pool update ─────────────────────────────────────
-        if iteration % pool_every == 0:
-            opponent_pool.append(_frozen_copy(model))
-            if len(opponent_pool) > pool_size:
-                opponent_pool.pop(0)
-
-        # ── Logging ─────────────────────────────────────────────────
-        if iteration % log_every == 0 or iteration == start_iteration:
-            avg100 = sum(history[-100:]) / len(history[-100:])
-            current_lr = optimizer.param_groups[0]["lr"]
-            row = {
-                "iteration":   iteration,
-                "temperature": temperature,
-                **stats,
-                "avg100":      avg100,
-                "lr":          current_lr,
-                "pimc_ratio":  pimc_ratio,
-                "elapsed_s":   round(elapsed, 2),
-            }
-            with open(log_file, "a") as f:
-                f.write(json.dumps(row) + "\n")
-            kl_str = f"  kl={stats['approx_kl']:.4f}" if "approx_kl" in stats else ""
-            print(
-                f"[{iteration:5d}] temp={temperature:.1f}  "
-                f"avg_score={stats['avg_score']:7.1f}  "
-                f"avg100={avg100:7.1f}  "
-                f"policy={stats['policy_loss']:8.4f}  "
-                f"value={stats['value_loss']:8.4f}  "
-                f"entropy={stats['entropy']:.4f}  "
-                f"lr={current_lr:.1e}"
-                f"{kl_str}  "
-                f"steps={stats['n_steps']:4d}  "
-                f"({elapsed:.1f}s)"
-            )
-
-        # ── Checkpoint ──────────────────────────────────────────────
-        if iteration % save_every == 0:
-            ckpt_path = save_path / f"ckpt_{iteration:05d}.pt"
-            torch.save(model.state_dict(), ckpt_path)
-
-            avg100 = sum(history[-100:]) / len(history[-100:])
-            if avg100 < best_avg_score:
-                best_avg_score = avg100
-                torch.save(model.state_dict(), save_path / "best.pt")
-                print(f"  => New best: avg100={avg100:.1f} -> best.pt")
+            if use_ppo:
+                stats = ppo_iteration(
+                    model, optimizer, opponent_pool,
+                    pimc_pool=pimc_pool, pimc_ratio=pimc_ratio,
+                    n_games=games_per_iter,
+                    n_epochs=n_epochs,
+                    temperature=temperature,
+                    clip_eps=clip_eps,
+                    entropy_coef=entropy_coef,
+                    value_coef=value_coef,
+                    max_grad_norm=max_grad_norm,
+                    gamma=gamma,
+                    lam=lam,
+                    seed=iter_seed,
+                )
             else:
-                print(f"  => Checkpoint saved: {ckpt_path.name}")
+                stats = train_iteration(
+                    model, optimizer, opponent_pool,
+                    pimc_pool=pimc_pool, pimc_ratio=pimc_ratio,
+                    n_games=games_per_iter,
+                    temperature=temperature,
+                    entropy_coef=entropy_coef,
+                    round_rewards=round_rewards,
+                    seed=iter_seed,
+                    bridge_pool=bridge_pool_ctx,
+                )
+            elapsed = time.time() - t0
+            history.append(stats["avg_score"])
+
+            # ── LR schedule + health checks ──────────────────────────────
+            scheduler.step()
+            if stats["entropy"] < entropy_stop_threshold and stats["n_steps"] > 0:
+                entropy_danger += 1
+                current_lr = optimizer.param_groups[0]["lr"]
+                print(f"  [WARN] entropy={stats['entropy']:.4f} < {entropy_stop_threshold} "
+                      f"({entropy_danger}/{entropy_stop_patience})  lr={current_lr:.2e}")
+                if entropy_danger >= entropy_stop_patience:
+                    print(f"  [STOP] Entropy collapsed for {entropy_stop_patience} consecutive "
+                          f"iterations — saving and stopping.")
+                    torch.save(model.state_dict(), save_path / "collapse_checkpoint.pt")
+                    break
+            else:
+                entropy_danger = 0
+
+            # ── Opponent pool update ─────────────────────────────────────
+            if iteration % pool_every == 0:
+                opponent_pool.append(_frozen_copy(model))
+                if len(opponent_pool) > pool_size:
+                    opponent_pool.pop(0)
+
+            # ── Logging ─────────────────────────────────────────────────
+            if iteration % log_every == 0 or iteration == start_iteration:
+                avg100 = sum(history[-100:]) / len(history[-100:])
+                current_lr = optimizer.param_groups[0]["lr"]
+                row = {
+                    "iteration":   iteration,
+                    "temperature": temperature,
+                    **stats,
+                    "avg100":      avg100,
+                    "lr":          current_lr,
+                    "pimc_ratio":  pimc_ratio,
+                    "elapsed_s":   round(elapsed, 2),
+                }
+                with open(log_file, "a") as f:
+                    f.write(json.dumps(row) + "\n")
+                kl_str = f"  kl={stats['approx_kl']:.4f}" if "approx_kl" in stats else ""
+                print(
+                    f"[{iteration:5d}] temp={temperature:.2f}  "
+                    f"avg_score={stats['avg_score']:7.1f}  "
+                    f"avg100={avg100:7.1f}  "
+                    f"policy={stats['policy_loss']:8.4f}  "
+                    f"value={stats['value_loss']:8.4f}  "
+                    f"entropy={stats['entropy']:.4f}  "
+                    f"lr={current_lr:.1e}"
+                    f"{kl_str}  "
+                    f"steps={stats['n_steps']:4d}  "
+                    f"({elapsed:.1f}s)"
+                )
+
+            # ── Checkpoint ──────────────────────────────────────────────
+            if iteration % save_every == 0:
+                ckpt_path = save_path / f"ckpt_{iteration:05d}.pt"
+                torch.save(model.state_dict(), ckpt_path)
+
+                avg100 = sum(history[-100:]) / len(history[-100:])
+                if avg100 < best_avg_score:
+                    best_avg_score = avg100
+                    torch.save(model.state_dict(), save_path / "best.pt")
+                    print(f"  => New best: avg100={avg100:.1f} -> best.pt")
+                else:
+                    print(f"  => Checkpoint saved: {ckpt_path.name}")
+
+    finally:
+        if bridge_pool_ctx is not None:
+            bridge_pool_ctx.close()
 
     torch.save(model.state_dict(), save_path / "final.pt")
     print(f"\nTraining complete. Final model: {save_path / 'final.pt'}")
@@ -364,30 +404,44 @@ if __name__ == "__main__":
     parser.add_argument("--lam",           type=float, default=0.95,      help="GAE lambda (default 0.95)")
     parser.add_argument("--value-coef",    type=float, default=0.5,       help="Value loss weight (default 0.5)")
     parser.add_argument("--max-grad-norm", type=float, default=0.5,       help="Gradient clip norm for PPO (default 0.5)")
+    # Bridge mode
+    parser.add_argument("--bridge-workers",   type=int,   default=0,
+                        help="Parallel TypeScript bridge processes (0 = use Python engine)")
+    parser.add_argument("--bridge-opponent",  type=str,   default="the-mastermind",
+                        choices=["the-mastermind", "the-shark", "the-nemesis"],
+                        help="AI personality for bridge opponents (default: the-mastermind)")
+    parser.add_argument("--entropy-stop-threshold", type=float, default=0.4,
+                        help="Stop training if entropy falls below this for N iters (default 0.4)")
+    parser.add_argument("--entropy-stop-patience",  type=int,   default=5,
+                        help="Consecutive low-entropy iters before stopping (default 5)")
     args = parser.parse_args()
 
     run_training(
-        warm_start      = args.warm_start,
-        from_checkpoint = args.from_checkpoint,
-        pimc_checkpoint = args.pimc_pool,
-        pimc_ratio      = args.pimc_ratio,
-        round_rewards   = not args.no_round_rewards,
-        save_dir        = args.save_dir,
-        n_iterations    = args.iterations,
-        games_per_iter  = args.games_per_iter,
-        pool_size       = args.pool_size,
-        pool_every      = args.pool_every,
-        lr              = args.lr,
-        entropy_coef    = args.entropy_coef,
-        save_every      = args.save_every,
-        log_every       = args.log_every,
-        seed            = args.seed,
-        resume          = args.resume,
-        use_ppo         = args.ppo,
-        n_epochs        = args.n_epochs,
-        clip_eps        = args.clip_eps,
-        gamma           = args.gamma,
-        lam             = args.lam,
-        value_coef      = args.value_coef,
-        max_grad_norm   = args.max_grad_norm,
+        warm_start              = args.warm_start,
+        from_checkpoint         = args.from_checkpoint,
+        pimc_checkpoint         = args.pimc_pool,
+        pimc_ratio              = args.pimc_ratio,
+        round_rewards           = not args.no_round_rewards,
+        save_dir                = args.save_dir,
+        n_iterations            = args.iterations,
+        games_per_iter          = args.games_per_iter,
+        pool_size               = args.pool_size,
+        pool_every              = args.pool_every,
+        lr                      = args.lr,
+        entropy_coef            = args.entropy_coef,
+        save_every              = args.save_every,
+        log_every               = args.log_every,
+        seed                    = args.seed,
+        resume                  = args.resume,
+        use_ppo                 = args.ppo,
+        n_epochs                = args.n_epochs,
+        clip_eps                = args.clip_eps,
+        gamma                   = args.gamma,
+        lam                     = args.lam,
+        value_coef              = args.value_coef,
+        max_grad_norm           = args.max_grad_norm,
+        bridge_workers          = args.bridge_workers,
+        bridge_opponent         = args.bridge_opponent,
+        entropy_stop_threshold  = args.entropy_stop_threshold,
+        entropy_stop_patience   = args.entropy_stop_patience,
     )

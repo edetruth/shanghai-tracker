@@ -244,6 +244,34 @@ describe('aiFindBestMelds — ace-high run backtracking', () => {
     expect(result).toHaveLength(3)
   })
 
+  it('conserves joker for 3-card natural run when J-Q-K-A requires no joker (Round 6)', () => {
+    // Regression: old code found J-Q-K-JOKER first (burning the only joker), then
+    // couldn't form 3♦-4♦-5♦ into a 4-card run. Fix: jCount outer loop + ace-high
+    // variant ensures J-Q-K-A is found at jCount=0, leaving joker for diamonds.
+    const hand = [
+      c('diamonds', 1), c('clubs', 1),    c('clubs', 1),   c('spades', 1),
+      c('diamonds', 3), c('diamonds', 4), c('diamonds', 5),
+      c('clubs', 3),    c('clubs', 7),    c('clubs', 8),   c('clubs', 10), c('clubs', 11),
+      c('spades', 5),   c('spades', 11),  c('spades', 12), c('spades', 13),
+      joker(),
+    ]
+    const result = aiFindBestMelds(hand, req6)
+    expect(result).not.toBeNull()
+    expect(result).toHaveLength(3)
+    // Must include the ace-high spades run J-Q-K-A
+    const hasAceHighSpades = result!.some(meld =>
+      meld.some(c => c.rank === 11 && c.suit === 'spades') &&
+      meld.some(c => c.rank === 1  && c.suit === 'spades') &&
+      meld.every(c => c.suit === 'spades' || c.suit === 'joker')
+    )
+    expect(hasAceHighSpades).toBe(true)
+    // Must not consume the joker in the ace-high run
+    const aceHighRun = result!.find(meld =>
+      meld.some(c => c.rank === 11 && c.suit === 'spades')
+    )
+    expect(aceHighRun?.some(c => c.suit === 'joker')).toBe(false)
+  })
+
   it('returns null when ace is genuinely contested (no valid combo exists)', () => {
     // A♥ needed for both ace-low run and ace-high run, only 7 hearts total
     const hand = [

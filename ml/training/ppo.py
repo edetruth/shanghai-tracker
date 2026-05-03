@@ -27,36 +27,22 @@ MODELS_DIR = Path(__file__).parent.parent / "models"
 MODELS_DIR.mkdir(exist_ok=True)
 
 
-# ── Action encoding helpers ────────────────────────────────────────────────────
-
-MAX_LAYOFF_CARD = 16   # max hand card index for layoff encoding
-MAX_LAYOFF_MELD = 20   # max meld index for layoff encoding
-LAYOFF_BASE = 19       # first layoff slot: 19 .. 19 + 16*20 - 1 = 338
+# ── Action encoding helpers (PPO v2: 26 strategic actions) ─────────────────────
 
 def encode_action(action: str) -> int:
-    """Map an action string to a flat integer index in [0, MAX_ACTIONS)."""
+    """Map a strategic action string to index in [0, 26)."""
     if action == "draw_pile":
         return 0
     if action == "take_discard":
         return 1
-    if action == "meld":
-        return 2
     if action.startswith("discard:"):
         idx = int(action.split(":")[1])
-        return 3 + min(idx, 15)  # clamp to 16 discard slots (3..18)
-    if action.startswith("layoff:"):
-        parts = action.split(":")
-        ci = min(int(parts[1]), MAX_LAYOFF_CARD - 1)
-        mi = min(int(parts[2]), MAX_LAYOFF_MELD - 1)
-        encoded = LAYOFF_BASE + ci * MAX_LAYOFF_MELD + mi
-        if encoded >= BUY_ACTION_IDX:
-            return -1  # out of bounds — will be skipped by mask
-        return encoded
+        return 2 + min(idx, 21)  # slots 2..23
     if action == "buy":
         return BUY_ACTION_IDX
     if action == "decline_buy":
         return DECLINE_BUY_ACTION_IDX
-    return 0
+    return 0  # fallback
 
 
 def decode_action(index: int, valid_actions: list) -> str:
@@ -109,6 +95,7 @@ def collect_batch(
     all_dones: list[float] = []
 
     game_rewards: list[float] = []
+    game_wins: list[bool] = []
 
     use_ai_opponents = env.opponent_ai is not None
 
@@ -119,10 +106,13 @@ def collect_batch(
             done = False
             step_count = 0
             # Scale step budget with player count: 4P games have buy windows
-            # and more opponent turns that generate RL decision points
-            max_steps = 3000 * max(1, player_count // 2)
+            # and more opponent turns that generate RL decision points.
+            # Needs to be generous — rounds can cycle 300+ steps without going out,
+            # and diagnose showed 94% timeout at 2000 for 2P.
+            max_steps = 4000 * max(1, player_count // 2)
 
             prev_score = 0.0
+            agent_won = False
             # Track the last index written by player 0 for done marking
             last_agent_idx: int = -1
 
@@ -130,9 +120,13 @@ def collect_batch(
             episode_start = len(all_states)
 
             while not done and step_count < max_steps:
-                valid_actions, current_player = env.get_valid_actions()
+                valid_actions, current_player, auto_state = env.get_strategic_actions()
                 if not valid_actions:
                     break
+
+                # If auto-meld/layoff updated the state, use the fresh one
+                if auto_state is not None:
+                    state_list = auto_state
 
                 if current_player == 0:
                     state_tensor = torch.tensor(state_list, dtype=torch.float32).unsqueeze(0)
@@ -154,62 +148,89 @@ def collect_batch(
                     all_values.append(value.item())
                     all_masks.append(mask)
                     all_is_buy.append(is_buy)
-                    # Reward and done will be filled after env.step()
                     all_rewards.append(0.0)
                     all_dones.append(0.0)
                     last_agent_idx = len(all_states) - 1
 
                     state_list, _, done, info = env.step(action_str)
 
-                    # Reward: negative score delta / 100 + per-step time penalty
-                    # Scale step penalty inversely with player count so cumulative
-                    # penalty stays comparable across 2P and 4P games
-                    step_reward = -0.0005 / max(1, player_count // 2)
+                    # ── Outcome-based reward ──
+                    # No hand-eval shaping: it was dominating the signal (~95% of
+                    # reward magnitude) and training the model to chase hand_eval
+                    # deltas instead of winning. Pure game-outcome signal is sparse
+                    # but faithful — score changes fire at every round end.
+                    step_reward = -0.001  # small time penalty to discourage stalling
+
+                    # Score change at round end — primary learning signal.
+                    # info.scores is cumulative total, so delta = round points scored.
                     if info.get("scores"):
                         current_score = float(info["scores"][0])
                         delta = current_score - prev_score
                         if delta != 0:
-                            step_reward += -delta / 100.0
+                            # -delta/50 gives ~-2 for a 100-point round, ~0 for going out
+                            step_reward += -delta / 50.0
                             prev_score = current_score
-
-                    # Shaped reward: bonus for melding (going down)
-                    if action_str == "meld":
-                        step_reward += 0.5
-
-                    # Shaped reward: bonus for laying off cards
-                    if action_str.startswith("layoff:"):
-                        step_reward += 0.05
 
                     all_rewards[last_agent_idx] = step_reward
 
                     if done:
                         all_dones[last_agent_idx] = 1.0
+                        # Game-end bonuses — scaled 5x vs the previous run.
+                        # Prior values (+10 / -5 / spread/100) left the value
+                        # function tracking round number (corr +0.109 instead
+                        # of negative). Bigger terminals force the critic to
+                        # learn outcome prediction rather than a step-count proxy.
+                        if info.get("scores"):
+                            scores = [float(s) for s in info["scores"]]
+                            agent_score = scores[0]
+                            best_score = min(scores)
+                            if agent_score == best_score:
+                                all_rewards[last_agent_idx] += 50.0  # game win
+                                agent_won = True
+                            else:
+                                all_rewards[last_agent_idx] -= 25.0  # game loss
+                            # Score-spread penalty scales with how badly we lost
+                            all_rewards[last_agent_idx] += -(agent_score - best_score) / 20.0
 
                 else:
                     # Opponent turn — random when no opponent_ai bridge
                     action_str = random.choice(valid_actions)
                     state_list, _, done, info = env.step(action_str)
 
-                    # Track opponent score changes for logging but do NOT
-                    # attribute them as reward to the agent — the temporal
-                    # gap makes this pure noise in multiplayer games.
-                    if info.get("scores"):
+                    # Round-end score change: attribute to agent's last step
+                    if info.get("scores") and last_agent_idx >= 0:
                         current_score = float(info["scores"][0])
-                        if current_score != prev_score:
+                        delta = current_score - prev_score
+                        if delta != 0:
+                            all_rewards[last_agent_idx] += -delta / 50.0
                             prev_score = current_score
 
                     if done and last_agent_idx >= 0:
                         all_dones[last_agent_idx] = 1.0
+                        # Check if agent won even though game ended on opponent turn.
+                        # Scaled 5x — must match the agent-turn path above.
+                        if info.get("scores"):
+                            scores = [float(s) for s in info["scores"]]
+                            agent_score = scores[0]
+                            best_score = min(scores)
+                            if agent_score == best_score:
+                                all_rewards[last_agent_idx] += 50.0
+                                agent_won = True
+                            else:
+                                all_rewards[last_agent_idx] -= 25.0
+                            all_rewards[last_agent_idx] += -(agent_score - best_score) / 20.0
 
                 step_count += 1
 
-            # Timeout penalty: if game didn't finish, penalize heavily
-            # This prevents the model from learning to stall (never discarding = never scored = 0 reward)
+            # Timeout penalty — scaled to match the new 5x terminal magnitude.
+            # A timeout is strictly worse than a loss (you didn't even finish),
+            # so it should hurt more than the -25 loss penalty.
             if not done and last_agent_idx >= 0:
-                all_rewards[last_agent_idx] += -10.0  # large penalty for not finishing
+                all_rewards[last_agent_idx] += -40.0
 
             # Log the actual game score (not the reward signal) for readable tracking
             game_rewards.append(-prev_score)  # negative final score in original scale
+            game_wins.append(agent_won)
 
             # Mark the very last agent step as done if the loop exited via
             # max_steps (done flag may still be False in that case)
@@ -228,6 +249,7 @@ def collect_batch(
         "is_buy":       torch.tensor(all_is_buy, dtype=torch.bool),
         "dones":        torch.tensor(all_dones, dtype=torch.float32),
         "game_rewards": game_rewards,
+        "game_wins": game_wins,
     }
 
 
@@ -320,8 +342,8 @@ def ppo_update(
         # Value loss (MSE against GAE returns)
         value_loss = F.mse_loss(values, returns)
 
-        # Entropy bonus — gameplay steps only (excludes buy/decline_buy)
-        entropy = net.get_gameplay_entropy(policy_logits, masks, is_buy)
+        # Entropy bonus — all steps (buy/decline now unified in action space)
+        entropy = net.get_entropy(policy_logits, masks)
 
         # Combined loss
         loss = policy_loss + 0.5 * value_loss - entropy_coef * entropy
@@ -340,6 +362,9 @@ def ppo_update(
 # ── Main training loop ────────────────────────────────────────────────────────
 
 def train(args):
+    from log_utils import setup_logging
+    setup_logging("ppo")
+
     print("Shanghai PPO Training")
     print(f"  Total games   : {args.games}")
     print(f"  Batch size    : {args.batch_size} games/update")
@@ -358,7 +383,7 @@ def train(args):
         from curriculum import CurriculumManager
         curriculum = CurriculumManager()
         tier = curriculum.current
-        print(f"  Curriculum    : ON — starting at tier 0: {tier['label']}")
+        print(f"  Curriculum    : ON - starting at tier 0: {tier['label']}")
         env = ShanghaiEnv(
             player_count=tier['players'],
             opponent_ai=tier['opponent'],
@@ -398,11 +423,12 @@ def train(args):
         current_players = curriculum.current['players'] if curriculum else args.players
         batch = collect_batch(env, net, this_batch_size, temperature=args.temperature, player_count=current_players)
         game_rewards = batch.pop("game_rewards")
+        game_wins = batch.pop("game_wins")
         all_game_rewards.extend(game_rewards)
         games_completed += this_batch_size
 
         if batch["states"].shape[0] == 0:
-            print(f"Batch {batch_num}: no agent steps collected — skipping update")
+            print(f"Batch {batch_num}: no agent steps collected - skipping update")
             continue
 
         # ── Compute GAE ─────────────────────────────────────────────────────
@@ -428,14 +454,18 @@ def train(args):
 
         elapsed = time.time() - t0
         batch_avg = sum(game_rewards) / len(game_rewards)
+        batch_wins = sum(game_wins)
+        # Avg score is the negative of game_rewards (game_rewards = -score)
+        batch_score = -batch_avg
         rolling = all_game_rewards[-100:]
         rolling_avg = sum(rolling) / len(rolling)
+        rolling_score = -rolling_avg
 
         print(
             f"Batch {batch_num:4d}/{total_batches} | "
             f"Games: {games_completed:5d} | "
-            f"BatchAvg: {batch_avg:7.1f} | "
-            f"Avg(100): {rolling_avg:7.1f} | "
+            f"Score: {batch_score:5.0f} ({rolling_score:5.0f}) | "
+            f"Wins: {batch_wins}/{this_batch_size} | "
             f"Loss: {mean_loss:9.4f} | "
             f"Entropy: {mean_entropy:.3f} | "
             f"Steps: {batch['states'].shape[0]:5d} | "
@@ -446,77 +476,105 @@ def train(args):
         total_steps = batch['states'].shape[0]
         avg_steps_per_game = total_steps / this_batch_size
 
-        # Scale thresholds with player count — 4P games legitimately take more steps
         player_scale = max(1, current_players // 2)
-        stall_threshold = 2500 * player_scale
-        zero_reward_threshold = 2000 * player_scale
+        stall_threshold = 2000 * player_scale
+        zero_reward_threshold = 1500 * player_scale
 
-        # Track health history
         if not hasattr(train, '_health'):
-            train._health = {'stall_count': 0, 'zero_reward_count': 0}
+            train._health = {'stall_count': 0, 'zero_reward_count': 0, 'lr_reductions': 0}
 
-        # Detect stalling: avg steps per game near the scaled cap
         if avg_steps_per_game > stall_threshold:
             train._health['stall_count'] += 1
         else:
             train._health['stall_count'] = max(0, train._health['stall_count'] - 1)
 
-        # Detect zero-reward exploit: batch avg near 0 with high steps
         if abs(batch_avg) < 1.0 and avg_steps_per_game > zero_reward_threshold:
             train._health['zero_reward_count'] += 1
         else:
             train._health['zero_reward_count'] = max(0, train._health['zero_reward_count'] - 1)
 
-        # Auto-recovery: if stalling for 10+ consecutive batches, something is wrong
-        if train._health['stall_count'] >= 10 or train._health['zero_reward_count'] >= 10:
-            print(f"\n{'!'*60}")
-            print(f"  HEALTH WARNING: Training appears stuck")
-            print(f"  Stall count: {train._health['stall_count']}, Zero-reward count: {train._health['zero_reward_count']}")
-            print(f"  Avg steps/game: {avg_steps_per_game:.0f}, Batch avg reward: {batch_avg:.1f}")
-            print(f"  Saving checkpoint and stopping to prevent wasted compute.")
-            print(f"{'!'*60}\n")
-            torch.save(net.state_dict(), model_path)
-            torch.save(net.state_dict(), MODELS_DIR / "shanghai_ppo_stopped.pt")
-            break
+        # Recovery ladder: reduce LR twice before giving up
+        stall_limit = 5
+        if train._health['stall_count'] >= stall_limit or train._health['zero_reward_count'] >= stall_limit:
+            train._health['lr_reductions'] += 1
+            if train._health['lr_reductions'] <= 2:
+                # Reduce LR by 50% and retry
+                for pg in optimizer.param_groups:
+                    pg['lr'] *= 0.5
+                new_lr = optimizer.param_groups[0]['lr']
+                print(f"  [!] Health recovery #{train._health['lr_reductions']}: LR reduced to {new_lr:.6f}")
+                train._health['stall_count'] = 0
+                train._health['zero_reward_count'] = 0
+            else:
+                # 3rd strike — save and stop
+                print(f"\n{'!'*60}")
+                print(f"  HEALTH WARNING: Training stuck after 2 LR reductions")
+                print(f"  Avg steps/game: {avg_steps_per_game:.0f}, Batch avg: {batch_avg:.1f}")
+                print(f"  Saving checkpoint and stopping.")
+                print(f"{'!'*60}\n")
+                torch.save(net.state_dict(), model_path)
+                torch.save(net.state_dict(), MODELS_DIR / "shanghai_ppo_stopped.pt")
+                break
 
-        # Entropy collapse detection
-        if mean_entropy < 0.3:
-            print(f"  ⚠ Low entropy: {mean_entropy:.3f} — policy may be collapsing")
+        # Entropy floor: boost entropy coefficient if policy is collapsing
+        if not hasattr(train, '_entropy_boost_batches'):
+            train._entropy_boost_batches = 0
+        if mean_entropy < 0.3 and train._entropy_boost_batches == 0:
+            train._entropy_boost_batches = 50
+            print(f"  [!] Entropy floor triggered: boosting entropy coef to 0.15 for 50 batches")
+        if train._entropy_boost_batches > 0:
+            entropy_coef = 0.15
+            train._entropy_boost_batches -= 1
+            if train._entropy_boost_batches == 0:
+                entropy_coef = args.entropy_coef
+                print(f"  Entropy boost ended, restored to {entropy_coef}")
 
         # ── LR warmup after tier promotion ──────────────────────────────────
         if hasattr(train, '_warmup_batches_left') and train._warmup_batches_left > 0:
             train._warmup_batches_left -= 1
             warmup_total = 20  # ramp over 20 batches
             progress = 1.0 - train._warmup_batches_left / warmup_total
-            warmup_lr = args.lr * (0.1 + 0.9 * progress)  # 10% → 100%
+            warmup_lr = args.lr * (0.1 + 0.9 * progress)  # 10% -> 100%
             for pg in optimizer.param_groups:
                 pg['lr'] = warmup_lr
             if train._warmup_batches_left == 0:
                 for pg in optimizer.param_groups:
                     pg['lr'] = args.lr
-                print(f"  LR warmup complete — restored to {args.lr}")
+                print(f"  LR warmup complete - restored to {args.lr}")
 
-        # ── Curriculum promotion check ────────────────────────────────────────
+        # ── Curriculum promotion/demotion check ───────────────────────────────
         if curriculum:
-            for r in game_rewards:
-                curriculum.record(r)
-            if curriculum.should_promote():
+            for r, won in zip(game_rewards, game_wins):
+                curriculum.record(r, won=won)
+            if batch_num % 10 == 0:
+                print(f"  [Curriculum] Tier {curriculum._tier_index}: {curriculum.current['label']} | "
+                      f"WinRate: {curriculum.win_rate:.1%} ({curriculum._wins}/{curriculum._games})")
+
+            if curriculum.should_demote():
+                curriculum.demote()
+                tier = curriculum.current
+                env.close()
+                env = ShanghaiEnv(
+                    player_count=tier['players'],
+                    opponent_ai=tier['opponent'] if tier['opponent'] != 'mixed-hard' else 'the-shark',
+                    rich_state=True,
+                )
+                train._health = {'stall_count': 0, 'zero_reward_count': 0, 'lr_reductions': 0}
+            elif curriculum.should_promote():
                 curriculum.promote()
                 tier = curriculum.current
                 env.close()
                 env = ShanghaiEnv(
                     player_count=tier['players'],
-                    opponent_ai=tier['opponent'],
+                    opponent_ai=tier['opponent'] if tier['opponent'] != 'mixed-hard' else 'the-shark',
                     rich_state=True,
                 )
-                # Start LR warmup: reduce to 10% and ramp back over 20 batches
                 train._warmup_batches_left = 20
                 warmup_lr = args.lr * 0.1
                 for pg in optimizer.param_groups:
                     pg['lr'] = warmup_lr
-                print(f"  LR warmup started: {warmup_lr:.6f} → {args.lr} over 20 batches")
-                # Reset health counters — new tier will have different step patterns
-                train._health = {'stall_count': 0, 'zero_reward_count': 0}
+                print(f"  LR warmup started: {warmup_lr:.6f} -> {args.lr} over 20 batches")
+                train._health = {'stall_count': 0, 'zero_reward_count': 0, 'lr_reductions': 0}
 
         # ── Checkpointing ────────────────────────────────────────────────────
         if batch_num % 10 == 0 or games_completed >= args.games:
@@ -544,9 +602,9 @@ if __name__ == "__main__":
     parser.add_argument("--batch-size",   type=int,   default=10,         help="Games per PPO update")
     parser.add_argument("--ppo-epochs",   type=int,   default=4,          help="Gradient steps per batch")
     parser.add_argument("--lr",           type=float, default=0.0003,     help="Adam learning rate")
-    parser.add_argument("--entropy-coef", type=float, default=0.05,       help="Entropy bonus coefficient")
+    parser.add_argument("--entropy-coef", type=float, default=0.1,        help="Entropy bonus coefficient (raised from 0.05 to combat discard-slot-0 collapse)")
     parser.add_argument("--clip-eps",     type=float, default=0.2,        help="PPO clip epsilon")
-    parser.add_argument("--temperature",  type=float, default=1.0,        help="Action sampling temperature")
+    parser.add_argument("--temperature",  type=float, default=0.7,        help="Action sampling temperature (0.7 = sharper than uniform; 1.0 was too noisy — argmax win rate diverged from sampled by ~17pp)")
     parser.add_argument("--players",      type=int,   default=4,          help="Number of players (2-8)")
     parser.add_argument("--opponent-ai",  type=str,   default=None,
                         help="AI personality for opponents (e.g. the-shark). Default: random")

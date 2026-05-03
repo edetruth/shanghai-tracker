@@ -37,21 +37,40 @@ function tryFindSet(hand: Card[], allJokers: Card[], jokersUsed: number): Card[]
   return null
 }
 
+// Builds 1-2 deduplicated sorted unique-card arrays for a suit:
+// always ace-low; also ace-high (ace at end) when an ace is present.
+// The ace-high variant lets contiguous-slice windows find J-Q-K-A.
+function _aceVariants(suitCards: Card[]): Card[][] {
+  const low: Card[] = []
+  const seen = new Set<number>()
+  for (const card of [...suitCards].sort((a, b) => a.rank - b.rank)) {
+    if (!seen.has(card.rank)) { seen.add(card.rank); low.push(card) }
+  }
+  if (!low.some(c => c.rank === 1)) return [low]
+  const high = [...low].sort((a, b) => {
+    const ra = a.rank === 1 ? 14 : a.rank
+    const rb = b.rank === 1 ? 14 : b.rank
+    return ra - rb
+  })
+  return [low, high]
+}
+
 function tryFindRun(hand: Card[], allJokers: Card[], jokersUsed: number): Card[] | null {
   const bySuit = groupBySuit(hand)
   const available = allJokers.slice(jokersUsed)
-  for (const [, suitCards] of bySuit) {
-    const seen = new Set<number>()
-    const unique: Card[] = []
-    for (const card of [...suitCards].sort((a, b) => a.rank - b.rank)) {
-      if (!seen.has(card.rank)) { seen.add(card.rank); unique.push(card) }
-    }
-    for (let jCount = 0; jCount <= available.length; jCount++) {
-      for (let start = 0; start < unique.length; start++) {
-        for (let end = start + Math.max(MIN_RUN_SIZE - jCount, 1); end <= unique.length; end++) {
-          const sub = unique.slice(start, end)
-          const testCards = [...sub, ...available.slice(0, jCount)]
-          if (testCards.length >= MIN_RUN_SIZE && isValidRun(testCards)) return testCards
+  // Pre-build variants per suit so we can iterate jCount in the outer loop.
+  // Outer-jCount order ensures joker-free runs (jCount=0) across all suits are
+  // tried before any joker-consuming run — this conserves the joker for other melds.
+  const allVariants = [...bySuit.values()].map(_aceVariants)
+  for (let jCount = 0; jCount <= available.length; jCount++) {
+    for (const variants of allVariants) {
+      for (const unique of variants) {
+        for (let start = 0; start < unique.length; start++) {
+          for (let end = start + Math.max(MIN_RUN_SIZE - jCount, 1); end <= unique.length; end++) {
+            const sub = unique.slice(start, end)
+            const testCards = [...sub, ...available.slice(0, jCount)]
+            if (testCards.length >= MIN_RUN_SIZE && isValidRun(testCards)) return testCards
+          }
         }
       }
     }
@@ -972,18 +991,15 @@ function trySuitPermutationMelds(hand: Card[], requirement: RoundRequirement): C
 /** Find a valid run from specific same-suit cards + available jokers */
 function tryFindRunFromCards(suitCards: Card[], availableJokers: Card[]): Card[] | null {
   if (suitCards.length === 0 && availableJokers.length < MIN_RUN_SIZE) return null
-  const seen = new Set<number>()
-  const unique: Card[] = []
-  for (const card of [...suitCards].sort((a, b) => a.rank - b.rank)) {
-    if (!seen.has(card.rank)) { seen.add(card.rank); unique.push(card) }
-  }
-  // Try with fewest jokers first to conserve them for other runs
+  const variants = _aceVariants(suitCards)
   for (let jCount = 0; jCount <= availableJokers.length; jCount++) {
-    for (let start = 0; start < unique.length; start++) {
-      for (let end = start + Math.max(MIN_RUN_SIZE - jCount, 1); end <= unique.length; end++) {
-        const sub = unique.slice(start, end)
-        const testCards = [...sub, ...availableJokers.slice(0, jCount)]
-        if (testCards.length >= MIN_RUN_SIZE && isValidRun(testCards)) return testCards
+    for (const unique of variants) {
+      for (let start = 0; start < unique.length; start++) {
+        for (let end = start + Math.max(MIN_RUN_SIZE - jCount, 1); end <= unique.length; end++) {
+          const sub = unique.slice(start, end)
+          const testCards = [...sub, ...availableJokers.slice(0, jCount)]
+          if (testCards.length >= MIN_RUN_SIZE && isValidRun(testCards)) return testCards
+        }
       }
     }
   }
@@ -1069,23 +1085,21 @@ function tryMeldOrderBacktrack(
         if (results.length >= MAX_CANDIDATES) break
       }
     } else {
-      for (const [, suitCards] of bySuit) {
-        const seen = new Set<number>()
-        const unique: Card[] = []
-        for (const card of [...suitCards].sort((a, b) => a.rank - b.rank)) {
-          if (!seen.has(card.rank)) { seen.add(card.rank); unique.push(card) }
-        }
-        for (let jCount = 0; jCount <= available.length; jCount++) {
-          for (let start = 0; start < unique.length; start++) {
-            for (let end = start + Math.max(MIN_RUN_SIZE - jCount, 1); end <= unique.length; end++) {
-              const sub = unique.slice(start, end)
-              const testCards = [...sub, ...available.slice(0, jCount)]
-              if (testCards.length >= MIN_RUN_SIZE && isValidRun(testCards)) {
-                const key = testCards.map(c => c.id).sort().join(',')
-                if (!seenKeys.has(key)) {
-                  seenKeys.add(key)
-                  results.push(testCards)
-                  if (results.length >= MAX_CANDIDATES) return results
+      const allVariants = [...bySuit.values()].map(_aceVariants)
+      for (let jCount = 0; jCount <= available.length; jCount++) {
+        for (const variants of allVariants) {
+          for (const unique of variants) {
+            for (let start = 0; start < unique.length; start++) {
+              for (let end = start + Math.max(MIN_RUN_SIZE - jCount, 1); end <= unique.length; end++) {
+                const sub = unique.slice(start, end)
+                const testCards = [...sub, ...available.slice(0, jCount)]
+                if (testCards.length >= MIN_RUN_SIZE && isValidRun(testCards)) {
+                  const key = testCards.map(c => c.id).sort().join(',')
+                  if (!seenKeys.has(key)) {
+                    seenKeys.add(key)
+                    results.push(testCards)
+                    if (results.length >= MAX_CANDIDATES) return results
+                  }
                 }
               }
             }

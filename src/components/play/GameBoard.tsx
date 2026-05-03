@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { createPlayedGame, saveGameEvents, saveAIDecisions, backfillDecisionOutcomes, savePlayerRoundStats, savePlayerGameStats, saveRoundScores } from '../../lib/gameStore'
+import { saveGameContext, clearGameContext } from '../../lib/gamePersist'
 import type { AIDecision, PlayerRoundStats, PlayerGameStats } from '../../game/types'
 import type { GameState, Player, Card as CardType, Meld, PlayerConfig, AIDifficulty, AIPersonality, OpponentHistory } from '../../game/types'
 import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, MAX_BUYS, cardPoints } from '../../game/rules'
@@ -53,6 +54,10 @@ interface Props {
   hostSeatIndex?: number
   remoteSeatIndices?: number[]
   onReplay?: (gameId: string, playerNames: string[]) => void
+  // Resume support
+  resuming?: boolean
+  resumedGameId?: string | null
+  resumedPlayerMap?: Record<string, string>
 }
 
 interface UndoState {
@@ -195,12 +200,27 @@ function advancePlayer(state: GameState): GameState {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyProp = 'medium', aiPersonality, buyLimit = 5, onExit, onGameComplete, tournamentGameNumber, tournamentMatchId, mode = 'local', roomCode, hostSeatIndex = 0, remoteSeatIndices = [], onReplay }: Props) {
+export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyProp = 'medium', aiPersonality, buyLimit = 5, onExit, onGameComplete, tournamentGameNumber, tournamentMatchId, mode = 'local', roomCode, hostSeatIndex = 0, remoteSeatIndices = [], onReplay, resuming = false, resumedGameId, resumedPlayerMap }: Props) {
   const aiDifficulty: AIDifficulty = aiDifficultyProp
 
   // ── Initialize Zustand store synchronously before first render ───────────
   const [_storeInit] = useState(() => {
-    useGameStore.getState().reset(initGame(initialPlayers, buyLimit))
+    if (!resuming) {
+      useGameStore.getState().reset(initGame(initialPlayers, buyLimit))
+    } else {
+      // Normalize transient phases that can't be safely restored:
+      // - buying: clear all buying state and roll back to draw
+      // - round-end: roundResults is not persisted, roll forward to draw
+      // - round-start: announcement already ran, skip re-animating and roll forward
+      // - game-over: stale (clearGameContext was blocked by missing gameId), reset to draw
+      const phase = useGameStore.getState().uiPhase
+      if (phase === 'buying') {
+        useGameStore.getState().completeBuyingRound()
+        useGameStore.getState().setUiPhase('draw')
+      } else if (phase === 'round-end' || phase === 'round-start' || phase === 'game-over') {
+        useGameStore.getState().setUiPhase('draw')
+      }
+    }
     return true
   })
 
@@ -730,14 +750,35 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
   }
 
 
-  // ── Create game record on mount ───────────────────────────────────────────
+  // ── Create game record on mount (or restore resumed context) ─────────────
   useEffect(() => {
+    if (resuming && resumedGameId !== undefined) {
+      // Restore DB context from saved game — no new record needed
+      setGameId(resumedGameId ?? null)
+      setPlayerMap(resumedPlayerMap ?? {})
+      return
+    }
     const date = new Date().toISOString().split('T')[0]
     const playerNames = initialPlayers.map(p => p.name)
     const gameType = mode === 'host' ? 'online' : initialPlayers.some(p => p.isAI) ? 'ai' : 'pass-and-play'
     const effectiveBuyLimit = buyLimit === -1 ? 999 : buyLimit
     createPlayedGame(playerNames, date, gameType, effectiveBuyLimit)
-      .then(({ gameId: id, playerMap: pm }) => { setGameId(id); setPlayerMap(pm) })
+      .then(({ gameId: id, playerMap: pm }) => {
+        setGameId(id)
+        setPlayerMap(pm)
+        // Only persist local games (not online, not tournament)
+        if (mode !== 'host' && !tournamentGameNumber) {
+          saveGameContext({
+            gameId: id,
+            playerMap: pm,
+            playerConfigs: initialPlayers,
+            aiPersonality: aiPersonality ?? 'steady-sam',
+            buyLimit,
+            currentRound: 1,
+            savedAt: Date.now(),
+          })
+        }
+      })
       .catch(() => {}) // silent fail — telemetry must never break the game
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1284,12 +1325,29 @@ export default function GameBoard({ initialPlayers, aiDifficulty: aiDifficultyPr
     // Incremental save: persist round scores to Supabase after every round.
     // On the final round, also mark the game as complete so the DB is
     // always up-to-date even if the user closes the app before GameOver.
+    const isFinal = state.currentRound >= TOTAL_ROUNDS
     if (gameId) {
-      const isFinal = state.currentRound >= TOTAL_ROUNDS
       const playerData = players.map(p => ({ name: p.name, roundScores: p.roundScores }))
       void saveRoundScores(gameId, playerData, isFinal, playerMap)
       // Keep unload ref current so beforeunload can flush if needed
       unloadSaveRef.current = { gameId, players: playerData, isFinal }
+    }
+    // Update persisted context regardless of DB availability
+    if (mode !== 'host' && !tournamentGameNumber) {
+      if (isFinal) {
+        // Always clear on final round — even if gameId is null (offline/failed DB)
+        clearGameContext()
+      } else if (gameId) {
+        saveGameContext({
+          gameId,
+          playerMap,
+          playerConfigs: initialPlayers,
+          aiPersonality: aiPersonality ?? 'steady-sam',
+          buyLimit,
+          currentRound: state.currentRound + 1,
+          savedAt: Date.now(),
+        })
+      }
     }
 
     // Telemetry: flush remaining decisions, backfill outcomes, save round stats

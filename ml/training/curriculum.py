@@ -8,14 +8,15 @@ the agent to the next tier when improvement has plateaued.
 from __future__ import annotations
 
 TIERS = [
-    {"players": 2, "opponent": None,            "label": "2P random"},
-    {"players": 2, "opponent": "rookie-riley",  "label": "2P rookie"},
-    {"players": 4, "opponent": None,            "label": "4P random"},
-    {"players": 4, "opponent": "rookie-riley",  "label": "4P rookie"},
-    {"players": 4, "opponent": "steady-sam",    "label": "4P steady"},
-    {"players": 4, "opponent": "patient-pat",   "label": "4P patient"},
-    {"players": 4, "opponent": "the-shark",     "label": "4P shark"},
-    {"players": 4, "opponent": "the-nemesis",   "label": "4P nemesis"},
+    {"players": 2, "opponent": None,            "label": "2P random",    "min_win_rate": 0.60},
+    {"players": 2, "opponent": "rookie-riley",  "label": "2P rookie",   "min_win_rate": 0.40},
+    {"players": 4, "opponent": None,            "label": "4P random",   "min_win_rate": 0.35},
+    {"players": 4, "opponent": "rookie-riley",  "label": "4P rookie",   "min_win_rate": 0.30},
+    {"players": 4, "opponent": "steady-sam",    "label": "4P steady",   "min_win_rate": 0.25},
+    {"players": 4, "opponent": "patient-pat",   "label": "4P patient",  "min_win_rate": 0.20},
+    {"players": 4, "opponent": "the-shark",     "label": "4P shark",    "min_win_rate": 0.15},
+    {"players": 4, "opponent": "mixed-hard",    "label": "4P mixed-hard", "min_win_rate": 0.15},
+    {"players": 4, "opponent": "the-nemesis",   "label": "4P nemesis",  "min_win_rate": 0.10},
 ]
 
 
@@ -23,22 +24,21 @@ class CurriculumManager:
     """
     Manages progressive difficulty tiers for RL training.
 
-    Promotion logic: after at least `plateau_window` rewards have been
-    recorded at the current tier, compare the mean of the most-recent 200
-    rewards against the mean of the 200 rewards from `plateau_window`
-    episodes ago. If the improvement is below `improvement_threshold`
-    the agent has plateaued and is promoted to the next tier.
+    Promotion: must meet per-tier minimum win rate AND plateau/dominate.
+    Demotion: win rate below half the tier minimum after 500 games.
     """
 
     def __init__(
         self,
-        plateau_window: int = 500,
-        improvement_threshold: float = 0.02,
+        plateau_window: int = 1000,
+        improvement_threshold: float = 0.05,
     ) -> None:
         self.plateau_window = plateau_window
         self.improvement_threshold = improvement_threshold
         self._tier_index: int = 0
         self._rewards: list[float] = []
+        self._wins: int = 0
+        self._games: int = 0
 
     # ------------------------------------------------------------------
     # Properties
@@ -54,13 +54,23 @@ class CurriculumManager:
         """Return the index of the highest available tier."""
         return len(TIERS) - 1
 
+    @property
+    def win_rate(self) -> float:
+        """Return win rate at current tier."""
+        if self._games == 0:
+            return 0.0
+        return self._wins / self._games
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
-    def record(self, reward: float) -> None:
-        """Append a single episode reward to the running history."""
+    def record(self, reward: float, won: bool = False) -> None:
+        """Append a single episode reward and win/loss to the running history."""
         self._rewards.append(reward)
+        self._games += 1
+        if won:
+            self._wins += 1
 
     def should_promote(self) -> bool:
         """
@@ -68,29 +78,37 @@ class CurriculumManager:
 
         Conditions (all must hold):
           1. Not already at the maximum tier.
-          2. At least `plateau_window` rewards recorded at this tier.
-          3. The mean of the last 200 rewards has improved by less than
-             `improvement_threshold` relative to the mean of the 200
-             rewards from `plateau_window` episodes ago.
+          2. At least `plateau_window` games played at this tier.
+          3. Win rate meets the tier's minimum threshold.
+          4. EITHER: reward has plateaued (improvement < threshold)
+             OR: win rate exceeds the tier minimum by 10+ percentage points.
+
+        This prevents promoting agents that plateau at zero competence.
         """
         if self._tier_index >= self.max_tier:
             return False
 
-        n = len(self._rewards)
-        if n < self.plateau_window:
+        if self._games < self.plateau_window:
             return False
 
+        min_wr = self.current.get("min_win_rate", 0.15)
+
+        # Gate: must meet minimum win rate for this tier
+        if self.win_rate < min_wr:
+            return False
+
+        # Fast-track: clearly dominating the tier
+        if self.win_rate >= min_wr + 0.10:
+            return True
+
+        # Standard: plateaued but competent
+        n = len(self._rewards)
         window = 200
-
-        # Recent window: last `window` rewards.
         recent_mean = _mean(self._rewards[-window:])
-
-        # Earlier window: `window` rewards ending `plateau_window` ago.
         older_end = n - self.plateau_window
         older_start = max(0, older_end - window)
         older_mean = _mean(self._rewards[older_start:older_end])
 
-        # Avoid division by zero / undefined improvement from a zero baseline.
         if older_mean == 0.0:
             improvement = abs(recent_mean - older_mean)
         else:
@@ -98,24 +116,52 @@ class CurriculumManager:
 
         return improvement < self.improvement_threshold
 
-    def promote(self) -> bool:
+    def should_demote(self) -> bool:
         """
-        Advance to the next tier if not already at the maximum.
+        Return True if agent should drop back to previous tier.
 
-        Resets the reward history so plateau detection starts fresh.
-        Prints a promotion message and returns True on success,
-        returns False if already at the maximum tier.
+        Condition: after 500 games at current tier, win rate is less
+        than half the tier's minimum threshold. Not at tier 0.
         """
+        if self._tier_index <= 0:
+            return False
+        if self._games < 500:
+            return False
+        min_wr = self.current.get("min_win_rate", 0.15)
+        return self.win_rate < min_wr * 0.5
+
+    def promote(self) -> bool:
+        """Advance to the next tier. Resets history. Returns True on success."""
         if self._tier_index >= self.max_tier:
             return False
 
         old_label = self.current["label"]
         self._tier_index += 1
         self._rewards = []
+        self._wins = 0
+        self._games = 0
         new_label = self.current["label"]
 
         print(
             f"[Curriculum] Promoted: {old_label!r} -> {new_label!r} "
+            f"(tier {self._tier_index}/{self.max_tier})"
+        )
+        return True
+
+    def demote(self) -> bool:
+        """Drop back to previous tier. Returns True on success."""
+        if self._tier_index <= 0:
+            return False
+
+        old_label = self.current["label"]
+        self._tier_index -= 1
+        self._rewards = []
+        self._wins = 0
+        self._games = 0
+        new_label = self.current["label"]
+
+        print(
+            f"[Curriculum] Demoted: {old_label!r} -> {new_label!r} "
             f"(tier {self._tier_index}/{self.max_tier})"
         )
         return True

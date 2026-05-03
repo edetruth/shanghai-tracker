@@ -57,10 +57,11 @@ GAME_CONTEXT_FEATURES = 21
 # Offered card features (unchanged)
 OFFERED_CARD_FEATURES = 6
 
-# Action encoding (unchanged)
-MAX_ACTIONS = 350
-BUY_ACTION_IDX = 339
-DECLINE_BUY_ACTION_IDX = 340
+# Action encoding — PPO v2 (simplified: draw/discard/buy only)
+MAX_ACTIONS = 26
+MAX_DISCARD_SLOTS = 22      # max hand size (rounds 5-7 deal 12, buys can grow to ~22)
+BUY_ACTION_IDX = 24
+DECLINE_BUY_ACTION_IDX = 25
 
 # ── V3: LSTM Sequence Model ──────────────────────────────────────────
 

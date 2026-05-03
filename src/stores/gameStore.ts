@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import type { GameState, Card } from '../game/types'
 import type { BuyingPhase } from '../components/play/BuyingCinematic'
 
@@ -103,7 +104,9 @@ const initialGameState: GameState = {
   },
 }
 
-export const useGameStore = create<GameStore>((set) => ({
+export const useGameStore = create<GameStore>()(
+  persist(
+    (set) => ({
   // ── Initial state ────────────────────────────────────────────────────────
   gameState: initialGameState,
   uiPhase: 'round-start',
@@ -216,4 +219,16 @@ export const useGameStore = create<GameStore>((set) => ({
       goingOutSequence: 'idle',
       goOutPlayerName: '',
     }),
-}))
+  }), // end create fn
+  {
+    name: 'shanghai_game_state_v1',
+    storage: createJSONStorage(() => localStorage),
+    // Only persist game state and display prefs — skip transient buying/animation state
+    partialize: (state) => ({
+      gameState: state.gameState,
+      uiPhase: state.uiPhase,
+      gameSpeed: state.gameSpeed,
+    }),
+    version: 1,
+  }
+))

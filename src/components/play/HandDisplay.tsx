@@ -12,7 +12,7 @@ interface Props {
   onSortChange: (mode: SortMode) => void
   label?: string
   disabled?: boolean
-  newCardId?: string
+  newCardIds?: Set<string>
   shimmerCardId?: string | null
   dealAnimation?: boolean
   leavingCardId?: string | null
@@ -46,7 +46,7 @@ export default function HandDisplay({
   onSortChange,
   label,
   disabled,
-  newCardId,
+  newCardIds,
   shimmerCardId,
   dealAnimation,
   leavingCardId,
@@ -240,7 +240,7 @@ export default function HandDisplay({
                     const isDrawSlide = drawSlideCardId && card.id === drawSlideCardId
                     return {
                       left: `${positions[index]}px`,
-                      zIndex: isSelected ? sorted.length + 10 : card.id === newCardId ? sorted.length + 5 : index + 1,
+                      zIndex: isSelected ? sorted.length + 10 : newCardIds?.has(card.id) ? sorted.length + 5 : index + 1,
                       transition: isLeaving || isDealArc || isDrawSlide ? 'none' : 'left 300ms ease-out, transform 300ms ease-out, opacity 200ms ease',
                       opacity: isGhosted ? 0.25 : 1,
                       animation: isDealArc
@@ -289,7 +289,7 @@ export default function HandDisplay({
                       card={card}
                       selected={isLeaving ? false : isSelected}
                       selectionIndex={selIdx !== undefined && selIdx >= 0 ? selIdx : undefined}
-                      isNew={card.id === newCardId}
+                      isNew={newCardIds?.has(card.id) ?? false}
                       shimmer={shimmerCardId ? card.id === shimmerCardId : false}
                       onClick={disabled || isLeaving ? undefined : () => onToggle(card.id)}
                       disabled={disabled || isLeaving}

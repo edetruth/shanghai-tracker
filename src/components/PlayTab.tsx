@@ -15,8 +15,9 @@ import ErrorBoundary from './ErrorBoundary'
 import type { PlayerConfig, Player, AIPersonality, TournamentState, TournamentGameResult, TournamentPlayerStats } from '../game/types'
 import type { GameRoomConfig, GameRoomPlayer } from '../game/multiplayer-types'
 import { loadGameStateSnapshot, getGameRoomPlayers } from '../lib/gameStore'
+import { loadGameContext, clearGameContext, type SavedGameContext } from '../lib/gamePersist'
 
-type PlayView = 'landing' | 'setup' | 'game' | 'lobby-host' | 'lobby-join' | 'remote-game' | 'spectator' | 'replay' | 'tournament-gameover' | 'tournament-trophy' | 'tournament-lobby-create' | 'tournament-lobby-join' | 'tutorial'
+type PlayView = 'landing' | 'setup' | 'game' | 'resume' | 'lobby-host' | 'lobby-join' | 'remote-game' | 'spectator' | 'replay' | 'tournament-gameover' | 'tournament-trophy' | 'tournament-lobby-create' | 'tournament-lobby-join' | 'tutorial'
 
 const ROUNDS = [
   { num: 1, req: '2 Sets of 3+',    cards: 10 },
@@ -132,6 +133,9 @@ export default function PlayTab({ onBack }: Props) {
   const [lastGamePlayers, setLastGamePlayers] = useState<Player[]>([])
   const [gameKey, setGameKey] = useState(0) // force remount GameBoard for new tournament games
   const [startingGame, setStartingGame] = useState(false)
+  const [savedContext, setSavedContext] = useState<SavedGameContext | null>(null)
+  const [resumedCtx, setResumedCtx] = useState<SavedGameContext | null>(null)
+  const [isResumedGame, setIsResumedGame] = useState(false)
 
   // Online multiplayer state
   const [roomCode, setRoomCode] = useState<string | null>(null)
@@ -160,7 +164,15 @@ export default function PlayTab({ onBack }: Props) {
   // ── Session recovery: resume online game after host refresh ─────────────
   useEffect(() => {
     const saved = sessionStorage.getItem('shanghai_active_game')
-    if (!saved) return
+    if (!saved) {
+      // No online session — check for local game save
+      const ctx = loadGameContext()
+      if (ctx) {
+        setSavedContext(ctx)
+        setView('resume')
+      }
+      return
+    }
     try {
       const session = JSON.parse(saved) as {
         roomCode: string
@@ -184,8 +196,10 @@ export default function PlayTab({ onBack }: Props) {
             setGameKey(k => k + 1)
             setView('game')
           } else {
-            // Snapshot gone or room empty — clear session
+            // Snapshot gone or room empty — clear session, then check local save
             sessionStorage.removeItem('shanghai_active_game')
+            const ctx = loadGameContext()
+            if (ctx) { setSavedContext(ctx); setView('resume') }
           }
         } else {
           // Remote player refresh — rejoin
@@ -198,6 +212,27 @@ export default function PlayTab({ onBack }: Props) {
       sessionStorage.removeItem('shanghai_active_game')
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleResume() {
+    if (!savedContext) return
+    const ctx = savedContext
+    setPlayerConfigs(ctx.playerConfigs)
+    setAiPersonality(ctx.aiPersonality)
+    setBuyLimit(ctx.buyLimit)
+    setResumedCtx(ctx)
+    setSavedContext(null) // clear so it can't cause a stale-read logic bomb
+    setIsResumedGame(true)
+    setGameKey(k => k + 1)
+    setView('game')
+  }
+
+  function handleDismissResume() {
+    clearGameContext()
+    setSavedContext(null)
+    setResumedCtx(null)
+    setIsResumedGame(false)
+    setView('landing')
+  }
 
   function handleStart(players: PlayerConfig[], personality: AIPersonality, limit: number, tournamentMode: boolean) {
     setPlayerConfigs(players)
@@ -474,6 +509,109 @@ export default function PlayTab({ onBack }: Props) {
     )
   }
 
+  if (view === 'resume' && savedContext) {
+    const humanPlayers = savedContext.playerConfigs.filter(p => !p.isAI)
+    const aiCount = savedContext.playerConfigs.filter(p => p.isAI).length
+    const roundLabel = `Round ${savedContext.currentRound} of 7`
+    const savedDate = new Date(savedContext.savedAt)
+    const dateLabel = savedDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+    const timeLabel = savedDate.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    return (
+      <div style={{
+        minHeight: '100dvh',
+        background: '#1a3a2a',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+        gap: 0,
+      }}>
+        <div style={{
+          background: '#0f2218',
+          borderRadius: 16,
+          padding: 24,
+          width: '100%',
+          maxWidth: 360,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 16,
+        }}>
+          {/* Header */}
+          <div style={{ textAlign: 'center' }}>
+            <p style={{ color: '#e2b858', fontSize: 22, fontWeight: 700, margin: 0, letterSpacing: 1 }}>
+              Game In Progress
+            </p>
+            <p style={{ color: '#6aad7a', fontSize: 11, margin: '4px 0 0' }}>
+              Saved {dateLabel} at {timeLabel}
+            </p>
+          </div>
+
+          {/* Game info */}
+          <div style={{
+            background: '#1a3a2a',
+            borderRadius: 10,
+            padding: '12px 16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: '#a8d0a8', fontSize: 12 }}>Round</span>
+              <span style={{ color: '#e2b858', fontSize: 14, fontWeight: 700 }}>{roundLabel}</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: '#a8d0a8', fontSize: 12 }}>Players</span>
+              <span style={{ color: '#fff', fontSize: 12 }}>{humanPlayers.map(p => p.name).join(', ')}</span>
+            </div>
+            {aiCount > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#a8d0a8', fontSize: 12 }}>AI opponents</span>
+                <span style={{ color: '#fff', fontSize: 12 }}>{aiCount}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Actions */}
+          <button
+            onClick={handleResume}
+            style={{
+              width: '100%',
+              background: '#e2b858',
+              color: '#2c1810',
+              border: 'none',
+              borderRadius: 12,
+              padding: 16,
+              fontSize: 16,
+              fontWeight: 700,
+              cursor: 'pointer',
+              minHeight: 52,
+            }}
+          >
+            Resume Game
+          </button>
+          <button
+            onClick={handleDismissResume}
+            style={{
+              width: '100%',
+              background: 'transparent',
+              color: '#a8d0a8',
+              border: '1px solid #2d5a3a',
+              borderRadius: 12,
+              padding: 14,
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer',
+              minHeight: 44,
+            }}
+          >
+            Start New Game
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   if (view === 'setup') {
     return (
       <>
@@ -586,6 +724,9 @@ export default function PlayTab({ onBack }: Props) {
           onExit={() => {
             setTournamentState(null)
             setRoomCode(null)
+            setSavedContext(null)
+            setResumedCtx(null)
+            setIsResumedGame(false)
             sessionStorage.removeItem('shanghai_active_game')
             setView('landing')
           }}
@@ -593,6 +734,9 @@ export default function PlayTab({ onBack }: Props) {
           onReplay={handleStartReplay}
           tournamentGameNumber={tournamentState?.currentGameNumber}
           tournamentMatchId={tournamentMatchId ?? undefined}
+          resuming={isResumedGame}
+          resumedGameId={isResumedGame ? (resumedCtx?.gameId ?? null) : undefined}
+          resumedPlayerMap={isResumedGame ? (resumedCtx?.playerMap ?? {}) : undefined}
         />
       </ErrorBoundary>
     )

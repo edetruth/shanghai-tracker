@@ -36,7 +36,7 @@ class ShanghaiEnv:
             f'npx tsx "{bridge_script}"',
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
             text=True,
             cwd=str(BRIDGE_DIR.parent.parent),  # project root
             bufsize=1,
