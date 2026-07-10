@@ -1,0 +1,713 @@
+{
+  "model": "lstm_v3",
+  "opponent": "the-shark",
+  "games": 100,
+  "players": 4,
+  "temperature": 0.1,
+  "win_rate": 0.0,
+  "avg_my_score": 529.8,
+  "avg_opp_score": 195.2,
+  "elapsed_s": 557.3,
+  "per_game": [
+    {
+      "seed": 10000,
+      "my_score": 650,
+      "best_opp_score": 165,
+      "won": false,
+      "steps": 1207
+    },
+    {
+      "seed": 10001,
+      "my_score": 310,
+      "best_opp_score": 110,
+      "won": false,
+      "steps": 6000
+    },
+    {
+      "seed": 10002,
+      "my_score": 670,
+      "best_opp_score": 170,
+      "won": false,
+      "steps": 924
+    },
+    {
+      "seed": 10003,
+      "my_score": 485,
+      "best_opp_score": 295,
+      "won": false,
+      "steps": 1001
+    },
+    {
+      "seed": 10004,
+      "my_score": 595,
+      "best_opp_score": 105,
+      "won": false,
+      "steps": 1187
+    },
+    {
+      "seed": 10005,
+      "my_score": 590,
+      "best_opp_score": 170,
+      "won": false,
+      "steps": 946
+    },
+    {
+      "seed": 10006,
+      "my_score": 565,
+      "best_opp_score": 320,
+      "won": false,
+      "steps": 847
+    },
+    {
+      "seed": 10007,
+      "my_score": 720,
+      "best_opp_score": 255,
+      "won": false,
+      "steps": 1159
+    },
+    {
+      "seed": 10008,
+      "my_score": 180,
+      "best_opp_score": 5,
+      "won": false,
+      "steps": 6000
+    },
+    {
+      "seed": 10009,
+      "my_score": 475,
+      "best_opp_score": 145,
+      "won": false,
+      "steps": 808
+    },
+    {
+      "seed": 10010,
+      "my_score": 405,
+      "best_opp_score": 105,
+      "won": false,
+      "steps": 1170
+    },
+    {
+      "seed": 10011,
+      "my_score": 650,
+      "best_opp_score": 300,
+      "won": false,
+      "steps": 693
+    },
+    {
+      "seed": 10012,
+      "my_score": 430,
+      "best_opp_score": 100,
+      "won": false,
+      "steps": 6000
+    },
+    {
+      "seed": 10013,
+      "my_score": 615,
+      "best_opp_score": 270,
+      "won": false,
+      "steps": 1132
+    },
+    {
+      "seed": 10014,
+      "my_score": 695,
+      "best_opp_score": 110,
+      "won": false,
+      "steps": 1051
+    },
+    {
+      "seed": 10015,
+      "my_score": 400,
+      "best_opp_score": 230,
+      "won": false,
+      "steps": 699
+    },
+    {
+      "seed": 10016,
+      "my_score": 525,
+      "best_opp_score": 60,
+      "won": false,
+      "steps": 916
+    },
+    {
+      "seed": 10017,
+      "my_score": 435,
+      "best_opp_score": 365,
+      "won": false,
+      "steps": 927
+    },
+    {
+      "seed": 10018,
+      "my_score": 515,
+      "best_opp_score": 190,
+      "won": false,
+      "steps": 6000
+    },
+    {
+      "seed": 10019,
+      "my_score": 485,
+      "best_opp_score": 235,
+      "won": false,
+      "steps": 886
+    },
+    {
+      "seed": 10020,
+      "my_score": 145,
+      "best_opp_score": 75,
+      "won": false,
+      "steps": 6000
+    },
+    {
+      "seed": 10021,
+      "my_score": 115,
+      "best_opp_score": 65,
+      "won": false,
+      "steps": 6000
+    },
+    {
+      "seed": 10022,
+      "my_score": 585,
+      "best_opp_score": 140,
+      "won": false,
+      "steps": 972
+    },
+    {
+      "seed": 10023,
+      "my_score": 365,
+      "best_opp_score": 200,
+      "won": false,
+      "steps": 6000
+    },
+    {
+      "seed": 10024,
+      "my_score": 585,
+      "best_opp_score": 165,
+      "won": false,
+      "steps": 887
+    },
+    {
+      "seed": 10025,
+      "my_score": 670,
+      "best_opp_score": 190,
+      "won": false,
+      "steps": 1149
+    },
+    {
+      "seed": 10026,
+      "my_score": 540,
+      "best_opp_score": 150,
+      "won": false,
+      "steps": 1153
+    },
+    {
+      "seed": 10027,
+      "my_score": 555,
+      "best_opp_score": 205,
+      "won": false,
+      "steps": 1211
+    },
+    {
+      "seed": 10028,
+      "my_score": 505,
+      "best_opp_score": 175,
+      "won": false,
+      "steps": 815
+    },
+    {
+      "seed": 10029,
+      "my_score": 520,
+      "best_opp_score": 150,
+      "won": false,
+      "steps": 899
+    },
+    {
+      "seed": 10030,
+      "my_score": 580,
+      "best_opp_score": 195,
+      "won": false,
+      "steps": 1003
+    },
+    {
+      "seed": 10031,
+      "my_score": 745,
+      "best_opp_score": 340,
+      "won": false,
+      "steps": 755
+    },
+    {
+      "seed": 10032,
+      "my_score": 555,
+      "best_opp_score": 235,
+      "won": false,
+      "steps": 1101
+    },
+    {
+      "seed": 10033,
+      "my_score": 680,
+      "best_opp_score": 240,
+      "won": false,
+      "steps": 992
+    },
+    {
+      "seed": 10034,
+      "my_score": 680,
+      "best_opp_score": 275,
+      "won": false,
+      "steps": 965
+    },
+    {
+      "seed": 10035,
+      "my_score": 565,
+      "best_opp_score": 330,
+      "won": false,
+      "steps": 699
+    },
+    {
+      "seed": 10036,
+      "my_score": 510,
+      "best_opp_score": 155,
+      "won": false,
+      "steps": 895
+    },
+    {
+      "seed": 10037,
+      "my_score": 640,
+      "best_opp_score": 120,
+      "won": false,
+      "steps": 1016
+    },
+    {
+      "seed": 10038,
+      "my_score": 315,
+      "best_opp_score": 250,
+      "won": false,
+      "steps": 727
+    },
+    {
+      "seed": 10039,
+      "my_score": 595,
+      "best_opp_score": 270,
+      "won": false,
+      "steps": 1033
+    },
+    {
+      "seed": 10040,
+      "my_score": 425,
+      "best_opp_score": 155,
+      "won": false,
+      "steps": 673
+    },
+    {
+      "seed": 10041,
+      "my_score": 390,
+      "best_opp_score": 230,
+      "won": false,
+      "steps": 984
+    },
+    {
+      "seed": 10042,
+      "my_score": 725,
+      "best_opp_score": 205,
+      "won": false,
+      "steps": 965
+    },
+    {
+      "seed": 10043,
+      "my_score": 630,
+      "best_opp_score": 190,
+      "won": false,
+      "steps": 1208
+    },
+    {
+      "seed": 10044,
+      "my_score": 545,
+      "best_opp_score": 190,
+      "won": false,
+      "steps": 1012
+    },
+    {
+      "seed": 10045,
+      "my_score": 185,
+      "best_opp_score": 105,
+      "won": false,
+      "steps": 6000
+    },
+    {
+      "seed": 10046,
+      "my_score": 570,
+      "best_opp_score": 140,
+      "won": false,
+      "steps": 952
+    },
+    {
+      "seed": 10047,
+      "my_score": 465,
+      "best_opp_score": 325,
+      "won": false,
+      "steps": 998
+    },
+    {
+      "seed": 10048,
+      "my_score": 675,
+      "best_opp_score": 250,
+      "won": false,
+      "steps": 1027
+    },
+    {
+      "seed": 10049,
+      "my_score": 500,
+      "best_opp_score": 175,
+      "won": false,
+      "steps": 1115
+    },
+    {
+      "seed": 10050,
+      "my_score": 645,
+      "best_opp_score": 270,
+      "won": false,
+      "steps": 875
+    },
+    {
+      "seed": 10051,
+      "my_score": 615,
+      "best_opp_score": 210,
+      "won": false,
+      "steps": 1000
+    },
+    {
+      "seed": 10052,
+      "my_score": 480,
+      "best_opp_score": 200,
+      "won": false,
+      "steps": 954
+    },
+    {
+      "seed": 10053,
+      "my_score": 155,
+      "best_opp_score": 30,
+      "won": false,
+      "steps": 6000
+    },
+    {
+      "seed": 10054,
+      "my_score": 555,
+      "best_opp_score": 345,
+      "won": false,
+      "steps": 977
+    },
+    {
+      "seed": 10055,
+      "my_score": 760,
+      "best_opp_score": 155,
+      "won": false,
+      "steps": 1102
+    },
+    {
+      "seed": 10056,
+      "my_score": 565,
+      "best_opp_score": 205,
+      "won": false,
+      "steps": 1008
+    },
+    {
+      "seed": 10057,
+      "my_score": 660,
+      "best_opp_score": 350,
+      "won": false,
+      "steps": 922
+    },
+    {
+      "seed": 10058,
+      "my_score": 600,
+      "best_opp_score": 190,
+      "won": false,
+      "steps": 1161
+    },
+    {
+      "seed": 10059,
+      "my_score": 620,
+      "best_opp_score": 235,
+      "won": false,
+      "steps": 1093
+    },
+    {
+      "seed": 10060,
+      "my_score": 480,
+      "best_opp_score": 240,
+      "won": false,
+      "steps": 6000
+    },
+    {
+      "seed": 10061,
+      "my_score": 610,
+      "best_opp_score": 155,
+      "won": false,
+      "steps": 579
+    },
+    {
+      "seed": 10062,
+      "my_score": 670,
+      "best_opp_score": 190,
+      "won": false,
+      "steps": 1063
+    },
+    {
+      "seed": 10063,
+      "my_score": 530,
+      "best_opp_score": 170,
+      "won": false,
+      "steps": 943
+    },
+    {
+      "seed": 10064,
+      "my_score": 100,
+      "best_opp_score": 30,
+      "won": false,
+      "steps": 6000
+    },
+    {
+      "seed": 10065,
+      "my_score": 590,
+      "best_opp_score": 255,
+      "won": false,
+      "steps": 920
+    },
+    {
+      "seed": 10066,
+      "my_score": 660,
+      "best_opp_score": 175,
+      "won": false,
+      "steps": 6000
+    },
+    {
+      "seed": 10067,
+      "my_score": 550,
+      "best_opp_score": 190,
+      "won": false,
+      "steps": 970
+    },
+    {
+      "seed": 10068,
+      "my_score": 415,
+      "best_opp_score": 140,
+      "won": false,
+      "steps": 6000
+    },
+    {
+      "seed": 10069,
+      "my_score": 410,
+      "best_opp_score": 155,
+      "won": false,
+      "steps": 6000
+    },
+    {
+      "seed": 10070,
+      "my_score": 640,
+      "best_opp_score": 265,
+      "won": false,
+      "steps": 828
+    },
+    {
+      "seed": 10071,
+      "my_score": 665,
+      "best_opp_score": 270,
+      "won": false,
+      "steps": 1075
+    },
+    {
+      "seed": 10072,
+      "my_score": 620,
+      "best_opp_score": 170,
+      "won": false,
+      "steps": 995
+    },
+    {
+      "seed": 10073,
+      "my_score": 695,
+      "best_opp_score": 70,
+      "won": false,
+      "steps": 809
+    },
+    {
+      "seed": 10074,
+      "my_score": 565,
+      "best_opp_score": 225,
+      "won": false,
+      "steps": 1166
+    },
+    {
+      "seed": 10075,
+      "my_score": 85,
+      "best_opp_score": 35,
+      "won": false,
+      "steps": 6000
+    },
+    {
+      "seed": 10076,
+      "my_score": 595,
+      "best_opp_score": 140,
+      "won": false,
+      "steps": 751
+    },
+    {
+      "seed": 10077,
+      "my_score": 445,
+      "best_opp_score": 165,
+      "won": false,
+      "steps": 657
+    },
+    {
+      "seed": 10078,
+      "my_score": 555,
+      "best_opp_score": 195,
+      "won": false,
+      "steps": 1050
+    },
+    {
+      "seed": 10079,
+      "my_score": 700,
+      "best_opp_score": 155,
+      "won": false,
+      "steps": 1192
+    },
+    {
+      "seed": 10080,
+      "my_score": 405,
+      "best_opp_score": 360,
+      "won": false,
+      "steps": 787
+    },
+    {
+      "seed": 10081,
+      "my_score": 605,
+      "best_opp_score": 225,
+      "won": false,
+      "steps": 1149
+    },
+    {
+      "seed": 10082,
+      "my_score": 565,
+      "best_opp_score": 300,
+      "won": false,
+      "steps": 1026
+    },
+    {
+      "seed": 10083,
+      "my_score": 640,
+      "best_opp_score": 160,
+      "won": false,
+      "steps": 1000
+    },
+    {
+      "seed": 10084,
+      "my_score": 505,
+      "best_opp_score": 70,
+      "won": false,
+      "steps": 6000
+    },
+    {
+      "seed": 10085,
+      "my_score": 585,
+      "best_opp_score": 270,
+      "won": false,
+      "steps": 1057
+    },
+    {
+      "seed": 10086,
+      "my_score": 430,
+      "best_opp_score": 285,
+      "won": false,
+      "steps": 6000
+    },
+    {
+      "seed": 10087,
+      "my_score": 530,
+      "best_opp_score": 135,
+      "won": false,
+      "steps": 1067
+    },
+    {
+      "seed": 10088,
+      "my_score": 560,
+      "best_opp_score": 160,
+      "won": false,
+      "steps": 1134
+    },
+    {
+      "seed": 10089,
+      "my_score": 410,
+      "best_opp_score": 185,
+      "won": false,
+      "steps": 1262
+    },
+    {
+      "seed": 10090,
+      "my_score": 610,
+      "best_opp_score": 250,
+      "won": false,
+      "steps": 1074
+    },
+    {
+      "seed": 10091,
+      "my_score": 595,
+      "best_opp_score": 155,
+      "won": false,
+      "steps": 1119
+    },
+    {
+      "seed": 10092,
+      "my_score": 550,
+      "best_opp_score": 90,
+      "won": false,
+      "steps": 901
+    },
+    {
+      "seed": 10093,
+      "my_score": 605,
+      "best_opp_score": 340,
+      "won": false,
+      "steps": 822
+    },
+    {
+      "seed": 10094,
+      "my_score": 585,
+      "best_opp_score": 85,
+      "won": false,
+      "steps": 1206
+    },
+    {
+      "seed": 10095,
+      "my_score": 335,
+      "best_opp_score": 210,
+      "won": false,
+      "steps": 881
+    },
+    {
+      "seed": 10096,
+      "my_score": 555,
+      "best_opp_score": 185,
+      "won": false,
+      "steps": 869
+    },
+    {
+      "seed": 10097,
+      "my_score": 590,
+      "best_opp_score": 360,
+      "won": false,
+      "steps": 705
+    },
+    {
+      "seed": 10098,
+      "my_score": 515,
+      "best_opp_score": 200,
+      "won": false,
+      "steps": 1145
+    },
+    {
+      "seed": 10099,
+      "my_score": 610,
+      "best_opp_score": 320,
+      "won": false,
+      "steps": 998
+    }
+  ]
+}

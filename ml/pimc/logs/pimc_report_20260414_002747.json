@@ -1,0 +1,49 @@
+{
+  "timestamp": "2026-04-14 00:27:47",
+  "args": {
+    "games": 50,
+    "players": 4,
+    "seed": 42,
+    "sweep": true
+  },
+  "baseline": {
+    "p0_avg": 349.7,
+    "opp_avg": 327.2,
+    "win_rate": 0.24
+  },
+  "sweep": [
+    {
+      "rollouts": 5,
+      "p0_avg": 288.5,
+      "p0_std": 95.2,
+      "opp_avg": 327.0,
+      "delta": 38.5,
+      "win_rate": 0.26
+    },
+    {
+      "rollouts": 10,
+      "p0_avg": 261.5,
+      "p0_std": 91.0,
+      "opp_avg": 323.7,
+      "delta": 62.2,
+      "win_rate": 0.36
+    },
+    {
+      "rollouts": 20,
+      "p0_avg": 244.4,
+      "p0_std": 96.6,
+      "opp_avg": 319.1,
+      "delta": 74.7,
+      "win_rate": 0.4
+    },
+    {
+      "rollouts": 40,
+      "p0_avg": 220.4,
+      "p0_std": 89.5,
+      "opp_avg": 307.4,
+      "delta": 87.0,
+      "win_rate": 0.48
+    }
+  ],
+  "total_elapsed_sec": 7673.0
+}

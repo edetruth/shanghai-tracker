@@ -1,0 +1,10 @@
+PIMC vs the-mastermind — 2026-04-14 15:10:06
+Games: 100  Rollouts: 10  Players: 4  Time: 7.03h
+
+  PIMC  (P0) :  237.7  +/- 83.5
+  the-mastermind (P1+):  283.3  +/- 94.8
+  Score delta : +45.6  (positive = PIMC better)
+  Win rate    : 36.0%
+
+  vs Human (227)     : +10.7
+  vs Mastermind (219): +18.8

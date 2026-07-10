@@ -1,0 +1,35 @@
+{
+  "action": "self_play",
+
+  "bridge_eval": {
+    "model": "vacation_best.pt",
+    "games": 30,
+    "opponent": "the-mastermind"
+  },
+
+  "self_play": {
+    "warm_start": "models/network_v7.pt",
+    "save_dir": "alphazero/checkpoints_run",
+    "batch_iterations": 200,
+    "total_iterations": 8000,
+    "iterations_done": 150,
+    "games_per_iter": 32,
+    "lr": 1e-4,
+    "bridge_workers": 4,
+    "bridge_opponent": "the-mastermind",
+    "resume": true,
+    "health": {
+      "entropy_min": 0.4,
+      "avg100_max_increase": 25,
+      "baseline_avg100": null
+    }
+  },
+
+  "quick_eval": {
+    "model": "vacation_best.pt",
+    "games": 50,
+    "discard_only": true
+  },
+
+  "_note": "Resumed from iter 150 (ckpt_00150.pt). Set action to idle to pause, bridge_eval to evaluate, or create pipeline_stop.flag to exit cleanly."
+}

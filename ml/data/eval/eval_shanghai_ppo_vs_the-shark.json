@@ -1,0 +1,94 @@
+{
+  "model": "../models/shanghai_ppo.pt",
+  "opponent": "the-shark",
+  "games": 10,
+  "players": 4,
+  "win_rate": 0.0,
+  "wins": 0,
+  "avg_my_score": 798.5,
+  "avg_opp_score": 146.5,
+  "avg_steps": 2820.2,
+  "total_time_s": 73.25,
+  "per_game": [
+    {
+      "my_score": 1065,
+      "best_opp_score": 230,
+      "won": false,
+      "steps": 825,
+      "seed": 10000,
+      "game_index": 0
+    },
+    {
+      "my_score": 1080,
+      "best_opp_score": 165,
+      "won": false,
+      "steps": 649,
+      "seed": 10001,
+      "game_index": 1
+    },
+    {
+      "my_score": 135,
+      "best_opp_score": 0,
+      "won": false,
+      "steps": 6000,
+      "seed": 10002,
+      "game_index": 2
+    },
+    {
+      "my_score": 1000,
+      "best_opp_score": 180,
+      "won": false,
+      "steps": 673,
+      "seed": 10003,
+      "game_index": 3
+    },
+    {
+      "my_score": 515,
+      "best_opp_score": 80,
+      "won": false,
+      "steps": 6000,
+      "seed": 10004,
+      "game_index": 4
+    },
+    {
+      "my_score": 960,
+      "best_opp_score": 110,
+      "won": false,
+      "steps": 534,
+      "seed": 10005,
+      "game_index": 5
+    },
+    {
+      "my_score": 535,
+      "best_opp_score": 110,
+      "won": false,
+      "steps": 6000,
+      "seed": 10006,
+      "game_index": 6
+    },
+    {
+      "my_score": 1025,
+      "best_opp_score": 240,
+      "won": false,
+      "steps": 804,
+      "seed": 10007,
+      "game_index": 7
+    },
+    {
+      "my_score": 590,
+      "best_opp_score": 80,
+      "won": false,
+      "steps": 6000,
+      "seed": 10008,
+      "game_index": 8
+    },
+    {
+      "my_score": 1080,
+      "best_opp_score": 270,
+      "won": false,
+      "steps": 717,
+      "seed": 10009,
+      "game_index": 9
+    }
+  ]
+}

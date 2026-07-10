@@ -1,0 +1,18 @@
+{
+  "n_games": 30,
+  "n_players": 4,
+  "opponent": "the-mastermind",
+  "p0_avg": 169.83333333333334,
+  "p0_std": 46.82107050974124,
+  "opp_avg": 293.88888888888886,
+  "opp_std": 78.30744660710857,
+  "win_rate": 0.7333333333333333,
+  "decisions": 68171,
+  "fallbacks": 0,
+  "discard_only": false,
+  "ld_decisions": 186,
+  "ld_skipped": 89,
+  "model": "network_v7.pt",
+  "elapsed_sec": 201.3,
+  "timestamp": "2026-04-29 00:46:01"
+}

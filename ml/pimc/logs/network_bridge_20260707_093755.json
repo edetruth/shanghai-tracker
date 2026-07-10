@@ -1,0 +1,17 @@
+{
+  "n_games": 500,
+  "n_players": 4,
+  "opponent": "the-shark",
+  "p0_avg": 230.84,
+  "p0_std": 92.31543033185032,
+  "opp_avg": 221.35999999999999,
+  "opp_std": 62.63862702191341,
+  "win_rate": 0.216,
+  "decisions": 103923,
+  "fallbacks": 0,
+  "discard_only": false,
+  "heuristic": false,
+  "model": "network_v7.pt",
+  "elapsed_sec": 1485.6,
+  "timestamp": "2026-07-07 09:37:55"
+}

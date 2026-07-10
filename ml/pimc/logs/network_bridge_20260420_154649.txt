@@ -1,0 +1,11 @@
+PIMCNet (discard+draw) vs the-nemesis — 2026-04-20 15:46:49
+Model: network_v5.pt  Games: 200  Players: 4  Time: 0.26h
+
+  PIMCNet (P0)          :  168.6  +/- 60.7
+  the-nemesis (P1+):  306.9  +/- 80.3
+  Score delta (net better): +138.3
+  Win rate              : 72.5%  (random=25%)
+
+  vs Human (227)        : +58.4
+  vs Mastermind (219)   : +50.4
+  vs PIMC-40R (220)     : +51.8

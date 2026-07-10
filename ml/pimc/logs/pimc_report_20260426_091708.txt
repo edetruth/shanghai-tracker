@@ -1,0 +1,9 @@
+PIMC Sweep Report — 2026-04-26 09:17:08
+Games: 200  Players: 4  Seed: 42
+Total time: 0.7h
+
+Benchmarks: Human=227  Mastermind=219  Greedy-P0=338.1
+
+  Rollouts   P0 avg  Opp avg   Delta   Win%  vs Human   vs MM
+--------------------------------------------------------------
+        20    258.9    328.4   +69.5  38.5%     +31.9   +40.1

@@ -1,0 +1,25 @@
+{
+  "timestamp": "2026-04-14 16:16:53",
+  "args": {
+    "games": 50,
+    "players": 4,
+    "seed": 42,
+    "sweep": false
+  },
+  "baseline": {
+    "p0_avg": 349.7,
+    "opp_avg": 327.2,
+    "win_rate": 0.24
+  },
+  "sweep": [
+    {
+      "rollouts": 80,
+      "p0_avg": 229.7,
+      "p0_std": 88.3,
+      "opp_avg": 326.2,
+      "delta": 96.5,
+      "win_rate": 0.52
+    }
+  ],
+  "total_elapsed_sec": 2579.7
+}

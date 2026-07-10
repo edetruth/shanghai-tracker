@@ -141,12 +141,16 @@ class ShanghaiEnv:
             if not actions:
                 return [], current_player, latest_state
 
-            # Always auto-execute mechanical actions (meld/layoff) first,
-            # regardless of whose turn it is. This keeps the random/rule-based
+            # Always auto-execute mechanical actions (jokerswap/meld/layoff)
+            # first, regardless of whose turn it is. This keeps the rule-based
             # opponent behavior symmetric with the agent's behavior.
-            mechanical = [a for a in actions if a == "meld" or a.startswith("layoff:")]
+            # Joker swaps run before meld to match the native AI turn order
+            # (a pre-laydown swap can enable completing the requirement).
+            mechanical = [a for a in actions if a in ("meld", "jokerswap") or a.startswith("layoff:")]
             if mechanical:
-                if "meld" in mechanical:
+                if "jokerswap" in mechanical:
+                    latest_state, _, _, _ = self.step("jokerswap")
+                elif "meld" in mechanical:
                     # For player 0: ask meld_hook before auto-executing
                     if meld_hook is not None and current_player == 0:
                         if meld_hook() is False:

@@ -43,6 +43,35 @@ from collect_data import build_laydown_state_vec, LAYDOWN_STATE_DIM
 # LaydownNet imported lazily (only if laydown_net.pt exists)
 
 
+class _NullHook:
+    """Stands in for NetworkHook in --heuristic mode (no network decisions)."""
+    decisions = 0
+    fallbacks = 0
+
+
+class AITimingHook:
+    """
+    Meld timing via the bridge's personality go-down logic (get_meld_decision).
+
+    Unlike LaydownNet's skip-once guard, no cap is needed: the bridge logic has
+    its own panic thresholds (turnsElapsed / turnsCouldGoDown), so P0's lay-down
+    timing exactly matches what the AI opponents do.
+    """
+
+    def __init__(self):
+        self._env      = None   # assigned in run_evaluation
+        self.decisions = 0
+        self.skipped   = 0
+
+    def __call__(self) -> bool:
+        resp = self._env._send({'cmd': 'get_meld_decision'})
+        go   = bool(resp.get('meld', True))
+        self.decisions += 1
+        if not go:
+            self.skipped += 1
+        return go
+
+
 # ── Card encoding: TypeScript <-> Python int ──────────────────────
 # Mirrors pimc_bridge_eval.py exactly.
 
@@ -153,15 +182,19 @@ def run_one_game(
     seed: int,
     discard_only: bool = False,
     laydown_hook=None,
+    heuristic: bool = False,
 ) -> tuple:
     """
     Play one game with PIMCNet as player 0.
+
+    heuristic=True: P0 plays draw+discard via the bridge's get_ai_action
+    (same TS heuristic the opponents use) — baseline control, no network.
 
     Returns:
         (scores list, hook) — hook exposes .decisions and .fallbacks
     """
     env.reset(seed=seed)
-    hook = NetworkHook(model=model, player_idx=0, n_players=n_players)
+    hook = NetworkHook(model=model, player_idx=0, n_players=n_players) if not heuristic else _NullHook()
 
     done   = False
     info   = {}
@@ -194,7 +227,11 @@ def run_one_game(
             discard_top = full.get('discardTop')
             discard_int = _ts_to_int(discard_top) if discard_top else -1
 
-            if not discard_only and discard_int >= 0 and 'take_discard' in actions:
+            if heuristic:
+                action = env._send({'cmd': 'get_ai_action'}).get('action', 'draw_pile')
+                if action not in ('draw_pile', 'take_discard'):
+                    action = 'draw_pile'
+            elif not discard_only and discard_int >= 0 and 'take_discard' in actions:
                 decision = hook.draw(0, hand_ints, discard_int, has_ld, round_idx)
                 action   = 'take_discard' if decision == 'take' else 'draw_pile'
             elif discard_int >= 0 and 'take_discard' in actions:
@@ -211,6 +248,12 @@ def run_one_game(
         # ── Discard decision ──────────────────────────────────────
         discard_actions = [a for a in actions if a.startswith('discard:')]
         if discard_actions:
+            if heuristic:
+                action = env._send({'cmd': 'get_ai_action'}).get('action', discard_actions[-1])
+                if action not in discard_actions:
+                    action = discard_actions[-1]
+                _, _, done, info = env.step(action)
+                continue
             chosen_int = hook.discard(0, hand_ints, has_ld, [], round_idx)
             if chosen_int is not None:
                 idx    = _find_discard_index(hand_cards, chosen_int)
@@ -223,6 +266,13 @@ def run_one_game(
         # ── Fallback ──────────────────────────────────────────────
         _, _, done, info = env.step(actions[0])
 
+    # Authoritative final scores: the game can end during auto-executed
+    # melds/lay-offs inside get_strategic_actions, in which case `info`
+    # is stale (missing the final round). get_full_state always reflects
+    # the current score totals.
+    final_scores = env.get_full_state().get('scores')
+    if final_scores:
+        return final_scores, hook
     return info.get('scores', [0] * n_players), hook
 
 
@@ -236,6 +286,7 @@ def run_evaluation(
     model,
     discard_only: bool = False,
     laydown_hook=None,
+    heuristic: bool = False,
 ) -> dict:
     import random as _random
 
@@ -253,7 +304,7 @@ def run_evaluation(
     for game_i in range(n_games):
         game_seed          = rng.randint(0, 2 ** 31 - 1)
         scores, hook       = run_one_game(env, model, n_players, game_seed, discard_only,
-                                          laydown_hook=laydown_hook)
+                                          laydown_hook=laydown_hook, heuristic=heuristic)
 
         p0_scores.append(scores[0])
         opp_avgs.append(mean(scores[1:]))
@@ -290,6 +341,7 @@ def run_evaluation(
         "decisions":    total_dec,
         "fallbacks":    total_fb,
         "discard_only": discard_only,
+        "heuristic":    heuristic,
     }
     if laydown_hook is not None:
         result["ld_decisions"] = laydown_hook.decisions
@@ -318,7 +370,10 @@ def _save_report(results: dict, model_name: str, elapsed: float) -> None:
 
     p0_avg   = results["p0_avg"]
     opp_avg  = results["opp_avg"]
-    mode_lbl = "discard-only" if results["discard_only"] else "discard+draw"
+    if results.get("heuristic"):
+        mode_lbl = "heuristic-control"
+    else:
+        mode_lbl = "discard-only" if results["discard_only"] else "discard+draw"
     lines = [
         f"PIMCNet ({mode_lbl}) vs {results['opponent']} — {time.strftime('%Y-%m-%d %H:%M:%S')}",
         f"Model: {model_name}  Games: {results['n_games']}  Players: {results['n_players']}  Time: {elapsed/3600:.2f}h",
@@ -376,14 +431,21 @@ def main() -> None:
                         help="Network discard only; greedy draw (no draw_hook)")
     parser.add_argument("--no-laydown",  action="store_true",
                         help="Force greedy lay-down (skip LaydownNet even if present)")
+    parser.add_argument("--heuristic",   action="store_true",
+                        help="P0 uses the TS heuristic (get_ai_action) instead of the network — baseline control")
+    parser.add_argument("--ai-laydown",  action="store_true",
+                        help="P0 lay-down timing via the bridge's personality go-down logic (same as opponents)")
     args = parser.parse_args()
 
     model_path = _HERE / "models" / args.model
-    if not model_path.exists():
+    if not args.heuristic and not model_path.exists():
         print(f"ERROR: model not found: {model_path}", file=sys.stderr)
         sys.exit(1)
 
-    mode_str = "discard-only (greedy draw)" if args.discard_only else "discard + draw"
+    if args.heuristic:
+        mode_str = "heuristic control (get_ai_action)"
+    else:
+        mode_str = "discard-only (greedy draw)" if args.discard_only else "discard + draw"
 
     print(f"Network Bridge Evaluator")
     print(f"  Player 0   : PIMCNet ({model_path.name}, {mode_str})")
@@ -392,16 +454,23 @@ def main() -> None:
     print(f"  Benchmarks : Human={HUMAN_AVG:.0f}  Mastermind={MASTERMIND_AVG:.0f}  PIMC-40R={PIMC_40R_AVG:.0f}")
     print()
 
-    model, is_v2 = load_model(model_path)
-    if is_v2:
-        args.discard_only = True   # v2 has no draw head
-    n_params = sum(p.numel() for p in model.parameters())
-    model_tag = "v2 discard-only" if is_v2 else "v1 dual-head"
-    print(f"  Model loaded: {n_params:,} parameters  ({model_tag})")
+    if args.heuristic:
+        model = None
+        print("  No model — P0 driven by get_ai_action (baseline control)")
+    else:
+        model, is_v2 = load_model(model_path)
+        if is_v2:
+            args.discard_only = True   # v2 has no draw head
+        n_params = sum(p.numel() for p in model.parameters())
+        model_tag = "v2 discard-only" if is_v2 else "v1 dual-head"
+        print(f"  Model loaded: {n_params:,} parameters  ({model_tag})")
 
-    # ── Load lay-down net (optional) ─────────────────────────────────
+    # ── Lay-down timing ───────────────────────────────────────────────
     laydown_hook = None
-    if not args.no_laydown:
+    if args.ai_laydown:
+        laydown_hook = AITimingHook()
+        print("  Lay-down timing: bridge AI personality logic (--ai-laydown)")
+    elif not args.no_laydown and not args.heuristic:
         ld_path = _HERE / "models" / "laydown_net.pt"
         if ld_path.exists():
             from laydown_net import LaydownNet
@@ -428,6 +497,7 @@ def main() -> None:
         model=model,
         discard_only=args.discard_only,
         laydown_hook=laydown_hook,
+        heuristic=args.heuristic,
     )
     elapsed = time.perf_counter() - t0
 
@@ -447,7 +517,7 @@ def main() -> None:
         skip_pct = ld_s / max(ld_d, 1)
         print(f"  LaydownNet decisions    : {ld_d}  skipped={ld_s} ({skip_pct:.0%})")
 
-    _save_report(results, model_path.name, elapsed)
+    _save_report(results, "heuristic-control" if args.heuristic else model_path.name, elapsed)
 
 
 if __name__ == "__main__":

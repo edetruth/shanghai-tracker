@@ -1,0 +1,11 @@
+PIMCNet (heuristic-control) vs the-mastermind — 2026-07-07 20:34:42
+Model: heuristic-control  Games: 30  Players: 4  Time: 0.03h
+
+  PIMCNet (P0)          :  360.3  +/- 148.4
+  the-mastermind (P1+):  219.4  +/- 68.2
+  Score delta (net better): -140.9
+  Win rate              : 10.0%  (random=25%)
+
+  vs Human (227)        : -133.3
+  vs Mastermind (219)   : -141.3
+  vs PIMC-40R (220)     : -139.9

@@ -1,0 +1,11 @@
+PIMCNet (discard+draw) vs the-shark — 2026-07-06 18:39:29
+Model: network_v7.pt  Games: 500  Players: 4  Time: 0.76h
+
+  PIMCNet (P0)          :  173.7  +/- 66.3
+  the-shark (P1+):  297.6  +/- 87.6
+  Score delta (net better): +123.9
+  Win rate              : 69.2%  (random=25%)
+
+  vs Human (227)        : +53.3
+  vs Mastermind (219)   : +45.3
+  vs PIMC-40R (220)     : +46.7

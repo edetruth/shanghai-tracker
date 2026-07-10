@@ -1,0 +1,13 @@
+{
+  "n_games": 200,
+  "n_players": 4,
+  "p0_avg": 194,
+  "p0_std": 84.47889332303915,
+  "opp_avg": 331.34166666666664,
+  "win_rate": 0.635,
+  "decisions": 48161,
+  "fallbacks": 0,
+  "discard_only": false,
+  "elapsed_s": 20.09778589999769,
+  "model": "network_v1.pt"
+}

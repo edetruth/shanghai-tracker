@@ -1,0 +1,17 @@
+{
+  "n_games": 500,
+  "n_players": 4,
+  "opponent": "the-nemesis",
+  "p0_avg": 234.58,
+  "p0_std": 91.8667655096794,
+  "opp_avg": 209.34,
+  "opp_std": 59.08583214281497,
+  "win_rate": 0.148,
+  "decisions": 103399,
+  "fallbacks": 0,
+  "discard_only": false,
+  "heuristic": false,
+  "model": "network_v7.pt",
+  "elapsed_sec": 1410.7,
+  "timestamp": "2026-07-07 11:08:05"
+}

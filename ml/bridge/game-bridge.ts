@@ -18,22 +18,26 @@
  */
 
 import { createDecks, shuffle, dealHands } from '../../src/game/deck'
-import { isValidRun, isValidSet, buildMeld, canLayOff, findSwappableJoker, evaluateLayOffReversal } from '../../src/game/meld-validator'
+import { isValidRun, isValidSet, buildMeld, canLayOff, findSwappableJoker, evaluateLayOffReversal, canGoOutViaChainLayOff } from '../../src/game/meld-validator'
 import { ROUND_REQUIREMENTS, CARDS_DEALT, TOTAL_ROUNDS, cardPoints } from '../../src/game/rules'
 import { scoreRound } from '../../src/game/scoring'
 import {
-  aiFindBestMelds,
+  aiFindBestMeldsForLayOff,
   aiShouldTakeDiscard,
   aiChooseDiscard,
   aiShouldBuy,
   aiFindLayOff,
   aiFindJokerSwap,
-  aiShouldBuy,
+  aiFindPreLayDownJokerSwap,
+  aiChooseJokerLayOffPosition,
+  aiShouldGoDownHard,
   getAIEvalConfig,
   evaluateHand,
 } from '../../src/game/ai'
+import { CardTracker } from '../../src/game/card-tracker'
 import { encodeMeldPlan } from './meld-plan-encoder'
-import type { Card, Meld, RoundRequirement, AIPersonality } from '../../src/game/types'
+import { PERSONALITIES } from '../../src/game/types'
+import type { Card, Meld, Player, RoundRequirement, AIPersonality, PersonalityConfig } from '../../src/game/types'
 import * as readline from 'readline'
 
 // ── V3 Opponent Action Tracking ─────────────────────────────────────────────
@@ -131,6 +135,10 @@ interface BridgeGameState {
     drawPlayerIndex: number // the next-in-turn player who declined free take
   } | null
   opponentHistory: OpponentHistory[]
+  // Go-down timing per player (mirrors simulate.ts GoDownTimingState) — reset each round
+  goDownTiming: { turnsCouldGoDown: number[]; turnsElapsed: number[] }
+  // Shared card tracker, re-synced per decision (mirrors simulate.ts roundTracker)
+  tracker: CardTracker
 }
 
 interface BridgePlayer {
@@ -190,6 +198,153 @@ function initGame(playerCount: number, seed: number, opponentAI: AIPersonality |
     lastDiscarderIndex: -1,
     buyWindowState: null,
     opponentHistory,
+    goDownTiming: {
+      turnsCouldGoDown: new Array(playerCount).fill(0),
+      turnsElapsed: new Array(playerCount).fill(0),
+    },
+    tracker: new CardTracker(),
+  }
+}
+
+// ── AI helper adapters (mirror simulate.ts) ─────────────────────────────────
+
+/** Build Player-shaped objects for ai.ts functions (race mode, ownership, danger). */
+function playersForAI(g: BridgeGameState): Player[] {
+  return g.players.map((p, i) => ({
+    id: `p${i}`,
+    name: `P${i}`,
+    hand: p.hand,
+    melds: p.melds,
+    hasLaidDown: p.hasLaidDown,
+    buysRemaining: p.buysRemaining,
+    roundScores: g.scores[i],
+    isAI: true,
+  }))
+}
+
+function opponentsOf(g: BridgeGameState, playerIdx: number): Player[] {
+  return playersForAI(g).filter((_, i) => i !== playerIdx)
+}
+
+/** Lightweight opponents shape used by aiShouldBuy (matches simProcessBuying). */
+function opponentsLite(g: BridgeGameState, playerIdx: number): { hand: { length: number }, hasLaidDown: boolean }[] {
+  return g.players
+    .filter((_, i) => i !== playerIdx)
+    .map(p => ({ hand: { length: p.hand.length }, hasLaidDown: p.hasLaidDown }))
+}
+
+/** Sync the shared tracker from the deciding player's perspective (mirrors syncSimTracker). */
+function syncTracker(g: BridgeGameState, playerIdx: number): CardTracker {
+  const t = g.tracker
+  t.reset(g.players[playerIdx].hand)
+  t.markSeenMany(g.discardPile)
+  for (const meld of g.tableMelds) {
+    t.markSeenMany(meld.cards)
+  }
+  return t
+}
+
+function getPersonalityConfig(id: AIPersonality): PersonalityConfig {
+  return PERSONALITIES.find(p => p.id === id)!
+}
+
+/**
+ * Apply a lay-off to a meld in place, maintaining run bounds and joker mappings.
+ * Mirrors simulate.ts simLayOff — without this, canLayOff/findSwappableJoker
+ * read stale runMin/runMax after the first lay-off and go wrong.
+ */
+function applyLayOffToMeld(meld: Meld, card: Card, jokerPosition?: 'low' | 'high'): void {
+  if (meld.type === 'run') {
+    if (card.suit === 'joker') {
+      if (jokerPosition === 'low') {
+        const newMin = (meld.runMin ?? 1) - 1
+        meld.runMin = newMin
+        meld.jokerMappings.push({ cardId: card.id, representsRank: newMin, representsSuit: meld.runSuit! })
+        meld.cards.unshift(card)
+      } else {
+        const newMax = (meld.runMax ?? 0) + 1
+        meld.runMax = newMax
+        meld.jokerMappings.push({ cardId: card.id, representsRank: newMax, representsSuit: meld.runSuit! })
+        meld.cards.push(card)
+      }
+    } else {
+      let r = card.rank
+      if (card.rank === 1 && meld.runMax === 13) {
+        meld.runMax = 14
+        meld.runAceHigh = true
+        meld.cards.push(card)
+      } else {
+        if (meld.runAceHigh && card.rank === 1) r = 14
+        if (r < (meld.runMin ?? 999)) {
+          meld.runMin = r
+          meld.cards.unshift(card)
+        } else {
+          if (r > (meld.runMax ?? 0)) meld.runMax = r
+          meld.cards.push(card)
+        }
+      }
+    }
+  } else {
+    meld.cards.push(card)
+  }
+}
+
+/** Swap a natural card from hand with a table joker, maintaining jokerMappings (mirrors simJokerSwap). */
+function applyJokerSwap(g: BridgeGameState, playerIdx: number, swap: { card: Card; meld: Meld }): boolean {
+  const player = g.players[playerIdx]
+  const joker = findSwappableJoker(swap.card, swap.meld)
+  if (!joker) return false
+  const meld = g.tableMelds.find(m => m.id === swap.meld.id)
+  if (!meld) return false
+  const jIdx = meld.cards.findIndex(c => c.id === joker.id)
+  const cIdx = player.hand.findIndex(c => c.id === swap.card.id)
+  if (jIdx < 0 || cIdx < 0) return false
+  meld.cards[jIdx] = swap.card
+  meld.jokerMappings = meld.jokerMappings.filter(m => m.cardId !== joker.id)
+  player.hand.splice(cIdx, 1)
+  player.hand.push(joker)
+  return true
+}
+
+/** Go-down timing decision per personality (mirrors simulate.ts shouldGoDownNow). */
+function bridgeShouldGoDownNow(g: BridgeGameState, playerIdx: number, melds: Card[][]): boolean {
+  const personality = getPersonalityConfig(g.opponentAI ?? 'the-shark')
+  const player = g.players[playerIdx]
+  const turnsHeld = g.goDownTiming.turnsCouldGoDown[playerIdx]
+
+  switch (personality.goDownStyle) {
+    case 'immediate':
+      return true
+
+    case 'immediate-random-hold':
+      if (turnsHeld === 0) return Math.random() > 0.25
+      return true
+
+    case 'hold-for-out': {
+      const meldedIds = new Set(melds.flatMap(m => m.map(c => c.id)))
+      const remaining = player.hand.filter(c => !meldedIds.has(c.id))
+      if (remaining.length === 0) return true
+      if (remaining.length <= 4 && g.tableMelds.length > 0 &&
+          canGoOutViaChainLayOff(remaining, g.tableMelds)) return true
+      if (remaining.length <= 2 && g.tableMelds.length > 0 &&
+          remaining.some(c => g.tableMelds.some(m => canLayOff(c, m)))) return true
+      if (turnsHeld >= 3) {
+        const handPoints = remaining.reduce((sum, c) => sum + cardPoints(c.rank), 0)
+        if (handPoints > 60) return true
+      }
+      if (g.goDownTiming.turnsElapsed[playerIdx] >= personality.panicThreshold) return true
+      if (g.players.some((p, i) => i !== playerIdx && p.hasLaidDown && p.hand.length <= 3)) return true
+      return false
+    }
+
+    case 'strategic':
+      return aiShouldGoDownHard(
+        player.hand, melds, g.requirement, g.tableMelds,
+        playersForAI(g), playerIdx, turnsHeld,
+      )
+
+    default:
+      return true
   }
 }
 
@@ -213,19 +368,42 @@ function getValidActions(g: BridgeGameState): string[] {
         actions.push(`discard:${i}`)
       }
     }
+    // Joker swap (mechanical, auto-executed like meld/layoff): pre-laydown
+    // swaps enable completing the requirement; post-laydown swaps reclaim a
+    // table joker for lay-off. Without these the env player never joker-swaps
+    // while AI opponents do — a measured ~significant scoring handicap.
+    const swapAvailable = g.tableMelds.length > 0 && (
+      player.hasLaidDown
+        ? aiFindJokerSwap(player.hand, g.tableMelds) !== null
+        : aiFindPreLayDownJokerSwap(player.hand, g.tableMelds, g.requirement) !== null
+    )
+    if (swapAvailable) actions.push('jokerswap')
+
     // Can lay down if not already and has valid melds
     if (!player.hasLaidDown) {
-      const melds = aiFindBestMelds(player.hand, g.requirement)
+      const melds = aiFindBestMeldsForLayOff(player.hand, g.requirement, g.tableMelds)
       if (melds) actions.push('meld')
     }
     // Can lay off if has laid down.
     // Layoff indices still use the RAW hand order (not sorted) because
     // layoff is auto-executed by the env wrapper, not chosen by the model.
+    // The strategic aiFindLayOff choice is emitted FIRST so the env wrapper's
+    // "execute first mechanical action" behavior matches simulate.ts quality
+    // (jokers-first / race mode / stranding safety) instead of first-valid.
     if (player.hasLaidDown) {
+      const best = aiFindLayOff(player.hand, g.tableMelds, `p${g.currentPlayerIndex}`, playersForAI(g))
+      if (best) {
+        const bci = player.hand.findIndex(c => c.id === best.card.id)
+        const bmi = g.tableMelds.findIndex(m => m.id === best.meld.id)
+        if (bci >= 0 && bmi >= 0) {
+          actions.push(best.jokerPosition ? `layoff:${bci}:${bmi}:${best.jokerPosition}` : `layoff:${bci}:${bmi}`)
+        }
+      }
       for (let ci = 0; ci < player.hand.length; ci++) {
         for (let mi = 0; mi < g.tableMelds.length; mi++) {
           if (canLayOff(player.hand[ci], g.tableMelds[mi])) {
-            actions.push(`layoff:${ci}:${mi}`)
+            const a = `layoff:${ci}:${mi}`
+            if (!actions.some(x => x === a || x.startsWith(a + ':'))) actions.push(a)
           }
         }
       }
@@ -300,6 +478,8 @@ function takeAction(g: BridgeGameState, action: string): { reward: number; done:
     ensureDrawPile(g)
     const card = g.drawPile.shift()!
     player.hand.push(card)
+    // P0's turn counter (opponents increment in playAITurn)
+    if (g.currentPlayerIndex === 0) g.goDownTiming.turnsElapsed[0]++
     g.phase = 'action'
     return { reward: 0, done: false }
   }
@@ -308,6 +488,7 @@ function takeAction(g: BridgeGameState, action: string): { reward: number; done:
   if (action === 'take_discard') {
     const card = g.discardPile.pop()!
     player.hand.push(card)
+    if (g.currentPlayerIndex === 0) g.goDownTiming.turnsElapsed[0]++
     g.opponentHistory[g.currentPlayerIndex].pickups.push(card)
     if (g.opponentHistory[g.currentPlayerIndex].pickups.length > 5) {
       g.opponentHistory[g.currentPlayerIndex].pickups.shift()
@@ -316,8 +497,16 @@ function takeAction(g: BridgeGameState, action: string): { reward: number; done:
     return { reward: 0, done: false }
   }
 
+  if (action === 'jokerswap') {
+    const swap = player.hasLaidDown
+      ? aiFindJokerSwap(player.hand, g.tableMelds)
+      : aiFindPreLayDownJokerSwap(player.hand, g.tableMelds, g.requirement)
+    if (swap) applyJokerSwap(g, g.currentPlayerIndex, swap)
+    return { reward: 0, done: false }
+  }
+
   if (action === 'meld') {
-    const meldGroups = aiFindBestMelds(player.hand, g.requirement)
+    const meldGroups = aiFindBestMeldsForLayOff(player.hand, g.requirement, g.tableMelds)
     if (meldGroups) {
       const usedIds = new Set<string>()
       for (const group of meldGroups) {
@@ -329,6 +518,7 @@ function takeAction(g: BridgeGameState, action: string): { reward: number; done:
       player.hand = player.hand.filter(c => !usedIds.has(c.id))
       player.hasLaidDown = true
       player.melds = g.tableMelds.filter(m => m.ownerId === `p${g.currentPlayerIndex}`)
+      g.goDownTiming.turnsCouldGoDown[g.currentPlayerIndex] = 0
 
       // Check going out
       if (player.hand.length === 0) {
@@ -339,8 +529,9 @@ function takeAction(g: BridgeGameState, action: string): { reward: number; done:
   }
 
   if (action.startsWith('layoff:')) {
-    const [, ciStr, miStr] = action.split(':')
-    const ci = parseInt(ciStr), mi = parseInt(miStr)
+    const parts = action.split(':')
+    const ci = parseInt(parts[1]), mi = parseInt(parts[2])
+    const posArg = parts[3] === 'low' || parts[3] === 'high' ? parts[3] as 'low' | 'high' : undefined
     const card = player.hand[ci]
     const meld = g.tableMelds[mi]
     if (card && meld && canLayOff(card, meld)) {
@@ -357,6 +548,7 @@ function takeAction(g: BridgeGameState, action: string): { reward: number; done:
           if (g.opponentHistory[g.currentPlayerIndex].discards.length > 10) {
             g.opponentHistory[g.currentPlayerIndex].discards.shift()
           }
+          g.lastDiscarderIndex = g.currentPlayerIndex
           g.currentPlayerIndex = (g.currentPlayerIndex + 1) % g.players.length
           g.phase = 'draw'
           g.turnCount++
@@ -364,9 +556,12 @@ function takeAction(g: BridgeGameState, action: string): { reward: number; done:
           return { reward: 0, done: false }
         }
       }
-      // Normal lay-off
+      // Normal lay-off — maintain run bounds + joker mappings (mirrors simLayOff)
+      const jokerPosition = card.suit === 'joker' && meld.type === 'run'
+        ? (posArg ?? aiChooseJokerLayOffPosition(meld))
+        : posArg
       player.hand.splice(ci, 1)
-      meld.cards.push(card)
+      applyLayOffToMeld(meld, card, jokerPosition)
       g.opponentHistory[g.currentPlayerIndex].layoffCount++
       if (player.hand.length === 0) {
         return endRound(g)
@@ -376,8 +571,17 @@ function takeAction(g: BridgeGameState, action: string): { reward: number; done:
   }
 
   if (action.startsWith('discard:')) {
-    // Can't go out by discarding last card — must meld or lay off
-    if (player.hand.length <= 1) return { reward: 0, done: false }
+    // GDD 6.3: can't go out by discarding last card — must meld or lay off.
+    // A stuck player's turn still ENDS (mirrors simulate.ts 'stuck' handling);
+    // a silent no-op here deadlocks the game with the same player forever.
+    if (player.hand.length <= 1) {
+      g.currentPlayerIndex = (g.currentPlayerIndex + 1) % g.players.length
+      g.phase = 'draw'
+      g.lastDiscarderIndex = -1
+      g.turnCount++
+      if (g.turnCount >= 200) return endRound(g)
+      return { reward: 0, done: false }
+    }
     // The incoming index refers to the SORTED hand (what the model sees).
     // Translate it to the raw hand index by matching card id.
     const sortedIdx = parseInt(action.split(':')[1])
@@ -469,7 +673,8 @@ function openBuyWindow(g: BridgeGameState, offeredCard: Card): 'paused' | 'resol
       const config = getAIEvalConfig(g.opponentAI)
       const aiPlayer = g.players[pi]
       const shouldBuy = aiShouldBuy(
-        aiPlayer.hand, offeredCard, g.requirement, aiPlayer.buysRemaining, config
+        aiPlayer.hand, offeredCard, g.requirement, aiPlayer.buysRemaining, config,
+        opponentsLite(g, pi), g.tableMelds, aiPlayer.hasLaidDown
       )
       if (shouldBuy) {
         // AI buys: gets discard + penalty card
@@ -508,7 +713,8 @@ function processBuyQueueAI(g: BridgeGameState, bws: NonNullable<BridgeGameState[
     const aiPlayer = g.players[pi]
     if (aiPlayer.buysRemaining <= 0) continue
     const shouldBuy = aiShouldBuy(
-      aiPlayer.hand, bws.offeredCard, g.requirement, aiPlayer.buysRemaining, config
+      aiPlayer.hand, bws.offeredCard, g.requirement, aiPlayer.buysRemaining, config,
+      opponentsLite(g, pi), g.tableMelds, aiPlayer.hasLaidDown
     )
     if (shouldBuy) {
       ensureDrawPile(g)
@@ -590,6 +796,8 @@ function endRound(g: BridgeGameState): { reward: number; done: boolean } {
     g.players[i].buysRemaining = 5
     g.players[i].melds = []
     g.opponentHistory[i].layoffCount = 0
+    g.goDownTiming.turnsCouldGoDown[i] = 0
+    g.goDownTiming.turnsElapsed[i] = 0
   }
 
   // V3: reset opponent action tracking at round boundaries
@@ -606,81 +814,94 @@ function playAITurn(g: BridgeGameState): { reward: number; done: boolean } {
   const config = getAIEvalConfig(personality)
   const player = g.players[g.currentPlayerIndex]
   const oppIdx = g.currentPlayerIndex
+  g.goDownTiming.turnsElapsed[oppIdx]++
 
   // Phase: draw — decide whether to take discard or draw from pile
+  // (mirrors simulate.ts draw phase incl. post-down take fixes 1 & 2)
   if (g.phase === 'draw') {
     const topDiscard = g.discardPile[g.discardPile.length - 1]
     let shouldTake = false
     if (topDiscard) {
       shouldTake = aiShouldTakeDiscard(
         player.hand, topDiscard, g.requirement, player.hasLaidDown,
-        config, g.tableMelds
-      )
+        config, g.tableMelds, opponentsOf(g, oppIdx), syncTracker(g, oppIdx)
+      ) ||
+        (player.hasLaidDown && g.tableMelds.some(m => canLayOff(topDiscard, m))) ||
+        (player.hasLaidDown && g.tableMelds.some(m => findSwappableJoker(topDiscard, m) !== null))
     }
     const drawAction = shouldTake ? 'take_discard' : 'draw_pile'
     const drawResult = takeAction(g, drawAction)
     if (g.useRichStateV3) recordOpponentAction(g, drawAction, oppIdx)
     if (drawResult.done) return drawResult
     // If draw_pile opened a buy window for player 0, stop here
-    if (g.phase === 'buy-window') return { reward: 0, done: false }
+    // (cast: takeAction mutates g.phase in ways TS narrowing can't track)
+    if ((g.phase as string) === 'buy-window') return { reward: 0, done: false }
   }
 
-  // Phase: action — meld if possible, then lay off, then discard
+  // Phase: action — joker swap → meld (with go-down timing) → lay off → discard
+  // (mirrors simulate.ts simExecuteAIAction hard path)
   if (g.phase === 'action') {
-    // Try to meld
-    if (!player.hasLaidDown) {
-      const melds = aiFindBestMelds(player.hand, g.requirement)
-      if (melds) {
-        const meldResult = takeAction(g, 'meld')
-        if (g.useRichStateV3) recordOpponentAction(g, 'meld', oppIdx)
-        if (meldResult.done) return meldResult
-      }
+    // Pre-lay-down joker swap, then meld attempt on the improved hand
+    if (!player.hasLaidDown && g.tableMelds.length > 0) {
+      const swap = aiFindPreLayDownJokerSwap(player.hand, g.tableMelds, g.requirement)
+      if (swap) applyJokerSwap(g, oppIdx, swap)
     }
 
-    // Try joker swaps
-    if (player.hasLaidDown) {
-      const swap = aiFindJokerSwap(player.hand, g.tableMelds)
-      if (swap) {
-        // Find matching card and meld indices
-        const ci = player.hand.findIndex(c => c.id === swap.card.id)
-        const mi = g.tableMelds.findIndex(m => m.id === swap.meld.id)
-        if (ci >= 0 && mi >= 0) {
-          // Joker swap: replace joker in meld with natural card, take joker
-          const meld = g.tableMelds[mi]
-          const jokerIdx = meld.cards.findIndex(c => c.suit === 'joker')
-          if (jokerIdx >= 0) {
-            const joker = meld.cards[jokerIdx]
-            meld.cards[jokerIdx] = player.hand[ci]
-            player.hand.splice(ci, 1)
-            player.hand.push(joker)
-          }
+    // Try to meld — gated by personality go-down timing
+    if (!player.hasLaidDown) {
+      const melds = aiFindBestMeldsForLayOff(player.hand, g.requirement, g.tableMelds)
+      if (melds && melds.length > 0) {
+        if (bridgeShouldGoDownNow(g, oppIdx, melds)) {
+          const meldResult = takeAction(g, 'meld')
+          g.goDownTiming.turnsCouldGoDown[oppIdx] = 0
+          if (g.useRichStateV3) recordOpponentAction(g, 'meld', oppIdx)
+          if (meldResult.done) return meldResult
+        } else {
+          g.goDownTiming.turnsCouldGoDown[oppIdx]++
         }
       }
     }
 
-    // Try lay offs
+    // Post-lay-down joker swap to reclaim a table joker for lay-off
     if (player.hasLaidDown) {
-      let layoff = aiFindLayOff(player.hand, g.tableMelds)
-      let maxLayoffs = 10 // safety limit
+      const swap = aiFindJokerSwap(player.hand, g.tableMelds)
+      if (swap) applyJokerSwap(g, oppIdx, swap)
+    }
+
+    // Lay-off chain (hard AI: unlimited until none possible)
+    if (player.hasLaidDown) {
+      let layoff = aiFindLayOff(player.hand, g.tableMelds, `p${oppIdx}`, playersForAI(g))
+      let maxLayoffs = 30 // safety limit
       while (layoff && maxLayoffs-- > 0) {
         const ci = player.hand.findIndex(c => c.id === layoff!.card.id)
         const mi = g.tableMelds.findIndex(m => m.id === layoff!.meld.id)
         if (ci >= 0 && mi >= 0) {
-          const layoffAction = `layoff:${ci}:${mi}`
+          const layoffAction = layoff.jokerPosition
+            ? `layoff:${ci}:${mi}:${layoff.jokerPosition}`
+            : `layoff:${ci}:${mi}`
           const result = takeAction(g, layoffAction)
           if (g.useRichStateV3) recordOpponentAction(g, layoffAction, oppIdx)
           if (result.done) return result
+          // Scenario C reversal discards and advances the turn — stop if so
+          // (cast: takeAction mutates g.phase in ways TS narrowing can't track)
+          if (g.currentPlayerIndex !== oppIdx || (g.phase as string) !== 'action') {
+            return { reward: 0, done: false }
+          }
         } else {
           break
         }
-        layoff = aiFindLayOff(player.hand, g.tableMelds)
+        layoff = aiFindLayOff(player.hand, g.tableMelds, `p${oppIdx}`, playersForAI(g))
       }
     }
 
     // Discard — emit sorted index (takeAction expects sorted index since
     // the discard-indexing fix that aligned actions with the state encoder).
+    // takeAction handles the 1-card stuck case by ending the turn.
     if (g.phase === 'action' && player.hand.length > 0) {
-      const discardCard = aiChooseDiscard(player.hand, g.requirement, config, g.tableMelds)
+      const discardCard = aiChooseDiscard(
+        player.hand, g.requirement, config, g.tableMelds,
+        opponentsOf(g, oppIdx), undefined, player.hasLaidDown, syncTracker(g, oppIdx)
+      )
       const sortedHand = sortHandForEncoding(player.hand)
       const sortedIdx = sortedHand.findIndex(c => c.id === discardCard.id)
       if (sortedIdx >= 0) {
@@ -704,11 +925,14 @@ function getAIRecommendedAction(g: BridgeGameState): string {
   const config = getAIEvalConfig(personality as AIPersonality)
   const player = g.players[g.currentPlayerIndex]
 
+  const idx = g.currentPlayerIndex
+
   if (g.phase === 'buy-window') {
     const offered = g.buyWindowState?.offeredCard
     if (offered) {
       const shouldBuy = aiShouldBuy(
-        player.hand, offered, g.requirement, player.buysRemaining, config
+        player.hand, offered, g.requirement, player.buysRemaining, config,
+        opponentsLite(g, idx), g.tableMelds, player.hasLaidDown
       )
       return shouldBuy ? 'buy' : 'decline_buy'
     }
@@ -720,8 +944,10 @@ function getAIRecommendedAction(g: BridgeGameState): string {
     if (topDiscard) {
       const shouldTake = aiShouldTakeDiscard(
         player.hand, topDiscard, g.requirement, player.hasLaidDown,
-        config, g.tableMelds
-      )
+        config, g.tableMelds, opponentsOf(g, idx), syncTracker(g, idx)
+      ) ||
+        (player.hasLaidDown && g.tableMelds.some(m => canLayOff(topDiscard, m))) ||
+        (player.hasLaidDown && g.tableMelds.some(m => findSwappableJoker(topDiscard, m) !== null))
       if (shouldTake) return 'take_discard'
     }
     return 'draw_pile'
@@ -730,23 +956,28 @@ function getAIRecommendedAction(g: BridgeGameState): string {
   if (g.phase === 'action') {
     // Meld if possible
     if (!player.hasLaidDown) {
-      const melds = aiFindBestMelds(player.hand, g.requirement)
+      const melds = aiFindBestMeldsForLayOff(player.hand, g.requirement, g.tableMelds)
       if (melds) return 'meld'
     }
 
     // Layoff if possible
     if (player.hasLaidDown) {
-      const layoff = aiFindLayOff(player.hand, g.tableMelds)
+      const layoff = aiFindLayOff(player.hand, g.tableMelds, `p${idx}`, playersForAI(g))
       if (layoff) {
         const ci = player.hand.findIndex(c => c.id === layoff.card.id)
         const mi = g.tableMelds.findIndex(m => m.id === layoff.meld.id)
-        if (ci >= 0 && mi >= 0) return `layoff:${ci}:${mi}`
+        if (ci >= 0 && mi >= 0) {
+          return layoff.jokerPosition ? `layoff:${ci}:${mi}:${layoff.jokerPosition}` : `layoff:${ci}:${mi}`
+        }
       }
     }
 
     // Discard — emit sorted index (see takeAction for why).
     if (player.hand.length > 0) {
-      const discardCard = aiChooseDiscard(player.hand, g.requirement, config, g.tableMelds)
+      const discardCard = aiChooseDiscard(
+        player.hand, g.requirement, config, g.tableMelds,
+        opponentsOf(g, idx), undefined, player.hasLaidDown, syncTracker(g, idx)
+      )
       const sortedHand = sortHandForEncoding(player.hand)
       const sortedIdx = sortedHand.findIndex(c => c.id === discardCard.id)
       if (sortedIdx >= 0) return `discard:${sortedIdx}`
@@ -766,7 +997,8 @@ function autoPlayOpponents(g: BridgeGameState): { reward: number; done: boolean 
     result = playAITurn(g)
     if (result.done) return result
     // If a buy window opened for player 0 during AI play, stop
-    if (g.phase === 'buy-window') return result
+    // (cast: playAITurn mutates g.phase in ways TS narrowing can't track)
+    if ((g.phase as string) === 'buy-window') return result
   }
 
   return result
@@ -1339,6 +1571,49 @@ rl.on('line', (line) => {
         if (!game) { respond({ ok: false, error: 'No game' }); break }
         const action = getAIRecommendedAction(game)
         respond({ ok: true, action })
+        break
+      }
+
+      // Diagnostic: play player 0's entire turn with the SAME playAITurn code
+      // the opponents use, then auto-play opponents. Isolates whether the
+      // Python-harness P0 path (vs native turn logic) causes a score handicap.
+      case 'play_p0_turn': {
+        if (!game) { respond({ ok: false, error: 'No game' }); break }
+        if (game.currentPlayerIndex !== 0) { autoPlayOpponents(game) }
+        let result = { reward: 0, done: false }
+        if (!game.gameOver && game.currentPlayerIndex === 0 && (game.phase === 'draw' || game.phase === 'action')) {
+          result = playAITurn(game)
+        }
+        if (!result.done && (game.phase as string) !== 'buy-window') {
+          const oppResult = autoPlayOpponents(game)
+          if (oppResult.done) result = oppResult
+        }
+        respond({
+          ok: true,
+          done: result.done || game.gameOver,
+          phase: game.phase,
+          currentPlayer: game.currentPlayerIndex,
+          scores: game.scores.map(rs => rs.reduce((a, b) => a + b, 0)),
+        })
+        break
+      }
+
+      // Go-down timing decision for the current player, using the same
+      // personality logic the AI opponents use (bridgeShouldGoDownNow).
+      // Increments the hold counter when the answer is "wait", so panic
+      // thresholds fire exactly as they do for opponents.
+      case 'get_meld_decision': {
+        if (!game) { respond({ ok: false, error: 'No game' }); break }
+        const p = game.players[game.currentPlayerIndex]
+        let meldNow = false
+        if (!p.hasLaidDown) {
+          const melds = aiFindBestMeldsForLayOff(p.hand, game.requirement, game.tableMelds)
+          if (melds && melds.length > 0) {
+            meldNow = bridgeShouldGoDownNow(game, game.currentPlayerIndex, melds)
+            if (!meldNow) game.goDownTiming.turnsCouldGoDown[game.currentPlayerIndex]++
+          }
+        }
+        respond({ ok: true, meld: meldNow })
         break
       }
 

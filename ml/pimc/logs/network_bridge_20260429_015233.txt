@@ -1,0 +1,11 @@
+PIMCNet (discard+draw) vs the-mastermind — 2026-04-29 01:52:33
+Model: network_v7.pt  Games: 30  Players: 4  Time: 0.03h
+
+  PIMCNet (P0)          :  171.3  +/- 59.9
+  the-mastermind (P1+):  306.3  +/- 86.1
+  Score delta (net better): +135.0
+  Win rate              : 80.0%  (random=25%)
+
+  vs Human (227)        : +55.7
+  vs Mastermind (219)   : +47.7
+  vs PIMC-40R (220)     : +49.1
