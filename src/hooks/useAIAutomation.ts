@@ -14,6 +14,8 @@ import {
 } from '../game/ai'
 import { loadOpponentModel, buildNemesisOverrides } from '../game/opponent-model'
 import { CardTracker } from '../game/card-tracker'
+import { oracleShouldTakeDiscard, oracleChooseDiscard } from '../game/oracle-net'
+import { ensureOracleModel, getLoadedOracleModel } from '../game/oracle-loader'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -182,6 +184,15 @@ export function useAIAutomation({
   }
 
   const nemesisOverridesRef = useRef<ReturnType<typeof buildNemesisOverrides> | null>(null)
+
+  // Preload The Oracle's weights (~1MB, code-split) as soon as a game with it
+  // starts. Until loaded, its first decisions fall back to the heuristic.
+  useEffect(() => {
+    if (personalityConfig?.id === 'the-oracle') {
+      ensureOracleModel().catch(err => console.error('[Oracle] weight load failed:', err))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [personalityConfig?.id])
 
   function getEvalConfig(): AIEvalConfig {
     const cfg = getPersonalityConfig()
@@ -380,9 +391,16 @@ export function useAIAutomation({
     if (player.hand.length > 0) {
       aiLayOffCountRef.current = 0
 
-      // Panic mode: stuck too long without laying down
+      // The Oracle: neural net picks the discard (panic mode intentionally
+      // bypassed — the evaluated agent's discards are always the net's)
       let card: CardType
-      if (!player.hasLaidDown && turnsElapsed >= config.panicThreshold) {
+      const oracleModel = config.id === 'the-oracle' ? getLoadedOracleModel() : null
+      const oracleCard = oracleModel
+        ? oracleChooseDiscard(oracleModel, player.hand, state.currentRound - 1, player.hasLaidDown, state.players.length - 1)
+        : null
+      if (oracleCard) {
+        card = oracleCard
+      } else if (!player.hasLaidDown && turnsElapsed >= config.panicThreshold) {
         const nonJokers = player.hand.filter(c => c.suit !== 'joker')
         const pool = nonJokers.length > 0 ? nonJokers : player.hand
         card = pool.reduce((worst, c) => cardPoints(c.rank) > cardPoints(worst.rank) ? c : worst)
@@ -426,8 +444,15 @@ export function useAIAutomation({
 
         const cfg = getPersonalityConfig()
         const evalCfg = getEvalConfig()
+        const drawOracleModel = cfg.id === 'the-oracle' ? getLoadedOracleModel() : null
         let shouldTake = false
-        if (top !== null) {
+        if (top !== null && drawOracleModel) {
+          // The Oracle: pure net decision, no post-laydown overrides —
+          // matches the evaluated configuration exactly
+          shouldTake = oracleShouldTakeDiscard(
+            drawOracleModel, player.hand, top, state.currentRound - 1,
+            player.hasLaidDown, state.players.length - 1)
+        } else if (top !== null) {
           const drawTracker = cfg.opponentAwareness ? syncTracker(state, player.id) : undefined
           shouldTake = aiShouldTakeDiscard(player.hand, top, state.roundState.requirement, player.hasLaidDown, evalCfg,
               state.roundState.tablesMelds, state.players.filter(p => p.id !== player.id), drawTracker)
@@ -439,7 +464,7 @@ export function useAIAutomation({
         }
 
         // If AI has laid down and top discard can be laid off, take it
-        if (!shouldTake && top !== null && player.hasLaidDown) {
+        if (!shouldTake && !drawOracleModel && top !== null && player.hasLaidDown) {
           const melds = state.roundState.tablesMelds
           if (melds.some(m => canLayOff(top, m))) {
             shouldTake = true

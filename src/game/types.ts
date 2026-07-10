@@ -50,6 +50,7 @@ export type AIPersonality =
   | 'the-shark'
   | 'the-mastermind'
   | 'the-nemesis'
+  | 'the-oracle'
 
 export interface PersonalityConfig {
   id: AIPersonality
@@ -204,6 +205,28 @@ export const PERSONALITIES: PersonalityConfig[] = [
     buySelfLimit: 5,
     panicThreshold: 5,
     denialOpponentCardThreshold: 3,
+  },
+  {
+    // Neural network (network_v7): the net decides draws and discards; all
+    // other mechanics use the same heuristics as the-mastermind. Bridge eval:
+    // 149 avg / 41.6% win vs 3 Masterminds over 500 games.
+    id: 'the-oracle',
+    name: 'The Oracle',
+    emoji: '🔮',
+    description: 'A neural network trained on millions of simulated decisions',
+    difficulty: 5,
+    takeStyle: 'aggressive-denial',
+    buyStyle: 'heavy-denial',
+    discardStyle: 'opponent-aware',
+    goDownStyle: 'hold-for-out',
+    layOffStyle: 'unlimited',
+    jokerSwapStyle: 'optimal',
+    denialEnabled: true,
+    opponentAwareness: true,
+    randomFactor: 0,
+    buySelfLimit: 5,
+    panicThreshold: 2,
+    denialOpponentCardThreshold: 4,
   },
 ]
 

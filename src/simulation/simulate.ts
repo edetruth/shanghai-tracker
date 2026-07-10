@@ -18,6 +18,8 @@ import {
   aiShouldGoDownHard,
   getAIEvalConfig, type AIEvalConfig,
 } from '../game/ai'
+import { oracleShouldTakeDiscard, oracleChooseDiscard } from '../game/oracle-net'
+import { getLoadedOracleModel } from '../game/oracle-loader'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -641,7 +643,13 @@ function simExecuteAIAction(
   if (player.hand.length > 0) {
     const discardOpponents = state.players.filter((_, i) => i !== state.roundState.currentPlayerIndex)
     const simTracker = tracker ? syncSimTracker(tracker, state, player.id) : undefined
-    const card = aiChooseDiscard(player.hand, requirement, evalConfig, tablesMelds, discardOpponents, undefined, player.hasLaidDown, simTracker)
+    // The Oracle: neural net picks the discard; heuristic fallback if the net
+    // has no legal choice (all-joker hand)
+    const discardOracleModel = personality.id === 'the-oracle' ? getLoadedOracleModel() : null
+    const oracleCard = discardOracleModel
+      ? oracleChooseDiscard(discardOracleModel, player.hand, state.currentRound - 1, player.hasLaidDown, state.players.length - 1)
+      : null
+    const card = oracleCard ?? aiChooseDiscard(player.hand, requirement, evalConfig, tablesMelds, discardOpponents, undefined, player.hasLaidDown, simTracker)
     const result = simDiscard(state, card.id)
     if (!result) {
       // Stuck with 1 card that can't be discarded
@@ -721,12 +729,18 @@ export function simulateRound(gameState: GameState, config: SimConfig): { state:
     const { evalConfig: takeEvalCfg, personality: takePersonality } = getSimPlayerConfig(playerIdx, config)
     const opponentsForDraw = state.players.filter((_, i) => i !== playerIdx)
     const takeTracker = takePersonality.opponentAwareness ? syncSimTracker(roundTracker, state, pid) : undefined
-    const shouldTake = topDiscard !== null && (
-      aiShouldTakeDiscard(player.hand, topDiscard, state.roundState.requirement, player.hasLaidDown, takeEvalCfg, state.roundState.tablesMelds, opponentsForDraw, takeTracker) ||
-      // Fix 1: Post-down discard taking — if player has laid down and top discard can lay off onto any table meld, take it
-      (player.hasLaidDown && state.roundState.tablesMelds.some(m => canLayOff(topDiscard, m))) ||
-      // Fix 2: Post-down joker-swap take — take a card that replaces a joker in a table run, freeing the joker for lay-off
-      (player.hasLaidDown && state.roundState.tablesMelds.some(m => findSwappableJoker(topDiscard, m) !== null))
+    // The Oracle: pure net decision, no post-laydown overrides (matches the
+    // evaluated configuration — see oracle-net.ts header)
+    const takeOracleModel = takePersonality.id === 'the-oracle' ? getLoadedOracleModel() : null
+    const shouldTake = topDiscard !== null && (takeOracleModel
+      ? oracleShouldTakeDiscard(takeOracleModel, player.hand, topDiscard, state.currentRound - 1, player.hasLaidDown, state.players.length - 1)
+      : (
+        aiShouldTakeDiscard(player.hand, topDiscard, state.roundState.requirement, player.hasLaidDown, takeEvalCfg, state.roundState.tablesMelds, opponentsForDraw, takeTracker) ||
+        // Fix 1: Post-down discard taking — if player has laid down and top discard can lay off onto any table meld, take it
+        (player.hasLaidDown && state.roundState.tablesMelds.some(m => canLayOff(topDiscard, m))) ||
+        // Fix 2: Post-down joker-swap take — take a card that replaces a joker in a table run, freeing the joker for lay-off
+        (player.hasLaidDown && state.roundState.tablesMelds.some(m => findSwappableJoker(topDiscard, m) !== null))
+      )
     )
 
     if (shouldTake) {

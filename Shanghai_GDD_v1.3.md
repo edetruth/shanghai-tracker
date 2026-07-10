@@ -283,7 +283,7 @@ Points are penalty points. Lower is better. Only cards remaining in a player's h
 
 ### 11.1 AI Personalities
 
-Six named personalities are available, grouped into three difficulty tiers:
+Seven named personalities are available (plus the adaptive Nemesis, §25), grouped into three difficulty tiers:
 
 #### Easy Tier
 
@@ -332,6 +332,13 @@ Six named personalities are available, grouped into three difficulty tiers:
 - Race mode: sheds highest-point cards when any opponent has ≤3 cards and has laid down
 - Round-aware strategy: `getRoundStrategy` adjusts discard weights by round type (set-heavy vs run-heavy)
 
+**The Oracle** 🔮 (★★★★★) — "A neural network trained on millions of simulated decisions"
+- **Hybrid neural personality**: draw (take-vs-pile) and discard decisions come from a neural network (`src/game/oracle-net.ts`); buying, meld timing, lay-offs, and joker swaps use the same heuristics as The Mastermind.
+- **Network**: 3-layer LayerNorm MLP (~191K parameters, `network_v7`), trained by supervised distillation of Perfect-Information Monte Carlo search (`ml/pimc/`). Weights ship as a lazily-loaded ~1 MB asset (`src/game/oracle-weights.json`); inference is a sub-millisecond hand-rolled forward pass — no runtime dependencies.
+- **State encoding**: 170 features — hand composition per card type, top discard, round, laid-down flag, flat opponent hand-size estimates. Jokers are never discarded (masked).
+- **Fallback**: until weights load (or for an all-joker hand), decisions fall back to Mastermind heuristics.
+- **Benchmark** (500-game evaluations per opponent): avg score 149–158 with 39–42% win rate in 4-player games against Shark/Mastermind/Nemesis tables (random = 25%); ~70 points/game stronger than any heuristic personality and ~78 points better than the human benchmark average (227). The TypeScript port reproduces the Python reference bit-for-bit on golden fixtures and matches its evaluation results (149.2 vs 149.4 avg) in the simulation harness.
+
 ### 11.2 Evaluation Engine
 
 All AI decisions use `evaluateHand(hand, requirement)` which returns a score from 0 (nothing useful) to 200+ (can go down). The score factors in:
@@ -354,6 +361,9 @@ Every decision (take discard, buy, discard) compares hand evaluation score befor
 | Patient Pat | 4 | 0 | 3 | immediate | no | no | 0 |
 | The Shark | 3 | +2 | 0 | immediate | yes | yes | 0.5 |
 | The Mastermind | 2 | +5 | 0 | strategic | yes | yes | 0.6 |
+| The Oracle* | 2 | +5 | 0 | strategic | yes | yes | 0.6 |
+
+\* The Oracle's take and discard decisions come from its neural network (§11.1); this config drives only its remaining heuristic decisions (buying, go-down timing, lay-offs, joker swaps).
 
 - **Take Threshold**: Minimum evaluation improvement required to take a discard (higher = pickier).
 - **Buy Risk Tolerance**: Adjustment to buy threshold (positive = more willing to buy, negative = reluctant).
@@ -741,6 +751,7 @@ Telemetry is fire-and-forget — logging never blocks or breaks gameplay. Three 
 | 1.2 | March 2026 | **Major update to match codebase.** Removed bonus melds (§3.4 — code only supports required melds). Replaced 3-level AI difficulty with 6-personality evaluation-based system (§11). Removed joker-swap reversal rule (§8.2 — not enforced in code). Added online multiplayer (§13), score tracker (§14), analytics dashboard (§15), game presentation/cinematics (§12), undo discard (§5.3), buy-window highlights (§7.3), joker run bounds (§8.1), deployment details (§17). Updated buy limit options. Added edge cases for stalemate and AI lay-off cap. |
 | 1.3 | March 2026 | **Feature expansion.** Added sound system (§18), card physics/3D animations (§19), in-game emotes (§20), push notifications (§21), achievements/milestones (§22), spectator mode (§23), game replay system (§24), adaptive AI "The Nemesis" (§25), online tournaments (§26). AI strategic fixes: no buying after laying down, post-down discard prioritizes highest points, lay-off prefers own melds, joker take gated by hasLaidDown, round-relative joker buy threshold. AI intelligence upgrades for Shark/Mastermind/Nemesis: run window detection, hand reading (`inferOpponentNeeds`), predictive go-down (Mastermind), race mode, round-aware strategy (`getRoundStrategy`). Multiplayer overhaul: heartbeat, action ACKs, host disconnect detection, broadcast throttle, session recovery. |
 | 1.3.1 | April 2026 | **Nemesis AI enhancements** (§25). Added card counting (`CardTracker`), Monte Carlo opponent hand inference (`sampleOpponentHands`), and discard lookahead (`discardDangerWithLookahead`). Card scarcity bonuses for take/buy decisions. Performance: ~20–60ms/turn. Benchmark: 40% win rate in 4-way matchup, avg score 227.5 (human-level). |
+| 1.3.2 | July 2026 | **Neural AI "The Oracle"** (§11.1, §11.3). New top-tier personality: neural network (PIMC-distilled `network_v7`, ~191K params) decides draws and discards; Mastermind heuristics handle buying, meld timing, lay-offs, joker swaps. In-browser inference via hand-rolled forward pass (`oracle-net.ts`), lazily-loaded ~1 MB weights, golden-fixture tests against the Python reference. Benchmark: 149–158 avg / 39–42% win vs Shark/Mastermind/Nemesis (500 games each); sim cross-check reproduces bridge results (149.2 vs 149.4 avg). |
 
 ---
 

@@ -7,12 +7,13 @@
  * NOTE: This test always "passes" — it's a data-collection harness, not a correctness test.
  */
 
-import { describe, it } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { writeFileSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { runSimulation, type SimConfig } from './simulate'
 import type { AIPersonality } from '../game/types'
 import { analyze } from './analyze'
+import { ensureOracleModel } from '../game/oracle-loader'
 
 const RESULTS_DIR = join(process.cwd(), 'src', 'simulation', 'results')
 mkdirSync(RESULTS_DIR, { recursive: true })
@@ -144,6 +145,34 @@ describe('Shanghai AI Simulations', () => {
       logLevel: 'summary',
       personalities,
     }, 'nemesis-vs-best')
+  })
+
+  // Unlike the tests above, this one ASSERTS: the TS port of The Oracle must
+  // reproduce the Python bridge evaluation (149 avg / 41.6% win vs 3 Masterminds
+  // over 500 games). Bars are set loose enough for n=50 sampling noise; a
+  // failure means the port diverged from the evaluated agent.
+  it('Test 9: Oracle cross-check — oracle vs 3 masterminds, 50 games', { timeout: 600_000 }, async () => {
+    await ensureOracleModel()
+    const personalities: AIPersonality[] = ['the-oracle', 'the-mastermind', 'the-mastermind', 'the-mastermind']
+    const { results } = runAndAnalyze('Oracle vs Masterminds', {
+      numGames: 50,
+      numPlayers: 4,
+      difficulty: 'hard',
+      logLevel: 'summary',
+      personalities,
+    }, 'oracle-vs-masterminds')
+
+    const oracleName = results[0].players[0]
+    const wins = results.filter(g => g.winner === oracleName).length
+    const avg = results.reduce((s, g) => s + g.finalScores[0], 0) / results.length
+    const oppAvg = results.reduce((s, g) => s + (g.finalScores[1] + g.finalScores[2] + g.finalScores[3]) / 3, 0) / results.length
+    console.log(`\nOracle cross-check: avg=${avg.toFixed(1)} oppAvg=${oppAvg.toFixed(1)} wins=${wins}/${results.length} (${(wins / results.length * 100).toFixed(0)}%)`)
+
+    // Bridge reference: 149.4 avg / 41.6% win. n=50 bars: win ≥ 25%, avg ≤ 200,
+    // and clearly better than the table average.
+    expect(wins / results.length).toBeGreaterThanOrEqual(0.25)
+    expect(avg).toBeLessThanOrEqual(200)
+    expect(avg).toBeLessThan(oppAvg)
   })
 
 })
